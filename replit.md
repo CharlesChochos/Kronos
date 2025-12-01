@@ -121,3 +121,12 @@ Preferred communication style: Simple, everyday language.
 - Custom Vite plugin (`vite-plugin-meta-images`) updates OpenGraph meta tags with deployment URLs
 - Session storage is in-memory by default but includes `connect-pg-simple` for PostgreSQL session store option
 - The build process separates client (Vite) and server (esbuild) builds with selective dependency bundling for server cold-start optimization
+
+## Email Integration
+
+**Resend Email Service**
+- Uses Replit Connectors for secure API key management (no hardcoded secrets)
+- Meeting invites are sent automatically when scheduling meetings with external participants
+- Email service preserves organizer's local timezone for accurate meeting time display
+- Beautifully formatted HTML emails with OSReaper branding
+- Graceful error handling - meeting creation succeeds even if email fails
