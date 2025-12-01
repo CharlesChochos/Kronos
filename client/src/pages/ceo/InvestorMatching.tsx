@@ -1,137 +1,364 @@
+import { useState, useCallback, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { 
-  Search, 
-  Filter, 
-  UserPlus, 
   Check, 
   X, 
-  Briefcase, 
   Building2,
-  TrendingUp,
-  Target
+  Target,
+  Mail,
+  Phone,
+  Globe
 } from "lucide-react";
-import { DEALS } from "@/lib/mockData";
-import { useState } from "react";
+import { useCurrentUser, useDeals } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const INVESTORS = [
-  { id: 1, name: "Ironclad PE", type: "Private Equity", focus: "Industrials", checkSize: "$50M - $200M", matchScore: 95, tags: ["Buyout", "Growth"] },
-  { id: 2, name: "Horizon Legacy", type: "Family Office", focus: "Healthcare", checkSize: "$10M - $50M", matchScore: 88, tags: ["Long-term", "Minority"] },
-  { id: 3, name: "Quantum Strategic", type: "Strategic", focus: "Technology", checkSize: "$100M+", matchScore: 92, tags: ["M&A", "Synergy"] },
-  { id: 4, name: "Bedrock Industries", type: "Strategic", focus: "Industrials", checkSize: "$500M+", matchScore: 75, tags: ["Consolidation"] },
+  { id: 1, name: "Ironclad PE", type: "Private Equity", focus: "Industrials", checkSize: "$50M - $200M", matchScore: 95, tags: ["Buyout", "Growth"], email: "deals@ironcladpe.com", phone: "+1 212-555-0101", website: "ironcladpe.com" },
+  { id: 2, name: "Horizon Legacy", type: "Family Office", focus: "Healthcare", checkSize: "$10M - $50M", matchScore: 88, tags: ["Long-term", "Minority"], email: "investments@horizonlegacy.com", phone: "+1 415-555-0102", website: "horizonlegacy.com" },
+  { id: 3, name: "Quantum Strategic", type: "Strategic", focus: "Technology", checkSize: "$100M+", matchScore: 92, tags: ["M&A", "Synergy"], email: "bd@quantumstrategic.com", phone: "+1 650-555-0103", website: "quantumstrategic.com" },
+  { id: 4, name: "Bedrock Industries", type: "Strategic", focus: "Industrials", checkSize: "$500M+", matchScore: 75, tags: ["Consolidation"], email: "corp@bedrockindustries.com", phone: "+1 312-555-0104", website: "bedrockindustries.com" },
+  { id: 5, name: "Apex Ventures", type: "Venture Capital", focus: "Technology", checkSize: "$5M - $25M", matchScore: 82, tags: ["Early Stage", "Growth"], email: "pitch@apexvc.com", phone: "+1 628-555-0105", website: "apexventures.com" },
+  { id: 6, name: "Sterling Capital", type: "Private Equity", focus: "Consumer", checkSize: "$75M - $300M", matchScore: 79, tags: ["Buyout", "Carve-out"], email: "deals@sterlingcap.com", phone: "+1 617-555-0106", website: "sterlingcapital.com" },
 ];
 
 export default function InvestorMatching() {
-  const [selectedDeal, setSelectedDeal] = useState(DEALS[0].id);
+  const { data: currentUser } = useCurrentUser();
+  const { data: deals = [], isLoading } = useDeals();
+  
+  const [selectedDeal, setSelectedDeal] = useState<string>('');
+  const [matchedInvestors, setMatchedInvestors] = useState<typeof INVESTORS>([]);
+  const [rejectedInvestors, setRejectedInvestors] = useState<number[]>([]);
+  const [showContactModal, setShowContactModal] = useState<typeof INVESTORS[0] | null>(null);
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+  
+  // Set initial deal once data loads or when deals change
+  useEffect(() => {
+    if (deals.length > 0 && !selectedDeal) {
+      setSelectedDeal(deals[0].id);
+    } else if (deals.length === 0 && selectedDeal) {
+      setSelectedDeal('');
+    }
+  }, [deals]);
+
+  const availableInvestors = INVESTORS.filter(inv => 
+    !matchedInvestors.some(m => m.id === inv.id) && 
+    !rejectedInvestors.includes(inv.id)
+  );
+  const currentInvestor = availableInvestors[0];
+
+  const handleSwipe = useCallback((direction: 'left' | 'right') => {
+    if (!currentInvestor) return;
+    
+    setSwipeDirection(direction);
+    
+    setTimeout(() => {
+      if (direction === 'right') {
+        setMatchedInvestors(prev => [...prev, currentInvestor]);
+        toast.success(`Matched with ${currentInvestor.name}!`);
+      } else {
+        setRejectedInvestors(prev => [...prev, currentInvestor.id]);
+        toast.info(`Passed on ${currentInvestor.name}`);
+      }
+      setSwipeDirection(null);
+    }, 300);
+  }, [currentInvestor]);
+
+  const handleContact = (investor: typeof INVESTORS[0]) => {
+    setShowContactModal(investor);
+  };
+
+  const handleSendEmail = () => {
+    if (showContactModal) {
+      const dealName = deals.find(d => d.id === selectedDeal)?.name || 'Investment Opportunity';
+      window.open(`mailto:${showContactModal.email}?subject=Investment Opportunity - ${dealName}`);
+      toast.success("Opening email client...");
+      setShowContactModal(null);
+    }
+  };
+
+  const handleCallPhone = () => {
+    if (showContactModal) {
+      window.open(`tel:${showContactModal.phone}`);
+      toast.info("Initiating call...");
+    }
+  };
+
+  const handleVisitWebsite = () => {
+    if (showContactModal) {
+      window.open(`https://${showContactModal.website}`, '_blank');
+      toast.info("Opening website...");
+    }
+  };
+
+  const resetMatches = () => {
+    setMatchedInvestors([]);
+    setRejectedInvestors([]);
+    toast.info("Matches reset");
+  };
+
+  if (isLoading) {
+    return (
+      <Layout role="CEO" pageTitle="Investor Match Deck" userName={currentUser?.name || ""}>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-muted-foreground">Loading...</div>
+        </div>
+      </Layout>
+    );
+  }
   
   return (
-    <Layout role="CEO" pageTitle="Investor Match Deck" userName="Joshua Orlinsky">
+    <Layout role="CEO" pageTitle="Investor Match Deck" userName={currentUser?.name || ""}>
       <div className="space-y-6">
         {/* Deal Selector */}
-        <div className="w-full max-w-md">
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Select Deal to Match</label>
-            <select 
-                className="w-full bg-card border border-border rounded-md p-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-                value={selectedDeal}
-                onChange={(e) => setSelectedDeal(e.target.value)}
-            >
-                {DEALS.map(deal => (
-                    <option key={deal.id} value={deal.id}>{deal.name}</option>
-                ))}
-            </select>
+        <div className="flex items-center justify-between">
+          <div className="w-full max-w-md">
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Select Deal to Match</label>
+              <select 
+                  className="w-full bg-card border border-border rounded-md p-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+                  value={selectedDeal}
+                  onChange={(e) => setSelectedDeal(e.target.value)}
+                  data-testid="select-deal"
+              >
+                  {deals.length === 0 && (
+                    <option value="">No deals available</option>
+                  )}
+                  {deals.map(deal => (
+                      <option key={deal.id} value={deal.id}>{deal.name} - ${deal.value}M ({deal.sector})</option>
+                  ))}
+              </select>
+          </div>
+          <Button variant="outline" size="sm" onClick={resetMatches}>
+            Reset All
+          </Button>
         </div>
 
         {/* Tinder-style Match Interface */}
-        <div className="flex flex-col items-center justify-center py-10">
-            <div className="relative w-full max-w-lg aspect-[3/4] md:aspect-[4/3]">
-                {/* Background cards for stack effect */}
-                <div className="absolute top-4 left-4 right-4 bottom-[-16px] bg-card/30 rounded-2xl border border-border z-0 scale-95"></div>
-                <div className="absolute top-2 left-2 right-2 bottom-[-8px] bg-card/60 rounded-2xl border border-border z-10 scale-[0.98]"></div>
-                
-                {/* Main Card */}
-                <Card className="absolute inset-0 bg-card border-border shadow-2xl z-20 flex flex-col items-center justify-center text-center p-8 hover:shadow-primary/10 transition-all">
-                    <div className="w-24 h-24 rounded-full bg-secondary flex items-center justify-center mb-6 shadow-inner">
-                        <Building2 className="w-10 h-10 text-primary" />
-                    </div>
-                    
-                    <h2 className="text-3xl font-display font-bold mb-2">{INVESTORS[0].name}</h2>
-                    <Badge variant="secondary" className="mb-4">{INVESTORS[0].type}</Badge>
-                    
-                    <div className="grid grid-cols-2 gap-8 w-full max-w-xs mb-8">
-                        <div className="text-center">
-                            <div className="text-xs text-muted-foreground uppercase tracking-wider">Focus</div>
-                            <div className="font-medium text-lg">{INVESTORS[0].focus}</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-xs text-muted-foreground uppercase tracking-wider">Check Size</div>
-                            <div className="font-medium text-lg">{INVESTORS[0].checkSize}</div>
-                        </div>
-                    </div>
+        <div className="flex flex-col items-center justify-center py-6">
+            {currentInvestor ? (
+              <div className="relative w-full max-w-lg aspect-[3/4] md:aspect-[4/3]">
+                  {/* Background cards for stack effect */}
+                  {availableInvestors.length > 2 && (
+                    <div className="absolute top-4 left-4 right-4 bottom-[-16px] bg-card/30 rounded-2xl border border-border z-0 scale-95"></div>
+                  )}
+                  {availableInvestors.length > 1 && (
+                    <div className="absolute top-2 left-2 right-2 bottom-[-8px] bg-card/60 rounded-2xl border border-border z-10 scale-[0.98]"></div>
+                  )}
+                  
+                  {/* Main Card */}
+                  <Card className={cn(
+                    "absolute inset-0 bg-card border-border shadow-2xl z-20 flex flex-col items-center justify-center text-center p-8 hover:shadow-primary/10 transition-all",
+                    swipeDirection === 'left' && "animate-[swipeLeft_0.3s_ease-out_forwards]",
+                    swipeDirection === 'right' && "animate-[swipeRight_0.3s_ease-out_forwards]"
+                  )}>
+                      <div className="w-24 h-24 rounded-full bg-secondary flex items-center justify-center mb-6 shadow-inner">
+                          <Building2 className="w-10 h-10 text-primary" />
+                      </div>
+                      
+                      <h2 className="text-3xl font-display font-bold mb-2">{currentInvestor.name}</h2>
+                      <Badge variant="secondary" className="mb-4">{currentInvestor.type}</Badge>
+                      
+                      <div className="grid grid-cols-2 gap-8 w-full max-w-xs mb-8">
+                          <div className="text-center">
+                              <div className="text-xs text-muted-foreground uppercase tracking-wider">Focus</div>
+                              <div className="font-medium text-lg">{currentInvestor.focus}</div>
+                          </div>
+                          <div className="text-center">
+                              <div className="text-xs text-muted-foreground uppercase tracking-wider">Check Size</div>
+                              <div className="font-medium text-lg">{currentInvestor.checkSize}</div>
+                          </div>
+                      </div>
 
-                    <div className="flex gap-2 mb-8">
-                        {INVESTORS[0].tags.map(tag => (
-                            <Badge key={tag} variant="outline" className="bg-secondary/30">{tag}</Badge>
-                        ))}
-                    </div>
+                      <div className="flex gap-2 mb-8">
+                          {currentInvestor.tags.map(tag => (
+                              <Badge key={tag} variant="outline" className="bg-secondary/30">{tag}</Badge>
+                          ))}
+                      </div>
 
-                    <div className="w-full bg-secondary/30 rounded-full h-12 flex items-center px-4 mb-6 relative overflow-hidden">
-                         <div className="absolute left-0 top-0 h-full bg-green-500/10 w-[95%] border-r-2 border-green-500"></div>
-                         <div className="relative z-10 flex justify-between w-full items-center">
-                            <span className="text-xs font-bold text-green-500">95% MATCH SCORE</span>
-                            <Target className="w-4 h-4 text-green-500" />
-                         </div>
-                    </div>
+                      <div className="w-full bg-secondary/30 rounded-full h-12 flex items-center px-4 mb-6 relative overflow-hidden">
+                           <div 
+                             className={cn(
+                               "absolute left-0 top-0 h-full border-r-2",
+                               currentInvestor.matchScore >= 90 ? "bg-green-500/10 border-green-500" :
+                               currentInvestor.matchScore >= 80 ? "bg-yellow-500/10 border-yellow-500" :
+                               "bg-orange-500/10 border-orange-500"
+                             )} 
+                             style={{ width: `${currentInvestor.matchScore}%` }}
+                           ></div>
+                           <div className="relative z-10 flex justify-between w-full items-center">
+                              <span className={cn(
+                                "text-xs font-bold",
+                                currentInvestor.matchScore >= 90 ? "text-green-500" :
+                                currentInvestor.matchScore >= 80 ? "text-yellow-500" :
+                                "text-orange-500"
+                              )}>
+                                {currentInvestor.matchScore}% MATCH SCORE
+                              </span>
+                              <Target className={cn(
+                                "w-4 h-4",
+                                currentInvestor.matchScore >= 90 ? "text-green-500" :
+                                currentInvestor.matchScore >= 80 ? "text-yellow-500" :
+                                "text-orange-500"
+                              )} />
+                           </div>
+                      </div>
 
-                    <div className="flex items-center gap-8 w-full max-w-xs mt-auto">
-                        <Button size="lg" variant="outline" className="flex-1 rounded-full h-14 border-2 border-red-500/20 text-red-500 hover:bg-red-500/10 hover:border-red-500">
-                            <X className="w-6 h-6" />
-                        </Button>
-                        <Button size="lg" className="flex-1 rounded-full h-14 bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20">
-                            <Check className="w-6 h-6" />
-                        </Button>
-                    </div>
-                    
-                    <div className="flex justify-between w-full max-w-xs mt-4 text-[10px] text-muted-foreground uppercase tracking-widest">
-                        <span>Swipe Left: No</span>
-                        <span>Swipe Right: Yes</span>
-                    </div>
-                </Card>
-            </div>
+                      <div className="flex items-center gap-8 w-full max-w-xs mt-auto">
+                          <Button 
+                            size="lg" 
+                            variant="outline" 
+                            className="flex-1 rounded-full h-14 border-2 border-red-500/20 text-red-500 hover:bg-red-500/10 hover:border-red-500"
+                            onClick={() => handleSwipe('left')}
+                            data-testid="button-reject"
+                          >
+                              <X className="w-6 h-6" />
+                          </Button>
+                          <Button 
+                            size="lg" 
+                            className="flex-1 rounded-full h-14 bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20"
+                            onClick={() => handleSwipe('right')}
+                            data-testid="button-approve"
+                          >
+                              <Check className="w-6 h-6" />
+                          </Button>
+                      </div>
+                      
+                      <div className="flex justify-between w-full max-w-xs mt-4 text-[10px] text-muted-foreground uppercase tracking-widest">
+                          <span>Pass</span>
+                          <span>Match</span>
+                      </div>
+                  </Card>
+              </div>
+            ) : (
+              <Card className="w-full max-w-lg p-12 text-center">
+                <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
+                  <Check className="w-8 h-8 text-green-500" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">All Caught Up!</h3>
+                <p className="text-muted-foreground mb-4">You've reviewed all available investors for this deal.</p>
+                <Button onClick={resetMatches}>Review Again</Button>
+              </Card>
+            )}
         </div>
         
         {/* Matched List */}
         <Card className="bg-card border-border mt-8">
-            <CardHeader>
-                <CardTitle className="text-lg">Matched Investors for {DEALS.find(d => d.id === selectedDeal)?.name}</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg">Matched Investors ({matchedInvestors.length})</CardTitle>
+                {matchedInvestors.length > 0 && (
+                  <Badge variant="secondary">{matchedInvestors.length} matches</Badge>
+                )}
             </CardHeader>
             <CardContent>
-                <div className="space-y-2">
-                    {INVESTORS.slice(1).map(inv => (
-                        <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-secondary/10">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center font-bold text-primary">
-                                    {inv.name[0]}
-                                </div>
-                                <div>
-                                    <div className="font-medium">{inv.name}</div>
-                                    <div className="text-xs text-muted-foreground">{inv.type} • {inv.focus}</div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <Badge className="bg-green-500/10 text-green-500 border-green-500/20">{inv.matchScore}% Match</Badge>
-                                <Button size="sm" variant="outline">Contact</Button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                {matchedInvestors.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No matches yet. Swipe right on investors you want to connect with.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                      {matchedInvestors.map(inv => (
+                          <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-secondary/10 hover:bg-secondary/20 transition-colors">
+                              <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center font-bold text-primary">
+                                      {inv.name[0]}
+                                  </div>
+                                  <div>
+                                      <div className="font-medium">{inv.name}</div>
+                                      <div className="text-xs text-muted-foreground">{inv.type} • {inv.focus}</div>
+                                  </div>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                  <Badge className="bg-green-500/10 text-green-500 border-green-500/20">{inv.matchScore}% Match</Badge>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => handleContact(inv)}
+                                    data-testid={`button-contact-${inv.id}`}
+                                  >
+                                    Contact
+                                  </Button>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+                )}
             </CardContent>
         </Card>
       </div>
+
+      {/* Contact Modal */}
+      <Dialog open={!!showContactModal} onOpenChange={() => setShowContactModal(null)}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Contact {showContactModal?.name}</DialogTitle>
+          </DialogHeader>
+          {showContactModal && (
+            <div className="space-y-4 py-4">
+              <button 
+                type="button"
+                className="w-full flex items-center gap-3 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors text-left"
+                onClick={handleSendEmail}
+                data-testid="button-contact-email"
+              >
+                <Mail className="w-5 h-5 text-primary flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-muted-foreground">Email</div>
+                  <div className="font-medium truncate">{showContactModal.email}</div>
+                </div>
+              </button>
+              <button 
+                type="button"
+                className="w-full flex items-center gap-3 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors text-left"
+                onClick={handleCallPhone}
+                data-testid="button-contact-phone"
+              >
+                <Phone className="w-5 h-5 text-primary flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-muted-foreground">Phone</div>
+                  <div className="font-medium">{showContactModal.phone}</div>
+                </div>
+              </button>
+              <button 
+                type="button"
+                className="w-full flex items-center gap-3 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors text-left"
+                onClick={handleVisitWebsite}
+                data-testid="button-contact-website"
+              >
+                <Globe className="w-5 h-5 text-primary flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-muted-foreground">Website</div>
+                  <div className="font-medium">{showContactModal.website}</div>
+                </div>
+              </button>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowContactModal(null)}>Close</Button>
+            <Button onClick={handleSendEmail}>
+              <Mail className="w-4 h-4 mr-2" /> Send Email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <style>{`
+        @keyframes swipeLeft {
+          to {
+            transform: translateX(-150%) rotate(-30deg);
+            opacity: 0;
+          }
+        }
+        @keyframes swipeRight {
+          to {
+            transform: translateX(150%) rotate(30deg);
+            opacity: 0;
+          }
+        }
+      `}</style>
     </Layout>
   );
 }
