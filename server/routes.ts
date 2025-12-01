@@ -7,6 +7,7 @@ import session from "express-session";
 import bcrypt from "bcryptjs";
 import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
+import { sendMeetingInvite } from "./email";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -388,10 +389,13 @@ export async function registerRoutes(
       
       // Create notifications for participants
       const currentUser = req.user as any;
+      const participantEmails: string[] = [];
+      
       if (result.data.participants && Array.isArray(result.data.participants)) {
         // Get all users to match emails to user IDs
         const allUsers = await storage.getAllUsers();
         for (const participantEmail of result.data.participants as string[]) {
+          participantEmails.push(participantEmail);
           const participant = allUsers.find(u => u.email === participantEmail);
           if (participant && participant.id !== currentUser.id) {
             await storage.createNotification({
@@ -402,6 +406,35 @@ export async function registerRoutes(
               link: `/ceo/dashboard`,
             });
           }
+        }
+      }
+      
+      // Send email invites via Resend
+      if (participantEmails.length > 0) {
+        try {
+          const scheduledDate = new Date(result.data.scheduledFor);
+          const dateStr = scheduledDate.toISOString().split('T')[0];
+          const timeStr = scheduledDate.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true 
+          });
+          
+          const emailResult = await sendMeetingInvite({
+            title: result.data.title,
+            description: result.data.description || undefined,
+            date: dateStr,
+            time: timeStr,
+            location: result.data.location || undefined,
+            attendeeEmails: participantEmails,
+            organizerName: currentUser.name,
+          });
+          
+          if (!emailResult.success) {
+            console.warn('Meeting created but email failed:', emailResult.error);
+          }
+        } catch (emailError) {
+          console.warn('Meeting created but email service error:', emailError);
         }
       }
       
