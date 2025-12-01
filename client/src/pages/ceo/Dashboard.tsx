@@ -312,6 +312,9 @@ export default function Dashboard() {
       const scheduledDateTime = new Date(`${newMeeting.scheduledFor}T${newMeeting.scheduledTime}`);
       const participantEmails = newMeeting.participants.split(',').map(e => e.trim()).filter(e => e);
       
+      // Get organizer's timezone for email display
+      const organizerTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
       await createMeeting.mutateAsync({
         title: newMeeting.title,
         description: newMeeting.description || null,
@@ -322,7 +325,11 @@ export default function Dashboard() {
         participants: participantEmails,
         dealId: newMeeting.dealId || null,
         status: 'scheduled',
-      });
+        // Include original local time info for email formatting
+        localDate: newMeeting.scheduledFor,
+        localTime: newMeeting.scheduledTime,
+        organizerTimezone,
+      } as any);
       
       toast.success("Meeting scheduled! Notifications sent to participants.");
       setShowScheduleMeetingModal(false);

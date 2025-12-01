@@ -381,7 +381,10 @@ export async function registerRoutes(
   // Create meeting (CEO only)
   app.post("/api/meetings", requireCEO, async (req, res) => {
     try {
-      const result = insertMeetingSchema.safeParse(req.body);
+      // Extract email formatting fields before validation (they're not in schema)
+      const { localDate, localTime, organizerTimezone, ...meetingData } = req.body;
+      
+      const result = insertMeetingSchema.safeParse(meetingData);
       if (!result.success) {
         return res.status(400).json({ error: fromError(result.error).toString() });
       }
@@ -412,22 +415,16 @@ export async function registerRoutes(
       // Send email invites via Resend
       if (participantEmails.length > 0) {
         try {
-          const scheduledDate = new Date(result.data.scheduledFor);
-          const dateStr = scheduledDate.toISOString().split('T')[0];
-          const timeStr = scheduledDate.toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: true 
-          });
-          
           const emailResult = await sendMeetingInvite({
             title: result.data.title,
             description: result.data.description || undefined,
-            date: dateStr,
-            time: timeStr,
+            scheduledFor: new Date(result.data.scheduledFor),
             location: result.data.location || undefined,
             attendeeEmails: participantEmails,
             organizerName: currentUser.name,
+            localDate,
+            localTime,
+            organizerTimezone,
           });
           
           if (!emailResult.success) {

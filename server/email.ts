@@ -44,16 +44,58 @@ async function getUncachableResendClient() {
 export interface MeetingInviteData {
   title: string;
   description?: string;
-  date: string;
-  time: string;
+  scheduledFor: Date;
   location?: string;
   attendeeEmails: string[];
   organizerName: string;
+  localDate?: string;
+  localTime?: string;
+  organizerTimezone?: string;
 }
 
 export async function sendMeetingInvite(data: MeetingInviteData): Promise<{ success: boolean; error?: string }> {
   try {
     const { client, fromEmail } = await getUncachableResendClient();
+    
+    let formattedDate: string;
+    let formattedTime: string;
+    
+    // Use the original local date/time strings if provided (preserves organizer's intent)
+    if (data.localDate && data.localTime) {
+      // Parse the date string (YYYY-MM-DD format)
+      const [year, month, day] = data.localDate.split('-').map(Number);
+      const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+      const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      
+      // Create a date object to get the day of week
+      const dateObj = new Date(year, month - 1, day);
+      formattedDate = `${weekdays[dateObj.getDay()]}, ${months[month - 1]} ${day}, ${year}`;
+      
+      // Parse and format time (HH:MM format)
+      const [hours, mins] = data.localTime.split(':').map(Number);
+      const hour12 = hours % 12 || 12;
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      formattedTime = `${hour12}:${mins.toString().padStart(2, '0')} ${ampm}`;
+      
+      // Add timezone if available
+      if (data.organizerTimezone) {
+        formattedTime += ` (${data.organizerTimezone})`;
+      }
+    } else {
+      // Fallback: format from UTC timestamp
+      const meetingDate = new Date(data.scheduledFor);
+      const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+      const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      formattedDate = `${weekdays[meetingDate.getUTCDay()]}, ${months[meetingDate.getUTCMonth()]} ${meetingDate.getUTCDate()}, ${meetingDate.getUTCFullYear()}`;
+      
+      const hours = meetingDate.getUTCHours();
+      const minutes = meetingDate.getUTCMinutes();
+      const hour12 = hours % 12 || 12;
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      formattedTime = `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm} UTC`;
+    }
     
     const emailHtml = `
       <!DOCTYPE html>
@@ -89,11 +131,11 @@ export async function sendMeetingInvite(data: MeetingInviteData): Promise<{ succ
                 
                 <div class="detail-row">
                   <span class="detail-label">Date:</span>
-                  <span class="detail-value">${new Date(data.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                  <span class="detail-value">${formattedDate}</span>
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">Time:</span>
-                  <span class="detail-value">${data.time}</span>
+                  <span class="detail-value">${formattedTime}</span>
                 </div>
                 ${data.location ? `
                 <div class="detail-row">
@@ -121,8 +163,8 @@ You've been invited to a meeting by ${data.organizerName}.
 
 Title: ${data.title}
 ${data.description ? `Description: ${data.description}` : ''}
-Date: ${new Date(data.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-Time: ${data.time}
+Date: ${formattedDate}
+Time: ${formattedTime}
 ${data.location ? `Location: ${data.location}` : ''}
 
 Please add this to your calendar and be prepared to join at the scheduled time.
