@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { CodeXml } from "lucide-react";
 import logo from "@assets/generated_images/abstract_minimalist_layer_icon_for_fintech_logo.png";
 
 const loginSchema = z.object({
@@ -81,6 +83,14 @@ export default function AuthPage() {
     }, 1500);
   }
 
+  function onReplitAuth() {
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+      setLocation("/employee/tasks");
+    }, 1000);
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
       {/* Abstract Background */}
@@ -109,171 +119,211 @@ export default function AuthPage() {
             </TabsList>
             
             <TabsContent value="login">
-              <Form {...loginForm}>
-                <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
-                  <FormField
-                    control={loginForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email Address</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="name@equiturn.com" 
-                            {...field} 
-                            className="bg-secondary/50 border-border focus:ring-primary/50" 
-                            data-testid="input-email"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={loginForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex items-center justify-between">
-                            <FormLabel>Password</FormLabel>
-                            <Button variant="link" className="p-0 h-auto text-xs text-primary hover:underline" type="button">
-                              Forgot password?
-                            </Button>
-                        </div>
-                        <FormControl>
-                          <Input 
-                            type="password" 
-                            placeholder="••••••••" 
-                            {...field} 
-                            className="bg-secondary/50 border-border focus:ring-primary/50"
-                            data-testid="input-password"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={loginForm.control}
-                    name="rememberMe"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md p-4 border border-border/50 bg-secondary/20">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>
-                            Stay connected
-                          </FormLabel>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold h-11 shadow-lg shadow-primary/20 mt-2" 
-                    disabled={isLoading}
-                    data-testid="button-login"
-                  >
-                    {isLoading ? "Authenticating..." : "Sign In"}
-                  </Button>
-                </form>
-              </Form>
+              <div className="space-y-4">
+                <Button 
+                  variant="outline" 
+                  className="w-full bg-secondary/50 border-border hover:bg-secondary h-11 gap-2"
+                  onClick={onReplitAuth}
+                  disabled={isLoading}
+                  type="button"
+                >
+                  <CodeXml className="w-4 h-4" />
+                  Continue with Replit
+                </Button>
+
+                <div className="relative flex items-center py-2">
+                  <Separator className="w-full bg-border/50" />
+                  <span className="absolute left-1/2 -translate-x-1/2 bg-card px-2 text-xs text-muted-foreground uppercase">
+                    Or continue with
+                  </span>
+                </div>
+
+                <Form {...loginForm}>
+                  <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
+                    <FormField
+                      control={loginForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email Address</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="name@equiturn.com" 
+                              {...field} 
+                              className="bg-secondary/50 border-border focus:ring-primary/50" 
+                              data-testid="input-email"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={loginForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center justify-between">
+                              <FormLabel>Password</FormLabel>
+                              <Button variant="link" className="p-0 h-auto text-xs text-primary hover:underline" type="button">
+                                Forgot password?
+                              </Button>
+                          </div>
+                          <FormControl>
+                            <Input 
+                              type="password" 
+                              placeholder="••••••••" 
+                              {...field} 
+                              className="bg-secondary/50 border-border focus:ring-primary/50"
+                              data-testid="input-password"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={loginForm.control}
+                      name="rememberMe"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md p-4 border border-border/50 bg-secondary/20">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              Stay connected
+                            </FormLabel>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <Button 
+                      type="submit" 
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold h-11 shadow-lg shadow-primary/20 mt-2" 
+                      disabled={isLoading}
+                      data-testid="button-login"
+                    >
+                      {isLoading ? "Authenticating..." : "Sign In"}
+                    </Button>
+                  </form>
+                </Form>
+              </div>
             </TabsContent>
 
             <TabsContent value="signup">
-              <Form {...signupForm}>
-                <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-4">
-                  <FormField
-                    control={signupForm.control}
-                    name="fullName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="John Doe" 
-                            {...field} 
-                            className="bg-secondary/50 border-border focus:ring-primary/50" 
-                            data-testid="input-fullname"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={signupForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email Address</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="name@equiturn.com" 
-                            {...field} 
-                            className="bg-secondary/50 border-border focus:ring-primary/50" 
-                            data-testid="input-email-signup"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={signupForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="password" 
-                            placeholder="••••••••" 
-                            {...field} 
-                            className="bg-secondary/50 border-border focus:ring-primary/50"
-                            data-testid="input-password-signup"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={signupForm.control}
-                    name="confirmPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Confirm Password</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="password" 
-                            placeholder="••••••••" 
-                            {...field} 
-                            className="bg-secondary/50 border-border focus:ring-primary/50"
-                            data-testid="input-confirm-password"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold h-11 shadow-lg shadow-primary/20 mt-2" 
-                    disabled={isLoading}
-                    data-testid="button-signup"
-                  >
-                    {isLoading ? "Creating Account..." : "Create Account"}
-                  </Button>
-                </form>
-              </Form>
+              <div className="space-y-4">
+                <Button 
+                  variant="outline" 
+                  className="w-full bg-secondary/50 border-border hover:bg-secondary h-11 gap-2"
+                  onClick={onReplitAuth}
+                  disabled={isLoading}
+                  type="button"
+                >
+                  <CodeXml className="w-4 h-4" />
+                  Sign up with Replit
+                </Button>
+
+                <div className="relative flex items-center py-2">
+                  <Separator className="w-full bg-border/50" />
+                  <span className="absolute left-1/2 -translate-x-1/2 bg-card px-2 text-xs text-muted-foreground uppercase">
+                    Or sign up with
+                  </span>
+                </div>
+
+                <Form {...signupForm}>
+                  <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-4">
+                    <FormField
+                      control={signupForm.control}
+                      name="fullName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Full Name</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="John Doe" 
+                              {...field} 
+                              className="bg-secondary/50 border-border focus:ring-primary/50" 
+                              data-testid="input-fullname"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={signupForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email Address</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="name@equiturn.com" 
+                              {...field} 
+                              className="bg-secondary/50 border-border focus:ring-primary/50" 
+                              data-testid="input-email-signup"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={signupForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="password" 
+                              placeholder="••••••••" 
+                              {...field} 
+                              className="bg-secondary/50 border-border focus:ring-primary/50"
+                              data-testid="input-password-signup"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={signupForm.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Confirm Password</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="password" 
+                              placeholder="••••••••" 
+                              {...field} 
+                              className="bg-secondary/50 border-border focus:ring-primary/50"
+                              data-testid="input-confirm-password"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <Button 
+                      type="submit" 
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold h-11 shadow-lg shadow-primary/20 mt-2" 
+                      disabled={isLoading}
+                      data-testid="button-signup"
+                    >
+                      {isLoading ? "Creating Account..." : "Create Account"}
+                    </Button>
+                  </form>
+                </Form>
+              </div>
             </TabsContent>
           </Tabs>
         </CardContent>
