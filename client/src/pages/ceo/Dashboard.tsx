@@ -17,7 +17,8 @@ import {
   Settings,
   CheckSquare
 } from "lucide-react";
-import { MARKET_DATA, USERS, DEALS, TASKS } from "@/lib/mockData";
+import { MARKET_DATA } from "@/lib/mockData";
+import { useCurrentUser, useUsers, useDeals, useTasks } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
@@ -31,8 +32,27 @@ const data = [
 ];
 
 export default function Dashboard() {
+  const { data: currentUser } = useCurrentUser();
+  const { data: users = [], isLoading: usersLoading } = useUsers();
+  const { data: deals = [], isLoading: dealsLoading } = useDeals();
+  const { data: tasks = [], isLoading: tasksLoading } = useTasks();
+
+  const activeDeals = deals.filter(d => d.status === 'Active');
+  const totalValue = deals.reduce((sum, deal) => sum + deal.value, 0);
+  const topUsers = [...users].sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 5);
+
+  if (usersLoading || dealsLoading || tasksLoading) {
+    return (
+      <Layout role="CEO" pageTitle="Dashboard" userName={currentUser?.name || ""}>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-muted-foreground">Loading dashboard...</div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
-    <Layout role="CEO" pageTitle="Dashboard" userName="Joshua Orlinsky">
+    <Layout role="CEO" pageTitle="Dashboard" userName={currentUser?.name || ""}>
       <div className="grid grid-cols-12 gap-6">
         
         {/* Left Column: Quick Actions & Filters - Integrated into sidebar visually in mockup but separate here for simplicity or as a widget */}
@@ -63,11 +83,11 @@ export default function Dashboard() {
               <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-display font-bold text-foreground">6</div>
+              <div className="text-3xl font-display font-bold text-foreground">{activeDeals.length}</div>
               <p className="text-xs text-muted-foreground mt-1">Total Active Deals</p>
               
               <div className="mt-6 space-y-4">
-                {DEALS.slice(0, 3).map((deal) => (
+                {activeDeals.slice(0, 3).map((deal) => (
                   <div key={deal.id} className="flex items-center justify-between group cursor-pointer">
                     <div className="flex items-center gap-3">
                       <div className={cn(
@@ -91,11 +111,11 @@ export default function Dashboard() {
               
               <div className="mt-6 pt-4 border-t border-border grid grid-cols-2 gap-4">
                 <div>
-                  <div className="text-lg font-bold text-green-400">$3,425M</div>
+                  <div className="text-lg font-bold text-green-400">${totalValue.toLocaleString()}M</div>
                   <div className="text-[10px] text-muted-foreground uppercase">Total Value</div>
                 </div>
                 <div>
-                    <div className="text-lg font-bold text-primary">83%</div>
+                    <div className="text-lg font-bold text-primary">{deals.length > 0 ? Math.round((activeDeals.length / deals.length) * 100) : 0}%</div>
                     <div className="text-[10px] text-muted-foreground uppercase">Active Rate</div>
                 </div>
               </div>
@@ -173,7 +193,7 @@ export default function Dashboard() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0 flex-1 overflow-y-auto">
-                    {USERS.map((user, index) => (
+                    {users.map((user, index) => (
                         <div key={user.id} className="p-4 border-b border-border/50 hover:bg-secondary/30 transition-colors group">
                             <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-3">
@@ -181,7 +201,7 @@ export default function Dashboard() {
                                         "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white",
                                         index === 0 ? "bg-primary" : "bg-secondary border border-border"
                                     )}>
-                                        {user.name.split(' ').map(n => n[0]).join('')}
+                                        {user.name.split(' ').map((n: string) => n[0]).join('')}
                                     </div>
                                     <div>
                                         <h4 className="text-sm font-medium text-foreground">{user.name}</h4>
@@ -189,19 +209,19 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 <div className="text-xs font-medium text-muted-foreground">
-                                    {index === 0 ? "45 tasks" : `${Math.floor(Math.random() * 20)} tasks`}
+                                    {tasks.filter(t => t.assignedTo === user.id).length} tasks
                                 </div>
                             </div>
                             
                             <div className="pl-11">
                                 <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
-                                    <span className="flex items-center gap-1 text-green-400"><CheckSquare className="w-3 h-3" /> {user.completedTasks} completed</span>
-                                    <span className="flex items-center gap-1"><Activity className="w-3 h-3" /> {user.activeDeals} active deals</span>
-                                    <span className="flex items-center gap-1 ml-auto font-mono text-primary">Score: {user.score}</span>
+                                    <span className="flex items-center gap-1 text-green-400"><CheckSquare className="w-3 h-3" /> {user.completedTasks || 0} completed</span>
+                                    <span className="flex items-center gap-1"><Activity className="w-3 h-3" /> {user.activeDeals || 0} active deals</span>
+                                    <span className="flex items-center gap-1 ml-auto font-mono text-primary">Score: {user.score || 0}</span>
                                 </div>
                                 {/* Progress Bar Visual */}
                                 <div className="mt-2 h-1 w-full bg-secondary rounded-full overflow-hidden">
-                                    <div className="h-full bg-primary/60 rounded-full" style={{ width: `${(user.score / 10) * 100}%` }}></div>
+                                    <div className="h-full bg-primary/60 rounded-full" style={{ width: `${((user.score || 0) / 100) * 100}%` }}></div>
                                 </div>
                             </div>
                         </div>
@@ -219,11 +239,11 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="space-y-1">
-                        {USERS.sort((a, b) => b.score - a.score).map((user, index) => (
+                        {topUsers.map((user, index) => (
                             <div key={user.id} className="p-4 border-l-2 border-transparent hover:border-primary hover:bg-secondary/30 transition-all cursor-pointer">
                                 <div className="flex items-center justify-between mb-1">
                                     <span className="text-xs font-bold text-muted-foreground">#{index + 1}</span>
-                                    <span className={cn("text-sm font-bold font-mono", index === 0 ? "text-accent" : "text-primary")}>{user.score}</span>
+                                    <span className={cn("text-sm font-bold font-mono", index === 0 ? "text-accent" : "text-primary")}>{user.score || 0}</span>
                                 </div>
                                 <div className="font-medium text-sm">{user.name}</div>
                                 <div className="text-xs text-muted-foreground mb-2">{user.role}</div>
@@ -231,15 +251,15 @@ export default function Dashboard() {
                                 <div className="grid grid-cols-3 gap-2 text-center">
                                     <div className="bg-secondary/50 rounded py-1">
                                         <div className="text-[10px] text-muted-foreground">Completed</div>
-                                        <div className="text-xs font-bold">{user.completedTasks}</div>
+                                        <div className="text-xs font-bold">{user.completedTasks || 0}</div>
                                     </div>
                                     <div className="bg-secondary/50 rounded py-1">
                                         <div className="text-[10px] text-muted-foreground">Active</div>
-                                        <div className="text-xs font-bold">{user.activeDeals}</div>
+                                        <div className="text-xs font-bold">{user.activeDeals || 0}</div>
                                     </div>
                                     <div className="bg-secondary/50 rounded py-1">
                                         <div className="text-[10px] text-muted-foreground">Deals</div>
-                                        <div className="text-xs font-bold">{user.activeDeals}</div>
+                                        <div className="text-xs font-bold">{user.activeDeals || 0}</div>
                                     </div>
                                 </div>
                             </div>

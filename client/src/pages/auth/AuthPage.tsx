@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLogin, useSignup } from "@/lib/api";
+import { toast } from "sonner";
 import logo from "@assets/generated_images/abstract_minimalist_layer_icon_for_fintech_logo.png";
 
 const loginSchema = z.object({
@@ -25,10 +27,11 @@ const loginSchema = z.object({
 });
 
 const signupSchema = z.object({
-  fullName: z.string().min(2, { message: "Name is required" }),
+  name: z.string().min(2, { message: "Name is required" }),
   email: z.string().email({ message: "Invalid email address" }),
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
   confirmPassword: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  role: z.string().default("Associate"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
@@ -36,8 +39,9 @@ const signupSchema = z.object({
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
-  const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
+  const loginMutation = useLogin();
+  const signupMutation = useSignup();
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -51,34 +55,46 @@ export default function AuthPage() {
   const signupForm = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
-      fullName: "",
+      name: "",
       email: "",
       password: "",
       confirmPassword: "",
+      role: "Associate",
     },
   });
 
-  function onLoginSubmit(values: z.infer<typeof loginSchema>) {
-    setIsLoading(true);
-    // Mock login logic
-    setTimeout(() => {
-      setIsLoading(false);
+  async function onLoginSubmit(values: z.infer<typeof loginSchema>) {
+    try {
+      const user = await loginMutation.mutateAsync({
+        email: values.email,
+        password: values.password,
+      });
+      
+      toast.success("Welcome back!");
+      
+      // Route based on email pattern
       if (values.email.includes("admin") || values.email.includes("josh")) {
         setLocation("/ceo/dashboard");
       } else {
         setLocation("/employee/tasks");
       }
-    }, 1500);
+    } catch (error: any) {
+      toast.error(error.message || "Login failed");
+    }
   }
 
-  function onSignupSubmit(values: z.infer<typeof signupSchema>) {
-    setIsLoading(true);
-    // Mock signup logic
-    setTimeout(() => {
-      setIsLoading(false);
-      // Default to employee view for new signups unless specified otherwise
+  async function onSignupSubmit(values: z.infer<typeof signupSchema>) {
+    try {
+      const { confirmPassword, ...signupData } = values;
+      const user = await signupMutation.mutateAsync(signupData);
+      
+      toast.success("Account created successfully!");
+      
+      // Default to employee view for new signups
       setLocation("/employee/tasks");
-    }, 1500);
+    } catch (error: any) {
+      toast.error(error.message || "Signup failed");
+    }
   }
 
   return (
@@ -177,10 +193,10 @@ export default function AuthPage() {
                   <Button 
                     type="submit" 
                     className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold h-11 shadow-lg shadow-primary/20 mt-2" 
-                    disabled={isLoading}
+                    disabled={loginMutation.isPending}
                     data-testid="button-login"
                   >
-                    {isLoading ? "Authenticating..." : "Sign In"}
+                    {loginMutation.isPending ? "Authenticating..." : "Sign In"}
                   </Button>
                 </form>
               </Form>
@@ -191,7 +207,7 @@ export default function AuthPage() {
                 <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-4">
                   <FormField
                     control={signupForm.control}
-                    name="fullName"
+                    name="name"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Full Name</FormLabel>
@@ -267,10 +283,10 @@ export default function AuthPage() {
                   <Button 
                     type="submit" 
                     className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold h-11 shadow-lg shadow-primary/20 mt-2" 
-                    disabled={isLoading}
+                    disabled={signupMutation.isPending}
                     data-testid="button-signup"
                   >
-                    {isLoading ? "Creating Account..." : "Create Account"}
+                    {signupMutation.isPending ? "Creating Account..." : "Create Account"}
                   </Button>
                 </form>
               </Form>
