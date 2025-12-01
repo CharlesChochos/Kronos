@@ -20,13 +20,17 @@ function Router() {
       {/* CEO Routes */}
       <Route path="/ceo/dashboard" component={Dashboard} />
       <Route path="/ceo/deals" component={DealManagement} />
-      <Route path="/ceo/documents" component={() => <DocumentGenerator role="CEO" />} />
+      <Route path="/ceo/documents">
+        <DocumentGenerator role="CEO" />
+      </Route>
       <Route path="/ceo/investors" component={InvestorMatching} />
       <Route path="/ceo/team" component={TeamAssignment} />
       
       {/* Employee Routes */}
       <Route path="/employee/tasks" component={MyTasks} />
-      <Route path="/employee/documents" component={() => <DocumentGenerator role="Employee" />} />
+      <Route path="/employee/documents">
+        <DocumentGenerator role="Employee" />
+      </Route>
       <Route path="/employee/deals" component={DealManagement} /> {/* Reusing deal view for now */}
 
       <Route component={NotFound} />

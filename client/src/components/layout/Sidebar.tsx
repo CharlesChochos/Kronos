@@ -45,8 +45,8 @@ export function Sidebar({ role }: SidebarProps) {
             <img src={logo} alt="Logo" className="w-full h-full object-cover" />
         </div>
         <div>
-          <h1 className="font-display font-bold text-lg leading-none tracking-tight">Equiturn</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">OSReaper v2.4</p>
+          <h1 className="font-display font-bold text-lg leading-none tracking-tight">OSReaper</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">v2.4</p>
         </div>
       </div>
 
