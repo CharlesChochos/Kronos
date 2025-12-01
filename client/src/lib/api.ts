@@ -282,6 +282,8 @@ export function useCreateMeeting() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
+      // Also invalidate notifications since meeting creation creates notifications
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
