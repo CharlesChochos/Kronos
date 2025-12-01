@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { User, Deal, Task, InsertUser } from "@shared/schema";
+import type { User, Deal, Task, InsertUser, Meeting, Notification } from "@shared/schema";
 
 // Auth API
 export function useLogin() {
@@ -252,6 +252,133 @@ export function useDeleteTask() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+}
+
+// Meeting API
+export function useMeetings() {
+  return useQuery({
+    queryKey: ["meetings"],
+    queryFn: async () => {
+      const res = await fetch("/api/meetings");
+      if (!res.ok) throw new Error("Failed to fetch meetings");
+      return res.json() as Promise<Meeting[]>;
+    },
+  });
+}
+
+export function useCreateMeeting() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (meeting: Omit<Meeting, "id" | "createdAt">) => {
+      const res = await fetch("/api/meetings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(meeting),
+      });
+      if (!res.ok) throw new Error("Failed to create meeting");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meetings"] });
+    },
+  });
+}
+
+export function useUpdateMeeting() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Meeting> & { id: string }) => {
+      const res = await fetch(`/api/meetings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error("Failed to update meeting");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meetings"] });
+    },
+  });
+}
+
+export function useDeleteMeeting() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/meetings/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete meeting");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meetings"] });
+    },
+  });
+}
+
+// Notification API
+export function useNotifications() {
+  return useQuery({
+    queryKey: ["notifications"],
+    queryFn: async () => {
+      const res = await fetch("/api/notifications");
+      if (!res.ok) throw new Error("Failed to fetch notifications");
+      return res.json() as Promise<Notification[]>;
+    },
+  });
+}
+
+export function useMarkNotificationRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/notifications/${id}/read`, {
+        method: "PATCH",
+      });
+      if (!res.ok) throw new Error("Failed to mark notification as read");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
+export function useDeleteNotification() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/notifications/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete notification");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
+// User Preferences API
+export function useUpdateUserPreferences() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, preferences }: { userId: string; preferences: any }) => {
+      const res = await fetch(`/api/users/${userId}/preferences`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(preferences),
+      });
+      if (!res.ok) throw new Error("Failed to update preferences");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["auth"] });
     },
   });
 }

@@ -5,7 +5,7 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
 import bcrypt from "bcryptjs";
-import { insertUserSchema, insertDealSchema, insertTaskSchema } from "@shared/schema";
+import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 
 export async function registerRoutes(
@@ -351,6 +351,136 @@ export async function registerRoutes(
       res.json({ message: "Task deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // ===== MEETING ROUTES =====
+  
+  app.get("/api/meetings", requireAuth, async (req, res) => {
+    try {
+      const meetings = await storage.getAllMeetings();
+      res.json(meetings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch meetings" });
+    }
+  });
+
+  app.get("/api/meetings/:id", requireAuth, async (req, res) => {
+    try {
+      const meeting = await storage.getMeeting(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ error: "Meeting not found" });
+      }
+      res.json(meeting);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch meeting" });
+    }
+  });
+
+  // Create meeting (CEO only)
+  app.post("/api/meetings", requireCEO, async (req, res) => {
+    try {
+      const result = insertMeetingSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const meeting = await storage.createMeeting(result.data);
+      
+      // Create notifications for participants
+      const currentUser = req.user as any;
+      if (result.data.participants && Array.isArray(result.data.participants)) {
+        // Get all users to match emails to user IDs
+        const allUsers = await storage.getAllUsers();
+        for (const participantEmail of result.data.participants as string[]) {
+          const participant = allUsers.find(u => u.email === participantEmail);
+          if (participant && participant.id !== currentUser.id) {
+            await storage.createNotification({
+              userId: participant.id,
+              title: "New Meeting Scheduled",
+              message: `You have been invited to "${result.data.title}" by ${currentUser.name}`,
+              type: "info",
+              link: `/ceo/dashboard`,
+            });
+          }
+        }
+      }
+      
+      res.json(meeting);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create meeting" });
+    }
+  });
+
+  // Update meeting (CEO only)
+  app.patch("/api/meetings/:id", requireCEO, async (req, res) => {
+    try {
+      const result = insertMeetingSchema.partial().safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const meeting = await storage.updateMeeting(req.params.id, result.data);
+      if (!meeting) {
+        return res.status(404).json({ error: "Meeting not found" });
+      }
+      res.json(meeting);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update meeting" });
+    }
+  });
+
+  // Delete meeting (CEO only)
+  app.delete("/api/meetings/:id", requireCEO, async (req, res) => {
+    try {
+      await storage.deleteMeeting(req.params.id);
+      res.json({ message: "Meeting deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete meeting" });
+    }
+  });
+
+  // ===== NOTIFICATION ROUTES =====
+  
+  app.get("/api/notifications", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const notifications = await storage.getNotificationsByUser(currentUser.id);
+      res.json(notifications);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", requireAuth, async (req, res) => {
+    try {
+      await storage.markNotificationRead(req.params.id);
+      res.json({ message: "Notification marked as read" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to mark notification as read" });
+    }
+  });
+
+  app.delete("/api/notifications/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteNotification(req.params.id);
+      res.json({ message: "Notification deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete notification" });
+    }
+  });
+
+  // ===== USER PREFERENCES ROUTE =====
+  
+  app.patch("/api/users/:id/preferences", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      // Users can only update their own preferences
+      if (currentUser.id !== req.params.id && currentUser.role !== 'CEO') {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      await storage.updateUserPreferences(req.params.id, req.body);
+      res.json({ message: "Preferences updated successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update preferences" });
     }
   });
 

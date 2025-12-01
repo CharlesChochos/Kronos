@@ -1,8 +1,8 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@shared/schema";
-import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask } from "@shared/schema";
+import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -32,6 +32,24 @@ export interface IStorage {
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, updates: Partial<InsertTask>): Promise<Task | undefined>;
   deleteTask(id: string): Promise<void>;
+  
+  // Meeting operations
+  getMeeting(id: string): Promise<Meeting | undefined>;
+  getAllMeetings(): Promise<Meeting[]>;
+  getMeetingsByOrganizer(organizerId: string): Promise<Meeting[]>;
+  createMeeting(meeting: InsertMeeting): Promise<Meeting>;
+  updateMeeting(id: string, updates: Partial<InsertMeeting>): Promise<Meeting | undefined>;
+  deleteMeeting(id: string): Promise<void>;
+  
+  // Notification operations
+  getNotification(id: string): Promise<Notification | undefined>;
+  getNotificationsByUser(userId: string): Promise<Notification[]>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationRead(id: string): Promise<void>;
+  deleteNotification(id: string): Promise<void>;
+  
+  // User preferences
+  updateUserPreferences(id: string, preferences: any): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -134,6 +152,75 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTask(id: string): Promise<void> {
     await db.delete(schema.tasks).where(eq(schema.tasks.id, id));
+  }
+  
+  // Meeting operations
+  async getMeeting(id: string): Promise<Meeting | undefined> {
+    const [meeting] = await db.select().from(schema.meetings).where(eq(schema.meetings.id, id));
+    return meeting;
+  }
+
+  async getAllMeetings(): Promise<Meeting[]> {
+    return await db.select().from(schema.meetings).orderBy(desc(schema.meetings.scheduledFor));
+  }
+
+  async getMeetingsByOrganizer(organizerId: string): Promise<Meeting[]> {
+    return await db.select().from(schema.meetings).where(eq(schema.meetings.organizerId, organizerId));
+  }
+
+  async createMeeting(insertMeeting: InsertMeeting): Promise<Meeting> {
+    const [meeting] = await db.insert(schema.meetings)
+      .values(insertMeeting)
+      .returning();
+    return meeting;
+  }
+
+  async updateMeeting(id: string, updates: Partial<InsertMeeting>): Promise<Meeting | undefined> {
+    const [meeting] = await db.update(schema.meetings)
+      .set(updates)
+      .where(eq(schema.meetings.id, id))
+      .returning();
+    return meeting;
+  }
+
+  async deleteMeeting(id: string): Promise<void> {
+    await db.delete(schema.meetings).where(eq(schema.meetings.id, id));
+  }
+
+  // Notification operations
+  async getNotification(id: string): Promise<Notification | undefined> {
+    const [notification] = await db.select().from(schema.notifications).where(eq(schema.notifications.id, id));
+    return notification;
+  }
+
+  async getNotificationsByUser(userId: string): Promise<Notification[]> {
+    return await db.select().from(schema.notifications)
+      .where(eq(schema.notifications.userId, userId))
+      .orderBy(desc(schema.notifications.createdAt));
+  }
+
+  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
+    const [notification] = await db.insert(schema.notifications)
+      .values(insertNotification)
+      .returning();
+    return notification;
+  }
+
+  async markNotificationRead(id: string): Promise<void> {
+    await db.update(schema.notifications)
+      .set({ read: true })
+      .where(eq(schema.notifications.id, id));
+  }
+
+  async deleteNotification(id: string): Promise<void> {
+    await db.delete(schema.notifications).where(eq(schema.notifications.id, id));
+  }
+
+  // User preferences
+  async updateUserPreferences(id: string, preferences: any): Promise<void> {
+    await db.update(schema.users)
+      .set({ preferences })
+      .where(eq(schema.users.id, id));
   }
 }
 
