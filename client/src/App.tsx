@@ -4,13 +4,31 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
+import AuthPage from "@/pages/auth/AuthPage";
+import Dashboard from "@/pages/ceo/Dashboard";
+import DealManagement from "@/pages/ceo/DealManagement";
+import DocumentGenerator from "@/pages/shared/DocumentGenerator";
+import InvestorMatching from "@/pages/ceo/InvestorMatching";
+import TeamAssignment from "@/pages/ceo/TeamAssignment";
+import MyTasks from "@/pages/employee/MyTasks";
 
 function Router() {
   return (
     <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
+      <Route path="/" component={AuthPage} />
+      
+      {/* CEO Routes */}
+      <Route path="/ceo/dashboard" component={Dashboard} />
+      <Route path="/ceo/deals" component={DealManagement} />
+      <Route path="/ceo/documents" component={() => <DocumentGenerator role="CEO" />} />
+      <Route path="/ceo/investors" component={InvestorMatching} />
+      <Route path="/ceo/team" component={TeamAssignment} />
+      
+      {/* Employee Routes */}
+      <Route path="/employee/tasks" component={MyTasks} />
+      <Route path="/employee/documents" component={() => <DocumentGenerator role="Employee" />} />
+      <Route path="/employee/deals" component={DealManagement} /> {/* Reusing deal view for now */}
+
       <Route component={NotFound} />
     </Switch>
   );

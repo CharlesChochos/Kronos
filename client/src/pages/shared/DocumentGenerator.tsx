@@ -1,0 +1,246 @@
+import { Layout } from "@/components/layout/Layout";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { 
+  FileText, 
+  Search, 
+  Clock, 
+  Eye, 
+  CheckCircle, 
+  Archive, 
+  Download, 
+  Share2,
+  Bot,
+  Sparkles,
+  ChevronRight
+} from "lucide-react";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+
+const TEMPLATES = [
+  { id: 1, name: "Term Sheet", description: "Standard term sheet template", lastUsed: "2025-12-01", complexity: "Medium" },
+  { id: 2, name: "Letter of Intent", description: "LOI template for initial offers", lastUsed: "2025-12-01", complexity: "Medium" },
+  { id: 3, name: "Due Diligence Request", description: "Information request list", lastUsed: "2025-11-28", complexity: "Medium" },
+  { id: 4, name: "Purchase Agreement", description: "Legal document for acquisition", lastUsed: "2025-11-25", complexity: "High" },
+  { id: 5, name: "NDA", description: "Non-disclosure agreement", lastUsed: "2025-12-02", complexity: "Low" },
+  { id: 6, name: "Board Resolution", description: "Corporate governance template", lastUsed: "2025-11-20", complexity: "Medium" },
+];
+
+type DocumentGeneratorProps = {
+  role?: 'CEO' | 'Employee';
+};
+
+export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorProps) {
+  const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerate = () => {
+    if (!selectedTemplate) return;
+    setIsGenerating(true);
+    setTimeout(() => {
+      setIsGenerating(false);
+    }, 2000);
+  };
+
+  return (
+    <Layout role={role} pageTitle="Document Generator" userName={role === 'CEO' ? "Joshua Orlinsky" : "Emily Johnson"}>
+      <div className="grid grid-cols-12 gap-6 h-[calc(100vh-8rem)]">
+        
+        {/* Left Sidebar: Templates */}
+        <div className="col-span-12 md:col-span-3 flex flex-col gap-6">
+          <Card className="bg-card border-border flex-1 flex flex-col">
+             <CardHeader className="pb-4">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Templates</CardTitle>
+                <div className="relative mt-2">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                    <Input placeholder="Search templates..." className="pl-8 h-8 text-xs bg-secondary/50 border-transparent focus:border-primary" />
+                </div>
+             </CardHeader>
+             <ScrollArea className="flex-1">
+                <div className="px-4 pb-4 space-y-2">
+                    {TEMPLATES.map((template) => (
+                        <div 
+                            key={template.id}
+                            onClick={() => setSelectedTemplate(template.id)}
+                            className={cn(
+                                "p-3 rounded-lg border cursor-pointer transition-all duration-200 group",
+                                selectedTemplate === template.id 
+                                    ? "bg-primary/10 border-primary shadow-sm" 
+                                    : "bg-transparent border-transparent hover:bg-secondary/50 hover:border-border"
+                            )}
+                        >
+                            <div className="flex justify-between items-start mb-1">
+                                <h4 className={cn("font-medium text-sm", selectedTemplate === template.id ? "text-primary" : "text-foreground")}>
+                                    {template.name}
+                                </h4>
+                                <Badge variant="outline" className={cn(
+                                    "text-[9px] px-1 h-4",
+                                    template.complexity === 'High' ? "border-red-500/50 text-red-400" :
+                                    template.complexity === 'Medium' ? "border-yellow-500/50 text-yellow-400" :
+                                    "border-green-500/50 text-green-400"
+                                )}>
+                                    {template.complexity}
+                                </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{template.description}</p>
+                            <div className="flex items-center text-[10px] text-muted-foreground/60">
+                                <Clock className="w-3 h-3 mr-1" /> Last used: {template.lastUsed}
+                                <ChevronRight className={cn("w-3 h-3 ml-auto opacity-0 transition-opacity", selectedTemplate === template.id && "opacity-100 text-primary")} />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+             </ScrollArea>
+          </Card>
+
+          <Card className="bg-card border-border h-1/3">
+             <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Recent Documents</CardTitle>
+             </CardHeader>
+             <CardContent className="space-y-2">
+                <div className="flex items-center gap-2 text-sm p-2 hover:bg-secondary/50 rounded cursor-pointer">
+                    <FileText className="w-4 h-4 text-muted-foreground" />
+                    <span className="truncate">Term Sheet - Project Titan</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm p-2 hover:bg-secondary/50 rounded cursor-pointer">
+                    <FileText className="w-4 h-4 text-muted-foreground" />
+                    <span className="truncate">NDA - StartupXYZ</span>
+                </div>
+             </CardContent>
+          </Card>
+        </div>
+
+        {/* Center: Preview / Generator Area */}
+        <div className="col-span-12 md:col-span-6">
+            <Card className="h-full bg-card border-border flex flex-col relative overflow-hidden">
+                {selectedTemplate ? (
+                    <>
+                        <div className="absolute top-0 left-0 w-full h-1 bg-primary/20">
+                            {isGenerating && <div className="h-full bg-primary animate-[loading_1s_ease-in-out_infinite]"></div>}
+                        </div>
+                        <CardHeader className="border-b border-border/50 pb-4">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <CardTitle className="text-xl">{TEMPLATES.find(t => t.id === selectedTemplate)?.name}</CardTitle>
+                                    <CardDescription>AI-assisted generation ready</CardDescription>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button variant="outline" size="sm" className="gap-2">
+                                        <Eye className="w-4 h-4" /> Preview
+                                    </Button>
+                                    <Button size="sm" className="gap-2" onClick={handleGenerate} disabled={isGenerating}>
+                                        {isGenerating ? (
+                                            <>Generating...</>
+                                        ) : (
+                                            <><Sparkles className="w-4 h-4" /> Generate with AI</>
+                                        )}
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="flex-1 bg-secondary/20 p-8 overflow-y-auto">
+                             {/* Mock Document View */}
+                             <div className="bg-white text-black p-10 shadow-lg min-h-[800px] w-full max-w-2xl mx-auto rounded-sm">
+                                <div className="mb-8">
+                                    <h1 className="text-2xl font-bold text-center mb-2">{TEMPLATES.find(t => t.id === selectedTemplate)?.name.toUpperCase()}</h1>
+                                    <p className="text-center text-gray-500 text-sm">Generated via Equiturn OS</p>
+                                </div>
+                                
+                                <div className="space-y-4 text-sm leading-relaxed font-serif text-gray-800">
+                                    <p><strong>DATE:</strong> December 01, 2025</p>
+                                    <p><strong>TO:</strong> [Client Name]</p>
+                                    <p><strong>FROM:</strong> Equiturn Holdings</p>
+                                    
+                                    <div className="h-4"></div>
+                                    
+                                    <p className="text-gray-400 italic">[AI Generation Area: Select parameters on the right to populate this document content...]</p>
+                                    
+                                    {isGenerating && (
+                                        <div className="space-y-2 mt-4 animate-pulse">
+                                            <div className="h-2 bg-gray-200 rounded w-full"></div>
+                                            <div className="h-2 bg-gray-200 rounded w-5/6"></div>
+                                            <div className="h-2 bg-gray-200 rounded w-4/6"></div>
+                                            <div className="h-2 bg-gray-200 rounded w-full"></div>
+                                        </div>
+                                    )}
+                                </div>
+                             </div>
+                        </CardContent>
+                    </>
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+                        <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
+                            <FileText className="w-8 h-8 opacity-50" />
+                        </div>
+                        <h3 className="text-lg font-medium">Select a Template</h3>
+                        <p className="text-sm max-w-xs text-center mt-2">Choose a document template from the left panel to begin the generation process.</p>
+                    </div>
+                )}
+            </Card>
+        </div>
+
+        {/* Right Sidebar: Controls */}
+        <div className="col-span-12 md:col-span-3 space-y-6">
+            <Card className="bg-card border-border h-full">
+                <CardHeader>
+                    <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Document Controls</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                        <label className="text-xs font-medium flex items-center gap-2"><Bot className="w-3 h-3 text-primary" /> Client Data Source</label>
+                        <Input placeholder="Select client..." className="h-8 text-sm bg-secondary/50" />
+                    </div>
+
+                    <Separator className="bg-border/50" />
+
+                    <div className="space-y-3">
+                        <label className="text-xs font-medium">Compliance Routing</label>
+                        
+                        <div className="flex items-start gap-2">
+                            <input type="checkbox" className="mt-1 rounded border-muted-foreground/50 bg-transparent" />
+                            <div>
+                                <div className="text-xs font-medium">SEC Review</div>
+                                <div className="text-[10px] text-muted-foreground">Securities and Exchange Commission compliance</div>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                            <input type="checkbox" className="mt-1 rounded border-muted-foreground/50 bg-transparent" />
+                            <div>
+                                <div className="text-xs font-medium">FINRA Review</div>
+                                <div className="text-[10px] text-muted-foreground">Financial Industry Regulatory Authority</div>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                             <input type="checkbox" className="mt-1 rounded border-muted-foreground/50 bg-transparent" />
+                             <div>
+                                <div className="text-xs font-medium">Legal Review</div>
+                                <div className="text-[10px] text-muted-foreground">Internal legal counsel review</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <Separator className="bg-border/50" />
+
+                    <div className="space-y-2">
+                        <label className="text-xs font-medium">Export Options</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <Button variant="outline" size="sm" className="text-xs h-8 bg-secondary/30">
+                                PDF
+                            </Button>
+                            <Button variant="outline" size="sm" className="text-xs h-8 bg-secondary/30">
+                                Word
+                            </Button>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+
+      </div>
+    </Layout>
+  );
+}
