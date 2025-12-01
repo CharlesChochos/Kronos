@@ -65,12 +65,27 @@ export async function registerRoutes(
     }
   });
 
+  // Helper to sanitize user data (remove password)
+  const sanitizeUser = (user: any) => {
+    if (!user) return null;
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  };
+
   // Middleware to check authentication
   const requireAuth = (req: any, res: any, next: any) => {
     if (req.isAuthenticated()) {
       return next();
     }
     res.status(401).json({ error: "Unauthorized" });
+  };
+
+  // Middleware to check CEO role
+  const requireCEO = (req: any, res: any, next: any) => {
+    if (req.isAuthenticated() && req.user?.role === 'CEO') {
+      return next();
+    }
+    res.status(403).json({ error: "Access denied. CEO role required." });
   };
 
   // ===== AUTH ROUTES =====
@@ -95,8 +110,7 @@ export async function registerRoutes(
         if (err) {
           return res.status(500).json({ error: "Error logging in after signup" });
         }
-        const { password, ...userWithoutPassword } = user;
-        res.json(userWithoutPassword);
+        res.json(sanitizeUser(user));
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to create user" });
@@ -116,8 +130,7 @@ export async function registerRoutes(
         if (loginErr) {
           return res.status(500).json({ error: "Login error" });
         }
-        const { password, ...userWithoutPassword } = user;
-        res.json(userWithoutPassword);
+        res.json(sanitizeUser(user));
       });
     })(req, res, next);
   });
@@ -135,8 +148,7 @@ export async function registerRoutes(
   // Get current user
   app.get("/api/auth/me", (req, res) => {
     if (req.isAuthenticated()) {
-      const { password, ...userWithoutPassword } = req.user as any;
-      res.json(userWithoutPassword);
+      res.json(sanitizeUser(req.user));
     } else {
       res.status(401).json({ error: "Not authenticated" });
     }
@@ -144,11 +156,25 @@ export async function registerRoutes(
 
   // ===== USER ROUTES =====
   
+  // Get all users (CEO only can see all, employees see limited view)
   app.get("/api/users", requireAuth, async (req, res) => {
     try {
+      const currentUser = req.user as any;
       const users = await storage.getAllUsers();
-      const usersWithoutPasswords = users.map(({ password, ...user }) => user);
-      res.json(usersWithoutPasswords);
+      const sanitizedUsers = users.map(user => sanitizeUser(user));
+      
+      // CEO can see all user details
+      if (currentUser.role === 'CEO') {
+        res.json(sanitizedUsers);
+      } else {
+        // Employees see limited user info (for task assignment display)
+        const limitedUsers = sanitizedUsers.map((u: any) => ({
+          id: u.id,
+          name: u.name,
+          role: u.role,
+        }));
+        res.json(limitedUsers);
+      }
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch users" });
     }
@@ -156,12 +182,18 @@ export async function registerRoutes(
 
   app.get("/api/users/:id", requireAuth, async (req, res) => {
     try {
+      const currentUser = req.user as any;
       const user = await storage.getUser(req.params.id);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
-      const { password, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      
+      // CEO can see anyone, employees can only see themselves
+      if (currentUser.role !== 'CEO' && currentUser.id !== req.params.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      res.json(sanitizeUser(user));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch user" });
     }
@@ -190,7 +222,8 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/deals", requireAuth, async (req, res) => {
+  // Create deal (CEO only)
+  app.post("/api/deals", requireCEO, async (req, res) => {
     try {
       const result = insertDealSchema.safeParse(req.body);
       if (!result.success) {
@@ -203,9 +236,14 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/deals/:id", requireAuth, async (req, res) => {
+  // Update deal (CEO only)
+  app.patch("/api/deals/:id", requireCEO, async (req, res) => {
     try {
-      const deal = await storage.updateDeal(req.params.id, req.body);
+      const result = insertDealSchema.partial().safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const deal = await storage.updateDeal(req.params.id, result.data);
       if (!deal) {
         return res.status(404).json({ error: "Deal not found" });
       }
@@ -215,7 +253,8 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/deals/:id", requireAuth, async (req, res) => {
+  // Delete deal (CEO only)
+  app.delete("/api/deals/:id", requireCEO, async (req, res) => {
     try {
       await storage.deleteDeal(req.params.id);
       res.json({ message: "Deal deleted successfully" });
@@ -255,7 +294,8 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/tasks", requireAuth, async (req, res) => {
+  // Create task (CEO only)
+  app.post("/api/tasks", requireCEO, async (req, res) => {
     try {
       const result = insertTaskSchema.safeParse(req.body);
       if (!result.success) {
@@ -268,19 +308,44 @@ export async function registerRoutes(
     }
   });
 
+  // Update task (CEO can update any, employees can only update their own task status)
   app.patch("/api/tasks/:id", requireAuth, async (req, res) => {
     try {
-      const task = await storage.updateTask(req.params.id, req.body);
-      if (!task) {
+      const currentUser = req.user as any;
+      const existingTask = await storage.getTask(req.params.id);
+      
+      if (!existingTask) {
         return res.status(404).json({ error: "Task not found" });
       }
+      
+      // Employees can only update their own tasks and only the status field
+      if (currentUser.role !== 'CEO') {
+        if (existingTask.assignedTo !== currentUser.id) {
+          return res.status(403).json({ error: "You can only update your own tasks" });
+        }
+        // Employees can only change status
+        const allowedFields = ['status'];
+        const attemptedFields = Object.keys(req.body);
+        const hasDisallowedFields = attemptedFields.some(f => !allowedFields.includes(f));
+        if (hasDisallowedFields) {
+          return res.status(403).json({ error: "You can only update task status" });
+        }
+      }
+      
+      const result = insertTaskSchema.partial().safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      
+      const task = await storage.updateTask(req.params.id, result.data);
       res.json(task);
     } catch (error) {
       res.status(500).json({ error: "Failed to update task" });
     }
   });
 
-  app.delete("/api/tasks/:id", requireAuth, async (req, res) => {
+  // Delete task (CEO only)
+  app.delete("/api/tasks/:id", requireCEO, async (req, res) => {
     try {
       await storage.deleteTask(req.params.id);
       res.json({ message: "Task deleted successfully" });
