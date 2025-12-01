@@ -12,6 +12,10 @@ import InvestorMatching from "@/pages/ceo/InvestorMatching";
 import TeamAssignment from "@/pages/ceo/TeamAssignment";
 import MyTasks from "@/pages/employee/MyTasks";
 
+// Wrapper components to ensure props are passed correctly with wouter
+const CeoDocumentGenerator = () => <DocumentGenerator role="CEO" />;
+const EmployeeDocumentGenerator = () => <DocumentGenerator role="Employee" />;
+
 function Router() {
   return (
     <Switch>
@@ -20,18 +24,14 @@ function Router() {
       {/* CEO Routes */}
       <Route path="/ceo/dashboard" component={Dashboard} />
       <Route path="/ceo/deals" component={DealManagement} />
-      <Route path="/ceo/documents">
-        <DocumentGenerator role="CEO" />
-      </Route>
+      <Route path="/ceo/documents" component={CeoDocumentGenerator} />
       <Route path="/ceo/investors" component={InvestorMatching} />
       <Route path="/ceo/team" component={TeamAssignment} />
       
       {/* Employee Routes */}
       <Route path="/employee/tasks" component={MyTasks} />
-      <Route path="/employee/documents">
-        <DocumentGenerator role="Employee" />
-      </Route>
-      <Route path="/employee/deals" component={DealManagement} /> {/* Reusing deal view for now */}
+      <Route path="/employee/documents" component={EmployeeDocumentGenerator} />
+      <Route path="/employee/deals" component={DealManagement} />
 
       <Route component={NotFound} />
     </Switch>
