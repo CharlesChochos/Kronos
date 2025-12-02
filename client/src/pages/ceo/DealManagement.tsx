@@ -22,7 +22,7 @@ import {
 import { useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isToday, isBefore, isAfter, parseISO } from "date-fns";
 import type { Deal, PodTeamMember, TaggedInvestor, AuditEntry } from "@shared/schema";
 
 const DEAL_STAGES = ['Origination', 'Execution', 'Negotiation', 'Due Diligence', 'Signing', 'Closed'];
@@ -71,6 +71,8 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [viewMode, setViewMode] = useState<'grid' | 'calendar'>('grid');
+  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('week');
+  const [calendarDate, setCalendarDate] = useState(new Date());
   
   const [newDeal, setNewDeal] = useState({
     name: '',
@@ -462,140 +464,318 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
         </div>
 
         {/* Calendar View */}
-        {viewMode === 'calendar' && (
-          <div className="space-y-6">
-            {/* Stage Timeline Header */}
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <CalendarDays className="w-5 h-5 text-primary" />
-                  Deal Pipeline Timeline
-                </CardTitle>
-                <CardDescription>View all deals organized by stage with associated tasks</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between gap-2 py-2">
-                  {DEAL_STAGES.map((stage, index) => (
-                    <div key={stage} className="flex-1 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        {index > 0 && <div className="h-0.5 bg-border w-full" />}
-                        <div className={cn(
-                          "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0",
-                          index === 0 ? "bg-blue-500/20 text-blue-400" :
-                          index === 1 ? "bg-indigo-500/20 text-indigo-400" :
-                          index === 2 ? "bg-orange-500/20 text-orange-400" :
-                          index === 3 ? "bg-purple-500/20 text-purple-400" :
-                          index === 4 ? "bg-yellow-500/20 text-yellow-400" :
-                          "bg-green-500/20 text-green-400"
-                        )}>
-                          {index + 1}
-                        </div>
-                        {index < DEAL_STAGES.length - 1 && <div className="h-0.5 bg-border w-full" />}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">{stage}</p>
-                      <p className="text-sm font-bold">
-                        {filteredDeals.filter(d => d.stage === stage).length}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+        {viewMode === 'calendar' && (() => {
+          const getCalendarDays = () => {
+            if (calendarView === 'day') {
+              return [calendarDate];
+            } else if (calendarView === 'week') {
+              const start = startOfWeek(calendarDate, { weekStartsOn: 0 });
+              const end = endOfWeek(calendarDate, { weekStartsOn: 0 });
+              return eachDayOfInterval({ start, end });
+            } else {
+              const monthStart = startOfMonth(calendarDate);
+              const monthEnd = endOfMonth(calendarDate);
+              const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+              const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+              return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+            }
+          };
 
-            {/* Deals by Stage */}
+          const navigatePrev = () => {
+            if (calendarView === 'day') setCalendarDate(subDays(calendarDate, 1));
+            else if (calendarView === 'week') setCalendarDate(subWeeks(calendarDate, 1));
+            else setCalendarDate(subMonths(calendarDate, 1));
+          };
+
+          const navigateNext = () => {
+            if (calendarView === 'day') setCalendarDate(addDays(calendarDate, 1));
+            else if (calendarView === 'week') setCalendarDate(addWeeks(calendarDate, 1));
+            else setCalendarDate(addMonths(calendarDate, 1));
+          };
+
+          const getEventsForDay = (day: Date) => {
+            const events: { type: 'task' | 'milestone' | 'stage_change'; deal: Deal; item?: any; date: Date }[] = [];
+            
+            filteredDeals.forEach(deal => {
+              const dealTasks = allTasks.filter((t: any) => t.dealId === deal.id);
+              dealTasks.forEach((task: any) => {
+                if (task.dueDate && isSameDay(parseISO(task.dueDate), day)) {
+                  events.push({ type: 'task', deal, item: task, date: day });
+                }
+              });
+              
+              const auditTrail = deal.auditTrail as AuditEntry[] || [];
+              auditTrail.forEach(entry => {
+                if (entry.timestamp && isSameDay(parseISO(entry.timestamp), day)) {
+                  if (entry.action === 'Stage Changed' || entry.action === 'Deal Created') {
+                    events.push({ type: 'milestone', deal, item: entry, date: day });
+                  }
+                }
+              });
+            });
+            
+            return events;
+          };
+
+          const calendarDays = getCalendarDays();
+
+          return (
             <div className="space-y-4">
-              {DEAL_STAGES.map((stage, stageIndex) => {
-                const stageDeals = filteredDeals.filter(d => d.stage === stage);
-                if (stageDeals.length === 0) return null;
-
-                return (
-                  <div key={stage} className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "w-3 h-3 rounded-full",
-                        stageIndex === 0 ? "bg-blue-500" :
-                        stageIndex === 1 ? "bg-indigo-500" :
-                        stageIndex === 2 ? "bg-orange-500" :
-                        stageIndex === 3 ? "bg-purple-500" :
-                        stageIndex === 4 ? "bg-yellow-500" :
-                        "bg-green-500"
-                      )} />
-                      <h3 className="font-semibold text-lg">{stage}</h3>
-                      <Badge variant="secondary" className="text-xs">{stageDeals.length} deals</Badge>
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="w-5 h-5 text-primary" />
+                      <CardTitle className="text-lg">Deal Calendar</CardTitle>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex bg-secondary rounded-lg p-0.5">
+                        <Button 
+                          variant={calendarView === 'day' ? 'default' : 'ghost'} 
+                          size="sm" 
+                          className="h-7 px-3 text-xs"
+                          onClick={() => setCalendarView('day')}
+                          data-testid="calendar-view-day"
+                        >
+                          Day
+                        </Button>
+                        <Button 
+                          variant={calendarView === 'week' ? 'default' : 'ghost'} 
+                          size="sm" 
+                          className="h-7 px-3 text-xs"
+                          onClick={() => setCalendarView('week')}
+                          data-testid="calendar-view-week"
+                        >
+                          Week
+                        </Button>
+                        <Button 
+                          variant={calendarView === 'month' ? 'default' : 'ghost'} 
+                          size="sm" 
+                          className="h-7 px-3 text-xs"
+                          onClick={() => setCalendarView('month')}
+                          data-testid="calendar-view-month"
+                        >
+                          Month
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between mb-4">
+                    <Button variant="outline" size="sm" onClick={navigatePrev}>
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <h3 className="text-lg font-semibold">
+                      {calendarView === 'day' && format(calendarDate, 'EEEE, MMMM d, yyyy')}
+                      {calendarView === 'week' && `${format(startOfWeek(calendarDate, { weekStartsOn: 0 }), 'MMM d')} - ${format(endOfWeek(calendarDate, { weekStartsOn: 0 }), 'MMM d, yyyy')}`}
+                      {calendarView === 'month' && format(calendarDate, 'MMMM yyyy')}
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setCalendarDate(new Date())}>
+                        Today
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={navigateNext}>
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
 
-                    <div className="grid grid-cols-1 gap-3 pl-6">
-                      {stageDeals.map(deal => {
-                        const dealTasks = allTasks.filter((t: any) => t.dealId === deal.id);
-                        const pendingTasks = dealTasks.filter((t: any) => t.status !== 'Completed');
-                        const completedTasks = dealTasks.filter((t: any) => t.status === 'Completed');
-
+                  {calendarView === 'month' && (
+                    <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                        <div key={day} className="bg-secondary p-2 text-center text-xs font-medium text-muted-foreground">
+                          {day}
+                        </div>
+                      ))}
+                      {calendarDays.map((day, index) => {
+                        const events = getEventsForDay(day);
+                        const isCurrentMonth = day.getMonth() === calendarDate.getMonth();
                         return (
-                          <Card 
-                            key={deal.id} 
-                            className="bg-card border-border hover:shadow-md transition-all cursor-pointer"
-                            onClick={() => { setSelectedDeal(deal); setActiveTab("overview"); }}
+                          <div 
+                            key={index} 
+                            className={cn(
+                              "bg-card min-h-[100px] p-2 transition-colors",
+                              !isCurrentMonth && "opacity-40",
+                              isToday(day) && "ring-2 ring-primary ring-inset"
+                            )}
                           >
-                            <CardContent className="p-4">
-                              <div className="flex items-start justify-between">
-                                <div className="space-y-1">
-                                  <h4 className="font-semibold">{deal.name}</h4>
-                                  <p className="text-sm text-muted-foreground">{deal.client}</p>
+                            <div className={cn(
+                              "text-sm font-medium mb-1",
+                              isToday(day) ? "text-primary" : "text-foreground"
+                            )}>
+                              {format(day, 'd')}
+                            </div>
+                            <div className="space-y-1">
+                              {events.slice(0, 3).map((event, i) => (
+                                <div 
+                                  key={i}
+                                  className={cn(
+                                    "text-[10px] px-1.5 py-0.5 rounded truncate cursor-pointer hover:opacity-80",
+                                    event.type === 'task' && (event.item?.status === 'Completed' ? "bg-green-500/20 text-green-400" : "bg-blue-500/20 text-blue-400"),
+                                    event.type === 'milestone' && "bg-purple-500/20 text-purple-400"
+                                  )}
+                                  onClick={() => { setSelectedDeal(event.deal); setActiveTab("overview"); }}
+                                >
+                                  {event.type === 'task' ? event.item?.title : event.item?.action}
                                 </div>
-                                <div className="text-right">
-                                  <p className="text-lg font-bold">${deal.value}M</p>
-                                  <p className="text-xs text-muted-foreground">{deal.sector}</p>
-                                </div>
-                              </div>
-
-                              {/* Progress Bar */}
-                              <div className="mt-3 space-y-1">
-                                <div className="flex justify-between text-xs text-muted-foreground">
-                                  <span>Progress</span>
-                                  <span>{deal.progress}%</span>
-                                </div>
-                                <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                                  <div 
-                                    className="h-full bg-primary transition-all"
-                                    style={{ width: `${deal.progress}%` }}
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Tasks Summary */}
-                              {dealTasks.length > 0 && (
-                                <div className="mt-3 pt-3 border-t border-border flex items-center gap-4 text-xs">
-                                  <div className="flex items-center gap-1 text-muted-foreground">
-                                    <CheckCircle2 className="w-3 h-3 text-green-500" />
-                                    <span>{completedTasks.length} completed</span>
-                                  </div>
-                                  <div className="flex items-center gap-1 text-muted-foreground">
-                                    <Clock className="w-3 h-3 text-yellow-500" />
-                                    <span>{pendingTasks.length} pending</span>
-                                  </div>
+                              ))}
+                              {events.length > 3 && (
+                                <div className="text-[10px] text-muted-foreground pl-1">
+                                  +{events.length - 3} more
                                 </div>
                               )}
-
-                              {/* Pod Team Summary */}
-                              {(deal.podTeam as PodTeamMember[])?.length > 0 && (
-                                <div className="mt-2 flex items-center gap-1">
-                                  <Users className="w-3 h-3 text-muted-foreground" />
-                                  <span className="text-xs text-muted-foreground">
-                                    {(deal.podTeam as PodTeamMember[]).length} team members
-                                  </span>
-                                </div>
-                              )}
-                            </CardContent>
-                          </Card>
+                            </div>
+                          </div>
                         );
                       })}
                     </div>
+                  )}
+
+                  {calendarView === 'week' && (
+                    <div className="grid grid-cols-7 gap-2">
+                      {calendarDays.map((day, index) => {
+                        const events = getEventsForDay(day);
+                        return (
+                          <div 
+                            key={index} 
+                            className={cn(
+                              "bg-secondary/30 rounded-lg p-3 min-h-[200px] transition-colors",
+                              isToday(day) && "ring-2 ring-primary"
+                            )}
+                          >
+                            <div className={cn(
+                              "text-center mb-2 pb-2 border-b border-border",
+                              isToday(day) ? "text-primary" : ""
+                            )}>
+                              <div className="text-xs text-muted-foreground">{format(day, 'EEE')}</div>
+                              <div className="text-lg font-bold">{format(day, 'd')}</div>
+                            </div>
+                            <ScrollArea className="h-[150px]">
+                              <div className="space-y-1.5">
+                                {events.map((event, i) => (
+                                  <div 
+                                    key={i}
+                                    className={cn(
+                                      "text-xs p-2 rounded cursor-pointer hover:opacity-80 transition-opacity",
+                                      event.type === 'task' && (event.item?.status === 'Completed' ? "bg-green-500/20 text-green-400" : "bg-blue-500/20 text-blue-400"),
+                                      event.type === 'milestone' && "bg-purple-500/20 text-purple-400"
+                                    )}
+                                    onClick={() => { setSelectedDeal(event.deal); setActiveTab("overview"); }}
+                                  >
+                                    <div className="font-medium truncate">{event.type === 'task' ? event.item?.title : event.item?.action}</div>
+                                    <div className="text-[10px] opacity-70 truncate">{event.deal.name}</div>
+                                  </div>
+                                ))}
+                                {events.length === 0 && (
+                                  <div className="text-xs text-muted-foreground text-center py-4">No events</div>
+                                )}
+                              </div>
+                            </ScrollArea>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {calendarView === 'day' && (
+                    <div className="space-y-4">
+                      {(() => {
+                        const events = getEventsForDay(calendarDate);
+                        const groupedByDeal = events.reduce((acc, event) => {
+                          if (!acc[event.deal.id]) acc[event.deal.id] = { deal: event.deal, events: [] };
+                          acc[event.deal.id].events.push(event);
+                          return acc;
+                        }, {} as Record<string, { deal: Deal; events: typeof events }>);
+
+                        if (Object.keys(groupedByDeal).length === 0) {
+                          return (
+                            <div className="text-center py-12 text-muted-foreground">
+                              <CalendarDays className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                              <p>No events scheduled for this day</p>
+                            </div>
+                          );
+                        }
+
+                        return Object.values(groupedByDeal).map(({ deal, events }) => (
+                          <Card key={deal.id} className="bg-secondary/30 border-border">
+                            <CardHeader className="pb-2">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <CardTitle className="text-base">{deal.name}</CardTitle>
+                                  <CardDescription>{deal.client} • {deal.sector}</CardDescription>
+                                </div>
+                                <Badge variant="outline">{deal.stage}</Badge>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                              {events.map((event, i) => (
+                                <div 
+                                  key={i}
+                                  className={cn(
+                                    "flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-secondary/50 transition-colors",
+                                    event.type === 'task' && (event.item?.status === 'Completed' ? "bg-green-500/10" : "bg-blue-500/10"),
+                                    event.type === 'milestone' && "bg-purple-500/10"
+                                  )}
+                                  onClick={() => { setSelectedDeal(deal); setActiveTab("overview"); }}
+                                >
+                                  <div className={cn(
+                                    "w-8 h-8 rounded-full flex items-center justify-center",
+                                    event.type === 'task' && (event.item?.status === 'Completed' ? "bg-green-500/20" : "bg-blue-500/20"),
+                                    event.type === 'milestone' && "bg-purple-500/20"
+                                  )}>
+                                    {event.type === 'task' ? (
+                                      event.item?.status === 'Completed' ? <CheckCircle2 className="w-4 h-4 text-green-400" /> : <Clock className="w-4 h-4 text-blue-400" />
+                                    ) : (
+                                      <TrendingUp className="w-4 h-4 text-purple-400" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="font-medium text-sm">
+                                      {event.type === 'task' ? event.item?.title : event.item?.action}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {event.type === 'task' ? `Priority: ${event.item?.priority}` : event.item?.details}
+                                    </div>
+                                  </div>
+                                  <Badge variant="secondary" className="text-[10px]">
+                                    {event.type === 'task' ? event.item?.status : 'Milestone'}
+                                  </Badge>
+                                </div>
+                              ))}
+                            </CardContent>
+                          </Card>
+                        ));
+                      })()}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Legend</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-blue-500/50"></div>
+                      <span className="text-sm text-muted-foreground">Pending Task</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-green-500/50"></div>
+                      <span className="text-sm text-muted-foreground">Completed Task</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-purple-500/50"></div>
+                      <span className="text-sm text-muted-foreground">Milestone / Stage Change</span>
+                    </div>
                   </div>
-                );
-              })}
+                </CardContent>
+              </Card>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Deals Grid */}
         {viewMode === 'grid' && (
