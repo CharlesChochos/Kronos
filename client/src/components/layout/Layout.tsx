@@ -1,5 +1,5 @@
 import { Sidebar } from "./Sidebar";
-import { Bell, Search, User } from "lucide-react";
+import { Bell, Search, User, BookOpen, Palette } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -24,7 +24,8 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     setShowProfileSheet, 
     setShowSettingsSheet, 
     setShowNotificationsSheet,
-    setShowResourcesSheet 
+    setShowResourcesSheet,
+    setShowCustomizeSheet
   } = useDashboardContext();
   
   const { data: notifications = [] } = useNotifications();
@@ -94,6 +95,23 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                   data-testid="menu-item-settings"
                 >
                   Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-border" />
+                <DropdownMenuItem 
+                  className="focus:bg-primary/10 focus:text-primary cursor-pointer"
+                  onClick={() => setShowResourcesSheet(true)}
+                  data-testid="menu-item-resources"
+                >
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  Resources
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="focus:bg-primary/10 focus:text-primary cursor-pointer"
+                  onClick={() => setShowCustomizeSheet(true)}
+                  data-testid="menu-item-customize"
+                >
+                  <Palette className="w-4 h-4 mr-2" />
+                  Customize Dashboard
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-border" />
                 <DropdownMenuItem className="text-red-400 focus:bg-red-400/10 focus:text-red-400 cursor-pointer" data-testid="menu-item-logout">Log out</DropdownMenuItem>

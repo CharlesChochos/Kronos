@@ -542,34 +542,17 @@ export default function Dashboard() {
           {/* User Profile Widget */}
           <Card className="bg-card border-border">
             <CardContent className="pt-4">
-              <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-lg font-bold text-primary">
                   {currentUser?.name?.split(' ').map(n => n[0]).join('') || 'U'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-semibold truncate">{currentUser?.name}</h3>
                   <p className="text-xs text-muted-foreground">{currentUser?.role}</p>
+                  <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                    {activeDeals.length} active deals • {tasks.filter(t => t.status !== 'Completed').length} pending tasks
+                  </p>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="w-full justify-start gap-2 h-9 text-xs bg-secondary/50 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/20 transition-all"
-                  onClick={() => setShowResourcesSheet(true)}
-                  data-testid="button-resources"
-                >
-                  <BookOpen className="w-3.5 h-3.5" /> Resources
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="w-full justify-start gap-2 h-9 text-xs bg-secondary/50 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/20 transition-all"
-                  onClick={() => setShowCustomizeSheet(true)}
-                  data-testid="button-customize"
-                >
-                  <Palette className="w-3.5 h-3.5" /> Customize
-                </Button>
               </div>
             </CardContent>
           </Card>
