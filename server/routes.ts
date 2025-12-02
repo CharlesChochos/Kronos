@@ -605,6 +605,24 @@ export async function registerRoutes(
       // Extract email formatting fields before validation (they're not in schema)
       const { localDate, localTime, organizerTimezone, ...meetingData } = req.body;
       
+      // Generate video link based on platform
+      let videoLink: string | null = null;
+      if (meetingData.videoPlatform) {
+        const meetingId = crypto.randomUUID().replace(/-/g, '').substring(0, 11);
+        switch (meetingData.videoPlatform) {
+          case 'zoom':
+            videoLink = `https://zoom.us/j/${meetingId}`;
+            break;
+          case 'google_meet':
+            videoLink = `https://meet.google.com/${meetingId.substring(0, 3)}-${meetingId.substring(3, 7)}-${meetingId.substring(7, 11)}`;
+            break;
+          case 'teams':
+            videoLink = `https://teams.microsoft.com/l/meetup-join/${meetingId}`;
+            break;
+        }
+        meetingData.videoLink = videoLink;
+      }
+      
       const result = insertMeetingSchema.safeParse(meetingData);
       if (!result.success) {
         return res.status(400).json({ error: fromError(result.error).toString() });
@@ -641,6 +659,8 @@ export async function registerRoutes(
             description: result.data.description || undefined,
             scheduledFor: new Date(result.data.scheduledFor),
             location: result.data.location || undefined,
+            videoLink: meeting.videoLink || undefined,
+            videoPlatform: meeting.videoPlatform || undefined,
             attendeeEmails: participantEmails,
             organizerName: currentUser.name,
             localDate,
@@ -1348,6 +1368,7 @@ Guidelines:
                   // Create attachment object
                   const attachment = {
                     id: crypto.randomUUID(),
+                    type: 'file',
                     filename: args.filename,
                     url: args.fileUrl,
                     mimeType: 'application/octet-stream',

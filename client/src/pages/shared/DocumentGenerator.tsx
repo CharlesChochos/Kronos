@@ -28,12 +28,18 @@ import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 
 const TEMPLATES = [
-  { id: 1, name: "Term Sheet", description: "Standard term sheet template for initial deal terms", lastUsed: "2025-12-01", complexity: "Medium" },
-  { id: 2, name: "Letter of Intent", description: "LOI template for preliminary offers and expressions of interest", lastUsed: "2025-12-01", complexity: "Medium" },
-  { id: 3, name: "Due Diligence Request", description: "Comprehensive information request checklist", lastUsed: "2025-11-28", complexity: "Medium" },
-  { id: 4, name: "Purchase Agreement", description: "Legal document for acquisition transactions", lastUsed: "2025-11-25", complexity: "High" },
-  { id: 5, name: "NDA", description: "Non-disclosure agreement for confidential information", lastUsed: "2025-12-02", complexity: "Low" },
-  { id: 6, name: "Board Resolution", description: "Corporate governance and approval template", lastUsed: "2025-11-20", complexity: "Medium" },
+  { id: 1, name: "Term Sheet", description: "Standard term sheet template for initial deal terms", lastUsed: "2025-12-01", complexity: "Medium", category: "Legal" },
+  { id: 2, name: "Letter of Intent", description: "LOI template for preliminary offers and expressions of interest", lastUsed: "2025-12-01", complexity: "Medium", category: "Legal" },
+  { id: 3, name: "Due Diligence Request", description: "Comprehensive information request checklist", lastUsed: "2025-11-28", complexity: "Medium", category: "Analysis" },
+  { id: 4, name: "Purchase Agreement", description: "Legal document for acquisition transactions", lastUsed: "2025-11-25", complexity: "High", category: "Legal" },
+  { id: 5, name: "NDA", description: "Non-disclosure agreement for confidential information", lastUsed: "2025-12-02", complexity: "Low", category: "Legal" },
+  { id: 6, name: "Board Resolution", description: "Corporate governance and approval template", lastUsed: "2025-11-20", complexity: "Medium", category: "Governance" },
+  { id: 7, name: "M&A Deal Template", description: "Complete template for mergers and acquisitions including due diligence, valuation, and integration planning", lastUsed: "2025-12-01", complexity: "High", category: "Deal" },
+  { id: 8, name: "IPO Roadshow Template", description: "Investor presentation and roadshow materials for initial public offerings", lastUsed: "2025-11-28", complexity: "High", category: "Deal" },
+  { id: 9, name: "Private Placement Memo", description: "Confidential information memorandum for private capital raising", lastUsed: "2025-11-25", complexity: "High", category: "Deal" },
+  { id: 10, name: "Debt Financing Template", description: "Credit facility and bond issuance documentation templates", lastUsed: "2025-11-22", complexity: "High", category: "Deal" },
+  { id: 11, name: "Valuation Report", description: "Comprehensive business valuation report template with DCF and comps analysis", lastUsed: "2025-12-02", complexity: "Medium", category: "Analysis" },
+  { id: 12, name: "Investment Committee Memo", description: "Presentation format for investment committee approval", lastUsed: "2025-11-30", complexity: "Medium", category: "Governance" },
 ];
 
 type DocumentGeneratorProps = {

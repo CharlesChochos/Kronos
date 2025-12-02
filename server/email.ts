@@ -46,6 +46,8 @@ export interface MeetingInviteData {
   description?: string;
   scheduledFor: Date;
   location?: string;
+  videoLink?: string;
+  videoPlatform?: string;
   attendeeEmails: string[];
   organizerName: string;
   localDate?: string;
@@ -143,7 +145,23 @@ export async function sendMeetingInvite(data: MeetingInviteData): Promise<{ succ
                   <span class="detail-value">${data.location}</span>
                 </div>
                 ` : ''}
+                ${data.videoLink ? `
+                <div class="detail-row">
+                  <span class="detail-label">Video:</span>
+                  <span class="detail-value">
+                    <a href="${data.videoLink}" style="color: #1a1a2e;">${
+                      data.videoPlatform === 'zoom' ? 'Join Zoom Meeting' :
+                      data.videoPlatform === 'google_meet' ? 'Join Google Meet' :
+                      data.videoPlatform === 'teams' ? 'Join Microsoft Teams' : 'Join Video Call'
+                    }</a>
+                  </span>
+                </div>
+                ` : ''}
               </div>
+              
+              ${data.videoLink ? `
+              <a href="${data.videoLink}" class="btn" style="color: white; text-decoration: none;">Join Video Meeting</a>
+              ` : ''}
               
               <p>Please add this to your calendar and be prepared to join at the scheduled time.</p>
             </div>
@@ -166,6 +184,7 @@ ${data.description ? `Description: ${data.description}` : ''}
 Date: ${formattedDate}
 Time: ${formattedTime}
 ${data.location ? `Location: ${data.location}` : ''}
+${data.videoLink ? `Video Conference: ${data.videoLink}` : ''}
 
 Please add this to your calendar and be prepared to join at the scheduled time.
 

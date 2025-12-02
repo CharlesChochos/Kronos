@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -96,7 +97,6 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'marketPulse', name: 'Market Pulse', enabled: true },
   { id: 'marketIntelligence', name: 'Market Intelligence', enabled: true },
   { id: 'teamTaskProgress', name: 'Team Task Progress', enabled: true },
-  { id: 'velocityScoreboard', name: 'Live Velocity Scoreboard', enabled: true },
   { id: 'upcomingMeetings', name: 'Upcoming Meetings', enabled: true },
   { id: 'recentActivity', name: 'Recent Activity', enabled: true },
   { id: 'dealPipeline', name: 'Deal Pipeline Overview', enabled: false },
@@ -168,6 +168,7 @@ export default function Dashboard() {
     location: '',
     participants: '',
     dealId: '',
+    videoPlatform: '' as '' | 'zoom' | 'google_meet' | 'teams',
   });
 
   // Market data from API (refreshes every 30 seconds)
@@ -177,8 +178,16 @@ export default function Dashboard() {
   
   // Market news from API (refreshes every minute)
   const { data: marketNewsResponse, isLoading: newsLoading } = useMarketNews();
-  const marketNews = marketNewsResponse?.data || [];
+  const rawMarketNews = marketNewsResponse?.data || [];
   const newsSource = marketNewsResponse?.source || 'sample';
+  
+  // Filter for investment banking related news
+  const ibKeywords = ['merger', 'm&a', 'acquisition', 'ipo', 'capital', 'deal', 'buyout', 'investment', 'equity', 'debt', 'bond', 'underwriting', 'financing', 'valuation', 'securities', 'advisory', 'banking', 'fund', 'private equity', 'venture', 'syndicate', 'offering', 'raise', 'billion', 'million'];
+  const marketNews = rawMarketNews.filter((news: any) => {
+    const headline = news.headline?.toLowerCase() || '';
+    const summary = news.summary?.toLowerCase() || '';
+    return ibKeywords.some(keyword => headline.includes(keyword) || summary.includes(keyword));
+  });
 
   // Compute analytics
   const activeDeals = deals.filter(d => d.status === 'Active');
@@ -350,7 +359,7 @@ export default function Dashboard() {
         participants: participantEmails,
         dealId: newMeeting.dealId || null,
         status: 'scheduled',
-        // Include original local time info for email formatting
+        videoPlatform: newMeeting.videoPlatform || null,
         localDate: newMeeting.scheduledFor,
         localTime: newMeeting.scheduledTime,
         organizerTimezone,
@@ -358,7 +367,7 @@ export default function Dashboard() {
       
       toast.success("Meeting scheduled! Notifications sent to participants.");
       setShowScheduleMeetingModal(false);
-      setNewMeeting({ title: '', description: '', scheduledFor: '', scheduledTime: '09:00', duration: 60, location: '', participants: '', dealId: '' });
+      setNewMeeting({ title: '', description: '', scheduledFor: '', scheduledTime: '09:00', duration: 60, location: '', participants: '', dealId: '', videoPlatform: '' });
     } catch (error: any) {
       toast.error(error.message || "Failed to schedule meeting");
     }
@@ -1287,44 +1296,8 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Right Column: Velocity Scoreboard & Additional Widgets */}
+        {/* Right Column: Meetings & Activity Widgets */}
         <div className="col-span-12 md:col-span-3 space-y-6">
-          {widgets.find(w => w.id === 'velocityScoreboard')?.enabled && (
-            <Card className="bg-card border-border">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Velocity Board</CardTitle>
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                  {topUsers.slice(0, 5).map((user, index) => (
-                    <div 
-                      key={user.id} 
-                      className="p-3 border-l-2 border-transparent hover:border-primary hover:bg-secondary/30 transition-all cursor-pointer"
-                      onClick={() => openEmployeeDetail(user)}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-muted-foreground">#{index + 1}</span>
-                        <span className={cn(
-                          "text-sm font-bold font-mono",
-                          index === 0 ? "text-accent" : "text-primary"
-                        )}>
-                          <Zap className="w-3 h-3 inline mr-1" />
-                          {user.velocityScore}
-                        </span>
-                      </div>
-                      <div className="font-medium text-sm flex items-center gap-1 truncate">
-                        {user.name}
-                        <ChevronRight className="w-3 h-3 text-muted-foreground" />
-                      </div>
-                      <div className="text-xs text-muted-foreground">{user.role}</div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Upcoming Meetings Widget */}
           {widgets.find(w => w.id === 'upcomingMeetings')?.enabled && (
             <Card className="bg-card border-border">
@@ -1609,15 +1582,34 @@ export default function Dashboard() {
               </div>
             </div>
             
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <MapPin className="w-4 h-4" /> Location
-              </Label>
-              <Input 
-                placeholder="Conference Room A / Zoom Link" 
-                value={newMeeting.location}
-                onChange={(e) => setNewMeeting({ ...newMeeting, location: e.target.value })}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4" /> Location
+                </Label>
+                <Input 
+                  placeholder="Conference Room A" 
+                  value={newMeeting.location}
+                  onChange={(e) => setNewMeeting({ ...newMeeting, location: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Video Conference</Label>
+                <Select 
+                  value={newMeeting.videoPlatform} 
+                  onValueChange={(v) => setNewMeeting({ ...newMeeting, videoPlatform: v as '' | 'zoom' | 'google_meet' | 'teams' })}
+                >
+                  <SelectTrigger data-testid="select-video-platform">
+                    <SelectValue placeholder="Optional video link" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No video link</SelectItem>
+                    <SelectItem value="zoom">Zoom Meeting</SelectItem>
+                    <SelectItem value="google_meet">Google Meet</SelectItem>
+                    <SelectItem value="teams">Microsoft Teams</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             
             <div className="space-y-2">
@@ -1695,13 +1687,49 @@ export default function Dashboard() {
               
               <Separator />
               
+              {/* Dashboard Background Color */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">DASHBOARD THEME</h4>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { name: 'Default', value: 'default', color: 'bg-background' },
+                    { name: 'Navy', value: 'navy', color: 'bg-[#0f172a]' },
+                    { name: 'Slate', value: 'slate', color: 'bg-[#1e293b]' },
+                    { name: 'Charcoal', value: 'charcoal', color: 'bg-[#18181b]' },
+                    { name: 'Ocean', value: 'ocean', color: 'bg-[#0c4a6e]' },
+                    { name: 'Forest', value: 'forest', color: 'bg-[#14532d]' },
+                    { name: 'Wine', value: 'wine', color: 'bg-[#450a0a]' },
+                    { name: 'Purple', value: 'purple', color: 'bg-[#3b0764]' },
+                  ].map((theme) => (
+                    <button
+                      key={theme.value}
+                      onClick={() => {
+                        localStorage.setItem('dashboardTheme', theme.value);
+                        toast.success(`Theme set to ${theme.name}`);
+                      }}
+                      className={cn(
+                        "w-full aspect-square rounded-lg border-2 transition-all",
+                        theme.color,
+                        localStorage.getItem('dashboardTheme') === theme.value 
+                          ? "border-primary ring-2 ring-primary/30" 
+                          : "border-border hover:border-primary/50"
+                      )}
+                      title={theme.name}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              <Separator />
+              
               <Button 
                 variant="outline" 
                 className="w-full"
                 onClick={() => {
                   setWidgets(DEFAULT_WIDGETS);
                   localStorage.removeItem('ceoDashboardWidgets');
-                  toast.success("Widgets reset to defaults");
+                  localStorage.removeItem('dashboardTheme');
+                  toast.success("Dashboard reset to defaults");
                 }}
               >
                 Reset to Defaults
@@ -1837,26 +1865,48 @@ export default function Dashboard() {
 
               <Separator />
 
-              {/* Score Breakdown */}
+              {/* Progress Overview */}
               <div>
-                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Score Calculation</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Completed Tasks ({(selectedEmployee as any).completedTasks} × 4)</span>
-                    <span className="font-mono">+{((selectedEmployee as any).completedTasks || 0) * 4}</span>
+                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Progress Overview</h4>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Task Completion Rate</span>
+                      <span className="font-medium text-green-400">
+                        {(selectedEmployee as any).totalTasks > 0 
+                          ? Math.round(((selectedEmployee as any).completedTasks / (selectedEmployee as any).totalTasks) * 100) 
+                          : 0}%
+                      </span>
+                    </div>
+                    <Progress 
+                      value={(selectedEmployee as any).totalTasks > 0 
+                        ? ((selectedEmployee as any).completedTasks / (selectedEmployee as any).totalTasks) * 100 
+                        : 0} 
+                      className="h-2" 
+                    />
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Active Tasks ({(selectedEmployee as any).inProgressTasks} × 2)</span>
-                    <span className="font-mono">+{((selectedEmployee as any).inProgressTasks || 0) * 2}</span>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="p-3 bg-secondary/30 rounded-lg">
+                      <p className="text-muted-foreground text-xs">Active Deals</p>
+                      <p className="text-xl font-bold">{Object.keys((selectedEmployee as any).tasksByDeal || {}).length}</p>
+                    </div>
+                    <div className="p-3 bg-secondary/30 rounded-lg">
+                      <p className="text-muted-foreground text-xs">Workload Status</p>
+                      <p className="text-xl font-bold">
+                        {(selectedEmployee as any).totalTasks > 8 ? 'High' : 
+                         (selectedEmployee as any).totalTasks > 4 ? 'Medium' : 'Low'}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Deal Involvement ({Object.keys((selectedEmployee as any).tasksByDeal || {}).length} × 5)</span>
-                    <span className="font-mono">+{Object.keys((selectedEmployee as any).tasksByDeal || {}).length * 5}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between font-medium">
-                    <span>Total Velocity Score</span>
-                    <span className="font-mono text-primary">{(selectedEmployee as any).velocityScore || 0}</span>
+                  <div className="text-sm text-muted-foreground">
+                    <p className="flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-yellow-400" />
+                      {(selectedEmployee as any).inProgressTasks} tasks currently in progress
+                    </p>
+                    <p className="flex items-center gap-2 mt-1">
+                      <Clock className="w-4 h-4" />
+                      {(selectedEmployee as any).pendingTasks} tasks pending assignment
+                    </p>
                   </div>
                 </div>
               </div>

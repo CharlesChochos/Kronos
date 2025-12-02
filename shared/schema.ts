@@ -137,6 +137,8 @@ export const meetings = pgTable("meetings", {
   scheduledFor: timestamp("scheduled_for").notNull(),
   duration: integer("duration").notNull().default(60), // in minutes
   location: text("location"),
+  videoPlatform: text("video_platform"), // zoom, google_meet, teams, or null
+  videoLink: text("video_link"), // auto-generated placeholder link
   organizerId: varchar("organizer_id").references(() => users.id),
   participants: jsonb("participants").default([]), // array of email strings
   dealId: varchar("deal_id").references(() => deals.id),
