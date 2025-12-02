@@ -48,9 +48,12 @@ import {
   AlertCircle,
   Info,
   Paperclip,
-  Search
+  Search,
+  Lock,
+  Phone,
+  Pencil
 } from "lucide-react";
-import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useMarkNotificationRead, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData } from "@/lib/api";
+import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useMarkNotificationRead, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useUpdateUserProfile, useChangePassword } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -88,6 +91,24 @@ export default function Dashboard() {
   const createMeeting = useCreateMeeting();
   const markNotificationRead = useMarkNotificationRead();
   const updateUserPreferences = useUpdateUserPreferences();
+  const updateUserProfile = useUpdateUserProfile();
+  const changePassword = useChangePassword();
+
+  // Profile editing state
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+  });
+  
+  // Password change state
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
 
   // Use context for shared sheet states
   const {
@@ -309,6 +330,83 @@ export default function Dashboard() {
     } catch (error: any) {
       toast.error(error.message || "Failed to schedule meeting");
     }
+  };
+
+  const handleStartEditProfile = () => {
+    if (currentUser) {
+      setProfileForm({
+        name: currentUser.name || '',
+        email: currentUser.email || '',
+        phone: (currentUser as any).phone || '',
+      });
+      setIsEditingProfile(true);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!currentUser?.id) return;
+    
+    if (!profileForm.name.trim() || !profileForm.email.trim()) {
+      toast.error("Name and email are required");
+      return;
+    }
+    
+    try {
+      await updateUserProfile.mutateAsync({
+        userId: currentUser.id,
+        updates: {
+          name: profileForm.name.trim(),
+          email: profileForm.email.trim(),
+          phone: profileForm.phone.trim() || undefined,
+        },
+      });
+      toast.success("Profile updated successfully!");
+      setIsEditingProfile(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update profile");
+    }
+  };
+
+  const handleCancelEditProfile = () => {
+    setIsEditingProfile(false);
+    setProfileForm({ name: '', email: '', phone: '' });
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentUser?.id) return;
+    
+    if (!passwordForm.currentPassword || !passwordForm.newPassword) {
+      toast.error("Please fill in all password fields");
+      return;
+    }
+    
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error("New passwords do not match");
+      return;
+    }
+    
+    if (passwordForm.newPassword.length < 6) {
+      toast.error("New password must be at least 6 characters");
+      return;
+    }
+    
+    try {
+      await changePassword.mutateAsync({
+        userId: currentUser.id,
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      toast.success("Password changed successfully!");
+      setIsChangingPassword(false);
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error: any) {
+      toast.error(error.message || "Failed to change password");
+    }
+  };
+
+  const handleCancelChangePassword = () => {
+    setIsChangingPassword(false);
+    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
   };
 
   const handleGenerateReport = async () => {
@@ -1266,7 +1364,15 @@ export default function Dashboard() {
       </Dialog>
 
       {/* Profile Sheet */}
-      <Sheet open={showProfileSheet} onOpenChange={setShowProfileSheet}>
+      <Sheet open={showProfileSheet} onOpenChange={(open) => {
+        setShowProfileSheet(open);
+        if (!open) {
+          setIsEditingProfile(false);
+          setIsChangingPassword(false);
+          setProfileForm({ name: '', email: '', phone: '' });
+          setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        }
+      }}>
         <SheetContent className="bg-card border-border">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
@@ -1275,42 +1381,214 @@ export default function Dashboard() {
             </SheetTitle>
             <SheetDescription>View and manage your profile information.</SheetDescription>
           </SheetHeader>
-          <div className="mt-6 space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-white text-xl font-bold">
-                {currentUser?.name?.split(' ').map(n => n[0]).join('') || 'U'}
+          
+          <ScrollArea className="h-[calc(100vh-120px)] mt-4">
+            <div className="space-y-6 pr-4">
+              {/* Profile Header */}
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-white text-xl font-bold">
+                  {currentUser?.name?.split(' ').map(n => n[0]).join('') || 'U'}
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold">{currentUser?.name}</h3>
+                  <p className="text-muted-foreground">{currentUser?.role}</p>
+                </div>
+                {!isEditingProfile && !isChangingPassword && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleStartEditProfile}
+                    data-testid="button-edit-profile"
+                  >
+                    <Pencil className="w-4 h-4 mr-1" />
+                    Edit
+                  </Button>
+                )}
               </div>
-              <div>
-                <h3 className="text-lg font-semibold">{currentUser?.name}</h3>
-                <p className="text-muted-foreground">{currentUser?.role}</p>
-              </div>
+              
+              <Separator />
+              
+              {/* Edit Profile Form */}
+              {isEditingProfile ? (
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Edit Contact Information</h4>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-name">Full Name</Label>
+                    <Input
+                      id="edit-name"
+                      value={profileForm.name}
+                      onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                      placeholder="Your full name"
+                      data-testid="input-edit-name"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-email">Email Address</Label>
+                    <Input
+                      id="edit-email"
+                      type="email"
+                      value={profileForm.email}
+                      onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                      placeholder="Your email address"
+                      data-testid="input-edit-email"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-phone">Phone Number</Label>
+                    <Input
+                      id="edit-phone"
+                      type="tel"
+                      value={profileForm.phone}
+                      onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                      placeholder="Your phone number (optional)"
+                      data-testid="input-edit-phone"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={handleCancelEditProfile}
+                      className="flex-1"
+                      data-testid="button-cancel-edit-profile"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleSaveProfile}
+                      disabled={updateUserProfile.isPending}
+                      className="flex-1"
+                      data-testid="button-save-profile"
+                    >
+                      {updateUserProfile.isPending ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </div>
+                </div>
+              ) : isChangingPassword ? (
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Change Password</h4>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="current-password">Current Password</Label>
+                    <Input
+                      id="current-password"
+                      type="password"
+                      value={passwordForm.currentPassword}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                      placeholder="Enter current password"
+                      data-testid="input-current-password"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">New Password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                      placeholder="Enter new password (min 6 characters)"
+                      data-testid="input-new-password"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">Confirm New Password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                      placeholder="Confirm new password"
+                      data-testid="input-confirm-password"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={handleCancelChangePassword}
+                      className="flex-1"
+                      data-testid="button-cancel-password"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleChangePassword}
+                      disabled={changePassword.isPending}
+                      className="flex-1"
+                      data-testid="button-save-password"
+                    >
+                      {changePassword.isPending ? "Changing..." : "Change Password"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Contact Information */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Contact Information</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <Mail className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <Label className="text-muted-foreground text-xs">Email</Label>
+                          <p className="text-sm">{currentUser?.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Phone className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <Label className="text-muted-foreground text-xs">Phone</Label>
+                          <p className="text-sm">{(currentUser as any)?.phone || 'Not set'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  {/* Performance Stats */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Performance</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="text-center p-3 bg-secondary/30 rounded-lg">
+                        <p className="text-2xl font-bold text-primary">{currentUser?.score || 0}</p>
+                        <p className="text-xs text-muted-foreground">Score</p>
+                      </div>
+                      <div className="text-center p-3 bg-secondary/30 rounded-lg">
+                        <p className="text-2xl font-bold">{currentUser?.activeDeals || 0}</p>
+                        <p className="text-xs text-muted-foreground">Active Deals</p>
+                      </div>
+                      <div className="text-center p-3 bg-secondary/30 rounded-lg">
+                        <p className="text-2xl font-bold text-green-500">{currentUser?.completedTasks || 0}</p>
+                        <p className="text-xs text-muted-foreground">Tasks Done</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  {/* Security */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Security</h4>
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => setIsChangingPassword(true)}
+                      data-testid="button-change-password"
+                    >
+                      <Lock className="w-4 h-4 mr-2" />
+                      Change Password
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
-            
-            <Separator />
-            
-            <div className="space-y-4">
-              <div>
-                <Label className="text-muted-foreground text-xs">Email</Label>
-                <p className="text-sm">{currentUser?.email}</p>
-              </div>
-              <div>
-                <Label className="text-muted-foreground text-xs">Role</Label>
-                <p className="text-sm">{currentUser?.role}</p>
-              </div>
-              <div>
-                <Label className="text-muted-foreground text-xs">Performance Score</Label>
-                <p className="text-sm font-mono text-primary">{currentUser?.score || 0}</p>
-              </div>
-              <div>
-                <Label className="text-muted-foreground text-xs">Active Deals</Label>
-                <p className="text-sm">{currentUser?.activeDeals || 0}</p>
-              </div>
-              <div>
-                <Label className="text-muted-foreground text-xs">Completed Tasks</Label>
-                <p className="text-sm">{currentUser?.completedTasks || 0}</p>
-              </div>
-            </div>
-          </div>
+          </ScrollArea>
         </SheetContent>
       </Sheet>
 
