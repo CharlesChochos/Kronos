@@ -77,6 +77,36 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
   
+  // Settings preferences - persist to localStorage
+  const [settings, setSettings] = useState(() => {
+    const saved = localStorage.getItem('userSettings');
+    return saved ? JSON.parse(saved) : {
+      // Notifications
+      dealUpdates: true,
+      taskReminders: true,
+      teamActivity: false,
+      weeklySummary: true,
+      desktopAlerts: false,
+      // Display
+      darkMode: true,
+      compactView: false,
+      animations: true,
+      autoRefresh: true,
+      // Account
+      twoFactorAuth: false,
+    };
+  });
+  
+  // Save settings to localStorage
+  useEffect(() => {
+    localStorage.setItem('userSettings', JSON.stringify(settings));
+  }, [settings]);
+  
+  const updateSetting = (key: string, value: boolean) => {
+    setSettings((prev: any) => ({ ...prev, [key]: value }));
+    toast.success(`Setting updated`);
+  };
+  
   // Photo upload ref
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -1066,28 +1096,40 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                       <Label className="text-sm">Deal Updates</Label>
                       <p className="text-xs text-muted-foreground">Notifications about deals you're assigned to</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch 
+                      checked={settings.dealUpdates} 
+                      onCheckedChange={(checked) => updateSetting('dealUpdates', checked)} 
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-sm">Task Reminders</Label>
                       <p className="text-xs text-muted-foreground">Reminders for upcoming due dates</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch 
+                      checked={settings.taskReminders} 
+                      onCheckedChange={(checked) => updateSetting('taskReminders', checked)} 
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-sm">Team Activity</Label>
                       <p className="text-xs text-muted-foreground">Updates when teammates make changes</p>
                     </div>
-                    <Switch />
+                    <Switch 
+                      checked={settings.teamActivity} 
+                      onCheckedChange={(checked) => updateSetting('teamActivity', checked)} 
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-sm">Weekly Summary</Label>
                       <p className="text-xs text-muted-foreground">Weekly digest of your activity</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch 
+                      checked={settings.weeklySummary} 
+                      onCheckedChange={(checked) => updateSetting('weeklySummary', checked)} 
+                    />
                   </div>
                 </div>
               </div>
@@ -1101,7 +1143,10 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                     <Label className="text-sm">Desktop Alerts</Label>
                     <p className="text-xs text-muted-foreground">Browser push notifications</p>
                   </div>
-                  <Switch />
+                  <Switch 
+                    checked={settings.desktopAlerts} 
+                    onCheckedChange={(checked) => updateSetting('desktopAlerts', checked)} 
+                  />
                 </div>
               </div>
             </TabsContent>
@@ -1116,21 +1161,30 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                       <Label className="text-sm">Dark Mode</Label>
                       <p className="text-xs text-muted-foreground">Use dark theme</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch 
+                      checked={settings.darkMode} 
+                      onCheckedChange={(checked) => updateSetting('darkMode', checked)} 
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-sm">Compact View</Label>
                       <p className="text-xs text-muted-foreground">Show more data in less space</p>
                     </div>
-                    <Switch />
+                    <Switch 
+                      checked={settings.compactView} 
+                      onCheckedChange={(checked) => updateSetting('compactView', checked)} 
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-sm">Animations</Label>
                       <p className="text-xs text-muted-foreground">Enable UI animations</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch 
+                      checked={settings.animations} 
+                      onCheckedChange={(checked) => updateSetting('animations', checked)} 
+                    />
                   </div>
                 </div>
               </div>
@@ -1144,7 +1198,10 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                     <Label className="text-sm">Auto-refresh</Label>
                     <p className="text-xs text-muted-foreground">Update data automatically</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch 
+                    checked={settings.autoRefresh} 
+                    onCheckedChange={(checked) => updateSetting('autoRefresh', checked)} 
+                  />
                 </div>
               </div>
             </TabsContent>
@@ -1161,7 +1218,10 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                     <Label className="text-sm">Two-Factor Authentication</Label>
                     <p className="text-xs text-muted-foreground">Add an extra layer of security</p>
                   </div>
-                  <Switch />
+                  <Switch 
+                    checked={settings.twoFactorAuth} 
+                    onCheckedChange={(checked) => updateSetting('twoFactorAuth', checked)} 
+                  />
                 </div>
               </div>
               

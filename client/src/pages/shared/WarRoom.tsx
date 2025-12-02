@@ -7,6 +7,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import {
   AlertTriangle,
   CheckCircle,
@@ -20,11 +22,15 @@ import {
   Calendar,
   Zap,
   Shield,
-  AlertCircle
+  AlertCircle,
+  Flag,
+  ChevronRight,
+  Briefcase
 } from "lucide-react";
 import { useCurrentUser, useDeals, useTasks, useUsers } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { format, differenceInDays, differenceInHours } from "date-fns";
+import { toast } from "sonner";
 
 type WarRoomProps = {
   role: 'CEO' | 'Employee';
@@ -37,6 +43,50 @@ export default function WarRoom({ role }: WarRoomProps) {
   const { data: users = [] } = useUsers();
   
   const [selectedDeal, setSelectedDeal] = useState<string>("all");
+  
+  // Detail modals
+  const [showDealDetail, setShowDealDetail] = useState(false);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
+  const [selectedDetailDeal, setSelectedDetailDeal] = useState<any>(null);
+  const [selectedDetailTask, setSelectedDetailTask] = useState<any>(null);
+  
+  // Flagging system - stored in localStorage
+  const [flaggedItems, setFlaggedItems] = useState<{dealIds: string[], taskIds: string[]}>(() => {
+    const saved = localStorage.getItem('warRoomFlags');
+    return saved ? JSON.parse(saved) : { dealIds: [], taskIds: [] };
+  });
+  
+  const toggleDealFlag = (dealId: string) => {
+    setFlaggedItems(prev => {
+      const newFlags = prev.dealIds.includes(dealId)
+        ? { ...prev, dealIds: prev.dealIds.filter(id => id !== dealId) }
+        : { ...prev, dealIds: [...prev.dealIds, dealId] };
+      localStorage.setItem('warRoomFlags', JSON.stringify(newFlags));
+      toast.success(prev.dealIds.includes(dealId) ? 'Deal unflagged' : 'Deal flagged for attention');
+      return newFlags;
+    });
+  };
+  
+  const toggleTaskFlag = (taskId: string) => {
+    setFlaggedItems(prev => {
+      const newFlags = prev.taskIds.includes(taskId)
+        ? { ...prev, taskIds: prev.taskIds.filter(id => id !== taskId) }
+        : { ...prev, taskIds: [...prev.taskIds, taskId] };
+      localStorage.setItem('warRoomFlags', JSON.stringify(newFlags));
+      toast.success(prev.taskIds.includes(taskId) ? 'Task unflagged' : 'Task flagged for attention');
+      return newFlags;
+    });
+  };
+  
+  const openDealDetail = (deal: any) => {
+    setSelectedDetailDeal(deal);
+    setShowDealDetail(true);
+  };
+  
+  const openTaskDetail = (task: any) => {
+    setSelectedDetailTask(task);
+    setShowTaskDetail(true);
+  };
 
   const criticalDeals = useMemo(() => {
     return deals.filter(d => {
@@ -201,11 +251,36 @@ export default function WarRoom({ role }: WarRoomProps) {
               <ScrollArea className="h-[400px]">
                 <div className="space-y-4">
                   {filteredDeals.map(deal => (
-                    <div key={deal.id} className="p-4 rounded-lg border border-border hover:border-primary/50 transition-colors">
+                    <div 
+                      key={deal.id} 
+                      className={cn(
+                        "p-4 rounded-lg border transition-colors cursor-pointer group",
+                        flaggedItems.dealIds.includes(deal.id) 
+                          ? "border-orange-500/50 bg-orange-500/5" 
+                          : "border-border hover:border-primary/50"
+                      )}
+                      onClick={() => openDealDetail(deal)}
+                      data-testid={`deal-card-${deal.id}`}
+                    >
                       <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h4 className="font-medium">{deal.name}</h4>
-                          <p className="text-sm text-muted-foreground">{deal.client} • {deal.sector}</p>
+                        <div className="flex items-start gap-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleDealFlag(deal.id); }}
+                            className={cn(
+                              "mt-1 p-1 rounded hover:bg-secondary/50 transition-colors",
+                              flaggedItems.dealIds.includes(deal.id) ? "text-orange-500" : "text-muted-foreground opacity-0 group-hover:opacity-100"
+                            )}
+                            data-testid={`flag-deal-${deal.id}`}
+                          >
+                            <Flag className="w-4 h-4" fill={flaggedItems.dealIds.includes(deal.id) ? "currentColor" : "none"} />
+                          </button>
+                          <div>
+                            <h4 className="font-medium flex items-center gap-2">
+                              {deal.name}
+                              <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </h4>
+                            <p className="text-sm text-muted-foreground">{deal.client} • {deal.sector}</p>
+                          </div>
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-lg">${deal.value}M</p>
@@ -264,15 +339,39 @@ export default function WarRoom({ role }: WarRoomProps) {
                       const daysLeft = differenceInDays(new Date(task.dueDate), new Date());
                       const hoursLeft = differenceInHours(new Date(task.dueDate), new Date());
                       return (
-                        <div key={task.id} className="p-2 rounded border border-border hover:bg-secondary/50">
-                          <p className="text-sm font-medium truncate">{task.title}</p>
-                          <div className="flex items-center justify-between mt-1">
-                            <Badge variant={task.priority === 'High' ? 'destructive' : 'secondary'} className="text-xs">
-                              {task.priority}
-                            </Badge>
-                            <span className="text-xs text-orange-500">
-                              {daysLeft > 0 ? `${daysLeft}d left` : `${hoursLeft}h left`}
-                            </span>
+                        <div 
+                          key={task.id} 
+                          className={cn(
+                            "p-2 rounded border cursor-pointer group transition-colors",
+                            flaggedItems.taskIds.includes(task.id)
+                              ? "border-orange-500/50 bg-orange-500/5"
+                              : "border-border hover:bg-secondary/50"
+                          )}
+                          onClick={() => openTaskDetail(task)}
+                          data-testid={`urgent-task-${task.id}`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleTaskFlag(task.id); }}
+                              className={cn(
+                                "p-0.5 rounded hover:bg-secondary/50 transition-colors",
+                                flaggedItems.taskIds.includes(task.id) ? "text-orange-500" : "text-muted-foreground opacity-0 group-hover:opacity-100"
+                              )}
+                              data-testid={`flag-task-${task.id}`}
+                            >
+                              <Flag className="w-3 h-3" fill={flaggedItems.taskIds.includes(task.id) ? "currentColor" : "none"} />
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{task.title}</p>
+                              <div className="flex items-center justify-between mt-1">
+                                <Badge variant={task.priority === 'High' ? 'destructive' : 'secondary'} className="text-xs">
+                                  {task.priority}
+                                </Badge>
+                                <span className="text-xs text-orange-500">
+                                  {daysLeft > 0 ? `${daysLeft}d left` : `${hoursLeft}h left`}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       );
@@ -297,11 +396,35 @@ export default function WarRoom({ role }: WarRoomProps) {
                 <ScrollArea className="h-32">
                   <div className="space-y-2">
                     {overdueTasks.slice(0, 5).map(task => (
-                      <div key={task.id} className="p-2 rounded border border-red-500/30 bg-red-500/5">
-                        <p className="text-sm font-medium truncate">{task.title}</p>
-                        <p className="text-xs text-red-500 mt-1">
-                          Due: {format(new Date(task.dueDate), 'MMM d')}
-                        </p>
+                      <div 
+                        key={task.id} 
+                        className={cn(
+                          "p-2 rounded border cursor-pointer group transition-colors",
+                          flaggedItems.taskIds.includes(task.id)
+                            ? "border-orange-500/50 bg-orange-500/10"
+                            : "border-red-500/30 bg-red-500/5 hover:bg-red-500/10"
+                        )}
+                        onClick={() => openTaskDetail(task)}
+                        data-testid={`overdue-task-${task.id}`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleTaskFlag(task.id); }}
+                            className={cn(
+                              "p-0.5 rounded hover:bg-secondary/50 transition-colors",
+                              flaggedItems.taskIds.includes(task.id) ? "text-orange-500" : "text-muted-foreground opacity-0 group-hover:opacity-100"
+                            )}
+                            data-testid={`flag-overdue-task-${task.id}`}
+                          >
+                            <Flag className="w-3 h-3" fill={flaggedItems.taskIds.includes(task.id) ? "currentColor" : "none"} />
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{task.title}</p>
+                            <p className="text-xs text-red-500 mt-1">
+                              Due: {format(new Date(task.dueDate), 'MMM d')}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     ))}
                     {overdueTasks.length === 0 && (
@@ -398,6 +521,143 @@ export default function WarRoom({ role }: WarRoomProps) {
           </Card>
         </div>
       </div>
+      
+      {/* Deal Detail Modal */}
+      <Dialog open={showDealDetail} onOpenChange={setShowDealDetail}>
+        <DialogContent className="bg-card border-border max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-primary" />
+              {selectedDetailDeal?.name}
+            </DialogTitle>
+            <DialogDescription>{selectedDetailDeal?.client} • {selectedDetailDeal?.sector}</DialogDescription>
+          </DialogHeader>
+          
+          {selectedDetailDeal && (
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-secondary/30 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-primary">${selectedDetailDeal.value}M</p>
+                  <p className="text-xs text-muted-foreground">Deal Value</p>
+                </div>
+                <div className="bg-secondary/30 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold">{selectedDetailDeal.progress || 0}%</p>
+                  <p className="text-xs text-muted-foreground">Progress</p>
+                </div>
+                <div className="bg-secondary/30 rounded-lg p-4 text-center">
+                  <Badge variant="secondary" className="text-lg">{selectedDetailDeal.stage}</Badge>
+                  <p className="text-xs text-muted-foreground mt-1">Current Stage</p>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">Description</h4>
+                <p className="text-sm">{selectedDetailDeal.description || 'No description available'}</p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">Related Tasks</h4>
+                <div className="space-y-2">
+                  {tasks.filter(t => t.dealId === selectedDetailDeal.id).slice(0, 5).map(task => (
+                    <div key={task.id} className="flex items-center justify-between p-2 bg-secondary/30 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className={cn(
+                          "w-4 h-4",
+                          task.status === 'Completed' ? 'text-green-500' : 'text-muted-foreground'
+                        )} />
+                        <span className="text-sm">{task.title}</span>
+                      </div>
+                      <Badge variant={task.status === 'Completed' ? 'default' : 'secondary'} className="text-xs">
+                        {task.status}
+                      </Badge>
+                    </div>
+                  ))}
+                  {tasks.filter(t => t.dealId === selectedDetailDeal.id).length === 0 && (
+                    <p className="text-sm text-muted-foreground">No tasks assigned to this deal</p>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button 
+                  variant={flaggedItems.dealIds.includes(selectedDetailDeal.id) ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => toggleDealFlag(selectedDetailDeal.id)}
+                >
+                  <Flag className="w-4 h-4 mr-2" fill={flaggedItems.dealIds.includes(selectedDetailDeal.id) ? "currentColor" : "none"} />
+                  {flaggedItems.dealIds.includes(selectedDetailDeal.id) ? 'Flagged' : 'Flag for Attention'}
+                </Button>
+                <Button variant="outline" onClick={() => setShowDealDetail(false)}>Close</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      
+      {/* Task Detail Modal */}
+      <Dialog open={showTaskDetail} onOpenChange={setShowTaskDetail}>
+        <DialogContent className="bg-card border-border max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-primary" />
+              {selectedDetailTask?.title}
+            </DialogTitle>
+            <DialogDescription>Task Details</DialogDescription>
+          </DialogHeader>
+          
+          {selectedDetailTask && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-secondary/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Priority</p>
+                  <Badge variant={selectedDetailTask.priority === 'High' ? 'destructive' : 'secondary'} className="mt-1">
+                    {selectedDetailTask.priority}
+                  </Badge>
+                </div>
+                <div className="bg-secondary/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <Badge variant={selectedDetailTask.status === 'Completed' ? 'default' : 'secondary'} className="mt-1">
+                    {selectedDetailTask.status}
+                  </Badge>
+                </div>
+                <div className="bg-secondary/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Due Date</p>
+                  <p className="text-sm font-medium mt-1">{format(new Date(selectedDetailTask.dueDate), 'MMM d, yyyy')}</p>
+                </div>
+                <div className="bg-secondary/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Assigned To</p>
+                  <p className="text-sm font-medium mt-1">
+                    {users.find(u => u.id === selectedDetailTask.assignedTo)?.name || 'Unassigned'}
+                  </p>
+                </div>
+              </div>
+              
+              {selectedDetailTask.dealId && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Related Deal</p>
+                  <div className="p-2 bg-secondary/30 rounded-lg">
+                    <p className="text-sm font-medium">{deals.find(d => d.id === selectedDetailTask.dealId)?.name || 'Unknown Deal'}</p>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex gap-2">
+                <Button 
+                  variant={flaggedItems.taskIds.includes(selectedDetailTask.id) ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => toggleTaskFlag(selectedDetailTask.id)}
+                >
+                  <Flag className="w-4 h-4 mr-2" fill={flaggedItems.taskIds.includes(selectedDetailTask.id) ? "currentColor" : "none"} />
+                  {flaggedItems.taskIds.includes(selectedDetailTask.id) ? 'Flagged' : 'Flag for Attention'}
+                </Button>
+                <Button variant="outline" onClick={() => setShowTaskDetail(false)}>Close</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
