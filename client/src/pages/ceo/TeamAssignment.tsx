@@ -14,11 +14,14 @@ import {
   Users, 
   MoreHorizontal,
   Calendar,
-  BarChart2,
   UserPlus,
   CheckCircle,
-  Clock
+  Clock,
+  Paperclip,
+  X,
+  FileText
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser, useUsers, useDeals, useTasks, useCreateTask } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -58,10 +61,13 @@ export default function TeamAssignment() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [newTask, setNewTask] = useState({
     title: '',
+    description: '',
     priority: 'Medium',
     type: 'Analysis',
     dueDate: new Date().toISOString().split('T')[0],
   });
+  const [taskAttachments, setTaskAttachments] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getUserTaskCount = (userId: string) => tasks.filter(t => t.assignedTo === userId && t.status !== 'Completed').length;
   const getUserAvailability = (userId: string) => {
@@ -76,24 +82,48 @@ export default function TeamAssignment() {
     return getUserAvailability(user.id) === filterAvailability;
   });
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      setTaskAttachments(prev => [...prev, ...Array.from(files)]);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setTaskAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleAssignTask = async () => {
     if (!selectedUser || !selectedDeal || !newTask.title) {
       toast.error("Please fill in all required fields");
       return;
     }
     try {
+      // Convert files to attachment objects (in a real app, you'd upload these to storage first)
+      const attachmentObjects = taskAttachments.map(file => ({
+        id: crypto.randomUUID(),
+        filename: file.name,
+        url: URL.createObjectURL(file), // In production, this would be a real upload URL
+        size: file.size,
+        uploadedAt: new Date().toISOString(),
+      }));
+
       await createTask.mutateAsync({
         title: newTask.title,
+        description: newTask.description || null,
         dealId: selectedDeal,
         assignedTo: selectedUser.id,
+        assignedBy: currentUser?.id || null,
         priority: newTask.priority,
         type: newTask.type,
         dueDate: newTask.dueDate,
         status: 'Pending',
+        attachments: attachmentObjects.length > 0 ? attachmentObjects : [],
       });
       toast.success(`Task assigned to ${selectedUser.name}!`);
       setShowAssignModal(false);
-      setNewTask({ title: '', priority: 'Medium', type: 'Analysis', dueDate: new Date().toISOString().split('T')[0] });
+      setNewTask({ title: '', description: '', priority: 'Medium', type: 'Analysis', dueDate: new Date().toISOString().split('T')[0] });
+      setTaskAttachments([]);
       setSelectedUser(null);
     } catch (error: any) {
       toast.error(error.message || "Failed to assign task");
@@ -109,22 +139,6 @@ export default function TeamAssignment() {
     setShowAssignModal(true);
   };
 
-  const handleExportReport = () => {
-    const report = users.map(u => ({
-      name: u.name,
-      role: u.role,
-      activeTasks: getUserTaskCount(u.id),
-      availability: getUserAvailability(u.id),
-      score: u.score || 0,
-    }));
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'team-workload-report.json';
-    a.click();
-    toast.success("Report exported!");
-  };
 
   if (usersLoading || dealsLoading) {
     return (
@@ -212,11 +226,6 @@ export default function TeamAssignment() {
                 <h2 className="text-sm font-medium text-muted-foreground">
                   {selectedDeal ? `Assigning team for: ${currentDeal?.name}` : 'Select a deal to assign team members'}
                 </h2>
-                <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handleExportReport}>
-                      <BarChart2 className="w-4 h-4 mr-2" /> Export Report
-                    </Button>
-                </div>
             </div>
             
             <Card className="bg-card border-border h-[calc(100%-3rem)] flex flex-col">
@@ -309,11 +318,11 @@ export default function TeamAssignment() {
 
       {/* Assign Task Modal */}
       <Dialog open={showAssignModal} onOpenChange={setShowAssignModal}>
-        <DialogContent className="bg-card border-border">
+        <DialogContent className="bg-card border-border max-w-lg">
           <DialogHeader>
             <DialogTitle>Assign Task to {selectedUser?.name}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
             <div className="text-sm text-muted-foreground">
               Assigning to deal: <span className="font-medium text-foreground">{currentDeal?.name}</span>
             </div>
@@ -323,6 +332,15 @@ export default function TeamAssignment() {
                 placeholder="e.g., Review financial model" 
                 value={newTask.title}
                 onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea 
+                placeholder="Provide detailed instructions for the task..."
+                value={newTask.description}
+                onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                rows={3}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -361,6 +379,47 @@ export default function TeamAssignment() {
                 value={newTask.dueDate}
                 onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Attachments</Label>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                multiple
+                className="hidden"
+              />
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Paperclip className="w-4 h-4 mr-2" /> Add Files
+              </Button>
+              {taskAttachments.length > 0 && (
+                <div className="space-y-2 mt-2">
+                  {taskAttachments.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-secondary/30 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-primary" />
+                        <span className="text-sm truncate max-w-48">{file.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({(file.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6"
+                        onClick={() => removeAttachment(index)}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

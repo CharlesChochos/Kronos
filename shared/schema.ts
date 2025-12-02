@@ -82,16 +82,28 @@ export const insertDealSchema = createInsertSchema(deals).omit({
 export type InsertDeal = z.infer<typeof insertDealSchema>;
 export type Deal = typeof deals.$inferSelect;
 
+// Task Attachment type
+export type TaskAttachment = {
+  id: string;
+  filename: string;
+  url: string;
+  size: number;
+  uploadedAt: string;
+};
+
 // Tasks table
 export const tasks = pgTable("tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
+  description: text("description"),
   dealId: varchar("deal_id").references(() => deals.id),
   assignedTo: varchar("assigned_to").references(() => users.id),
+  assignedBy: varchar("assigned_by").references(() => users.id),
   priority: text("priority").notNull().default('Medium'),
   dueDate: text("due_date").notNull(),
   status: text("status").notNull().default('Pending'),
   type: text("type").notNull(),
+  attachments: jsonb("attachments").default([]).$type<TaskAttachment[]>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -145,3 +157,66 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+
+// Conversations table for chat
+export const conversations = pgTable("conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name"),
+  isGroup: boolean("is_group").default(false),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertConversationSchema = createInsertSchema(conversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+
+// Conversation Members table
+export const conversationMembers = pgTable("conversation_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").references(() => conversations.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  joinedAt: timestamp("joined_at").defaultNow(),
+  lastReadAt: timestamp("last_read_at"),
+});
+
+export const insertConversationMemberSchema = createInsertSchema(conversationMembers).omit({
+  id: true,
+  joinedAt: true,
+});
+
+export type InsertConversationMember = z.infer<typeof insertConversationMemberSchema>;
+export type ConversationMember = typeof conversationMembers.$inferSelect;
+
+// Message Attachment type
+export type MessageAttachment = {
+  id: string;
+  filename: string;
+  url: string;
+  size: number;
+  type: string;
+};
+
+// Messages table
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").references(() => conversations.id).notNull(),
+  senderId: varchar("sender_id").references(() => users.id).notNull(),
+  content: text("content").notNull(),
+  attachments: jsonb("attachments").default([]).$type<MessageAttachment[]>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMessageSchema = createInsertSchema(messages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messages.$inferSelect;
