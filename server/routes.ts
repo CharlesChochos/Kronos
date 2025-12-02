@@ -648,6 +648,92 @@ Generate only the document content, no additional commentary.`;
     }
   });
 
+  // ===== AI TASK ANALYSIS =====
+
+  app.post("/api/ai/analyze-task", requireAuth, async (req, res) => {
+    try {
+      const { task, deal } = req.body;
+      
+      if (!task) {
+        return res.status(400).json({ error: "Task data is required" });
+      }
+      
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const taskContext = `
+Task Information:
+- Title: ${task.title || 'N/A'}
+- Description: ${task.description || 'No description'}
+- Type: ${task.type || 'General'}
+- Priority: ${task.priority || 'Medium'}
+`;
+
+      const dealContext = deal ? `
+Deal Context:
+- Name: ${deal.name || 'N/A'}
+- Client: ${deal.client || 'N/A'}
+- Sector: ${deal.sector || 'N/A'}
+- Stage: ${deal.stage || 'N/A'}
+` : 'No deal context provided.';
+
+      const prompt = `You are an AI assistant for an investment banking platform. Analyze the following task and suggest the best action to take.
+
+${taskContext}
+${dealContext}
+
+Based on this task, provide:
+1. A recommended action (1-2 sentences)
+2. Brief reasoning for this recommendation (2-3 sentences)
+3. List of 2-4 relevant tools/applications the user should use
+
+Respond in JSON format:
+{
+  "action": "string - the recommended action",
+  "reasoning": "string - explanation of why this action is best",
+  "tools": ["array", "of", "tool", "names"]
+}
+
+Consider common investment banking tasks like:
+- Document preparation (Word, Excel, PowerPoint)
+- Financial modeling (Excel, specialized tools)
+- Due diligence research (web research, databases)
+- Client communication (Email, Calendar)
+- Data analysis (Excel, BI tools)
+- Presentation creation (PowerPoint)
+- Legal review (Document management)`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "You are an expert investment banking workflow assistant. Always respond with valid JSON." },
+          { role: "user", content: prompt }
+        ],
+        max_tokens: 500,
+        temperature: 0.7,
+        response_format: { type: "json_object" }
+      });
+      
+      const content = response.choices[0]?.message?.content;
+      
+      if (!content) {
+        return res.status(500).json({ error: "Failed to analyze task" });
+      }
+      
+      const analysis = JSON.parse(content);
+      res.json(analysis);
+    } catch (error: any) {
+      console.error('AI task analysis error:', error);
+      res.status(500).json({ 
+        action: "Manual Review Required",
+        reasoning: "Unable to analyze the task automatically at this time.",
+        tools: ["Document Editor", "Email Client", "Calendar"]
+      });
+    }
+  });
+
   // ===== MARKET DATA ROUTE =====
   
   app.get("/api/market-data", requireAuth, async (req, res) => {

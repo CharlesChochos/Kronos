@@ -1,9 +1,16 @@
-import { useState, useEffect, useRef } from "react";
-import { useSearch } from "wouter";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useSearch, useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from "framer-motion";
 import { 
   Calendar, 
   Clock, 
@@ -11,68 +18,232 @@ import {
   FileText, 
   MessageSquare, 
   BarChart,
-  Check
+  Check,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUp,
+  ArrowDown,
+  Send,
+  Sparkles,
+  User,
+  Briefcase,
+  Paperclip,
+  ExternalLink,
+  X,
+  Loader2,
+  Brain
 } from "lucide-react";
-import { useCurrentUser, useTasks, useDeals, useUpdateTask } from "@/lib/api";
+import { useCurrentUser, useTasks, useDeals, useUpdateTask, useUsers } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import type { Task } from "@shared/schema";
+import { format, parseISO, isToday, isBefore, addDays, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
+import type { Task, Deal } from "@shared/schema";
+
+type SwipeDirection = 'left' | 'right' | 'up' | null;
 
 export default function MyTasks() {
+  const [, setLocation] = useLocation();
   const searchString = useSearch();
   const { data: currentUser } = useCurrentUser();
   const { data: allTasks = [], isLoading } = useTasks();
   const { data: deals = [] } = useDeals();
+  const { data: users = [] } = useUsers();
   const updateTask = useUpdateTask();
+  
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
+  const [currentSwipeIndex, setCurrentSwipeIndex] = useState(0);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [forwardToUser, setForwardToUser] = useState<string>("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<{action: string, reasoning: string, tools: string[]} | null>(null);
+  const [deferredTasks, setDeferredTasks] = useState<string[]>([]);
+  
   const taskRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   
-  // Handle URL query parameter for highlighting a specific task
   useEffect(() => {
     if (searchString && allTasks.length > 0) {
       const params = new URLSearchParams(searchString);
       const taskId = params.get('id');
       if (taskId) {
         setHighlightedTaskId(taskId);
-        // Scroll to the task after a short delay
         setTimeout(() => {
           const element = taskRefs.current[taskId];
           if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
         }, 100);
-        // Remove highlight after 3 seconds
         setTimeout(() => setHighlightedTaskId(null), 3000);
       }
     }
   }, [searchString, allTasks]);
   
   const myTasks = currentUser ? allTasks.filter(t => t.assignedTo === currentUser.id) : [];
-  const pendingTasks = myTasks.filter(t => t.status === 'Pending');
-  const inProgressTasks = myTasks.filter(t => t.status === 'In Progress');
-  const completedTasks = myTasks.filter(t => t.status === 'Completed');
-  const highPriorityTasks = myTasks.filter(t => t.priority === 'High' && t.status !== 'Completed');
+  
+  const getDealName = (dealId: string | null) => {
+    const deal = deals.find(d => d.id === dealId);
+    return deal?.name || 'No Deal';
+  };
 
-  const getTaskWithDealName = (task: Task) => {
-    const deal = deals.find(d => d.id === task.dealId);
-    return { ...task, dealName: deal?.name || 'No Deal' };
+  const getDeal = (dealId: string | null): Deal | null => {
+    return deals.find(d => d.id === dealId) || null;
+  };
+
+  const isDateWithinThisWeek = (dateStr: string | null) => {
+    if (!dateStr) return false;
+    const date = parseISO(dateStr);
+    const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(new Date(), { weekStartsOn: 0 });
+    return isWithinInterval(date, { start: weekStart, end: weekEnd }) && !isToday(date);
+  };
+
+  const dueTodayTasks = myTasks.filter(t => 
+    t.status !== 'Completed' && t.dueDate && isToday(parseISO(t.dueDate))
+  );
+  
+  const dueNextWeekTasks = myTasks.filter(t => 
+    t.status !== 'Completed' && t.dueDate && isDateWithinThisWeek(t.dueDate)
+  );
+  
+  const dueLaterTasks = myTasks.filter(t => {
+    if (t.status === 'Completed') return false;
+    if (!t.dueDate) return true;
+    const dueDate = parseISO(t.dueDate);
+    return !isToday(dueDate) && !isDateWithinThisWeek(t.dueDate);
+  });
+  
+  const completedTasks = myTasks.filter(t => t.status === 'Completed');
+
+  const swipeableTasks = useMemo(() => {
+    const todayNonDeferred = dueTodayTasks.filter(t => !deferredTasks.includes(t.id));
+    const todayDeferred = dueTodayTasks.filter(t => deferredTasks.includes(t.id));
+    return [...todayNonDeferred, ...todayDeferred];
+  }, [dueTodayTasks, deferredTasks]);
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return { tasks: [], deals: [] };
+    const query = searchQuery.toLowerCase();
+    const matchedTasks = myTasks.filter(t => 
+      t.title.toLowerCase().includes(query) || 
+      t.description?.toLowerCase().includes(query)
+    );
+    const matchedDeals = deals.filter(d => 
+      d.name.toLowerCase().includes(query) || 
+      d.client.toLowerCase().includes(query)
+    );
+    return { tasks: matchedTasks, deals: matchedDeals };
+  }, [searchQuery, myTasks, deals]);
+
+  const handleSwipe = async (direction: SwipeDirection, task: Task) => {
+    if (direction === 'right') {
+      setDeferredTasks(prev => [...prev, task.id]);
+      toast.info("Task deferred to later");
+      setCurrentSwipeIndex(prev => Math.min(prev + 1, swipeableTasks.length - 1));
+    } else if (direction === 'left') {
+      setSelectedTask(task);
+      setShowForwardModal(true);
+    } else if (direction === 'up') {
+      setSelectedTask(task);
+      setShowAIModal(true);
+      analyzeTaskWithAI(task);
+    }
+  };
+
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setShowTaskDetailModal(true);
   };
 
   const handleCompleteTask = async (taskId: string) => {
     try {
       await updateTask.mutateAsync({ id: taskId, status: 'Completed' });
       toast.success("Task marked as completed!");
+      setShowTaskDetailModal(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to update task");
     }
   };
 
-  const handleStartTask = async (taskId: string) => {
+  const handleForwardTask = async () => {
+    if (!selectedTask || !forwardToUser) {
+      toast.error("Please select a team member");
+      return;
+    }
     try {
-      await updateTask.mutateAsync({ id: taskId, status: 'In Progress' });
-      toast.success("Task started!");
+      await updateTask.mutateAsync({ 
+        id: selectedTask.id, 
+        assignedTo: forwardToUser,
+        status: 'Pending'
+      });
+      toast.success("Task forwarded successfully!");
+      setShowForwardModal(false);
+      setForwardToUser("");
+      setSelectedTask(null);
+      setCurrentSwipeIndex(prev => Math.min(prev + 1, swipeableTasks.length - 1));
     } catch (error: any) {
-      toast.error(error.message || "Failed to update task");
+      toast.error(error.message || "Failed to forward task");
+    }
+  };
+
+  const analyzeTaskWithAI = async (task: Task) => {
+    setIsAnalyzing(true);
+    setAiSuggestion(null);
+    
+    try {
+      const deal = getDeal(task.dealId);
+      const response = await fetch('/api/ai/analyze-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task: {
+            title: task.title,
+            description: task.description,
+            type: task.type,
+            priority: task.priority,
+          },
+          deal: deal ? {
+            name: deal.name,
+            client: deal.client,
+            sector: deal.sector,
+            stage: deal.stage,
+          } : null
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to analyze task');
+      }
+      
+      const data = await response.json();
+      setAiSuggestion(data);
+    } catch (error: any) {
+      toast.error("Failed to analyze task with AI");
+      setAiSuggestion({
+        action: "Manual Analysis Required",
+        reasoning: "Unable to get AI suggestions at this time. Please analyze the task manually.",
+        tools: ["Document Editor", "Email Client", "Calendar"]
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleSearchSelect = (type: 'task' | 'deal', id: string) => {
+    setShowSearchResults(false);
+    setSearchQuery("");
+    if (type === 'task') {
+      const task = myTasks.find(t => t.id === id);
+      if (task) {
+        setSelectedTask(task);
+        setShowTaskDetailModal(true);
+      }
+    } else {
+      setLocation(`/employee/deals?id=${id}`);
     }
   };
 
@@ -86,239 +257,682 @@ export default function MyTasks() {
     );
   }
 
-  const todayTasks = [...pendingTasks, ...inProgressTasks].slice(0, 4);
-  const upcomingTasks = pendingTasks.slice(4);
+  const currentTask = swipeableTasks[currentSwipeIndex];
 
   return (
     <Layout role="Employee" pageTitle="My Tasks" userName={currentUser?.name || ""}>
       <div className="space-y-6">
         
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+          <Input
+            placeholder="Search tasks, deals, or projects..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setShowSearchResults(e.target.value.length > 0);
+            }}
+            onFocus={() => setShowSearchResults(searchQuery.length > 0)}
+            className="pl-10 h-12 bg-card border-border text-lg"
+            data-testid="input-task-search"
+          />
+          {showSearchResults && (searchResults.tasks.length > 0 || searchResults.deals.length > 0) && (
+            <div className="absolute top-full left-0 right-0 z-50 mt-2 bg-card border border-border rounded-lg shadow-xl max-h-[400px] overflow-y-auto">
+              {searchResults.tasks.length > 0 && (
+                <>
+                  <div className="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider bg-secondary/50">
+                    Tasks
+                  </div>
+                  {searchResults.tasks.map(task => (
+                    <div
+                      key={task.id}
+                      className="px-4 py-3 hover:bg-secondary/50 cursor-pointer transition-colors border-b border-border/50 last:border-b-0"
+                      onClick={() => handleSearchSelect('task', task.id)}
+                      data-testid={`search-result-task-${task.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <FileText className="w-4 h-4 text-primary" />
+                        <div>
+                          <div className="font-medium text-sm">{task.title}</div>
+                          <div className="text-xs text-muted-foreground">{getDealName(task.dealId)} • {task.status}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+              {searchResults.deals.length > 0 && (
+                <>
+                  <div className="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider bg-secondary/50">
+                    Deals / Projects
+                  </div>
+                  {searchResults.deals.map(deal => (
+                    <div
+                      key={deal.id}
+                      className="px-4 py-3 hover:bg-secondary/50 cursor-pointer transition-colors border-b border-border/50 last:border-b-0"
+                      onClick={() => handleSearchSelect('deal', deal.id)}
+                      data-testid={`search-result-deal-${deal.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Briefcase className="w-4 h-4 text-accent" />
+                        <div>
+                          <div className="font-medium text-sm">{deal.name}</div>
+                          <div className="text-xs text-muted-foreground">{deal.client} • {deal.stage}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+              {searchResults.tasks.length === 0 && searchResults.deals.length === 0 && (
+                <div className="px-4 py-6 text-center text-muted-foreground text-sm">
+                  No results found for "{searchQuery}"
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        
         {/* Header Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-card border-border">
-                <CardContent className="p-4 flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
-                        <Clock className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <div className="text-2xl font-bold" data-testid="stat-pending">{pendingTasks.length + inProgressTasks.length}</div>
-                        <div className="text-xs text-muted-foreground">Pending Tasks</div>
-                    </div>
-                </CardContent>
-            </Card>
-            <Card className="bg-card border-border">
-                <CardContent className="p-4 flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-500">
-                        <AlertCircle className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <div className="text-2xl font-bold" data-testid="stat-high-priority">{highPriorityTasks.length}</div>
-                        <div className="text-xs text-muted-foreground">High Priority</div>
-                    </div>
-                </CardContent>
-            </Card>
-            <Card className="bg-card border-border">
-                <CardContent className="p-4 flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-500">
-                        <Check className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <div className="text-2xl font-bold" data-testid="stat-completed">{completedTasks.length}</div>
-                        <div className="text-xs text-muted-foreground">Completed</div>
-                    </div>
-                </CardContent>
-            </Card>
-            <Card className="bg-card border-border">
-                <CardContent className="p-4 flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-accent-foreground">
-                        <BarChart className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <div className="text-2xl font-bold" data-testid="stat-score">{currentUser?.score || 0}</div>
-                        <div className="text-xs text-muted-foreground">Efficiency Score</div>
-                    </div>
-                </CardContent>
-            </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-500">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold" data-testid="stat-today">{dueTodayTasks.length}</div>
+                <div className="text-xs text-muted-foreground">Due Today</div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold" data-testid="stat-week">{dueNextWeekTasks.length}</div>
+                <div className="text-xs text-muted-foreground">Due This Week</div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-500">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold" data-testid="stat-later">{dueLaterTasks.length}</div>
+                <div className="text-xs text-muted-foreground">Due Later</div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-500">
+                <Check className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold" data-testid="stat-completed">{completedTasks.length}</div>
+                <div className="text-xs text-muted-foreground">Completed</div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Task Board */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Column 1: Today / In Progress */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Active Tasks</h3>
-                    <Badge variant="secondary" className="text-xs">{todayTasks.length}</Badge>
-                </div>
-                
-                {todayTasks.length === 0 ? (
-                  <Card className="bg-card/50 border-border border-dashed">
-                    <CardContent className="p-4 text-center text-muted-foreground text-sm">
-                      No active tasks
-                    </CardContent>
-                  </Card>
-                ) : (
-                  todayTasks.map((task) => {
-                    const taskWithDeal = getTaskWithDealName(task);
-                    return (
-                      <Card 
-                        key={task.id} 
-                        ref={(el) => { taskRefs.current[task.id] = el; }}
-                        className={cn(
-                          "bg-card border-border hover:border-primary/50 transition-all cursor-pointer group",
-                          highlightedTaskId === task.id && "ring-2 ring-primary border-primary animate-pulse"
-                        )} 
-                        data-testid={`card-task-${task.id}`}
-                      >
-                          <CardContent className="p-4 space-y-3">
-                              <div className="flex justify-between items-start">
-                                  <Badge variant="outline" className={cn(
-                                      "text-[10px] px-1.5 py-0.5 h-5",
-                                      task.priority === 'High' ? "bg-red-500/10 text-red-500 border-red-500/20" : 
-                                      task.priority === 'Medium' ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" :
-                                      "bg-blue-500/10 text-blue-500 border-blue-500/20"
-                                  )}>
-                                      {task.priority}
-                                  </Badge>
-                                  <div className="flex gap-1">
-                                    {task.status === 'Pending' && (
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        onClick={() => handleStartTask(task.id)}
-                                        data-testid={`button-start-${task.id}`}
-                                      >
-                                        <Clock className="w-4 h-4 text-blue-500" />
-                                      </Button>
-                                    )}
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon" 
-                                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                      onClick={() => handleCompleteTask(task.id)}
-                                      data-testid={`button-complete-${task.id}`}
-                                    >
-                                        <Check className="w-4 h-4 text-green-500" />
-                                    </Button>
-                                  </div>
-                              </div>
-                              
-                              <div>
-                                  <h4 className="font-medium text-sm group-hover:text-primary transition-colors">{task.title}</h4>
-                                  <p className="text-xs text-muted-foreground mt-1">{taskWithDeal.dealName}</p>
-                              </div>
-                              
-                              <div className="flex items-center gap-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
-                                  {task.type === 'Document' && <FileText className="w-3 h-3" />}
-                                  {task.type === 'Meeting' && <Calendar className="w-3 h-3" />}
-                                  {task.type === 'Analysis' && <BarChart className="w-3 h-3" />}
-                                  {task.type === 'Review' && <MessageSquare className="w-3 h-3" />}
-                                  <span>{task.type}</span>
-                                  <Badge variant={task.status === 'In Progress' ? 'default' : 'secondary'} className="ml-auto text-[10px]">
-                                    {task.status}
-                                  </Badge>
-                              </div>
-                          </CardContent>
-                      </Card>
-                    );
-                  })
-                )}
+        {/* Swipeable Task Section */}
+        <Card className="bg-card border-border overflow-hidden">
+          <CardHeader className="pb-2 border-b border-border">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary" />
+                Today's Focus
+              </CardTitle>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                {currentSwipeIndex + 1} / {swipeableTasks.length}
+              </div>
             </div>
+            <CardDescription className="text-xs">
+              Swipe right to defer • Swipe up for AI assist • Swipe left to forward • Click for details
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6">
+            {swipeableTasks.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Check className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p className="text-lg font-medium">All caught up!</p>
+                <p className="text-sm">No tasks due today</p>
+              </div>
+            ) : (
+              <div className="relative h-[300px] flex items-center justify-center">
+                <AnimatePresence mode="wait">
+                  {currentTask && (
+                    <SwipeableTaskCard
+                      key={currentTask.id}
+                      task={currentTask}
+                      dealName={getDealName(currentTask.dealId)}
+                      onSwipe={(direction) => handleSwipe(direction, currentTask)}
+                      onClick={() => handleTaskClick(currentTask)}
+                    />
+                  )}
+                </AnimatePresence>
+                
+                {/* Swipe indicators */}
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 text-green-500 opacity-30">
+                  <div className="flex flex-col items-center gap-1">
+                    <ChevronRight className="w-8 h-8" />
+                    <span className="text-xs">Defer</span>
+                  </div>
+                </div>
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 text-blue-500 opacity-30">
+                  <div className="flex flex-col items-center gap-1">
+                    <ChevronLeft className="w-8 h-8" />
+                    <span className="text-xs">Forward</span>
+                  </div>
+                </div>
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 text-purple-500 opacity-30">
+                  <div className="flex flex-col items-center gap-1">
+                    <ArrowUp className="w-8 h-8" />
+                    <span className="text-xs">AI Assist</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-            {/* Column 2: Upcoming */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Upcoming</h3>
-                    <Badge variant="secondary" className="text-xs">{upcomingTasks.length}</Badge>
-                </div>
-                
-                {upcomingTasks.length === 0 ? (
-                  <Card className="bg-card/50 border-border border-dashed">
-                    <CardContent className="p-4 text-center text-muted-foreground text-sm">
-                      No upcoming tasks
-                    </CardContent>
-                  </Card>
-                ) : (
-                  upcomingTasks.map((task) => {
-                    const taskWithDeal = getTaskWithDealName(task);
-                    return (
-                      <Card 
-                        key={task.id}
-                        ref={(el) => { taskRefs.current[task.id] = el; }}
-                        className={cn(
-                          "bg-card border-border hover:border-primary/50 transition-all cursor-pointer group opacity-80 hover:opacity-100",
-                          highlightedTaskId === task.id && "ring-2 ring-primary border-primary animate-pulse opacity-100"
-                        )}
-                      >
-                          <CardContent className="p-4 space-y-3">
-                              <div className="flex justify-between items-start">
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 bg-secondary text-muted-foreground border-border">
-                                      {task.priority}
-                                  </Badge>
-                              </div>
-                              
-                              <div>
-                                  <h4 className="font-medium text-sm">{task.title}</h4>
-                                  <p className="text-xs text-muted-foreground mt-1">{taskWithDeal.dealName}</p>
-                              </div>
-                              
-                              <div className="flex items-center gap-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
-                                  <Calendar className="w-3 h-3" />
-                                  <span>Due: {task.dueDate}</span>
-                              </div>
-                          </CardContent>
-                      </Card>
-                    );
-                  })
-                )}
+        {/* Task Categories Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          
+          {/* Due Today */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-orange-500" />
+                Due Today
+              </h3>
+              <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/20">{dueTodayTasks.length}</Badge>
             </div>
+            <ScrollArea className="h-[400px] pr-2">
+              {dueTodayTasks.length === 0 ? (
+                <Card className="bg-card/50 border-border border-dashed">
+                  <CardContent className="p-4 text-center text-muted-foreground text-sm">
+                    No tasks due today
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {dueTodayTasks.map((task) => (
+                    <TaskCard 
+                      key={task.id} 
+                      task={task} 
+                      dealName={getDealName(task.dealId)}
+                      onClick={() => handleTaskClick(task)}
+                      highlighted={highlightedTaskId === task.id}
+                      ref={(el) => { taskRefs.current[task.id] = el; }}
+                    />
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
 
-            {/* Column 3: Completed */}
-            <div className="space-y-4">
-                 <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Completed</h3>
-                    <Badge variant="secondary" className="text-xs">{completedTasks.length}</Badge>
-                </div>
-                
-                {completedTasks.length === 0 ? (
-                  <Card className="bg-card/50 border-border border-dashed">
-                    <CardContent className="p-4 text-center text-muted-foreground text-sm">
-                      No completed tasks yet
-                    </CardContent>
-                  </Card>
-                ) : (
-                  completedTasks.map((task) => {
-                    const taskWithDeal = getTaskWithDealName(task);
-                    return (
-                      <Card 
-                        key={task.id}
-                        ref={(el) => { taskRefs.current[task.id] = el; }}
-                        className={cn(
-                          "bg-card/50 border-border border-dashed",
-                          highlightedTaskId === task.id && "ring-2 ring-primary border-primary animate-pulse"
-                        )}
-                      >
-                          <CardContent className="p-4 space-y-3 opacity-60">
-                               <div className="flex justify-between items-start">
-                                      <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 bg-green-500/10 text-green-500 border-green-500/20">
-                                          Done
-                                      </Badge>
-                                  </div>
-                                  
-                                  <div>
-                                      <h4 className="font-medium text-sm line-through">{task.title}</h4>
-                                      <p className="text-xs text-muted-foreground mt-1">{taskWithDeal.dealName}</p>
-                                  </div>
-                          </CardContent>
-                      </Card>
-                    );
-                  })
-                )}
+          {/* Due This Week */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-blue-500" />
+                Due This Week
+              </h3>
+              <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20">{dueNextWeekTasks.length}</Badge>
             </div>
-            
+            <ScrollArea className="h-[400px] pr-2">
+              {dueNextWeekTasks.length === 0 ? (
+                <Card className="bg-card/50 border-border border-dashed">
+                  <CardContent className="p-4 text-center text-muted-foreground text-sm">
+                    No tasks due this week
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {dueNextWeekTasks.map((task) => (
+                    <TaskCard 
+                      key={task.id} 
+                      task={task} 
+                      dealName={getDealName(task.dealId)}
+                      onClick={() => handleTaskClick(task)}
+                      highlighted={highlightedTaskId === task.id}
+                      ref={(el) => { taskRefs.current[task.id] = el; }}
+                    />
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+
+          {/* Due Later */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <Clock className="w-4 h-4 text-purple-500" />
+                Due Later
+              </h3>
+              <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20">{dueLaterTasks.length}</Badge>
+            </div>
+            <ScrollArea className="h-[400px] pr-2">
+              {dueLaterTasks.length === 0 ? (
+                <Card className="bg-card/50 border-border border-dashed">
+                  <CardContent className="p-4 text-center text-muted-foreground text-sm">
+                    No tasks due later
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {dueLaterTasks.map((task) => (
+                    <TaskCard 
+                      key={task.id} 
+                      task={task} 
+                      dealName={getDealName(task.dealId)}
+                      onClick={() => handleTaskClick(task)}
+                      highlighted={highlightedTaskId === task.id}
+                      ref={(el) => { taskRefs.current[task.id] = el; }}
+                    />
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+
+          {/* Completed */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-500" />
+                Completed
+              </h3>
+              <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">{completedTasks.length}</Badge>
+            </div>
+            <ScrollArea className="h-[400px] pr-2">
+              {completedTasks.length === 0 ? (
+                <Card className="bg-card/50 border-border border-dashed">
+                  <CardContent className="p-4 text-center text-muted-foreground text-sm">
+                    No completed tasks yet
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {completedTasks.slice(0, 10).map((task) => (
+                    <TaskCard 
+                      key={task.id} 
+                      task={task} 
+                      dealName={getDealName(task.dealId)}
+                      onClick={() => handleTaskClick(task)}
+                      highlighted={highlightedTaskId === task.id}
+                      completed
+                      ref={(el) => { taskRefs.current[task.id] = el; }}
+                    />
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
         </div>
       </div>
+
+      {/* Task Detail Modal */}
+      <Dialog open={showTaskDetailModal} onOpenChange={setShowTaskDetailModal}>
+        <DialogContent className="bg-card border-border max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{selectedTask?.title}</DialogTitle>
+            <DialogDescription>Task Details</DialogDescription>
+          </DialogHeader>
+          {selectedTask && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className={cn(
+                  "text-xs",
+                  selectedTask.priority === 'High' ? "bg-red-500/10 text-red-500 border-red-500/20" : 
+                  selectedTask.priority === 'Medium' ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" :
+                  "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                )}>
+                  {selectedTask.priority} Priority
+                </Badge>
+                <Badge variant="secondary">{selectedTask.type}</Badge>
+                <Badge variant={selectedTask.status === 'Completed' ? 'default' : 'outline'}>
+                  {selectedTask.status}
+                </Badge>
+              </div>
+              
+              <div>
+                <Label className="text-xs text-muted-foreground">Description</Label>
+                <p className="text-sm mt-1">{selectedTask.description || 'No description provided'}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Deal</Label>
+                  <p className="text-sm mt-1">{getDealName(selectedTask.dealId)}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Due Date</Label>
+                  <p className="text-sm mt-1">{selectedTask.dueDate || 'No due date'}</p>
+                </div>
+              </div>
+              
+              {selectedTask.attachments && Array.isArray(selectedTask.attachments) && selectedTask.attachments.length > 0 && (
+                <div>
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Paperclip className="w-3 h-3" /> Attachments
+                  </Label>
+                  <div className="mt-2 space-y-2">
+                    {(selectedTask.attachments as any[]).map((attachment: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2 p-2 bg-secondary/30 rounded-lg">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm flex-1 truncate">{typeof attachment === 'string' ? attachment : attachment?.name || 'Attachment'}</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                          <ExternalLink className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowTaskDetailModal(false)}>
+              Close
+            </Button>
+            {selectedTask?.status !== 'Completed' && (
+              <Button onClick={() => selectedTask && handleCompleteTask(selectedTask.id)}>
+                <Check className="w-4 h-4 mr-2" /> Mark Complete
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Forward Task Modal */}
+      <Dialog open={showForwardModal} onOpenChange={setShowForwardModal}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle>Forward Task</DialogTitle>
+            <DialogDescription>
+              Choose a team member to forward "{selectedTask?.title}" to
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Select Team Member</Label>
+              <Select value={forwardToUser} onValueChange={setForwardToUser}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a team member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.filter(u => u.id !== currentUser?.id).map(user => (
+                    <SelectItem key={user.id} value={user.id}>
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        <span>{user.name}</span>
+                        <span className="text-muted-foreground">({user.role})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowForwardModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleForwardTask} disabled={!forwardToUser}>
+              <Send className="w-4 h-4 mr-2" /> Forward Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Analysis Modal */}
+      <Dialog open={showAIModal} onOpenChange={setShowAIModal}>
+        <DialogContent className="bg-card border-border max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Brain className="w-5 h-5 text-primary" />
+              AI Task Analysis
+            </DialogTitle>
+            <DialogDescription>
+              Analyzing "{selectedTask?.title}" to suggest next steps
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {isAnalyzing ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+                <p className="text-muted-foreground">Analyzing task details...</p>
+              </div>
+            ) : aiSuggestion ? (
+              <>
+                <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
+                  <h4 className="font-medium text-sm mb-2">Recommended Action</h4>
+                  <p className="text-lg font-semibold">{aiSuggestion.action}</p>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-sm mb-2">Reasoning</h4>
+                  <p className="text-sm text-muted-foreground">{aiSuggestion.reasoning}</p>
+                </div>
+                
+                <Separator />
+                
+                <div>
+                  <h4 className="font-medium text-sm mb-3">Suggested Tools</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {aiSuggestion.tools.map((tool, i) => (
+                      <Button key={i} variant="outline" size="sm" className="gap-2">
+                        <ExternalLink className="w-3 h-3" />
+                        {tool}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No analysis available</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAIModal(false)}>
+              Close
+            </Button>
+            {selectedTask?.status !== 'Completed' && !isAnalyzing && (
+              <Button onClick={() => {
+                setShowAIModal(false);
+                handleStartTask(selectedTask?.id || '');
+              }}>
+                Start Working
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
+
+  async function handleStartTask(taskId: string) {
+    try {
+      await updateTask.mutateAsync({ id: taskId, status: 'In Progress' });
+      toast.success("Task started!");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to start task");
+    }
+  }
 }
+
+interface SwipeableTaskCardProps {
+  task: Task;
+  dealName: string;
+  onSwipe: (direction: SwipeDirection) => void;
+  onClick: () => void;
+}
+
+function SwipeableTaskCard({ task, dealName, onSwipe, onClick }: SwipeableTaskCardProps) {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  
+  const rotateZ = useTransform(x, [-200, 0, 200], [-15, 0, 15]);
+  const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0.5, 1, 1, 1, 0.5]);
+  
+  const rightIndicatorOpacity = useTransform(x, [0, 100], [0, 1]);
+  const leftIndicatorOpacity = useTransform(x, [-100, 0], [1, 0]);
+  const upIndicatorOpacity = useTransform(y, [-100, 0], [1, 0]);
+  
+  const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const threshold = 100;
+    
+    if (info.offset.y < -threshold) {
+      onSwipe('up');
+    } else if (info.offset.x > threshold) {
+      onSwipe('right');
+    } else if (info.offset.x < -threshold) {
+      onSwipe('left');
+    }
+  };
+
+  return (
+    <motion.div
+      drag
+      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+      dragElastic={0.7}
+      onDragEnd={handleDragEnd}
+      style={{ x, y, rotateZ, opacity }}
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.9, opacity: 0 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      className="absolute w-full max-w-md cursor-grab active:cursor-grabbing"
+    >
+      <Card className="bg-card border-border shadow-xl">
+        <CardContent className="p-6 space-y-4">
+          <div className="flex justify-between items-start">
+            <Badge variant="outline" className={cn(
+              "text-xs",
+              task.priority === 'High' ? "bg-red-500/10 text-red-500 border-red-500/20" : 
+              task.priority === 'Medium' ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" :
+              "bg-blue-500/10 text-blue-500 border-blue-500/20"
+            )}>
+              {task.priority} Priority
+            </Badge>
+            <Badge variant="secondary">{task.type}</Badge>
+          </div>
+          
+          <div>
+            <h3 className="text-xl font-semibold">{task.title}</h3>
+            <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+              {task.description || 'No description'}
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-4 pt-2 border-t border-border/50 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Briefcase className="w-4 h-4" />
+              <span>{dealName}</span>
+            </div>
+            {task.dueDate && (
+              <div className="flex items-center gap-1">
+                <Calendar className="w-4 h-4" />
+                <span>{task.dueDate}</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Swipe overlay indicators */}
+          <motion.div
+            style={{ opacity: rightIndicatorOpacity }}
+            className="absolute inset-0 bg-green-500/20 rounded-lg flex items-center justify-center pointer-events-none"
+          >
+            <div className="bg-green-500 text-white px-4 py-2 rounded-full font-medium">
+              Defer
+            </div>
+          </motion.div>
+          
+          <motion.div
+            style={{ opacity: leftIndicatorOpacity }}
+            className="absolute inset-0 bg-blue-500/20 rounded-lg flex items-center justify-center pointer-events-none"
+          >
+            <div className="bg-blue-500 text-white px-4 py-2 rounded-full font-medium">
+              Forward
+            </div>
+          </motion.div>
+          
+          <motion.div
+            style={{ opacity: upIndicatorOpacity }}
+            className="absolute inset-0 bg-purple-500/20 rounded-lg flex items-center justify-center pointer-events-none"
+          >
+            <div className="bg-purple-500 text-white px-4 py-2 rounded-full font-medium">
+              AI Assist
+            </div>
+          </motion.div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
+interface TaskCardProps {
+  task: Task;
+  dealName: string;
+  onClick: () => void;
+  highlighted?: boolean;
+  completed?: boolean;
+}
+
+const TaskCard = ({ task, dealName, onClick, highlighted, completed, ref }: TaskCardProps & { ref?: React.Ref<HTMLDivElement> }) => {
+  return (
+    <Card 
+      ref={ref}
+      className={cn(
+        "bg-card border-border hover:border-primary/50 transition-all cursor-pointer",
+        highlighted && "ring-2 ring-primary border-primary animate-pulse",
+        completed && "opacity-60"
+      )}
+      onClick={onClick}
+      data-testid={`card-task-${task.id}`}
+    >
+      <CardContent className="p-3 space-y-2">
+        <div className="flex justify-between items-start gap-2">
+          <Badge variant="outline" className={cn(
+            "text-[10px] px-1.5 py-0.5 h-5 shrink-0",
+            completed ? "bg-green-500/10 text-green-500 border-green-500/20" :
+            task.priority === 'High' ? "bg-red-500/10 text-red-500 border-red-500/20" : 
+            task.priority === 'Medium' ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" :
+            "bg-blue-500/10 text-blue-500 border-blue-500/20"
+          )}>
+            {completed ? 'Done' : task.priority}
+          </Badge>
+          <Badge variant="secondary" className="text-[10px]">{task.type}</Badge>
+        </div>
+        
+        <div>
+          <h4 className={cn(
+            "font-medium text-sm",
+            completed && "line-through"
+          )}>{task.title}</h4>
+          <p className="text-xs text-muted-foreground mt-0.5">{dealName}</p>
+        </div>
+        
+        {task.dueDate && !completed && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Calendar className="w-3 h-3" />
+            <span>{task.dueDate}</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
