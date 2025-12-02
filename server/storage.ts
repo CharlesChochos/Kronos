@@ -15,6 +15,8 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserScore(id: string, score: number): Promise<void>;
   updateUserStats(id: string, activeDeals: number, completedTasks: number): Promise<void>;
+  updateUserProfile(id: string, updates: { name?: string; email?: string; phone?: string }): Promise<User | undefined>;
+  updateUserPassword(id: string, newPassword: string): Promise<void>;
   getAllUsers(): Promise<User[]>;
   
   // Deal operations
@@ -86,6 +88,21 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(schema.users);
+  }
+
+  async updateUserProfile(id: string, updates: { name?: string; email?: string; phone?: string }): Promise<User | undefined> {
+    const [user] = await db.update(schema.users)
+      .set(updates)
+      .where(eq(schema.users.id, id))
+      .returning();
+    return user;
+  }
+
+  async updateUserPassword(id: string, newPassword: string): Promise<void> {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await db.update(schema.users)
+      .set({ password: hashedPassword })
+      .where(eq(schema.users.id, id));
   }
 
   // Deal operations
