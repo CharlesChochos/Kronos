@@ -71,8 +71,10 @@ export default function AuthPage() {
   useEffect(() => {
     if (showWelcome && redirectPath) {
       const timer = setTimeout(() => {
+        // Clear the welcome pending flag before redirect
+        sessionStorage.removeItem('welcomePending');
         setLocation(redirectPath);
-      }, 2500);
+      }, 3500); // Extended to 3.5 seconds for better visibility
       return () => clearTimeout(timer);
     }
   }, [showWelcome, redirectPath, setLocation]);
@@ -95,6 +97,8 @@ export default function AuthPage() {
         setRedirectPath("/employee/home");
       }
       
+      // Set flag to prevent router from redirecting during animation
+      sessionStorage.setItem('welcomePending', 'true');
       setShowWelcome(true);
     } catch (error: any) {
       toast.error(error.message || "Login failed");
@@ -110,6 +114,9 @@ export default function AuthPage() {
       const firstName = values.name.split(' ')[0];
       setWelcomeName(firstName);
       setRedirectPath("/employee/home");
+      
+      // Set flag to prevent router from redirecting during animation
+      sessionStorage.setItem('welcomePending', 'true');
       setShowWelcome(true);
     } catch (error: any) {
       toast.error(error.message || "Signup failed");

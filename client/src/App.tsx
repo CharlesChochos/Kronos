@@ -55,6 +55,12 @@ function Router() {
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
+    // Check if welcome animation is pending - don't redirect during animation
+    const welcomePending = sessionStorage.getItem('welcomePending');
+    if (welcomePending === 'true') {
+      return; // Let AuthPage handle the redirect after animation
+    }
+    
     if (user && location === "/") {
       if (user.email.includes("admin") || user.email.includes("josh")) {
         setLocation("/ceo/dashboard");
