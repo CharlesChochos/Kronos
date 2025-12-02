@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,11 +11,14 @@ import {
   Target,
   Mail,
   Phone,
-  Globe
+  Globe,
+  Heart
 } from "lucide-react";
-import { useCurrentUser, useDeals } from "@/lib/api";
+import { useCurrentUser, useDeals, useUpdateDeal } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion";
+import type { TaggedInvestor } from "@shared/schema";
 
 const INVESTORS = [
   { id: 1, name: "Ironclad PE", type: "Private Equity", focus: "Industrials", checkSize: "$50M - $200M", matchScore: 95, tags: ["Buyout", "Growth"], email: "deals@ironcladpe.com", phone: "+1 212-555-0101", website: "ironcladpe.com" },
@@ -29,12 +32,19 @@ const INVESTORS = [
 export default function InvestorMatching() {
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [], isLoading } = useDeals();
+  const updateDeal = useUpdateDeal();
   
   const [selectedDeal, setSelectedDeal] = useState<string>('');
   const [matchedInvestors, setMatchedInvestors] = useState<typeof INVESTORS>([]);
   const [rejectedInvestors, setRejectedInvestors] = useState<number[]>([]);
   const [showContactModal, setShowContactModal] = useState<typeof INVESTORS[0] | null>(null);
-  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
+  
+  const x = useMotionValue(0);
+  const rotate = useTransform(x, [-200, 200], [-25, 25]);
+  const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0.5, 1, 1, 1, 0.5]);
+  const likeOpacity = useTransform(x, [0, 100], [0, 1]);
+  const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
   
   // Set initial deal once data loads or when deals change
   useEffect(() => {
@@ -50,23 +60,69 @@ export default function InvestorMatching() {
     !rejectedInvestors.includes(inv.id)
   );
   const currentInvestor = availableInvestors[0];
+  const currentDeal = deals.find(d => d.id === selectedDeal);
 
-  const handleSwipe = useCallback((direction: 'left' | 'right') => {
-    if (!currentInvestor) return;
+  const addInvestorToTaggedList = async (investor: typeof INVESTORS[0]) => {
+    if (!selectedDeal) return;
     
-    setSwipeDirection(direction);
+    const latestDeal = deals.find(d => d.id === selectedDeal);
+    if (!latestDeal) return;
     
-    setTimeout(() => {
-      if (direction === 'right') {
-        setMatchedInvestors(prev => [...prev, currentInvestor]);
-        toast.success(`Matched with ${currentInvestor.name}!`);
-      } else {
-        setRejectedInvestors(prev => [...prev, currentInvestor.id]);
-        toast.info(`Passed on ${currentInvestor.name}`);
-      }
-      setSwipeDirection(null);
-    }, 300);
-  }, [currentInvestor]);
+    const existingTagged = latestDeal.taggedInvestors || [];
+    
+    const alreadyExists = existingTagged.some(
+      (inv) => inv.name === investor.name && inv.firm === investor.name
+    );
+    
+    if (alreadyExists) {
+      return;
+    }
+    
+    const newTaggedInvestor: TaggedInvestor = {
+      id: crypto.randomUUID(),
+      name: investor.name,
+      firm: investor.name,
+      type: investor.type,
+      status: 'Contacted',
+      notes: `Check size: ${investor.checkSize}, Focus: ${investor.focus}, Email: ${investor.email}`,
+    };
+    
+    try {
+      await updateDeal.mutateAsync({
+        id: selectedDeal,
+        taggedInvestors: [...existingTagged, newTaggedInvestor],
+      });
+    } catch (error) {
+      console.error('Failed to add investor to deal:', error);
+    }
+  };
+
+  const handleSwipe = useCallback(async (direction: 'left' | 'right') => {
+    if (!currentInvestor || isAnimating) return;
+    
+    setIsAnimating(true);
+    
+    if (direction === 'right') {
+      setMatchedInvestors(prev => [...prev, currentInvestor]);
+      await addInvestorToTaggedList(currentInvestor);
+      toast.success(`Matched with ${currentInvestor.name}! Added to deal.`);
+    } else {
+      setRejectedInvestors(prev => [...prev, currentInvestor.id]);
+      toast.info(`Passed on ${currentInvestor.name}`);
+    }
+    
+    x.set(0);
+    setIsAnimating(false);
+  }, [currentInvestor, isAnimating, currentDeal, selectedDeal]);
+
+  const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const threshold = 100;
+    if (info.offset.x > threshold) {
+      handleSwipe('right');
+    } else if (info.offset.x < -threshold) {
+      handleSwipe('left');
+    }
+  };
 
   const handleContact = (investor: typeof INVESTORS[0]) => {
     setShowContactModal(investor);
@@ -143,18 +199,49 @@ export default function InvestorMatching() {
               <div className="relative w-full max-w-lg aspect-[3/4] md:aspect-[4/3]">
                   {/* Background cards for stack effect */}
                   {availableInvestors.length > 2 && (
-                    <div className="absolute top-4 left-4 right-4 bottom-[-16px] bg-card/30 rounded-2xl border border-border z-0 scale-95"></div>
+                    <motion.div 
+                      className="absolute top-4 left-4 right-4 bottom-[-16px] bg-card/30 rounded-2xl border border-border z-0"
+                      initial={{ scale: 0.92 }}
+                      animate={{ scale: 0.95 }}
+                      transition={{ duration: 0.3 }}
+                    />
                   )}
                   {availableInvestors.length > 1 && (
-                    <div className="absolute top-2 left-2 right-2 bottom-[-8px] bg-card/60 rounded-2xl border border-border z-10 scale-[0.98]"></div>
+                    <motion.div 
+                      className="absolute top-2 left-2 right-2 bottom-[-8px] bg-card/60 rounded-2xl border border-border z-10"
+                      initial={{ scale: 0.95 }}
+                      animate={{ scale: 0.98 }}
+                      transition={{ duration: 0.3 }}
+                    />
                   )}
                   
-                  {/* Main Card */}
-                  <Card className={cn(
-                    "absolute inset-0 bg-card border-border shadow-2xl z-20 flex flex-col items-center justify-center text-center p-8 hover:shadow-primary/10 transition-all",
-                    swipeDirection === 'left' && "animate-[swipeLeft_0.3s_ease-out_forwards]",
-                    swipeDirection === 'right' && "animate-[swipeRight_0.3s_ease-out_forwards]"
-                  )}>
+                  {/* Main Draggable Card */}
+                  <motion.div
+                    className="absolute inset-0 z-20 cursor-grab active:cursor-grabbing"
+                    drag="x"
+                    dragConstraints={{ left: 0, right: 0 }}
+                    dragElastic={0.7}
+                    onDragEnd={handleDragEnd}
+                    style={{ x, rotate, opacity }}
+                    whileTap={{ scale: 1.02 }}
+                    data-testid="swipe-card"
+                  >
+                    {/* Like/Nope Indicators */}
+                    <motion.div 
+                      className="absolute top-8 right-8 z-30 bg-green-500 text-white px-4 py-2 rounded-lg font-bold text-xl rotate-12 border-4 border-green-400"
+                      style={{ opacity: likeOpacity }}
+                    >
+                      <Heart className="w-6 h-6 inline mr-2" />
+                      MATCH
+                    </motion.div>
+                    <motion.div 
+                      className="absolute top-8 left-8 z-30 bg-red-500 text-white px-4 py-2 rounded-lg font-bold text-xl -rotate-12 border-4 border-red-400"
+                      style={{ opacity: nopeOpacity }}
+                    >
+                      PASS
+                    </motion.div>
+                    
+                    <Card className="h-full bg-card border-border shadow-2xl flex flex-col items-center justify-center text-center p-8 hover:shadow-primary/10 transition-all">
                       <div className="w-24 h-24 rounded-full bg-secondary flex items-center justify-center mb-6 shadow-inner">
                           <Building2 className="w-10 h-10 text-primary" />
                       </div>
@@ -207,12 +294,15 @@ export default function InvestorMatching() {
                            </div>
                       </div>
 
+                      <p className="text-xs text-muted-foreground mb-4">Drag card to swipe or use buttons below</p>
+
                       <div className="flex items-center gap-8 w-full max-w-xs mt-auto">
                           <Button 
                             size="lg" 
                             variant="outline" 
                             className="flex-1 rounded-full h-14 border-2 border-red-500/20 text-red-500 hover:bg-red-500/10 hover:border-red-500"
                             onClick={() => handleSwipe('left')}
+                            disabled={isAnimating}
                             data-testid="button-reject"
                           >
                               <X className="w-6 h-6" />
@@ -221,6 +311,7 @@ export default function InvestorMatching() {
                             size="lg" 
                             className="flex-1 rounded-full h-14 bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20"
                             onClick={() => handleSwipe('right')}
+                            disabled={isAnimating}
                             data-testid="button-approve"
                           >
                               <Check className="w-6 h-6" />
@@ -231,7 +322,8 @@ export default function InvestorMatching() {
                           <span>Pass</span>
                           <span>Match</span>
                       </div>
-                  </Card>
+                    </Card>
+                  </motion.div>
               </div>
             ) : (
               <Card className="w-full max-w-lg p-12 text-center">
@@ -345,20 +437,6 @@ export default function InvestorMatching() {
         </DialogContent>
       </Dialog>
 
-      <style>{`
-        @keyframes swipeLeft {
-          to {
-            transform: translateX(-150%) rotate(-30deg);
-            opacity: 0;
-          }
-        }
-        @keyframes swipeRight {
-          to {
-            transform: translateX(150%) rotate(30deg);
-            opacity: 0;
-          }
-        }
-      `}</style>
     </Layout>
   );
 }
