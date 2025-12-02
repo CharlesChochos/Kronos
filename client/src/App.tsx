@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useCurrentUser } from "@/lib/api";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth/AuthPage";
+import ResetPassword from "@/pages/auth/ResetPassword";
 import Dashboard from "@/pages/ceo/Dashboard";
 import DealManagement from "@/pages/ceo/DealManagement";
 import DocumentGenerator from "@/pages/shared/DocumentGenerator";
@@ -75,6 +76,7 @@ function Router() {
     <Switch>
       <Route path="/" component={AuthPage} />
       <Route path="/auth" component={AuthPage} />
+      <Route path="/reset-password" component={ResetPassword} />
       
       {/* CEO Routes */}
       <Route path="/ceo/dashboard">

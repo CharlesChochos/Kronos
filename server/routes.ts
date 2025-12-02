@@ -7,7 +7,7 @@ import session from "express-session";
 import bcrypt from "bcryptjs";
 import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
-import { sendMeetingInvite } from "./email";
+import { sendMeetingInvite, sendPasswordResetEmail } from "./email";
 import OpenAI from "openai";
 import * as fs from "fs";
 import * as path from "path";
@@ -149,6 +149,108 @@ export async function registerRoutes(
       }
       res.json({ message: "Logged out successfully" });
     });
+  });
+
+  // Forgot Password - Request Reset
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      
+      // Always return success to prevent email enumeration attacks
+      if (!user) {
+        return res.json({ message: "If an account exists with this email, you will receive a password reset link." });
+      }
+
+      // Generate secure token
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+
+      // Store the token
+      await storage.createPasswordResetToken(user.id, token, expiresAt);
+
+      // Generate reset link
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPLIT_DEPLOYMENT_URL || 'http://localhost:5000';
+      const resetLink = `${baseUrl}/reset-password?token=${token}`;
+
+      // Send the email
+      const emailResult = await sendPasswordResetEmail({
+        email: user.email,
+        userName: user.name,
+        resetLink,
+      });
+
+      if (!emailResult.success) {
+        console.error('Failed to send password reset email:', emailResult.error);
+        // Still return success to prevent enumeration
+      }
+
+      res.json({ message: "If an account exists with this email, you will receive a password reset link." });
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({ error: "Failed to process password reset request" });
+    }
+  });
+
+  // Reset Password - Verify Token and Update Password
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+      
+      if (!token || !newPassword) {
+        return res.status(400).json({ error: "Token and new password are required" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters long" });
+      }
+
+      // Find valid token
+      const resetToken = await storage.getValidPasswordResetToken(token);
+      
+      if (!resetToken) {
+        return res.status(400).json({ error: "Invalid or expired reset token. Please request a new password reset." });
+      }
+
+      // Update the user's password
+      await storage.updateUserPassword(resetToken.userId, newPassword);
+
+      // Mark token as used
+      await storage.markPasswordResetTokenUsed(resetToken.id);
+
+      res.json({ message: "Password has been reset successfully. You can now log in with your new password." });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
+  // Verify Reset Token (for frontend validation)
+  app.get("/api/auth/verify-reset-token", async (req, res) => {
+    try {
+      const token = req.query.token as string;
+      
+      if (!token) {
+        return res.status(400).json({ valid: false, error: "Token is required" });
+      }
+
+      const resetToken = await storage.getValidPasswordResetToken(token);
+      
+      if (!resetToken) {
+        return res.status(400).json({ valid: false, error: "Invalid or expired token" });
+      }
+
+      res.json({ valid: true });
+    } catch (error) {
+      res.status(500).json({ valid: false, error: "Failed to verify token" });
+    }
   });
 
   // ===== FILE UPLOAD ROUTES =====

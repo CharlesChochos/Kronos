@@ -1,8 +1,8 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, gt } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@shared/schema";
-import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification } from "@shared/schema";
+import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -52,6 +52,11 @@ export interface IStorage {
   
   // User preferences
   updateUserPreferences(id: string, preferences: any): Promise<void>;
+  
+  // Password reset token operations
+  createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<PasswordResetToken>;
+  getValidPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
+  markPasswordResetTokenUsed(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -238,6 +243,33 @@ export class DatabaseStorage implements IStorage {
     await db.update(schema.users)
       .set({ preferences })
       .where(eq(schema.users.id, id));
+  }
+  
+  // Password reset token operations
+  async createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<PasswordResetToken> {
+    const [resetToken] = await db.insert(schema.passwordResetTokens)
+      .values({ userId, token, expiresAt })
+      .returning();
+    return resetToken;
+  }
+  
+  async getValidPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+    const [resetToken] = await db.select()
+      .from(schema.passwordResetTokens)
+      .where(
+        and(
+          eq(schema.passwordResetTokens.token, token),
+          eq(schema.passwordResetTokens.used, false),
+          gt(schema.passwordResetTokens.expiresAt, new Date())
+        )
+      );
+    return resetToken;
+  }
+  
+  async markPasswordResetTokenUsed(id: string): Promise<void> {
+    await db.update(schema.passwordResetTokens)
+      .set({ used: true })
+      .where(eq(schema.passwordResetTokens.id, id));
   }
 }
 

@@ -16,9 +16,11 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useLogin, useSignup } from "@/lib/api";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { Mail, CheckCircle } from "lucide-react";
 import logo from "@assets/generated_images/abstract_minimalist_layer_icon_for_fintech_logo.png";
 
 const loginSchema = z.object({
@@ -44,8 +46,46 @@ export default function AuthPage() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [welcomeName, setWelcomeName] = useState("");
   const [redirectPath, setRedirectPath] = useState("");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
   const loginMutation = useLogin();
   const signupMutation = useSignup();
+
+  const handleForgotPassword = async () => {
+    if (!forgotPasswordEmail || !forgotPasswordEmail.includes('@')) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    
+    setForgotPasswordLoading(true);
+    try {
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotPasswordEmail }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setForgotPasswordSent(true);
+      } else {
+        toast.error(data.error || "Failed to send reset email");
+      }
+    } catch (error) {
+      toast.error("Failed to send reset email. Please try again.");
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
+  const closeForgotPasswordDialog = () => {
+    setShowForgotPassword(false);
+    setForgotPasswordEmail("");
+    setForgotPasswordSent(false);
+  };
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -282,7 +322,13 @@ export default function AuthPage() {
                       <FormItem>
                         <div className="flex items-center justify-between">
                             <FormLabel>Password</FormLabel>
-                            <Button variant="link" className="p-0 h-auto text-xs text-primary hover:underline" type="button">
+                            <Button 
+                              variant="link" 
+                              className="p-0 h-auto text-xs text-primary hover:underline" 
+                              type="button"
+                              onClick={() => setShowForgotPassword(true)}
+                              data-testid="button-forgot-password"
+                            >
                               Forgot password?
                             </Button>
                         </div>
@@ -433,6 +479,78 @@ export default function AuthPage() {
            </div>
         </CardFooter>
       </Card>
+
+      {/* Forgot Password Dialog */}
+      <Dialog open={showForgotPassword} onOpenChange={closeForgotPasswordDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {forgotPasswordSent ? (
+                <>
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  Check Your Email
+                </>
+              ) : (
+                <>
+                  <Mail className="w-5 h-5" />
+                  Reset Password
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {forgotPasswordSent 
+                ? "If an account exists with this email, you will receive a password reset link shortly."
+                : "Enter your email address and we'll send you a link to reset your password."
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          {!forgotPasswordSent ? (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label htmlFor="forgot-email" className="text-sm font-medium">
+                  Email Address
+                </label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  placeholder="name@equiturn.com"
+                  value={forgotPasswordEmail}
+                  onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                  className="bg-secondary/50 border-border"
+                  data-testid="input-forgot-email"
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={closeForgotPasswordDialog}
+                  data-testid="button-cancel-forgot"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleForgotPassword}
+                  disabled={forgotPasswordLoading}
+                  data-testid="button-send-reset"
+                >
+                  {forgotPasswordLoading ? "Sending..." : "Send Reset Link"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="py-4">
+              <Button 
+                className="w-full" 
+                onClick={closeForgotPasswordDialog}
+                data-testid="button-close-forgot"
+              >
+                Back to Login
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

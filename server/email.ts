@@ -257,3 +257,75 @@ export async function sendNotificationEmail(
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
+
+export interface PasswordResetEmailData {
+  email: string;
+  userName: string;
+  resetLink: string;
+}
+
+export async function sendPasswordResetEmail(data: PasswordResetEmailData): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { client, fromEmail } = await getUncachableResendClient();
+    
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #1a1a2e; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center; }
+            .header h1 { margin: 0; font-size: 24px; }
+            .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px; }
+            .message { background: white; border-radius: 8px; padding: 25px; margin: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+            .button { display: inline-block; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white !important; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0; }
+            .button:hover { opacity: 0.9; }
+            .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+            .warning { color: #666; font-size: 13px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Password Reset Request</h1>
+            </div>
+            <div class="content">
+              <div class="message">
+                <p>Hi ${data.userName},</p>
+                <p>We received a request to reset your password for your OSReaper account. Click the button below to create a new password:</p>
+                <p style="text-align: center;">
+                  <a href="${data.resetLink}" class="button">Reset Password</a>
+                </p>
+                <p class="warning">
+                  <strong>Security Notice:</strong> This link will expire in 1 hour. If you didn't request a password reset, you can safely ignore this email - your password will remain unchanged.
+                </p>
+              </div>
+            </div>
+            <div class="footer">
+              <p>OSReaper - Investment Banking Operations Platform</p>
+              <p>This is an automated message, please do not reply.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      to: data.email,
+      subject: 'Reset Your OSReaper Password',
+      html: emailHtml,
+      text: `Hi ${data.userName}, We received a request to reset your password. Visit this link to reset it: ${data.resetLink}. This link expires in 1 hour. If you didn't request this, you can ignore this email.`,
+    });
+
+    if (result.error) {
+      return { success: false, error: result.error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to send password reset email:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
