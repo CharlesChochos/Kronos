@@ -1,7 +1,7 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import { Sidebar } from "./Sidebar";
-import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check, Rocket, TrendingUp, UserCheck, ChevronRight, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check, Rocket, TrendingUp, UserCheck, ChevronRight, PanelLeftClose, PanelLeft, Camera, Trash2 } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -63,6 +63,10 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   
   // Sidebar collapsed state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  
+  // Photo upload ref
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   
   const { 
     showProfileSheet,
@@ -172,6 +176,63 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (error: any) {
       toast.error(error.message || "Failed to change password");
+    }
+  };
+  
+  const handlePhotoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentUser?.id) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error("Please select an image file");
+      return;
+    }
+    
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image size must be less than 2MB");
+      return;
+    }
+    
+    setIsUploadingPhoto(true);
+    
+    try {
+      // Convert to base64 for storage
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        
+        await updateUserProfile.mutateAsync({
+          userId: currentUser.id,
+          updates: { avatar: base64 },
+        });
+        
+        toast.success("Photo uploaded successfully");
+        setIsUploadingPhoto(false);
+      };
+      reader.onerror = () => {
+        toast.error("Failed to read image file");
+        setIsUploadingPhoto(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to upload photo");
+      setIsUploadingPhoto(false);
+    }
+  };
+  
+  const handleRemovePhoto = async () => {
+    if (!currentUser?.id) return;
+    
+    try {
+      await updateUserProfile.mutateAsync({
+        userId: currentUser.id,
+        updates: { avatar: '' },
+      });
+      toast.success("Photo removed");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to remove photo");
     }
   };
   
@@ -417,8 +478,10 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
               <DropdownMenuTrigger className="focus:outline-none" data-testid="dropdown-user">
                 <div className="flex items-center gap-3 hover:bg-secondary/50 p-1.5 pr-3 rounded-full transition-colors border border-transparent hover:border-border">
                   <Avatar className="w-8 h-8 border border-border">
-                    <AvatarImage src="https://github.com/shadcn.png" />
-                    <AvatarFallback className="bg-primary text-primary-foreground text-xs">JO</AvatarFallback>
+                    <AvatarImage src={(currentUser as any)?.avatar || undefined} />
+                    <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                      {currentUser?.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'U'}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="text-left hidden md:block">
                     <p className="text-sm font-medium leading-none">{userName}</p>
@@ -754,11 +817,56 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
             {/* Profile Tab */}
             <TabsContent value="profile" className="mt-4 space-y-4">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-xl font-bold text-primary">
-                  {currentUser?.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'U'}
+                <div className="relative group">
+                  {(currentUser as any)?.avatar ? (
+                    <img 
+                      src={(currentUser as any).avatar} 
+                      alt="Profile" 
+                      className="w-16 h-16 rounded-full object-cover border-2 border-primary/30"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-xl font-bold text-primary">
+                      {currentUser?.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'U'}
+                    </div>
+                  )}
+                  <button 
+                    onClick={() => photoInputRef.current?.click()}
+                    className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Camera className="w-5 h-5 text-white" />
+                  </button>
                 </div>
                 <div>
-                  <Button variant="outline" size="sm">Upload Photo</Button>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                    data-testid="input-photo-upload"
+                  />
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={isUploadingPhoto}
+                      data-testid="button-upload-photo"
+                    >
+                      {isUploadingPhoto ? "Uploading..." : "Upload Photo"}
+                    </Button>
+                    {(currentUser as any)?.avatar && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={handleRemovePhoto}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                        data-testid="button-remove-photo"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground mt-1">JPG, PNG. Max 2MB</p>
                 </div>
               </div>

@@ -525,12 +525,13 @@ export async function registerRoutes(
         return res.status(403).json({ error: "Access denied" });
       }
       
-      const { name, email, phone } = req.body;
-      const updates: { name?: string; email?: string; phone?: string } = {};
+      const { name, email, phone, avatar } = req.body;
+      const updates: { name?: string; email?: string; phone?: string; avatar?: string } = {};
       
       if (name) updates.name = name;
       if (email) updates.email = email;
       if (phone !== undefined) updates.phone = phone;
+      if (avatar !== undefined) updates.avatar = avatar;
       
       const updatedUser = await storage.updateUserProfile(req.params.id, updates);
       res.json(updatedUser);

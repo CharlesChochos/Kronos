@@ -118,6 +118,14 @@ export default function EmployeeHome() {
       case 'purple': return 'bg-purple-950/20';
       case 'green': return 'bg-green-950/20';
       case 'orange': return 'bg-orange-950/20';
+      case 'red': return 'bg-red-950/20';
+      case 'pink': return 'bg-pink-950/20';
+      case 'cyan': return 'bg-cyan-950/20';
+      case 'amber': return 'bg-amber-950/20';
+      case 'emerald': return 'bg-emerald-950/20';
+      case 'indigo': return 'bg-indigo-950/20';
+      case 'rose': return 'bg-rose-950/20';
+      case 'slate': return 'bg-slate-800/30';
       default: return '';
     }
   };
@@ -198,26 +206,71 @@ export default function EmployeeHome() {
                 <div className="space-y-4">
                   <div>
                     <h4 className="font-medium text-sm mb-3">Background Color</h4>
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-7 gap-2">
                       <button
                         onClick={() => setBgColor('default')}
                         className={cn("w-8 h-8 rounded-full bg-background border-2 transition-all", bgColor === 'default' ? "border-primary ring-2 ring-primary/20" : "border-border")}
+                        title="Default"
                       />
                       <button
                         onClick={() => setBgColor('blue')}
                         className={cn("w-8 h-8 rounded-full bg-blue-950/50 border-2 transition-all", bgColor === 'blue' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                        title="Blue"
                       />
                       <button
                         onClick={() => setBgColor('purple')}
                         className={cn("w-8 h-8 rounded-full bg-purple-950/50 border-2 transition-all", bgColor === 'purple' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                        title="Purple"
                       />
                       <button
                         onClick={() => setBgColor('green')}
                         className={cn("w-8 h-8 rounded-full bg-green-950/50 border-2 transition-all", bgColor === 'green' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                        title="Green"
                       />
                       <button
                         onClick={() => setBgColor('orange')}
                         className={cn("w-8 h-8 rounded-full bg-orange-950/50 border-2 transition-all", bgColor === 'orange' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                        title="Orange"
+                      />
+                      <button
+                        onClick={() => setBgColor('red')}
+                        className={cn("w-8 h-8 rounded-full bg-red-950/50 border-2 transition-all", bgColor === 'red' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                        title="Red"
+                      />
+                      <button
+                        onClick={() => setBgColor('pink')}
+                        className={cn("w-8 h-8 rounded-full bg-pink-950/50 border-2 transition-all", bgColor === 'pink' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                        title="Pink"
+                      />
+                      <button
+                        onClick={() => setBgColor('cyan')}
+                        className={cn("w-8 h-8 rounded-full bg-cyan-950/50 border-2 transition-all", bgColor === 'cyan' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                        title="Cyan"
+                      />
+                      <button
+                        onClick={() => setBgColor('amber')}
+                        className={cn("w-8 h-8 rounded-full bg-amber-950/50 border-2 transition-all", bgColor === 'amber' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                        title="Amber"
+                      />
+                      <button
+                        onClick={() => setBgColor('emerald')}
+                        className={cn("w-8 h-8 rounded-full bg-emerald-950/50 border-2 transition-all", bgColor === 'emerald' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                        title="Emerald"
+                      />
+                      <button
+                        onClick={() => setBgColor('indigo')}
+                        className={cn("w-8 h-8 rounded-full bg-indigo-950/50 border-2 transition-all", bgColor === 'indigo' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                        title="Indigo"
+                      />
+                      <button
+                        onClick={() => setBgColor('rose')}
+                        className={cn("w-8 h-8 rounded-full bg-rose-950/50 border-2 transition-all", bgColor === 'rose' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                        title="Rose"
+                      />
+                      <button
+                        onClick={() => setBgColor('slate')}
+                        className={cn("w-8 h-8 rounded-full bg-slate-700/50 border-2 transition-all", bgColor === 'slate' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                        title="Slate"
                       />
                     </div>
                   </div>

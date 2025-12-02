@@ -442,7 +442,7 @@ export function useGenerateDocument() {
 export function useUpdateUserProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ userId, updates }: { userId: string; updates: { name?: string; email?: string; phone?: string } }) => {
+    mutationFn: async ({ userId, updates }: { userId: string; updates: { name?: string; email?: string; phone?: string; avatar?: string } }) => {
       const res = await fetch(`/api/users/${userId}/profile`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
