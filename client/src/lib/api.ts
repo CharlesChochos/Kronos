@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { User, Deal, Task, InsertUser, Meeting, Notification } from "@shared/schema";
+import type { User, Deal, Task, InsertUser, Meeting, Notification, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction } from "@shared/schema";
 
 // Auth API
 export function useLogin() {
@@ -508,6 +508,222 @@ export function useChangePassword() {
         throw new Error(error.error || "Failed to change password");
       }
       return res.json();
+    },
+  });
+}
+
+// ===== TIME TRACKING API =====
+export function useTimeEntries() {
+  return useQuery({
+    queryKey: ["time-entries"],
+    queryFn: async () => {
+      const res = await fetch("/api/time-entries");
+      if (!res.ok) throw new Error("Failed to fetch time entries");
+      return res.json() as Promise<TimeEntry[]>;
+    },
+  });
+}
+
+export function useCreateTimeEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (entry: Omit<InsertTimeEntry, 'userId'>) => {
+      const res = await fetch("/api/time-entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entry),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create time entry");
+      }
+      return res.json() as Promise<TimeEntry>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["time-entries"] });
+    },
+  });
+}
+
+export function useDeleteTimeEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/time-entries/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete time entry");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["time-entries"] });
+    },
+  });
+}
+
+// ===== TIME OFF REQUESTS API =====
+export function useTimeOffRequests() {
+  return useQuery({
+    queryKey: ["time-off-requests"],
+    queryFn: async () => {
+      const res = await fetch("/api/time-off-requests");
+      if (!res.ok) throw new Error("Failed to fetch time off requests");
+      return res.json() as Promise<(TimeOffRequest & { userName?: string; approverName?: string })[]>;
+    },
+  });
+}
+
+export function useCreateTimeOffRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (request: Omit<InsertTimeOffRequest, 'userId'>) => {
+      const res = await fetch("/api/time-off-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create time off request");
+      }
+      return res.json() as Promise<TimeOffRequest>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["time-off-requests"] });
+    },
+  });
+}
+
+export function useUpdateTimeOffRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<TimeOffRequest> }) => {
+      const res = await fetch(`/api/time-off-requests/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update time off request");
+      }
+      return res.json() as Promise<TimeOffRequest>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["time-off-requests"] });
+    },
+  });
+}
+
+// ===== AUDIT LOGS API =====
+export function useAuditLogs(limit?: number) {
+  return useQuery({
+    queryKey: ["audit-logs", limit],
+    queryFn: async () => {
+      const url = limit ? `/api/audit-logs?limit=${limit}` : "/api/audit-logs";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch audit logs");
+      return res.json() as Promise<(AuditLog & { userName?: string })[]>;
+    },
+  });
+}
+
+// ===== INVESTOR CRM API =====
+export function useInvestors() {
+  return useQuery({
+    queryKey: ["investors"],
+    queryFn: async () => {
+      const res = await fetch("/api/investors");
+      if (!res.ok) throw new Error("Failed to fetch investors");
+      return res.json() as Promise<Investor[]>;
+    },
+  });
+}
+
+export function useInvestor(id: string) {
+  return useQuery({
+    queryKey: ["investors", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/investors/${id}`);
+      if (!res.ok) throw new Error("Failed to fetch investor");
+      return res.json() as Promise<Investor & { interactions: InvestorInteraction[] }>;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useCreateInvestor() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (investor: InsertInvestor) => {
+      const res = await fetch("/api/investors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(investor),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create investor");
+      }
+      return res.json() as Promise<Investor>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["investors"] });
+    },
+  });
+}
+
+export function useUpdateInvestor() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<InsertInvestor> }) => {
+      const res = await fetch(`/api/investors/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update investor");
+      }
+      return res.json() as Promise<Investor>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["investors"] });
+    },
+  });
+}
+
+export function useDeleteInvestor() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/investors/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete investor");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["investors"] });
+    },
+  });
+}
+
+export function useCreateInvestorInteraction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ investorId, interaction }: { investorId: string; interaction: Omit<InsertInvestorInteraction, 'investorId' | 'userId'> }) => {
+      const res = await fetch(`/api/investors/${investorId}/interactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(interaction),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create interaction");
+      }
+      return res.json() as Promise<InvestorInteraction>;
+    },
+    onSuccess: (_, { investorId }) => {
+      queryClient.invalidateQueries({ queryKey: ["investors", investorId] });
+      queryClient.invalidateQueries({ queryKey: ["investors"] });
     },
   });
 }

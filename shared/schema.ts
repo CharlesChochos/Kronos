@@ -270,3 +270,115 @@ export const insertAssistantMessageSchema = createInsertSchema(assistantMessages
 
 export type InsertAssistantMessage = z.infer<typeof insertAssistantMessageSchema>;
 export type AssistantMessage = typeof assistantMessages.$inferSelect;
+
+// Time Entries table (for Time Tracking)
+export const timeEntries = pgTable("time_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  dealId: varchar("deal_id").references(() => deals.id),
+  taskId: varchar("task_id").references(() => tasks.id),
+  description: text("description"),
+  hours: integer("hours").notNull().default(0), // stored as minutes for precision
+  date: text("date").notNull(), // YYYY-MM-DD format
+  category: text("category").notNull().default('General'), // Meetings, Research, Document Review, Client Calls, etc.
+  billable: boolean("billable").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
+export type TimeEntry = typeof timeEntries.$inferSelect;
+
+// Time Off Requests table (for Vacation Calendar)
+export const timeOffRequests = pgTable("time_off_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  type: text("type").notNull().default('Vacation'), // Vacation, Sick Leave, Personal, WFH
+  startDate: text("start_date").notNull(), // YYYY-MM-DD
+  endDate: text("end_date").notNull(), // YYYY-MM-DD
+  reason: text("reason"),
+  status: text("status").notNull().default('Pending'), // Pending, Approved, Rejected
+  approvedBy: varchar("approved_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTimeOffRequestSchema = createInsertSchema(timeOffRequests).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTimeOffRequest = z.infer<typeof insertTimeOffRequestSchema>;
+export type TimeOffRequest = typeof timeOffRequests.$inferSelect;
+
+// Audit Logs table (for Audit Trail)
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  action: text("action").notNull(), // CREATE, UPDATE, DELETE, VIEW, LOGIN, LOGOUT, etc.
+  entityType: text("entity_type").notNull(), // Deal, Task, Document, User, etc.
+  entityId: varchar("entity_id"),
+  details: text("details"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
+
+// Investors table (for Investor CRM)
+export const investors = pgTable("investors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  firm: text("firm").notNull(),
+  type: text("type").notNull().default('PE'), // PE, VC, Strategic, Family Office, Sovereign Wealth
+  email: text("email"),
+  phone: text("phone"),
+  linkedIn: text("linkedin"),
+  location: text("location"),
+  investmentFocus: text("investment_focus"), // sectors of interest
+  ticketSize: text("ticket_size"), // typical investment range
+  status: text("status").notNull().default('Active'), // Active, Inactive, Relationship Building
+  notes: text("notes"),
+  lastContactDate: text("last_contact_date"), // YYYY-MM-DD
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInvestorSchema = createInsertSchema(investors).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertInvestor = z.infer<typeof insertInvestorSchema>;
+export type Investor = typeof investors.$inferSelect;
+
+// Investor Interactions table (for tracking touchpoints)
+export const investorInteractions = pgTable("investor_interactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  investorId: varchar("investor_id").references(() => investors.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  dealId: varchar("deal_id").references(() => deals.id),
+  type: text("type").notNull().default('Call'), // Call, Email, Meeting, Conference, Introduction
+  date: text("date").notNull(), // YYYY-MM-DD
+  notes: text("notes"),
+  outcome: text("outcome"), // Positive, Neutral, Negative
+  followUpDate: text("follow_up_date"), // YYYY-MM-DD
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInvestorInteractionSchema = createInsertSchema(investorInteractions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertInvestorInteraction = z.infer<typeof insertInvestorInteractionSchema>;
+export type InvestorInteraction = typeof investorInteractions.$inferSelect;

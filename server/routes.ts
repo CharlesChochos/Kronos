@@ -5,7 +5,7 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
 import bcrypt from "bcryptjs";
-import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema, insertAssistantConversationSchema, insertAssistantMessageSchema } from "@shared/schema";
+import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema, insertAssistantConversationSchema, insertAssistantMessageSchema, insertTimeEntrySchema, insertTimeOffRequestSchema, insertAuditLogSchema, insertInvestorSchema, insertInvestorInteractionSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import { sendMeetingInvite, sendPasswordResetEmail } from "./email";
 import OpenAI from "openai";
@@ -1852,6 +1852,430 @@ Guidelines:
     } catch (error) {
       console.error('Market news error:', error);
       res.status(500).json({ error: "Failed to fetch market news" });
+    }
+  });
+
+  // ===== TIME TRACKING ROUTES =====
+  
+  // Get all time entries (CEO sees all, employees see their own)
+  app.get("/api/time-entries", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      let entries;
+      if (user.role === 'CEO') {
+        entries = await storage.getAllTimeEntries();
+      } else {
+        entries = await storage.getTimeEntriesByUser(user.id);
+      }
+      res.json(entries);
+    } catch (error) {
+      console.error('Get time entries error:', error);
+      res.status(500).json({ error: "Failed to fetch time entries" });
+    }
+  });
+  
+  // Get time entries for a specific deal
+  app.get("/api/time-entries/deal/:dealId", requireAuth, async (req, res) => {
+    try {
+      const entries = await storage.getTimeEntriesByDeal(req.params.dealId);
+      res.json(entries);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch time entries for deal" });
+    }
+  });
+  
+  // Create time entry
+  app.post("/api/time-entries", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const result = insertTimeEntrySchema.safeParse({ ...req.body, userId: user.id });
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const entry = await storage.createTimeEntry(result.data);
+      
+      // Create audit log
+      await storage.createAuditLog({
+        userId: user.id,
+        action: 'CREATE',
+        entityType: 'TimeEntry',
+        entityId: entry.id,
+        details: `Logged ${result.data.hours} minutes for ${result.data.category}`,
+      });
+      
+      res.status(201).json(entry);
+    } catch (error) {
+      console.error('Create time entry error:', error);
+      res.status(500).json({ error: "Failed to create time entry" });
+    }
+  });
+  
+  // Update time entry
+  app.patch("/api/time-entries/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const entry = await storage.getTimeEntry(req.params.id);
+      if (!entry) {
+        return res.status(404).json({ error: "Time entry not found" });
+      }
+      if (entry.userId !== user.id && user.role !== 'CEO') {
+        return res.status(403).json({ error: "Not authorized to update this entry" });
+      }
+      
+      const updated = await storage.updateTimeEntry(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update time entry" });
+    }
+  });
+  
+  // Delete time entry
+  app.delete("/api/time-entries/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const entry = await storage.getTimeEntry(req.params.id);
+      if (!entry) {
+        return res.status(404).json({ error: "Time entry not found" });
+      }
+      if (entry.userId !== user.id && user.role !== 'CEO') {
+        return res.status(403).json({ error: "Not authorized to delete this entry" });
+      }
+      
+      await storage.deleteTimeEntry(req.params.id);
+      res.json({ message: "Time entry deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete time entry" });
+    }
+  });
+  
+  // ===== TIME OFF REQUEST ROUTES =====
+  
+  // Get all time off requests
+  app.get("/api/time-off-requests", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      let requests;
+      if (user.role === 'CEO') {
+        requests = await storage.getAllTimeOffRequests();
+      } else {
+        requests = await storage.getTimeOffRequestsByUser(user.id);
+      }
+      
+      // Enrich with user info
+      const users = await storage.getAllUsers();
+      const enrichedRequests = requests.map((r: any) => {
+        const requestUser = users.find(u => u.id === r.userId);
+        const approver = r.approvedBy ? users.find(u => u.id === r.approvedBy) : null;
+        return {
+          ...r,
+          userName: requestUser?.name || 'Unknown',
+          userEmail: requestUser?.email,
+          approverName: approver?.name,
+        };
+      });
+      
+      res.json(enrichedRequests);
+    } catch (error) {
+      console.error('Get time off requests error:', error);
+      res.status(500).json({ error: "Failed to fetch time off requests" });
+    }
+  });
+  
+  // Create time off request
+  app.post("/api/time-off-requests", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const result = insertTimeOffRequestSchema.safeParse({ ...req.body, userId: user.id });
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const request = await storage.createTimeOffRequest(result.data);
+      
+      // Create audit log
+      await storage.createAuditLog({
+        userId: user.id,
+        action: 'CREATE',
+        entityType: 'TimeOffRequest',
+        entityId: request.id,
+        details: `Requested ${result.data.type} from ${result.data.startDate} to ${result.data.endDate}`,
+      });
+      
+      res.status(201).json(request);
+    } catch (error) {
+      console.error('Create time off request error:', error);
+      res.status(500).json({ error: "Failed to create time off request" });
+    }
+  });
+  
+  // Update time off request (approve/reject - CEO only, or update own pending request)
+  app.patch("/api/time-off-requests/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const request = await storage.getTimeOffRequest(req.params.id);
+      if (!request) {
+        return res.status(404).json({ error: "Time off request not found" });
+      }
+      
+      // CEO can approve/reject
+      if (req.body.status && user.role === 'CEO') {
+        const updates = {
+          status: req.body.status,
+          approvedBy: user.id,
+        };
+        const updated = await storage.updateTimeOffRequest(req.params.id, updates);
+        
+        // Create audit log
+        await storage.createAuditLog({
+          userId: user.id,
+          action: 'UPDATE',
+          entityType: 'TimeOffRequest',
+          entityId: request.id,
+          details: `${req.body.status} time off request`,
+        });
+        
+        return res.json(updated);
+      }
+      
+      // Users can update their own pending requests
+      if (request.userId === user.id && request.status === 'Pending') {
+        const updated = await storage.updateTimeOffRequest(req.params.id, req.body);
+        return res.json(updated);
+      }
+      
+      res.status(403).json({ error: "Not authorized to update this request" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update time off request" });
+    }
+  });
+  
+  // Delete time off request
+  app.delete("/api/time-off-requests/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const request = await storage.getTimeOffRequest(req.params.id);
+      if (!request) {
+        return res.status(404).json({ error: "Time off request not found" });
+      }
+      if (request.userId !== user.id && user.role !== 'CEO') {
+        return res.status(403).json({ error: "Not authorized to delete this request" });
+      }
+      
+      await storage.deleteTimeOffRequest(req.params.id);
+      res.json({ message: "Time off request deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete time off request" });
+    }
+  });
+  
+  // ===== AUDIT LOG ROUTES =====
+  
+  // Get audit logs (CEO only)
+  app.get("/api/audit-logs", requireCEO, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 500;
+      const logs = await storage.getAuditLogs(limit);
+      
+      // Enrich with user names
+      const users = await storage.getAllUsers();
+      const enrichedLogs = logs.map((log: any) => {
+        const logUser = users.find(u => u.id === log.userId);
+        return {
+          ...log,
+          userName: logUser?.name || 'System',
+        };
+      });
+      
+      res.json(enrichedLogs);
+    } catch (error) {
+      console.error('Get audit logs error:', error);
+      res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+  
+  // Get audit logs for specific entity
+  app.get("/api/audit-logs/:entityType/:entityId", requireAuth, async (req, res) => {
+    try {
+      const logs = await storage.getAuditLogsByEntity(req.params.entityType, req.params.entityId);
+      
+      // Enrich with user names
+      const users = await storage.getAllUsers();
+      const enrichedLogs = logs.map((log: any) => {
+        const logUser = users.find(u => u.id === log.userId);
+        return {
+          ...log,
+          userName: logUser?.name || 'System',
+        };
+      });
+      
+      res.json(enrichedLogs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch audit logs for entity" });
+    }
+  });
+  
+  // ===== INVESTOR CRM ROUTES =====
+  
+  // Get all investors
+  app.get("/api/investors", requireAuth, async (req, res) => {
+    try {
+      const investors = await storage.getAllInvestors();
+      res.json(investors);
+    } catch (error) {
+      console.error('Get investors error:', error);
+      res.status(500).json({ error: "Failed to fetch investors" });
+    }
+  });
+  
+  // Get single investor with interactions
+  app.get("/api/investors/:id", requireAuth, async (req, res) => {
+    try {
+      const investor = await storage.getInvestor(req.params.id);
+      if (!investor) {
+        return res.status(404).json({ error: "Investor not found" });
+      }
+      
+      const interactions = await storage.getInvestorInteractions(investor.id);
+      
+      // Enrich interactions with user names
+      const users = await storage.getAllUsers();
+      const enrichedInteractions = interactions.map((i: any) => {
+        const interactionUser = users.find(u => u.id === i.userId);
+        return {
+          ...i,
+          userName: interactionUser?.name || 'Unknown',
+        };
+      });
+      
+      res.json({ ...investor, interactions: enrichedInteractions });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch investor" });
+    }
+  });
+  
+  // Create investor (CEO only)
+  app.post("/api/investors", requireCEO, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const result = insertInvestorSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const investor = await storage.createInvestor(result.data);
+      
+      // Create audit log
+      await storage.createAuditLog({
+        userId: user.id,
+        action: 'CREATE',
+        entityType: 'Investor',
+        entityId: investor.id,
+        details: `Created investor: ${result.data.name} from ${result.data.firm}`,
+      });
+      
+      res.status(201).json(investor);
+    } catch (error) {
+      console.error('Create investor error:', error);
+      res.status(500).json({ error: "Failed to create investor" });
+    }
+  });
+  
+  // Update investor
+  app.patch("/api/investors/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const investor = await storage.getInvestor(req.params.id);
+      if (!investor) {
+        return res.status(404).json({ error: "Investor not found" });
+      }
+      
+      const updated = await storage.updateInvestor(req.params.id, req.body);
+      
+      // Create audit log
+      await storage.createAuditLog({
+        userId: user.id,
+        action: 'UPDATE',
+        entityType: 'Investor',
+        entityId: investor.id,
+        details: `Updated investor: ${investor.name}`,
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update investor" });
+    }
+  });
+  
+  // Delete investor (CEO only)
+  app.delete("/api/investors/:id", requireCEO, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const investor = await storage.getInvestor(req.params.id);
+      if (!investor) {
+        return res.status(404).json({ error: "Investor not found" });
+      }
+      
+      await storage.deleteInvestor(req.params.id);
+      
+      // Create audit log
+      await storage.createAuditLog({
+        userId: user.id,
+        action: 'DELETE',
+        entityType: 'Investor',
+        entityId: req.params.id,
+        details: `Deleted investor: ${investor.name}`,
+      });
+      
+      res.json({ message: "Investor deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete investor" });
+    }
+  });
+  
+  // Create investor interaction
+  app.post("/api/investors/:investorId/interactions", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const investor = await storage.getInvestor(req.params.investorId);
+      if (!investor) {
+        return res.status(404).json({ error: "Investor not found" });
+      }
+      
+      const result = insertInvestorInteractionSchema.safeParse({
+        ...req.body,
+        investorId: req.params.investorId,
+        userId: user.id,
+      });
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      
+      const interaction = await storage.createInvestorInteraction(result.data);
+      
+      // Update last contact date on investor
+      await storage.updateInvestor(investor.id, { lastContactDate: result.data.date });
+      
+      // Create audit log
+      await storage.createAuditLog({
+        userId: user.id,
+        action: 'CREATE',
+        entityType: 'InvestorInteraction',
+        entityId: interaction.id,
+        details: `Logged ${result.data.type} interaction with ${investor.name}`,
+      });
+      
+      res.status(201).json(interaction);
+    } catch (error) {
+      console.error('Create interaction error:', error);
+      res.status(500).json({ error: "Failed to create interaction" });
+    }
+  });
+  
+  // Delete investor interaction
+  app.delete("/api/investor-interactions/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteInvestorInteraction(req.params.id);
+      res.json({ message: "Interaction deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete interaction" });
     }
   });
 

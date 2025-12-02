@@ -2,7 +2,7 @@ import { eq, and, desc, gt } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@shared/schema";
-import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage } from "@shared/schema";
+import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -82,6 +82,41 @@ export interface IStorage {
   createMessage(message: InsertMessage): Promise<Message>;
   getUnreadMessageCount(userId: string): Promise<number>;
   markMessagesAsRead(conversationId: string, userId: string): Promise<void>;
+  
+  // Time Entry operations
+  getTimeEntry(id: string): Promise<TimeEntry | undefined>;
+  getTimeEntriesByUser(userId: string): Promise<TimeEntry[]>;
+  getTimeEntriesByDeal(dealId: string): Promise<TimeEntry[]>;
+  getAllTimeEntries(): Promise<TimeEntry[]>;
+  createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry>;
+  updateTimeEntry(id: string, updates: Partial<InsertTimeEntry>): Promise<TimeEntry | undefined>;
+  deleteTimeEntry(id: string): Promise<void>;
+  
+  // Time Off Request operations
+  getTimeOffRequest(id: string): Promise<TimeOffRequest | undefined>;
+  getTimeOffRequestsByUser(userId: string): Promise<TimeOffRequest[]>;
+  getAllTimeOffRequests(): Promise<TimeOffRequest[]>;
+  createTimeOffRequest(request: InsertTimeOffRequest): Promise<TimeOffRequest>;
+  updateTimeOffRequest(id: string, updates: Partial<InsertTimeOffRequest>): Promise<TimeOffRequest | undefined>;
+  deleteTimeOffRequest(id: string): Promise<void>;
+  
+  // Audit Log operations
+  getAuditLogs(limit?: number): Promise<AuditLog[]>;
+  getAuditLogsByUser(userId: string): Promise<AuditLog[]>;
+  getAuditLogsByEntity(entityType: string, entityId: string): Promise<AuditLog[]>;
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  
+  // Investor operations
+  getInvestor(id: string): Promise<Investor | undefined>;
+  getAllInvestors(): Promise<Investor[]>;
+  createInvestor(investor: InsertInvestor): Promise<Investor>;
+  updateInvestor(id: string, updates: Partial<InsertInvestor>): Promise<Investor | undefined>;
+  deleteInvestor(id: string): Promise<void>;
+  
+  // Investor Interaction operations
+  getInvestorInteractions(investorId: string): Promise<InvestorInteraction[]>;
+  createInvestorInteraction(interaction: InsertInvestorInteraction): Promise<InvestorInteraction>;
+  deleteInvestorInteraction(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -454,6 +489,151 @@ export class DatabaseStorage implements IStorage {
           eq(schema.conversationMembers.userId, userId)
         )
       );
+  }
+  
+  // Time Entry operations
+  async getTimeEntry(id: string): Promise<TimeEntry | undefined> {
+    const [entry] = await db.select().from(schema.timeEntries).where(eq(schema.timeEntries.id, id));
+    return entry;
+  }
+  
+  async getTimeEntriesByUser(userId: string): Promise<TimeEntry[]> {
+    return await db.select().from(schema.timeEntries)
+      .where(eq(schema.timeEntries.userId, userId))
+      .orderBy(desc(schema.timeEntries.date));
+  }
+  
+  async getTimeEntriesByDeal(dealId: string): Promise<TimeEntry[]> {
+    return await db.select().from(schema.timeEntries)
+      .where(eq(schema.timeEntries.dealId, dealId))
+      .orderBy(desc(schema.timeEntries.date));
+  }
+  
+  async getAllTimeEntries(): Promise<TimeEntry[]> {
+    return await db.select().from(schema.timeEntries).orderBy(desc(schema.timeEntries.date));
+  }
+  
+  async createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry> {
+    const [created] = await db.insert(schema.timeEntries).values(entry).returning();
+    return created;
+  }
+  
+  async updateTimeEntry(id: string, updates: Partial<InsertTimeEntry>): Promise<TimeEntry | undefined> {
+    const [updated] = await db.update(schema.timeEntries)
+      .set(updates)
+      .where(eq(schema.timeEntries.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteTimeEntry(id: string): Promise<void> {
+    await db.delete(schema.timeEntries).where(eq(schema.timeEntries.id, id));
+  }
+  
+  // Time Off Request operations
+  async getTimeOffRequest(id: string): Promise<TimeOffRequest | undefined> {
+    const [request] = await db.select().from(schema.timeOffRequests).where(eq(schema.timeOffRequests.id, id));
+    return request;
+  }
+  
+  async getTimeOffRequestsByUser(userId: string): Promise<TimeOffRequest[]> {
+    return await db.select().from(schema.timeOffRequests)
+      .where(eq(schema.timeOffRequests.userId, userId))
+      .orderBy(desc(schema.timeOffRequests.startDate));
+  }
+  
+  async getAllTimeOffRequests(): Promise<TimeOffRequest[]> {
+    return await db.select().from(schema.timeOffRequests).orderBy(desc(schema.timeOffRequests.startDate));
+  }
+  
+  async createTimeOffRequest(request: InsertTimeOffRequest): Promise<TimeOffRequest> {
+    const [created] = await db.insert(schema.timeOffRequests).values(request).returning();
+    return created;
+  }
+  
+  async updateTimeOffRequest(id: string, updates: Partial<InsertTimeOffRequest>): Promise<TimeOffRequest | undefined> {
+    const [updated] = await db.update(schema.timeOffRequests)
+      .set(updates)
+      .where(eq(schema.timeOffRequests.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteTimeOffRequest(id: string): Promise<void> {
+    await db.delete(schema.timeOffRequests).where(eq(schema.timeOffRequests.id, id));
+  }
+  
+  // Audit Log operations
+  async getAuditLogs(limit?: number): Promise<AuditLog[]> {
+    const query = db.select().from(schema.auditLogs).orderBy(desc(schema.auditLogs.createdAt));
+    if (limit) {
+      return await query.limit(limit);
+    }
+    return await query;
+  }
+  
+  async getAuditLogsByUser(userId: string): Promise<AuditLog[]> {
+    return await db.select().from(schema.auditLogs)
+      .where(eq(schema.auditLogs.userId, userId))
+      .orderBy(desc(schema.auditLogs.createdAt));
+  }
+  
+  async getAuditLogsByEntity(entityType: string, entityId: string): Promise<AuditLog[]> {
+    return await db.select().from(schema.auditLogs)
+      .where(and(
+        eq(schema.auditLogs.entityType, entityType),
+        eq(schema.auditLogs.entityId, entityId)
+      ))
+      .orderBy(desc(schema.auditLogs.createdAt));
+  }
+  
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const [created] = await db.insert(schema.auditLogs).values(log).returning();
+    return created;
+  }
+  
+  // Investor operations
+  async getInvestor(id: string): Promise<Investor | undefined> {
+    const [investor] = await db.select().from(schema.investors).where(eq(schema.investors.id, id));
+    return investor;
+  }
+  
+  async getAllInvestors(): Promise<Investor[]> {
+    return await db.select().from(schema.investors).orderBy(schema.investors.name);
+  }
+  
+  async createInvestor(investor: InsertInvestor): Promise<Investor> {
+    const [created] = await db.insert(schema.investors).values(investor).returning();
+    return created;
+  }
+  
+  async updateInvestor(id: string, updates: Partial<InsertInvestor>): Promise<Investor | undefined> {
+    const [updated] = await db.update(schema.investors)
+      .set(updates)
+      .where(eq(schema.investors.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteInvestor(id: string): Promise<void> {
+    await db.delete(schema.investorInteractions).where(eq(schema.investorInteractions.investorId, id));
+    await db.delete(schema.investors).where(eq(schema.investors.id, id));
+  }
+  
+  // Investor Interaction operations
+  async getInvestorInteractions(investorId: string): Promise<InvestorInteraction[]> {
+    return await db.select().from(schema.investorInteractions)
+      .where(eq(schema.investorInteractions.investorId, investorId))
+      .orderBy(desc(schema.investorInteractions.date));
+  }
+  
+  async createInvestorInteraction(interaction: InsertInvestorInteraction): Promise<InvestorInteraction> {
+    const [created] = await db.insert(schema.investorInteractions).values(interaction).returning();
+    return created;
+  }
+  
+  async deleteInvestorInteraction(id: string): Promise<void> {
+    await db.delete(schema.investorInteractions).where(eq(schema.investorInteractions.id, id));
   }
 }
 
