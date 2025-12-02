@@ -64,8 +64,16 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     confirmPassword: '',
   });
   
-  // Sidebar collapsed state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Sidebar collapsed state - persist to localStorage
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebarCollapsed');
+    return saved === 'true';
+  });
+  
+  // Save sidebar state to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
   
   // Photo upload ref
   const photoInputRef = useRef<HTMLInputElement>(null);
