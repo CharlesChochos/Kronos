@@ -107,12 +107,6 @@ export async function registerRoutes(
 
       const user = await storage.createUser(result.data);
       
-      // Send Slack invite asynchronously (don't block signup)
-      import("./slack").then(({ sendSlackInvite, sendSlackWelcomeMessage }) => {
-        sendSlackInvite(user).catch(err => console.error("[Signup] Slack invite error:", err));
-        sendSlackWelcomeMessage(user).catch(err => console.error("[Signup] Slack welcome error:", err));
-      }).catch(err => console.error("[Signup] Failed to load Slack module:", err));
-      
       // Auto-login after signup
       req.login(user, (err) => {
         if (err) {
