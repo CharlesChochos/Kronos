@@ -840,75 +840,6 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {/* Market Intelligence Widget */}
-          {widgets.find(w => w.id === 'marketIntelligence')?.enabled && (
-            <Card className="bg-card border-border">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Market Intelligence</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
-                    {newsSource === 'live' ? (
-                      <span className="text-green-400 flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div> Live
-                      </span>
-                    ) : (
-                      <span className="text-yellow-400">Sample</span>
-                    )}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {newsLoading ? (
-                  <div className="text-center py-4 text-muted-foreground text-sm">Loading news...</div>
-                ) : (
-                  <ScrollArea className="h-[280px]">
-                    <div className="space-y-3 pr-3">
-                      {marketNews.slice(0, 5).map((news) => (
-                        <a 
-                          key={news.id}
-                          href={news.url !== '#' ? news.url : undefined}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors group"
-                        >
-                          <div className="flex items-start gap-3">
-                            {news.image && (
-                              <img 
-                                src={news.image} 
-                                alt="" 
-                                className="w-16 h-12 object-cover rounded flex-shrink-0"
-                              />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <h4 className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors">
-                                {news.headline}
-                              </h4>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[10px] text-muted-foreground">{news.source}</span>
-                                <span className="text-[10px] text-muted-foreground">•</span>
-                                <span className="text-[10px] text-muted-foreground">
-                                  {format(new Date(news.datetime), 'h:mm a')}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </a>
-                      ))}
-                      {marketNews.length === 0 && (
-                        <div className="text-center py-4 text-muted-foreground text-xs">
-                          No news available
-                        </div>
-                      )}
-                    </div>
-                  </ScrollArea>
-                )}
-                <div className="text-[10px] text-muted-foreground text-center pt-2 border-t border-border/50">
-                  {newsSource === 'sample' && <span className="text-yellow-500">Add FINNHUB_API_KEY for live news • </span>}
-                  Real-time financial news
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
 
         {/* Middle Column: Main Content */}
@@ -1034,6 +965,61 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Market Intelligence Widget */}
+          {widgets.find(w => w.id === 'marketIntelligence')?.enabled && (
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Market Intelligence</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
+                    {newsSource === 'live' ? (
+                      <span className="text-green-400 flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div> Live
+                      </span>
+                    ) : (
+                      <span className="text-yellow-400">Sample</span>
+                    )}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {newsLoading ? (
+                  <div className="text-center py-4 text-muted-foreground text-sm">Loading news...</div>
+                ) : (
+                  <ScrollArea className="h-[200px]">
+                    <div className="space-y-2 pr-3">
+                      {marketNews.slice(0, 4).map((news) => (
+                        <a 
+                          key={news.id}
+                          href={news.url !== '#' ? news.url : undefined}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block p-2 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors group"
+                        >
+                          <h4 className="text-xs font-medium line-clamp-2 group-hover:text-primary transition-colors">
+                            {news.headline}
+                          </h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-muted-foreground">{news.source}</span>
+                            <span className="text-[10px] text-muted-foreground">•</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {format(new Date(news.datetime), 'h:mm a')}
+                            </span>
+                          </div>
+                        </a>
+                      ))}
+                      {marketNews.length === 0 && (
+                        <div className="text-center py-4 text-muted-foreground text-xs">
+                          No news available
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                )}
               </CardContent>
             </Card>
           )}
