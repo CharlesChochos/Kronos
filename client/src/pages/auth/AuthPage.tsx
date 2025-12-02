@@ -130,8 +130,8 @@ export default function AuthPage() {
       const firstName = user?.name?.split(' ')[0] || values.email.split('@')[0];
       setWelcomeName(firstName);
       
-      // Route based on email pattern
-      if (values.email.includes("admin") || values.email.includes("josh")) {
+      // Route based on user's actual role from database
+      if (user?.role === 'CEO') {
         setRedirectPath("/ceo/dashboard");
       } else {
         setRedirectPath("/employee/home");
@@ -153,7 +153,13 @@ export default function AuthPage() {
       // Extract first name
       const firstName = values.name.split(' ')[0];
       setWelcomeName(firstName);
-      setRedirectPath("/employee/home");
+      
+      // Route based on selected role - CEOs go to CEO dashboard
+      if (values.role === 'CEO') {
+        setRedirectPath("/ceo/dashboard");
+      } else {
+        setRedirectPath("/employee/home");
+      }
       
       // Set flag to prevent router from redirecting during animation
       sessionStorage.setItem('welcomePending', 'true');

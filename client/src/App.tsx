@@ -96,7 +96,8 @@ function Router() {
     }
     
     if (user && location === "/") {
-      if (user.email.includes("admin") || user.email.includes("josh")) {
+      // Use actual role from database - CEO role goes to CEO dashboard, others to employee home
+      if (user.role === 'CEO') {
         setLocation("/ceo/dashboard");
       } else {
         setLocation("/employee/home");
