@@ -394,9 +394,8 @@ export default function DealManagement() {
           {filteredDeals.map((deal) => (
             <Card 
               key={deal.id} 
-              className="bg-card border-border hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group cursor-pointer" 
+              className="bg-card border-border hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group" 
               data-testid={`card-deal-${deal.id}`}
-              onClick={() => { setSelectedDeal(deal); setActiveTab("overview"); }}
             >
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
@@ -417,14 +416,14 @@ export default function DealManagement() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedDeal(deal); setActiveTab("overview"); }}>
+                      <DropdownMenuItem onClick={() => { setSelectedDeal(deal); setActiveTab("overview"); }}>
                         <Eye className="w-4 h-4 mr-2" /> View Details
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditModal(deal); }}>
+                      <DropdownMenuItem onClick={() => openEditModal(deal)}>
                         <Pencil className="w-4 h-4 mr-2" /> Edit Deal
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-red-500" onClick={(e) => { e.stopPropagation(); handleDeleteDeal(deal.id); }}>
+                      <DropdownMenuItem className="text-red-500" onClick={() => handleDeleteDeal(deal.id)}>
                         <Trash2 className="w-4 h-4 mr-2" /> Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -435,26 +434,33 @@ export default function DealManagement() {
               </CardHeader>
               
               <CardContent className="space-y-4">
-                {/* Stage Progress Bar */}
+                {/* Stage Progress Bar - Click icons to change stage */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     {DEAL_STAGES.map((stage, index) => {
                       const isActive = getStageIndex(deal.stage) >= index;
                       const isCurrent = deal.stage === stage;
                       return (
-                        <div key={stage} className="flex flex-col items-center flex-1">
+                        <div 
+                          key={stage} 
+                          className="flex flex-col items-center flex-1 cursor-pointer group/stage"
+                          onClick={() => handleStageChange(deal, stage)}
+                          data-testid={`stage-icon-${deal.id}-${stage.toLowerCase().replace(' ', '-')}`}
+                        >
                           <div className={cn(
                             "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all",
                             isCurrent ? "bg-primary text-primary-foreground ring-2 ring-primary/30" :
                             isActive ? "bg-primary/60 text-primary-foreground" :
-                            "bg-secondary text-muted-foreground"
+                            "bg-secondary text-muted-foreground",
+                            "group-hover/stage:ring-2 group-hover/stage:ring-primary/50 group-hover/stage:scale-110"
                           )}>
                             {isActive ? <CheckCircle2 className="w-3.5 h-3.5" /> : index + 1}
                           </div>
                           <span className={cn(
-                            "text-[8px] mt-1 truncate max-w-full",
+                            "text-[8px] mt-1 truncate max-w-full transition-colors",
                             isCurrent ? "text-primary font-bold" :
-                            isActive ? "text-foreground" : "text-muted-foreground"
+                            isActive ? "text-foreground" : "text-muted-foreground",
+                            "group-hover/stage:text-primary"
                           )}>{stage.slice(0, 4)}</span>
                         </div>
                       );
@@ -466,6 +472,7 @@ export default function DealManagement() {
                       style={{ width: `${getStageProgress(deal.stage)}%` }}
                     />
                   </div>
+                  <p className="text-[9px] text-muted-foreground text-center">Click any stage to update</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -494,7 +501,7 @@ export default function DealManagement() {
               <CardFooter className="pt-2">
                 <Button 
                   className="w-full bg-secondary hover:bg-primary hover:text-primary-foreground text-secondary-foreground transition-colors gap-2"
-                  onClick={(e) => { e.stopPropagation(); setSelectedDeal(deal); setActiveTab("overview"); }}
+                  onClick={() => { setSelectedDeal(deal); setActiveTab("overview"); }}
                   data-testid={`button-view-deal-${deal.id}`}
                 >
                   View Deal Room <ArrowRight className="w-4 h-4" />

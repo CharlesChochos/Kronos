@@ -47,7 +47,8 @@ import {
   Check,
   AlertCircle,
   Info,
-  Paperclip
+  Paperclip,
+  Search
 } from "lucide-react";
 import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useMarkNotificationRead, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData } from "@/lib/api";
 import { cn } from "@/lib/utils";
