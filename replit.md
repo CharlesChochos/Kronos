@@ -130,3 +130,33 @@ Preferred communication style: Simple, everyday language.
 - Email service preserves organizer's local timezone for accurate meeting time display
 - Beautifully formatted HTML emails with OSReaper branding
 - Graceful error handling - meeting creation succeeds even if email fails
+
+## AI Assistant (Reaper)
+
+**Overview**
+- Platform-wide AI assistant accessible via floating button in the bottom-right corner
+- Available to both CEOs and employees with role-appropriate context
+- Powered by OpenAI via Replit AI Integrations (gpt-5 model)
+
+**Database Schema**
+- **assistant_conversations table**: Stores conversation metadata (userId, title, createdAt)
+- **assistant_messages table**: Stores individual messages with role, content, and optional context
+
+**Features**
+- Persistent conversation history with ability to create multiple conversations
+- Context enrichment with platform data (deals, tasks, users, documents)
+- Role-based access filtering (CEOs see all data, employees see their assigned items)
+- Automatic conversation title generation based on first message
+- Markdown rendering for formatted responses
+
+**API Endpoints**
+- `GET /api/assistant/conversations` - List user's conversations
+- `POST /api/assistant/conversations` - Create new conversation
+- `DELETE /api/assistant/conversations/:id` - Delete conversation
+- `GET /api/assistant/conversations/:id/messages` - Get conversation messages
+- `POST /api/assistant/conversations/:id/messages` - Send message and get AI response
+
+**Frontend Component**
+- `ReaperAssistant.tsx` - Slide-out panel with conversation management
+- Integrated globally via Layout component
+- Auto-selects most recent conversation when opened
