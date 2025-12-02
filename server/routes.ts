@@ -1147,12 +1147,17 @@ Your capabilities:
 - Explain platform features and how to use them
 - Summarize team member activities and workloads
 - SEND IN-APP MESSAGES to team members (use send_message function)
-- Share files and documents with team members
+- SHARE FILES with team members (use share_file function)
 
 IMPORTANT - Sending Messages:
 When the user asks you to send a message to someone, you MUST use the send_message function.
 Extract the recipient name and the message content from the user's request.
 Example: "Send a message to Emily saying hello" -> call send_message with recipientName="Emily" and content="hello"
+
+IMPORTANT - Sharing Files:
+When the user uploads a file to this conversation and asks you to share it with someone, use the share_file function.
+The file information will be provided in the user's message attachments. Extract the filename and recipient from the request.
+Example: "Share this file with Michael" -> call share_file with the uploaded file's details and recipientName="Michael"
 
 Current Platform Context:
 ${JSON.stringify(platformContext, null, 2)}
@@ -1188,6 +1193,35 @@ Guidelines:
                 }
               },
               required: ["recipientName", "content"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "share_file",
+            description: "Share a file with a team member. Use this when the user has uploaded a file and asks you to share it with someone.",
+            parameters: {
+              type: "object",
+              properties: {
+                recipientName: {
+                  type: "string",
+                  description: "The name of the person to share the file with"
+                },
+                fileUrl: {
+                  type: "string",
+                  description: "The URL of the file to share"
+                },
+                filename: {
+                  type: "string",
+                  description: "The name of the file being shared"
+                },
+                message: {
+                  type: "string",
+                  description: "Optional message to send along with the file"
+                }
+              },
+              required: ["recipientName", "fileUrl", "filename"]
             }
           }
         }
@@ -1277,6 +1311,85 @@ Guidelines:
                 toolResults.push({
                   tool_call_id: toolCall.id,
                   result: "Failed to parse message parameters"
+                });
+              }
+            } else if (functionCall?.name === "share_file") {
+              try {
+                const args = JSON.parse(functionCall.arguments);
+                
+                // Find recipient user
+                const allUsers = await storage.getAllUsers();
+                const recipient = allUsers.find(u => 
+                  u.name.toLowerCase() === args.recipientName.toLowerCase() ||
+                  u.name.toLowerCase().includes(args.recipientName.toLowerCase())
+                );
+                
+                if (recipient && recipient.id !== currentUser.id) {
+                  // Get or create conversation
+                  let conversation = await storage.getConversationBetweenUsers(currentUser.id, recipient.id);
+                  
+                  if (!conversation) {
+                    conversation = await storage.createConversation({
+                      name: recipient.name,
+                      isGroup: false,
+                      createdBy: currentUser.id,
+                    });
+                    
+                    await storage.addConversationMember(conversation.id, currentUser.id);
+                    await storage.addConversationMember(conversation.id, recipient.id);
+                  }
+                  
+                  // Build message content with file link
+                  const messageContent = args.message 
+                    ? `${args.message}\n\n📎 Shared file: ${args.filename}`
+                    : `📎 Shared file: ${args.filename}`;
+                  
+                  // Create attachment object
+                  const attachment = {
+                    id: crypto.randomUUID(),
+                    filename: args.filename,
+                    url: args.fileUrl,
+                    mimeType: 'application/octet-stream',
+                    size: 0,
+                    uploadedAt: new Date().toISOString(),
+                  };
+                  
+                  // Send message with file attachment
+                  await storage.createMessage({
+                    conversationId: conversation.id,
+                    senderId: currentUser.id,
+                    content: messageContent,
+                    attachments: [attachment],
+                  });
+                  
+                  // Create notification
+                  await storage.createNotification({
+                    userId: recipient.id,
+                    title: 'New File Shared',
+                    message: `${currentUser.name} shared: ${args.filename}`,
+                    type: 'info',
+                    link: '/chat',
+                  });
+                  
+                  toolResults.push({
+                    tool_call_id: toolCall.id,
+                    result: `File "${args.filename}" shared successfully with ${recipient.name}`
+                  });
+                } else if (recipient?.id === currentUser.id) {
+                  toolResults.push({
+                    tool_call_id: toolCall.id,
+                    result: "Cannot share file with yourself"
+                  });
+                } else {
+                  toolResults.push({
+                    tool_call_id: toolCall.id,
+                    result: `User "${args.recipientName}" not found. Available team members: ${allUsers.filter(u => u.id !== currentUser.id).map(u => u.name).join(', ')}`
+                  });
+                }
+              } catch (parseError) {
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: "Failed to parse file sharing parameters"
                 });
               }
             }

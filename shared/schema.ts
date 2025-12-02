@@ -253,12 +253,23 @@ export const insertAssistantConversationSchema = createInsertSchema(assistantCon
 export type InsertAssistantConversation = z.infer<typeof insertAssistantConversationSchema>;
 export type AssistantConversation = typeof assistantConversations.$inferSelect;
 
+// Assistant Message Attachment type
+export type AssistantAttachment = {
+  id: string;
+  filename: string;
+  url: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string;
+};
+
 // Reaper Assistant Messages table
 export const assistantMessages = pgTable("assistant_messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   conversationId: varchar("conversation_id").references(() => assistantConversations.id).notNull(),
   role: text("role").notNull(), // 'user' or 'assistant'
   content: text("content").notNull(),
+  attachments: jsonb("attachments").default([]).$type<AssistantAttachment[]>(),
   context: jsonb("context").default({}), // stores any context used for the response
   createdAt: timestamp("created_at").defaultNow(),
 });
