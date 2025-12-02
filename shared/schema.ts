@@ -12,6 +12,7 @@ export const users = pgTable("users", {
   phone: text("phone"),
   avatar: text("avatar"),
   role: text("role").notNull().default('Associate'),
+  jobTitle: text("job_title"),
   score: integer("score").default(0),
   activeDeals: integer("active_deals").default(0),
   completedTasks: integer("completed_tasks").default(0),

@@ -33,11 +33,11 @@
   --color-input: hsl(217 33% 22%);
   --color-ring: hsl(224 76% 48%);
 
-  --color-chart-1: hsl(217 91% 60%);
-  --color-chart-2: hsl(43 96% 64%);
-  --color-chart-3: hsl(199 89% 48%);
-  --color-chart-4: hsl(280 67% 55%);
-  --color-chart-5: hsl(340 75% 55%);
+  --color-chart-1: hsl(210 100% 56%);  /* Vivid Electric Blue */
+  --color-chart-2: hsl(45 100% 55%);   /* Bright Gold/Yellow */
+  --color-chart-3: hsl(160 84% 45%);   /* Vibrant Emerald Green */
+  --color-chart-4: hsl(280 85% 60%);   /* Rich Purple/Violet */
+  --color-chart-5: hsl(350 92% 58%);   /* Vivid Coral/Red */
 
   --color-sidebar: hsl(222 47% 10%); /* Slightly darker than bg */
   --color-sidebar-foreground: hsl(210 40% 98%);

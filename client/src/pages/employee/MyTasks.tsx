@@ -783,6 +783,8 @@ interface SwipeableTaskCardProps {
 function SwipeableTaskCard({ task, dealName, onSwipe, onClick }: SwipeableTaskCardProps) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
+  const isDragging = useRef(false);
+  const dragDistance = useRef(0);
   
   const rotateZ = useTransform(x, [-200, 0, 200], [-15, 0, 15]);
   const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0.5, 1, 1, 1, 0.5]);
@@ -790,6 +792,18 @@ function SwipeableTaskCard({ task, dealName, onSwipe, onClick }: SwipeableTaskCa
   const rightIndicatorOpacity = useTransform(x, [0, 100], [0, 1]);
   const leftIndicatorOpacity = useTransform(x, [-100, 0], [1, 0]);
   const upIndicatorOpacity = useTransform(y, [-100, 0], [1, 0]);
+  
+  const handleDragStart = () => {
+    isDragging.current = true;
+    dragDistance.current = 0;
+  };
+  
+  const handleDrag = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    dragDistance.current = Math.max(
+      dragDistance.current,
+      Math.abs(info.offset.x) + Math.abs(info.offset.y)
+    );
+  };
   
   const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const threshold = 100;
@@ -801,6 +815,19 @@ function SwipeableTaskCard({ task, dealName, onSwipe, onClick }: SwipeableTaskCa
     } else if (info.offset.x < -threshold) {
       onSwipe('left');
     }
+    
+    setTimeout(() => {
+      isDragging.current = false;
+    }, 50);
+  };
+  
+  const handleClick = (e: React.MouseEvent) => {
+    if (isDragging.current || dragDistance.current > 10) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    onClick();
   };
 
   return (
@@ -808,13 +835,16 @@ function SwipeableTaskCard({ task, dealName, onSwipe, onClick }: SwipeableTaskCa
       drag
       dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
       dragElastic={0.7}
+      dragTransition={{ bounceStiffness: 300, bounceDamping: 20 }}
+      onDragStart={handleDragStart}
+      onDrag={handleDrag}
       onDragEnd={handleDragEnd}
       style={{ x, y, rotateZ, opacity }}
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       exit={{ scale: 0.9, opacity: 0 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
+      transition={{ type: "spring", stiffness: 300, damping: 25 }}
+      onClick={handleClick}
       className="absolute w-full max-w-md cursor-grab active:cursor-grabbing"
     >
       <Card className="bg-card border-border shadow-xl">

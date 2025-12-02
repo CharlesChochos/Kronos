@@ -184,27 +184,39 @@ export default function Dashboard() {
     setResizeStart({ x: e.clientX, y: e.clientY, width: currentWidth, height: currentHeight });
   };
   
-  // Handle resize move
+  // Handle resize move with smooth animation frame updates
   useEffect(() => {
     if (!isResizing || !resizeStart) return;
     
+    let animationFrameId: number;
+    let lastUpdate = 0;
+    const throttleMs = 16; // ~60fps
+    
     const handleMouseMove = (e: MouseEvent) => {
-      const deltaX = e.clientX - resizeStart.x;
-      const deltaY = e.clientY - resizeStart.y;
-      const minWidth = widgetSizes[isResizing]?.minWidth || 150;
-      const minHeight = widgetSizes[isResizing]?.minHeight || 100;
+      const now = Date.now();
+      if (now - lastUpdate < throttleMs) return;
+      lastUpdate = now;
       
-      setWidgetSizes(prev => ({
-        ...prev,
-        [isResizing]: {
-          ...prev[isResizing],
-          width: Math.max(minWidth, resizeStart.width + deltaX),
-          height: Math.max(minHeight, resizeStart.height + deltaY),
-        }
-      }));
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = requestAnimationFrame(() => {
+        const deltaX = e.clientX - resizeStart.x;
+        const deltaY = e.clientY - resizeStart.y;
+        const minWidth = widgetSizes[isResizing]?.minWidth || 150;
+        const minHeight = widgetSizes[isResizing]?.minHeight || 100;
+        
+        setWidgetSizes(prev => ({
+          ...prev,
+          [isResizing]: {
+            ...prev[isResizing],
+            width: Math.max(minWidth, resizeStart.width + deltaX),
+            height: Math.max(minHeight, resizeStart.height + deltaY),
+          }
+        }));
+      });
     };
     
     const handleMouseUp = () => {
+      cancelAnimationFrame(animationFrameId);
       setIsResizing(null);
       setResizeStart(null);
     };
@@ -213,6 +225,7 @@ export default function Dashboard() {
     document.addEventListener('mouseup', handleMouseUp);
     
     return () => {
+      cancelAnimationFrame(animationFrameId);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };

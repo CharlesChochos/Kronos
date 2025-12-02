@@ -54,6 +54,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
     { icon: CheckSquare, label: "My Tasks", path: "/employee/tasks" },
     { icon: FileText, label: "Document Generator", path: "/employee/documents" },
     { icon: Briefcase, label: "Deal Management", path: "/employee/deals" },
+    { icon: PieChart, label: "Investor Match", path: "/employee/investors" },
     { icon: MessageCircle, label: "Messages", path: "/employee/chat" },
   ];
 

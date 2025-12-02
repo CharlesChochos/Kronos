@@ -17,7 +17,7 @@ import {
   Search, Filter, MoreVertical, ArrowRight, Calendar, DollarSign, Briefcase, 
   Pencil, Trash2, Eye, Users, Phone, Mail, MessageSquare, Plus, X, 
   Building2, TrendingUp, FileText, Clock, CheckCircle2, ChevronRight,
-  UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft
+  UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload
 } from "lucide-react";
 import { useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -1030,11 +1030,12 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
 
               {/* Tabs */}
               <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
-                <TabsList className="grid grid-cols-4 bg-secondary/50">
+                <TabsList className="grid grid-cols-5 bg-secondary/50">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="team">Pod Team</TabsTrigger>
                   <TabsTrigger value="investors">Investors</TabsTrigger>
-                  <TabsTrigger value="audit">Audit Trail</TabsTrigger>
+                  <TabsTrigger value="documents">Documents</TabsTrigger>
+                  <TabsTrigger value="audit">Audit</TabsTrigger>
                 </TabsList>
 
                 {/* Overview Tab */}
@@ -1288,6 +1289,141 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       <Plus className="w-4 h-4 mr-1" /> Tag Investor
                     </Button>
                   </div>
+                </TabsContent>
+
+                {/* Documents Tab */}
+                <TabsContent value="documents" className="mt-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Deal Documents</h4>
+                    <Badge variant="secondary">
+                      {((selectedDeal.attachments as any[] || [])).length} files
+                    </Badge>
+                  </div>
+
+                  <div 
+                    className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer"
+                    onClick={() => document.getElementById('deal-document-upload')?.click()}
+                  >
+                    <input 
+                      type="file" 
+                      id="deal-document-upload" 
+                      className="hidden" 
+                      multiple 
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+                      onChange={async (e) => {
+                        const files = Array.from(e.target.files || []);
+                        if (files.length === 0) return;
+                        
+                        const existingAttachments = (selectedDeal.attachments as any[] || []);
+                        const uploadedAttachments: any[] = [];
+                        
+                        // Upload each file to the server using FormData
+                        for (const file of files) {
+                          try {
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            
+                            const response = await fetch('/api/upload', {
+                              method: 'POST',
+                              credentials: 'include',
+                              body: formData,
+                            });
+                            
+                            if (response.ok) {
+                              const uploadedFile = await response.json();
+                              uploadedAttachments.push(uploadedFile);
+                            } else {
+                              const error = await response.json();
+                              throw new Error(error.error || 'Upload failed');
+                            }
+                          } catch (error: any) {
+                            console.error('Error uploading file:', error);
+                            toast.error(`Failed to upload ${file.name}: ${error.message || 'Unknown error'}`);
+                          }
+                        }
+                        
+                        if (uploadedAttachments.length > 0) {
+                          try {
+                            await updateDeal.mutateAsync({
+                              id: selectedDeal.id,
+                              attachments: [...existingAttachments, ...uploadedAttachments],
+                            });
+                            toast.success(`${uploadedAttachments.length} file(s) uploaded successfully`);
+                          } catch (error) {
+                            toast.error("Failed to save files to deal");
+                          }
+                        }
+                        
+                        // Reset the input
+                        e.target.value = '';
+                      }}
+                      data-testid="input-document-upload"
+                    />
+                    <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">
+                      Click to upload documents
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      PDF, Word, Excel, PowerPoint, CSV, TXT
+                    </p>
+                  </div>
+
+                  <ScrollArea className="h-[300px]">
+                    <div className="space-y-2">
+                      {((selectedDeal.attachments as any[] || [])).map((doc: any) => (
+                        <div key={doc.id} className="p-3 bg-secondary/30 rounded-lg flex items-center justify-between group">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center">
+                              <FileText className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-sm">{doc.filename}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {(doc.size / 1024).toFixed(1)} KB • {format(new Date(doc.uploadedAt), 'MMM d, yyyy')}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={() => window.open(doc.url, '_blank')}
+                              data-testid={`button-view-doc-${doc.id}`}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-red-400 hover:text-red-300"
+                              onClick={async () => {
+                                const updatedAttachments = (selectedDeal.attachments as any[] || [])
+                                  .filter((a: any) => a.id !== doc.id);
+                                try {
+                                  await updateDeal.mutateAsync({
+                                    id: selectedDeal.id,
+                                    attachments: updatedAttachments,
+                                  });
+                                  toast.success("Document removed");
+                                } catch (error) {
+                                  toast.error("Failed to remove document");
+                                }
+                              }}
+                              data-testid={`button-delete-doc-${doc.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      {((selectedDeal.attachments as any[] || [])).length === 0 && (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                          No documents uploaded yet
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
                 </TabsContent>
 
                 {/* Audit Trail Tab */}

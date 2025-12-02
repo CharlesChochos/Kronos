@@ -54,6 +54,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     email: '',
     phone: '',
     role: '',
+    jobTitle: '',
   });
   
   // Password change state
@@ -119,13 +120,14 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
       email: currentUser?.email || '',
       phone: (currentUser as any)?.phone || '',
       role: currentUser?.role || '',
+      jobTitle: (currentUser as any)?.jobTitle || '',
     });
     setIsEditingProfile(true);
   };
 
   const handleCancelEditProfile = () => {
     setIsEditingProfile(false);
-    setProfileForm({ name: '', email: '', phone: '', role: '' });
+    setProfileForm({ name: '', email: '', phone: '', role: '', jobTitle: '' });
   };
 
   const handleSaveProfile = async () => {
@@ -140,7 +142,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     }
     
     try {
-      const updates: { name: string; email: string; phone: string; role?: string } = {
+      const updates: { name: string; email: string; phone: string; role?: string; jobTitle?: string } = {
         name: profileForm.name,
         email: profileForm.email,
         phone: profileForm.phone,
@@ -149,6 +151,13 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
       // Only include role if user is not CEO and role has changed
       if (currentUser.role !== 'CEO' && profileForm.role && profileForm.role !== currentUser.role) {
         updates.role = profileForm.role;
+      }
+      
+      // Include jobTitle if role is Custom
+      if (profileForm.role === 'Custom' && profileForm.jobTitle) {
+        updates.jobTitle = profileForm.jobTitle;
+      } else if (profileForm.role !== 'Custom') {
+        updates.jobTitle = '';
       }
       
       await updateUserProfile.mutateAsync({
@@ -286,7 +295,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   }, []);
   
   const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return { deals: [], tasks: [], users: [] };
+    if (!searchQuery.trim()) return { deals: [], tasks: [], users: [], documents: [] };
     
     const query = searchQuery.toLowerCase();
     
@@ -336,10 +345,24 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
       user.role?.toLowerCase().includes(query)
     ).slice(0, 5);
     
-    return { deals: filteredDeals, tasks: filteredTasks, users: filteredUsers };
+    // Search documents across accessible deals
+    const documents: { doc: any; deal: any }[] = [];
+    accessibleDeals.forEach((deal: any) => {
+      const attachments = deal.attachments || [];
+      if (Array.isArray(attachments)) {
+        attachments.forEach((doc: any) => {
+          if (doc.filename?.toLowerCase().includes(query)) {
+            documents.push({ doc, deal });
+          }
+        });
+      }
+    });
+    const filteredDocuments = documents.slice(0, 5);
+    
+    return { deals: filteredDeals, tasks: filteredTasks, users: filteredUsers, documents: filteredDocuments };
   }, [searchQuery, deals, tasks, users, role, currentUser]);
   
-  const hasResults = searchResults.deals.length > 0 || searchResults.tasks.length > 0 || searchResults.users.length > 0;
+  const hasResults = searchResults.deals.length > 0 || searchResults.tasks.length > 0 || searchResults.users.length > 0 || searchResults.documents.length > 0;
   
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
@@ -489,6 +512,36 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                           ))}
                         </div>
                       )}
+                      
+                      {searchResults.documents.length > 0 && (
+                        <div>
+                          <div className="px-3 py-2 bg-secondary/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                            <FileText className="w-3 h-3" /> Documents
+                          </div>
+                          {searchResults.documents.map((item: any, index: number) => (
+                            <button
+                              key={`${item.deal.id}-${item.doc.id || index}`}
+                              onClick={() => { 
+                                if (item.doc.url) {
+                                  window.open(item.doc.url, '_blank');
+                                }
+                                setShowSearchResults(false); 
+                                setSearchQuery(""); 
+                              }}
+                              className="w-full px-3 py-2 text-left hover:bg-primary/10 flex items-center gap-3"
+                              data-testid={`search-result-doc-${item.doc.id || index}`}
+                            >
+                              <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center">
+                                <FileText className="w-4 h-4 text-orange-500" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{item.doc.filename}</p>
+                                <p className="text-xs text-muted-foreground">{item.deal.name} • {(item.doc.size / 1024).toFixed(1)} KB</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="px-4 py-6 text-center text-muted-foreground">
@@ -524,7 +577,11 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                   </Avatar>
                   <div className="text-left hidden md:block">
                     <p className="text-sm font-medium leading-none">{userName}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{currentUser?.role || role}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {currentUser?.role === 'Custom' && (currentUser as any)?.jobTitle 
+                        ? (currentUser as any).jobTitle 
+                        : currentUser?.role || role}
+                    </p>
                   </div>
                 </div>
               </DropdownMenuTrigger>
@@ -599,11 +656,12 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
             email: currentUser?.email || '',
             phone: (currentUser as any)?.phone || '',
             role: currentUser?.role || '',
+            jobTitle: (currentUser as any)?.jobTitle || '',
           });
         } else {
           setIsEditingProfile(false);
           setIsChangingPassword(false);
-          setProfileForm({ name: '', email: '', phone: '', role: '' });
+          setProfileForm({ name: '', email: '', phone: '', role: '', jobTitle: '' });
           setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
         }
       }}>
@@ -625,7 +683,11 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold">{currentUser?.name}</h3>
-                  <p className="text-muted-foreground">{currentUser?.role}</p>
+                  <p className="text-muted-foreground">
+                    {currentUser?.role === 'Custom' && (currentUser as any)?.jobTitle 
+                      ? (currentUser as any).jobTitle 
+                      : currentUser?.role}
+                  </p>
                 </div>
                 {!isEditingProfile && !isChangingPassword && (
                   <Button 
@@ -835,6 +897,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
             email: currentUser.email || '',
             phone: (currentUser as any)?.phone || '',
             role: currentUser.role || '',
+            jobTitle: (currentUser as any)?.jobTitle || '',
           });
         }
       }}>
@@ -942,10 +1005,14 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="Junior Analyst">Junior Analyst</SelectItem>
                         <SelectItem value="Analyst">Analyst</SelectItem>
                         <SelectItem value="Associate">Associate</SelectItem>
+                        <SelectItem value="Senior Associate">Senior Associate</SelectItem>
+                        <SelectItem value="VP">VP</SelectItem>
                         <SelectItem value="Director">Director</SelectItem>
                         <SelectItem value="Managing Director">Managing Director</SelectItem>
+                        <SelectItem value="Custom">Custom Title</SelectItem>
                       </SelectContent>
                     </Select>
                   )}
@@ -953,6 +1020,20 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                     {currentUser?.role === 'CEO' ? 'CEO role cannot be changed' : 'Select your role in the organization'}
                   </p>
                 </div>
+                {profileForm.role === 'Custom' && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Job Title</Label>
+                    <Input 
+                      value={profileForm.jobTitle || ''} 
+                      onChange={(e) => setProfileForm(prev => ({ ...prev, jobTitle: e.target.value }))}
+                      placeholder="Enter your job title (e.g., AI Engineer, HR Manager)"
+                      data-testid="input-job-title"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This title will be displayed instead of a standard role
+                    </p>
+                  </div>
+                )}
               </div>
               
               <Button 

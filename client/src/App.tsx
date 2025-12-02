@@ -10,6 +10,7 @@ import Dashboard from "@/pages/ceo/Dashboard";
 import DealManagement from "@/pages/ceo/DealManagement";
 import DocumentGenerator from "@/pages/shared/DocumentGenerator";
 import InvestorMatching from "@/pages/ceo/InvestorMatching";
+import EmployeeInvestorMatching from "@/pages/employee/InvestorMatching";
 import TeamAssignment from "@/pages/ceo/TeamAssignment";
 import MyTasks from "@/pages/employee/MyTasks";
 import EmployeeHome from "@/pages/employee/Home";
@@ -107,6 +108,9 @@ function Router() {
       </Route>
       <Route path="/employee/deals">
         {() => <ProtectedRoute component={EmployeeDealManagement} />}
+      </Route>
+      <Route path="/employee/investors">
+        {() => <ProtectedRoute component={EmployeeInvestorMatching} />}
       </Route>
       <Route path="/employee/chat">
         {() => <ProtectedRoute component={EmployeeChat} />}

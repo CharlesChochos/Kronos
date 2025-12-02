@@ -9,6 +9,10 @@ import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSche
 import { fromError } from "zod-validation-error";
 import { sendMeetingInvite } from "./email";
 import OpenAI from "openai";
+import * as fs from "fs";
+import * as path from "path";
+import * as crypto from "crypto";
+import multer from "multer";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -145,6 +149,108 @@ export async function registerRoutes(
       }
       res.json({ message: "Logged out successfully" });
     });
+  });
+
+  // ===== FILE UPLOAD ROUTES =====
+  
+  // Ensure uploads directory exists
+  const uploadsDir = path.join(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  // Configure multer for file uploads
+  const fileStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      cb(null, uploadsDir);
+    },
+    filename: (_req, file, cb) => {
+      // Generate unique filename with sanitized original name
+      const uniqueId = crypto.randomUUID();
+      const ext = path.extname(file.originalname).toLowerCase();
+      const baseName = path.basename(file.originalname, ext)
+        .replace(/[^a-zA-Z0-9._-]/g, '_')
+        .substring(0, 100);
+      cb(null, `${uniqueId}-${baseName}${ext}`);
+    }
+  });
+
+  const upload = multer({
+    storage: fileStorage,
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB max
+    },
+    fileFilter: (_req, file, cb) => {
+      const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv'];
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (allowedExtensions.includes(ext)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Allowed: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV'));
+      }
+    }
+  });
+
+  // Serve uploaded files statically (with path traversal protection)
+  app.use("/uploads", (req, res, next) => {
+    const requestedPath = path.normalize(req.path).replace(/^(\.\.[\/\\])+/, '');
+    const filePath = path.join(uploadsDir, requestedPath);
+    
+    // Ensure file is within uploads directory
+    if (!filePath.startsWith(uploadsDir)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
+      res.status(404).json({ error: "File not found" });
+    }
+  });
+
+  // Upload file using multer
+  app.post("/api/upload", requireAuth, upload.single('file'), (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const fileUrl = `/uploads/${req.file.filename}`;
+      
+      res.json({
+        id: crypto.randomUUID(),
+        filename: req.file.originalname,
+        url: fileUrl,
+        size: req.file.size,
+        type: req.file.mimetype,
+        uploadedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("File upload error:", error);
+      res.status(500).json({ error: "Failed to upload file" });
+    }
+  });
+
+  // Delete file
+  app.delete("/api/upload/:filename", requireAuth, async (req, res) => {
+    try {
+      const requestedFilename = path.normalize(req.params.filename).replace(/^(\.\.[\/\\])+/, '');
+      const filePath = path.join(uploadsDir, requestedFilename);
+      
+      // Ensure file is within uploads directory
+      if (!filePath.startsWith(uploadsDir)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        res.json({ message: "File deleted successfully" });
+      } else {
+        res.status(404).json({ error: "File not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete file" });
+    }
   });
 
   // Get current user
