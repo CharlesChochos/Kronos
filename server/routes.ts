@@ -181,6 +181,9 @@ export async function registerRoutes(
       const resetLink = `${baseUrl}/reset-password?token=${token}`;
 
       // Send the email
+      console.log('Attempting to send password reset email to:', user.email);
+      console.log('Reset link:', resetLink);
+      
       const emailResult = await sendPasswordResetEmail({
         email: user.email,
         userName: user.name,
@@ -189,7 +192,9 @@ export async function registerRoutes(
 
       if (!emailResult.success) {
         console.error('Failed to send password reset email:', emailResult.error);
-        // Still return success to prevent enumeration
+        console.error('Email config details - User:', user.email, 'Name:', user.name);
+      } else {
+        console.log('Password reset email sent successfully to:', user.email);
       }
 
       res.json({ message: "If an account exists with this email, you will receive a password reset link." });
@@ -528,17 +533,17 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Task not found" });
       }
       
-      // Employees can only update their own tasks and only the status field
+      // Employees can only update their own tasks (status, or forward to another user)
       if (currentUser.role !== 'CEO') {
         if (existingTask.assignedTo !== currentUser.id) {
           return res.status(403).json({ error: "You can only update your own tasks" });
         }
-        // Employees can only change status
-        const allowedFields = ['status'];
+        // Employees can change status or forward tasks (assignedTo)
+        const allowedFields = ['status', 'assignedTo'];
         const attemptedFields = Object.keys(req.body);
         const hasDisallowedFields = attemptedFields.some(f => !allowedFields.includes(f));
         if (hasDisallowedFields) {
-          return res.status(403).json({ error: "You can only update task status" });
+          return res.status(403).json({ error: "You can only update task status or forward tasks" });
         }
       }
       
@@ -743,7 +748,7 @@ export async function registerRoutes(
       
       // Handle role change with validation
       if (role) {
-        const validRoles = ['Analyst', 'Associate', 'Director', 'Managing Director', 'CEO'];
+        const validRoles = ['Analyst', 'Associate', 'Director', 'Managing Director', 'CEO', 'Custom'];
         if (!validRoles.includes(role)) {
           return res.status(400).json({ error: "Invalid role" });
         }
@@ -756,6 +761,12 @@ export async function registerRoutes(
           return res.status(403).json({ error: "CEO cannot change their own role" });
         }
         updates.role = role;
+      }
+      
+      // Handle custom job title
+      const { jobTitle } = req.body;
+      if (jobTitle !== undefined) {
+        (updates as any).jobTitle = jobTitle;
       }
       
       const updatedUser = await storage.updateUserProfile(req.params.id, updates);

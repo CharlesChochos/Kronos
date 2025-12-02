@@ -125,8 +125,9 @@ export default function EmployeeHome() {
     return saved ? { ...DEFAULT_EMPLOYEE_WIDGET_SIZES, ...JSON.parse(saved) } : DEFAULT_EMPLOYEE_WIDGET_SIZES;
   });
   
-  // Resize state
+  // Resize state with direction support
   const [isResizing, setIsResizing] = useState<string | null>(null);
+  const [resizeDirection, setResizeDirection] = useState<string>('se');
   const [resizeStart, setResizeStart] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   
   // Save settings to localStorage when they change
@@ -147,15 +148,16 @@ export default function EmployeeHome() {
     localStorage.setItem('employeeHomeWidgetSizes', JSON.stringify(widgetSizes));
   }, [widgetSizes]);
   
-  // Handle resize start
-  const handleResizeStart = (e: React.MouseEvent, widgetId: string, currentWidth: number, currentHeight: number) => {
+  // Handle resize start with direction
+  const handleResizeStart = (e: React.MouseEvent, widgetId: string, currentWidth: number, currentHeight: number, direction: string = 'se') => {
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(widgetId);
+    setResizeDirection(direction);
     setResizeStart({ x: e.clientX, y: e.clientY, width: currentWidth, height: currentHeight });
   };
   
-  // Handle resize move with smooth animation frame updates
+  // Handle resize move with direction-aware logic
   useEffect(() => {
     if (!isResizing || !resizeStart) return;
     
@@ -175,12 +177,29 @@ export default function EmployeeHome() {
         const minWidth = widgetSizes[isResizing]?.minWidth || 150;
         const minHeight = widgetSizes[isResizing]?.minHeight || 100;
         
+        let newWidth = resizeStart.width;
+        let newHeight = resizeStart.height;
+        
+        // Handle different resize directions
+        if (resizeDirection.includes('e')) {
+          newWidth = Math.max(minWidth, resizeStart.width + deltaX);
+        }
+        if (resizeDirection.includes('w')) {
+          newWidth = Math.max(minWidth, resizeStart.width - deltaX);
+        }
+        if (resizeDirection.includes('s')) {
+          newHeight = Math.max(minHeight, resizeStart.height + deltaY);
+        }
+        if (resizeDirection.includes('n')) {
+          newHeight = Math.max(minHeight, resizeStart.height - deltaY);
+        }
+        
         setWidgetSizes(prev => ({
           ...prev,
           [isResizing]: {
             ...prev[isResizing],
-            width: Math.max(minWidth, resizeStart.width + deltaX),
-            height: Math.max(minHeight, resizeStart.height + deltaY),
+            width: newWidth,
+            height: newHeight,
           }
         }));
       });
@@ -200,7 +219,7 @@ export default function EmployeeHome() {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, resizeStart, widgetSizes]);
+  }, [isResizing, resizeStart, resizeDirection, widgetSizes]);
   
   // Resizable widget wrapper component
   const ResizableWidget = ({ 
@@ -225,18 +244,33 @@ export default function EmployeeHome() {
         }}
       >
         {children}
-        {/* Resize handle */}
+        
+        {/* Right edge resize */}
         <div
-          className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-primary/30 rounded-r"
           onMouseDown={(e) => {
             const rect = widgetRef.current?.getBoundingClientRect();
-            if (rect) {
-              handleResizeStart(e, id, rect.width, rect.height);
-            }
+            if (rect) handleResizeStart(e, id, rect.width, rect.height, 'e');
+          }}
+        />
+        {/* Bottom edge resize */}
+        <div
+          className="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-primary/30 rounded-b"
+          onMouseDown={(e) => {
+            const rect = widgetRef.current?.getBoundingClientRect();
+            if (rect) handleResizeStart(e, id, rect.width, rect.height, 's');
+          }}
+        />
+        {/* SE corner resize with visible grip */}
+        <div
+          className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center"
+          onMouseDown={(e) => {
+            const rect = widgetRef.current?.getBoundingClientRect();
+            if (rect) handleResizeStart(e, id, rect.width, rect.height, 'se');
           }}
         >
           <svg 
-            className="w-4 h-4 text-muted-foreground/50 hover:text-primary transition-colors"
+            className="w-4 h-4 text-muted-foreground/60 hover:text-primary transition-colors"
             viewBox="0 0 16 16" 
             fill="currentColor"
           >

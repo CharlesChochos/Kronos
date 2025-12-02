@@ -131,22 +131,24 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   };
 
   const handleSaveProfile = async () => {
-    if (!profileForm.name || !profileForm.email) {
-      toast.error("Name and email are required");
-      return;
-    }
-    
     if (!currentUser?.id) {
       toast.error("User not found");
       return;
     }
     
     try {
-      const updates: { name: string; email: string; phone: string; role?: string; jobTitle?: string } = {
-        name: profileForm.name,
-        email: profileForm.email,
-        phone: profileForm.phone,
-      };
+      const updates: { name?: string; email?: string; phone?: string; role?: string; jobTitle?: string } = {};
+      
+      // Only include fields that have changed
+      if (profileForm.name && profileForm.name !== currentUser.name) {
+        updates.name = profileForm.name;
+      }
+      if (profileForm.email && profileForm.email !== currentUser.email) {
+        updates.email = profileForm.email;
+      }
+      if (profileForm.phone !== ((currentUser as any)?.phone || '')) {
+        updates.phone = profileForm.phone;
+      }
       
       // Only include role if user is not CEO and role has changed
       if (currentUser.role !== 'CEO' && profileForm.role && profileForm.role !== currentUser.role) {
@@ -156,8 +158,15 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
       // Include jobTitle if role is Custom
       if (profileForm.role === 'Custom' && profileForm.jobTitle) {
         updates.jobTitle = profileForm.jobTitle;
-      } else if (profileForm.role !== 'Custom') {
+      } else if (profileForm.role !== 'Custom' && (currentUser as any)?.jobTitle) {
         updates.jobTitle = '';
+      }
+      
+      // Check if there are any updates to make
+      if (Object.keys(updates).length === 0) {
+        toast.info("No changes to save");
+        setIsEditingProfile(false);
+        return;
       }
       
       await updateUserProfile.mutateAsync({
