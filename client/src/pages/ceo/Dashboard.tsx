@@ -775,9 +775,9 @@ export default function Dashboard() {
                   <div className="text-center py-4 text-muted-foreground text-sm">Loading market data...</div>
                 ) : (
                   marketData
-                    .filter(metric => marketSymbols.some(s => metric.name.toUpperCase().includes(s)))
+                    .filter(metric => marketSymbols.includes(metric.symbol))
                     .map((metric) => (
-                    <div key={metric.name} className="flex items-center justify-between hover:bg-secondary/30 p-2 rounded -mx-2 transition-colors group">
+                    <div key={metric.symbol} className="flex items-center justify-between hover:bg-secondary/30 p-2 rounded -mx-2 transition-colors group">
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium truncate">{metric.name}</div>
                         <div className="text-[10px] text-muted-foreground truncate">{metric.description}</div>
@@ -795,11 +795,10 @@ export default function Dashboard() {
                           size="sm"
                           className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={() => {
-                            const symbol = metric.name.split(' ')[0].toUpperCase();
-                            setMarketSymbols(prev => prev.filter(s => s !== symbol));
-                            toast.success(`Removed ${symbol} from watchlist`);
+                            setMarketSymbols(prev => prev.filter(s => s !== metric.symbol));
+                            toast.success(`Removed ${metric.symbol} from watchlist`);
                           }}
-                          data-testid={`button-remove-market-${metric.name}`}
+                          data-testid={`button-remove-market-${metric.symbol}`}
                         >
                           <X className="w-3 h-3 text-muted-foreground hover:text-destructive" />
                         </Button>
@@ -807,7 +806,7 @@ export default function Dashboard() {
                     </div>
                   ))
                 )}
-                {!marketLoading && marketData.filter(metric => marketSymbols.some(s => metric.name.toUpperCase().includes(s))).length === 0 && (
+                {!marketLoading && marketData.filter(metric => marketSymbols.includes(metric.symbol)).length === 0 && (
                   <div className="text-center py-4 text-muted-foreground text-xs">
                     No symbols tracked. Click the search icon to add stocks.
                   </div>

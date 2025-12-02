@@ -82,7 +82,7 @@ export default function DealManagement() {
   }, [deals, searchQuery, stageFilter]);
 
   const getStageIndex = (stage: string) => DEAL_STAGES.indexOf(stage);
-  const getStageProgress = (stage: string) => ((getStageIndex(stage) + 1) / DEAL_STAGES.length) * 100;
+  const getStageProgress = (stage: string) => Math.round(((getStageIndex(stage) + 1) / DEAL_STAGES.length) * 100);
 
   const handleCreateDeal = async () => {
     if (!newDeal.name || !newDeal.client || !newDeal.value) {
