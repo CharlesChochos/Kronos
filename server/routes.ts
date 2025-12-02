@@ -102,10 +102,16 @@ export async function registerRoutes(
 
       const existingUser = await storage.getUserByEmail(result.data.email);
       if (existingUser) {
-        return res.status(400).json({ error: "Email already registered" });
+        return res.status(400).json({ error: "Email already registered. Please sign in instead." });
       }
 
       const user = await storage.createUser(result.data);
+      
+      // Send Slack invite asynchronously (don't block signup)
+      import("./slack").then(({ sendSlackInvite, sendSlackWelcomeMessage }) => {
+        sendSlackInvite(user).catch(err => console.error("[Signup] Slack invite error:", err));
+        sendSlackWelcomeMessage(user).catch(err => console.error("[Signup] Slack welcome error:", err));
+      }).catch(err => console.error("[Signup] Failed to load Slack module:", err));
       
       // Auto-login after signup
       req.login(user, (err) => {
