@@ -7,6 +7,10 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { 
   CheckSquare, 
   Clock, 
@@ -21,7 +25,9 @@ import {
   User,
   Paperclip,
   ExternalLink,
-  MessageSquare
+  MessageSquare,
+  Settings2,
+  Palette
 } from "lucide-react";
 import { useCurrentUser, useTasks, useDeals, useMeetings, useNotifications, useUsers, useUpdateTask } from "@/lib/api";
 import { Link } from "wouter";
@@ -41,6 +47,17 @@ export default function EmployeeHome() {
   
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
+  const [showCustomizePopover, setShowCustomizePopover] = useState(false);
+  
+  // Customization state
+  const [widgetSettings, setWidgetSettings] = useState({
+    showQuickStats: true,
+    showMyTasks: true,
+    showMyProjects: true,
+    showSchedule: true,
+    showQuickActions: true,
+  });
+  const [bgColor, setBgColor] = useState<string>('default');
 
   const openTaskDetail = (task: Task) => {
     setSelectedTask(task);
@@ -71,14 +88,39 @@ export default function EmployeeHome() {
 
   // Filter tasks assigned to current user
   const myTasks = allTasks.filter((task: any) => task.assignedTo === currentUser?.id);
-  const pendingTasks = myTasks.filter((t: any) => t.status === 'Pending');
-  const inProgressTasks = myTasks.filter((t: any) => t.status === 'In Progress');
   const completedTasks = myTasks.filter((t: any) => t.status === 'Completed');
+  
+  // Task categorization for tabs
+  const now = new Date();
+  const activeTasks = myTasks.filter((t: any) => t.status === 'In Progress');
+  const upcomingTasksAll = myTasks.filter((t: any) => {
+    if (t.status === 'Completed') return false;
+    const dueDate = new Date(t.dueDate);
+    return dueDate > now;
+  }).sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  const overdueTasks = myTasks.filter((t: any) => {
+    if (t.status === 'Completed') return false;
+    const dueDate = new Date(t.dueDate);
+    return dueDate < now;
+  });
+  const pendingTasks = myTasks.filter((t: any) => t.status === 'Pending');
+  const inProgressTasks = activeTasks;
   
   // Calculate task completion rate
   const taskCompletionRate = myTasks.length > 0 
     ? Math.round((completedTasks.length / myTasks.length) * 100) 
     : 0;
+    
+  // Background color classes
+  const getBackgroundClass = () => {
+    switch (bgColor) {
+      case 'blue': return 'bg-blue-950/20';
+      case 'purple': return 'bg-purple-950/20';
+      case 'green': return 'bg-green-950/20';
+      case 'orange': return 'bg-orange-950/20';
+      default: return '';
+    }
+  };
 
   // Filter deals where user is on the pod team
   const myDeals = allDeals.filter((deal: any) => {
@@ -130,49 +172,151 @@ export default function EmployeeHome() {
 
   return (
     <Layout role="Employee" pageTitle="Home" userName={currentUser?.name || ""}>
-      <div className="space-y-6">
+      <div className={cn("space-y-6 min-h-full", getBackgroundClass())}>
         {/* Welcome Header */}
         <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-6 border border-primary/20">
-          <h1 className="text-2xl font-bold">
-            {getGreeting()}, {currentUser?.name?.split(' ')[0] || 'User'}!
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Here's an overview of your work today. You have {pendingTasks.length + inProgressTasks.length} active tasks.
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">
+                {format(new Date(), 'EEEE, MMMM d, yyyy')}
+              </p>
+              <h1 className="text-2xl font-bold">
+                {getGreeting()}, {currentUser?.name?.split(' ')[0] || 'User'}!
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Here's an overview of your work today. You have {pendingTasks.length + inProgressTasks.length} active tasks.
+              </p>
+            </div>
+            <Popover open={showCustomizePopover} onOpenChange={setShowCustomizePopover}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Settings2 className="w-4 h-4" />
+                  Customize
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 bg-card border-border" align="end">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-medium text-sm mb-3">Background Color</h4>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setBgColor('default')}
+                        className={cn("w-8 h-8 rounded-full bg-background border-2 transition-all", bgColor === 'default' ? "border-primary ring-2 ring-primary/20" : "border-border")}
+                      />
+                      <button
+                        onClick={() => setBgColor('blue')}
+                        className={cn("w-8 h-8 rounded-full bg-blue-950/50 border-2 transition-all", bgColor === 'blue' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                      />
+                      <button
+                        onClick={() => setBgColor('purple')}
+                        className={cn("w-8 h-8 rounded-full bg-purple-950/50 border-2 transition-all", bgColor === 'purple' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                      />
+                      <button
+                        onClick={() => setBgColor('green')}
+                        className={cn("w-8 h-8 rounded-full bg-green-950/50 border-2 transition-all", bgColor === 'green' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                      />
+                      <button
+                        onClick={() => setBgColor('orange')}
+                        className={cn("w-8 h-8 rounded-full bg-orange-950/50 border-2 transition-all", bgColor === 'orange' ? "border-primary ring-2 ring-primary/20" : "border-transparent")}
+                      />
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div>
+                    <h4 className="font-medium text-sm mb-3">Widgets</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm">Quick Stats</Label>
+                        <Switch 
+                          checked={widgetSettings.showQuickStats} 
+                          onCheckedChange={(c) => setWidgetSettings(prev => ({ ...prev, showQuickStats: c }))} 
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm">My Tasks</Label>
+                        <Switch 
+                          checked={widgetSettings.showMyTasks} 
+                          onCheckedChange={(c) => setWidgetSettings(prev => ({ ...prev, showMyTasks: c }))} 
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm">My Projects</Label>
+                        <Switch 
+                          checked={widgetSettings.showMyProjects} 
+                          onCheckedChange={(c) => setWidgetSettings(prev => ({ ...prev, showMyProjects: c }))} 
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm">Today's Schedule</Label>
+                        <Switch 
+                          checked={widgetSettings.showSchedule} 
+                          onCheckedChange={(c) => setWidgetSettings(prev => ({ ...prev, showSchedule: c }))} 
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm">Quick Actions</Label>
+                        <Switch 
+                          checked={widgetSettings.showQuickActions} 
+                          onCheckedChange={(c) => setWidgetSettings(prev => ({ ...prev, showQuickActions: c }))} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Pending Tasks</p>
-                  <p className="text-2xl font-bold mt-1">{pendingTasks.length}</p>
+        {widgetSettings.showQuickStats && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="bg-card border-border">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Active</p>
+                    <p className="text-2xl font-bold mt-1">{activeTasks.length}</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-blue-500" />
+                  </div>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-yellow-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">In Progress</p>
-                  <p className="text-2xl font-bold mt-1">{inProgressTasks.length}</p>
+            <Card className="bg-card border-border">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Upcoming</p>
+                    <p className="text-2xl font-bold mt-1">{upcomingTasksAll.length}</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-yellow-500" />
+                  </div>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-blue-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
+            <Card className="bg-card border-border">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Overdue</p>
+                    <p className="text-2xl font-bold mt-1 text-red-400">{overdueTasks.length}</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                    <AlertCircle className="w-5 h-5 text-red-500" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border">
+              <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wider">Completed</p>
@@ -199,220 +343,359 @@ export default function EmployeeHome() {
             </CardContent>
           </Card>
         </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* My Tasks Overview */}
-          <Card className="bg-card border-border lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <CheckSquare className="w-5 h-5 text-primary" />
-                  My Tasks
-                </CardTitle>
-                <CardDescription>Your upcoming and active tasks</CardDescription>
-              </div>
-              <Link href="/employee/tasks">
-                <Button variant="ghost" size="sm">
-                  View All <ArrowRight className="w-4 h-4 ml-1" />
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {upcomingTasks.length > 0 ? (
-                <div className="space-y-3">
-                  {upcomingTasks.map((task: any) => (
-                    <div 
-                      key={task.id} 
-                      className="flex items-center justify-between p-3 bg-secondary/20 rounded-lg hover:bg-secondary/30 transition-colors cursor-pointer group"
-                      onClick={() => openTaskDetail(task)}
-                      data-testid={`task-item-${task.id}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "w-2 h-2 rounded-full",
-                          task.status === 'In Progress' ? 'bg-blue-500' : 'bg-yellow-500'
-                        )} />
-                        <div>
-                          <p className="font-medium text-sm group-hover:text-primary transition-colors">{task.title}</p>
-                          <p className="text-xs text-muted-foreground">{task.type}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Badge className={cn("text-xs", getPriorityColor(task.priority))}>
-                          {task.priority}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDueDate(task.dueDate)}
-                        </span>
-                        <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </div>
-                  ))}
+          {/* My Tasks Overview with Tabs */}
+          {widgetSettings.showMyTasks && (
+            <Card className="bg-card border-border lg:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <CheckSquare className="w-5 h-5 text-primary" />
+                    My Tasks
+                  </CardTitle>
+                  <CardDescription>Your tasks organized by status</CardDescription>
                 </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <CheckSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>No pending tasks</p>
-                </div>
-              )}
+                <Link href="/employee/tasks">
+                  <Button variant="ghost" size="sm">
+                    View All <ArrowRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </Link>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="active" className="w-full">
+                  <TabsList className="grid w-full grid-cols-4 mb-4">
+                    <TabsTrigger value="active" className="text-xs">
+                      Active ({activeTasks.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="upcoming" className="text-xs">
+                      Upcoming ({upcomingTasksAll.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="overdue" className="text-xs">
+                      Overdue ({overdueTasks.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="completed" className="text-xs">
+                      Completed ({completedTasks.length})
+                    </TabsTrigger>
+                  </TabsList>
 
-              {/* Task Progress */}
-              <div className="mt-6 pt-4 border-t border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground">Task Completion Rate</span>
-                  <span className="text-sm font-medium">{taskCompletionRate}%</span>
+                  {/* Active Tasks Tab */}
+                  <TabsContent value="active">
+                    <ScrollArea className="h-[200px]">
+                      {activeTasks.length > 0 ? (
+                        <div className="space-y-2">
+                          {activeTasks.map((task: any) => (
+                            <div 
+                              key={task.id} 
+                              className="flex items-center justify-between p-3 bg-secondary/20 rounded-lg hover:bg-secondary/30 transition-colors cursor-pointer group"
+                              onClick={() => openTaskDetail(task)}
+                              data-testid={`task-active-${task.id}`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                <div>
+                                  <p className="font-medium text-sm group-hover:text-primary transition-colors">{task.title}</p>
+                                  <p className="text-xs text-muted-foreground">{task.type}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge className={cn("text-xs", getPriorityColor(task.priority))}>
+                                  {task.priority}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDueDate(task.dueDate)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <TrendingUp className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p>No active tasks</p>
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </TabsContent>
+
+                  {/* Upcoming Tasks Tab */}
+                  <TabsContent value="upcoming">
+                    <ScrollArea className="h-[200px]">
+                      {upcomingTasksAll.length > 0 ? (
+                        <div className="space-y-2">
+                          {upcomingTasksAll.map((task: any) => (
+                            <div 
+                              key={task.id} 
+                              className="flex items-center justify-between p-3 bg-secondary/20 rounded-lg hover:bg-secondary/30 transition-colors cursor-pointer group"
+                              onClick={() => openTaskDetail(task)}
+                              data-testid={`task-upcoming-${task.id}`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                                <div>
+                                  <p className="font-medium text-sm group-hover:text-primary transition-colors">{task.title}</p>
+                                  <p className="text-xs text-muted-foreground">{task.type}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge className={cn("text-xs", getPriorityColor(task.priority))}>
+                                  {task.priority}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDueDate(task.dueDate)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p>No upcoming tasks</p>
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </TabsContent>
+
+                  {/* Overdue Tasks Tab */}
+                  <TabsContent value="overdue">
+                    <ScrollArea className="h-[200px]">
+                      {overdueTasks.length > 0 ? (
+                        <div className="space-y-2">
+                          {overdueTasks.map((task: any) => (
+                            <div 
+                              key={task.id} 
+                              className="flex items-center justify-between p-3 bg-red-500/5 border border-red-500/20 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer group"
+                              onClick={() => openTaskDetail(task)}
+                              data-testid={`task-overdue-${task.id}`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-2 h-2 rounded-full bg-red-500" />
+                                <div>
+                                  <p className="font-medium text-sm group-hover:text-primary transition-colors">{task.title}</p>
+                                  <p className="text-xs text-muted-foreground">{task.type}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge className="text-xs text-red-400 bg-red-500/10">
+                                  Overdue
+                                </Badge>
+                                <span className="text-xs text-red-400">
+                                  {formatDueDate(task.dueDate)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <CheckCircle2 className="w-8 h-8 mx-auto mb-2 opacity-50 text-green-500" />
+                          <p>No overdue tasks</p>
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </TabsContent>
+
+                  {/* Completed Tasks Tab */}
+                  <TabsContent value="completed">
+                    <ScrollArea className="h-[200px]">
+                      {completedTasks.length > 0 ? (
+                        <div className="space-y-2">
+                          {completedTasks.slice(0, 10).map((task: any) => (
+                            <div 
+                              key={task.id} 
+                              className="flex items-center justify-between p-3 bg-green-500/5 border border-green-500/20 rounded-lg cursor-pointer group"
+                              onClick={() => openTaskDetail(task)}
+                              data-testid={`task-completed-${task.id}`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                <div>
+                                  <p className="font-medium text-sm line-through opacity-70">{task.title}</p>
+                                  <p className="text-xs text-muted-foreground">{task.type}</p>
+                                </div>
+                              </div>
+                              <Badge className="text-xs text-green-400 bg-green-500/10">
+                                Completed
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <CheckSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p>No completed tasks yet</p>
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </TabsContent>
+                </Tabs>
+
+                {/* Task Progress */}
+                <div className="mt-4 pt-4 border-t border-border">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-muted-foreground">Task Completion Rate</span>
+                    <span className="text-sm font-medium">{taskCompletionRate}%</span>
+                  </div>
+                  <Progress value={taskCompletionRate} className="h-2" />
                 </div>
-                <Progress value={taskCompletionRate} className="h-2" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* My Projects (Deals) */}
-          <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Briefcase className="w-5 h-5 text-primary" />
-                  My Projects
-                </CardTitle>
-                <CardDescription>Deals you're assigned to</CardDescription>
-              </div>
-              <Link href="/employee/deals">
-                <Button variant="ghost" size="sm">
-                  View All <ArrowRight className="w-4 h-4 ml-1" />
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {myDeals.length > 0 ? (
-                <div className="space-y-3">
-                  {myDeals.slice(0, 4).map((deal: any) => (
-                    <div 
-                      key={deal.id} 
-                      className="p-3 bg-secondary/20 rounded-lg hover:bg-secondary/30 transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="font-medium text-sm">{deal.name}</p>
-                        <Badge variant="secondary" className="text-xs">
-                          {deal.stage}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{deal.client}</span>
-                        <span>${deal.value}M</span>
-                      </div>
-                      <Progress value={deal.progress || 0} className="h-1.5 mt-2" />
-                    </div>
-                  ))}
+          {widgetSettings.showMyProjects && (
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Briefcase className="w-5 h-5 text-primary" />
+                    My Projects
+                  </CardTitle>
+                  <CardDescription>Deals you're assigned to</CardDescription>
                 </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>No assigned projects</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                <Link href="/employee/deals">
+                  <Button variant="ghost" size="sm">
+                    View All <ArrowRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </Link>
+              </CardHeader>
+              <CardContent>
+                {myDeals.length > 0 ? (
+                  <div className="space-y-3">
+                    {myDeals.slice(0, 4).map((deal: any) => (
+                      <div 
+                        key={deal.id} 
+                        className="p-3 bg-secondary/20 rounded-lg hover:bg-secondary/30 transition-colors"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="font-medium text-sm">{deal.name}</p>
+                          <Badge variant="secondary" className="text-xs">
+                            {deal.stage}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>{deal.client}</span>
+                          <span>${deal.value}M</span>
+                        </div>
+                        <Progress value={deal.progress || 0} className="h-1.5 mt-2" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p>No assigned projects</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Bottom Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Today's Schedule */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-primary" />
-                Today's Schedule
-              </CardTitle>
-              <CardDescription>Your meetings and events for today</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {todayMeetings.length > 0 ? (
-                <div className="space-y-3">
-                  {todayMeetings.map((meeting: any) => (
-                    <div 
-                      key={meeting.id} 
-                      className="flex items-center gap-3 p-3 bg-secondary/20 rounded-lg"
-                    >
-                      <div className="w-12 h-12 rounded-lg bg-primary/10 flex flex-col items-center justify-center">
-                        <span className="text-xs font-bold text-primary">
-                          {format(new Date(meeting.scheduledFor), 'HH:mm')}
-                        </span>
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{meeting.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {meeting.location || 'No location'} • {meeting.duration} min
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>No meetings scheduled for today</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions & Notifications */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Target className="w-5 h-5 text-primary" />
-                Quick Actions
-              </CardTitle>
-              <CardDescription>Frequently used features</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-3">
-                <Link href="/employee/tasks">
-                  <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
-                    <CheckSquare className="w-5 h-5" />
-                    <span className="text-xs">View Tasks</span>
-                  </Button>
-                </Link>
-                <Link href="/employee/documents">
-                  <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
-                    <FileText className="w-5 h-5" />
-                    <span className="text-xs">Documents</span>
-                  </Button>
-                </Link>
-                <Link href="/employee/deals">
-                  <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
-                    <Briefcase className="w-5 h-5" />
-                    <span className="text-xs">My Deals</span>
-                  </Button>
-                </Link>
-                <Link href="/employee/chat">
-                  <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
-                    <AlertCircle className="w-5 h-5" />
-                    <span className="text-xs">Messages</span>
-                  </Button>
-                </Link>
-              </div>
-
-              {/* Recent Notifications */}
-              {unreadNotifications.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-border">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Recent Notifications</p>
-                  <div className="space-y-2">
-                    {unreadNotifications.map((notification: any) => (
-                      <div key={notification.id} className="flex items-start gap-2 text-sm">
-                        <div className="w-2 h-2 rounded-full bg-primary mt-1.5" />
-                        <div>
-                          <p className="font-medium">{notification.title}</p>
-                          <p className="text-xs text-muted-foreground">{notification.message}</p>
+          {widgetSettings.showSchedule && (
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-primary" />
+                  Today's Schedule
+                </CardTitle>
+                <CardDescription>Your meetings and events for today</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {todayMeetings.length > 0 ? (
+                  <div className="space-y-3">
+                    {todayMeetings.map((meeting: any) => (
+                      <div 
+                        key={meeting.id} 
+                        className="flex items-center gap-3 p-3 bg-secondary/20 rounded-lg"
+                      >
+                        <div className="w-12 h-12 rounded-lg bg-primary/10 flex flex-col items-center justify-center">
+                          <span className="text-xs font-bold text-primary">
+                            {format(new Date(meeting.scheduledFor), 'HH:mm')}
+                          </span>
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{meeting.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {meeting.location || 'No location'} • {meeting.duration} min
+                          </p>
                         </div>
                       </div>
                     ))}
                   </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p>No meetings scheduled for today</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Quick Actions & Notifications */}
+          {widgetSettings.showQuickActions && (
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Target className="w-5 h-5 text-primary" />
+                  Quick Actions
+                </CardTitle>
+                <CardDescription>Frequently used features</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-3">
+                  <Link href="/employee/tasks">
+                    <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
+                      <CheckSquare className="w-5 h-5" />
+                      <span className="text-xs">View Tasks</span>
+                    </Button>
+                  </Link>
+                  <Link href="/employee/documents">
+                    <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
+                      <FileText className="w-5 h-5" />
+                      <span className="text-xs">Documents</span>
+                    </Button>
+                  </Link>
+                  <Link href="/employee/deals">
+                    <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
+                      <Briefcase className="w-5 h-5" />
+                      <span className="text-xs">My Deals</span>
+                    </Button>
+                  </Link>
+                  <Link href="/employee/chat">
+                    <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
+                      <MessageSquare className="w-5 h-5" />
+                      <span className="text-xs">Messages</span>
+                    </Button>
+                  </Link>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+
+                {/* Recent Notifications */}
+                {unreadNotifications.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Recent Notifications</p>
+                    <div className="space-y-2">
+                      {unreadNotifications.map((notification: any) => (
+                        <div key={notification.id} className="flex items-start gap-2 text-sm">
+                          <div className="w-2 h-2 rounded-full bg-primary mt-1.5" />
+                          <div>
+                            <p className="font-medium">{notification.title}</p>
+                            <p className="text-xs text-muted-foreground">{notification.message}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 

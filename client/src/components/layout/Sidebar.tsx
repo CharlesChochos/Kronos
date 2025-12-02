@@ -18,9 +18,10 @@ import logo from "@assets/generated_images/abstract_minimalist_layer_icon_for_fi
 
 type SidebarProps = {
   role: 'CEO' | 'Employee';
+  collapsed?: boolean;
 };
 
-export function Sidebar({ role }: SidebarProps) {
+export function Sidebar({ role, collapsed = false }: SidebarProps) {
   const [location, setLocation] = useLocation();
   const logoutMutation = useLogout();
   
@@ -56,34 +57,43 @@ export function Sidebar({ role }: SidebarProps) {
   const links = role === 'CEO' ? ceoLinks : employeeLinks;
 
   return (
-    <div className="h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col text-sidebar-foreground fixed left-0 top-0 z-50">
-      <div className="p-6 flex items-center gap-3">
-        <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center overflow-hidden">
+    <div className={cn(
+      "h-screen bg-sidebar border-r border-sidebar-border flex flex-col text-sidebar-foreground fixed left-0 top-0 z-50 transition-all duration-300",
+      collapsed ? "w-20" : "w-64"
+    )}>
+      <div className={cn("p-6 flex items-center", collapsed ? "justify-center" : "gap-3")}>
+        <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center overflow-hidden flex-shrink-0">
             <img src={logo} alt="Logo" className="w-full h-full object-cover" />
         </div>
-        <div>
-          <h1 className="font-display font-bold text-lg leading-none tracking-tight">OSReaper</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">v2.4</p>
-        </div>
+        {!collapsed && (
+          <div>
+            <h1 className="font-display font-bold text-lg leading-none tracking-tight">OSReaper</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">v2.4</p>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        <div className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Platform
-        </div>
+        {!collapsed && (
+          <div className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Platform
+          </div>
+        )}
         {links.map((link) => (
           <Link key={link.path} href={link.path}>
             <div
               className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer group",
+                "flex items-center rounded-md text-sm font-medium transition-all duration-200 cursor-pointer group",
+                collapsed ? "justify-center px-2 py-3" : "gap-3 px-3 py-2",
                 isActive(link.path)
                   ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_0_hsl(var(--primary))]"
                   : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
               )}
               data-testid={`sidebar-link-${link.path.split('/').pop()}`}
+              title={collapsed ? link.label : undefined}
             >
-              <link.icon className={cn("w-4 h-4", isActive(link.path) ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-              {link.label}
+              <link.icon className={cn("w-4 h-4 flex-shrink-0", isActive(link.path) ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+              {!collapsed && link.label}
             </div>
           </Link>
         ))}
@@ -94,11 +104,15 @@ export function Sidebar({ role }: SidebarProps) {
         <button
           onClick={handleLogout}
           disabled={logoutMutation.isPending}
-          className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-red-400 hover:bg-red-400/10 cursor-pointer transition-colors w-full text-left disabled:opacity-50"
+          className={cn(
+            "flex items-center rounded-md text-sm font-medium text-red-400 hover:bg-red-400/10 cursor-pointer transition-colors w-full disabled:opacity-50",
+            collapsed ? "justify-center px-2 py-3" : "gap-3 px-3 py-2 text-left"
+          )}
           data-testid="sidebar-signout"
+          title={collapsed ? "Sign Out" : undefined}
         >
-          <LogOut className="w-4 h-4" />
-          {logoutMutation.isPending ? "Signing Out..." : "Sign Out"}
+          <LogOut className="w-4 h-4 flex-shrink-0" />
+          {!collapsed && (logoutMutation.isPending ? "Signing Out..." : "Sign Out")}
         </button>
       </div>
     </div>

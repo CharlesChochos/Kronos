@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Sidebar } from "./Sidebar";
-import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check } from "lucide-react";
+import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check, Rocket, TrendingUp, UserCheck, ChevronRight, PanelLeftClose, PanelLeft } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useDashboardContext } from "@/contexts/DashboardContext";
 import { useNotifications, useDeals, useTasks, useUsers, useLogout, useCurrentUser, useMarkNotificationRead, useUpdateUserProfile, useChangePassword } from "@/lib/api";
 import { toast } from "sonner";
@@ -59,6 +60,9 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     newPassword: '',
     confirmPassword: '',
   });
+  
+  // Sidebar collapsed state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   const { 
     showProfileSheet,
@@ -255,12 +259,21 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
-      <Sidebar role={role} />
+      <Sidebar role={role} collapsed={sidebarCollapsed} />
       
-      <div className="pl-64 flex flex-col min-h-screen">
+      <div className={cn("flex flex-col min-h-screen transition-all duration-300", sidebarCollapsed ? "pl-20" : "pl-64")}>
         {/* Header */}
         <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-40 px-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="w-8 h-8"
+              data-testid="button-toggle-sidebar"
+            >
+              {sidebarCollapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+            </Button>
             <h2 className="text-lg font-display font-semibold tracking-tight">{pageTitle}</h2>
           </div>
           
@@ -913,7 +926,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
 
       {/* Resources Sheet */}
       <Sheet open={showResourcesSheet} onOpenChange={setShowResourcesSheet}>
-        <SheetContent className="bg-card border-border">
+        <SheetContent className="bg-card border-border w-[500px] sm:max-w-[500px]">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-primary" />
@@ -921,98 +934,183 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
             </SheetTitle>
             <SheetDescription>Help documentation and useful resources.</SheetDescription>
           </SheetHeader>
-          <div className="mt-6 space-y-4">
-            <a 
-              href="https://www.equiturn.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full text-left p-4 bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors cursor-pointer border border-primary/20"
-              data-testid="resource-my-organization"
-            >
-              <h4 className="font-medium flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-primary" />
-                My Organization
-              </h4>
-              <p className="text-xs text-muted-foreground mt-1">Visit Equiturn's main website</p>
-            </a>
-            <button 
-              className="w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
-              onClick={() => {
-                setShowResourcesSheet(false);
-                setLocation(`${rolePrefix}/documents`);
-              }}
-              data-testid="resource-user-guide"
-            >
-              <h4 className="font-medium flex items-center gap-2">
-                <FileText className="w-4 h-4 text-primary" />
-                Document Generator
-              </h4>
-              <p className="text-xs text-muted-foreground mt-1">Create and manage documents</p>
-            </button>
-            <button 
-              className="w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
-              onClick={() => {
-                setShowResourcesSheet(false);
-                setLocation(`${rolePrefix}/deals`);
-              }}
-              data-testid="resource-deal-management"
-            >
-              <h4 className="font-medium flex items-center gap-2">
-                <Target className="w-4 h-4 text-primary" />
-                Deal Management
-              </h4>
-              <p className="text-xs text-muted-foreground mt-1">View and manage your deals</p>
-            </button>
-            <button 
-              className="w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
-              onClick={() => {
-                setShowResourcesSheet(false);
-                if (role === 'CEO') {
-                  setLocation('/ceo/team');
-                } else {
-                  setLocation('/employee/tasks');
-                }
-              }}
-              data-testid="resource-team-collaboration"
-            >
-              <h4 className="font-medium flex items-center gap-2">
-                <Users className="w-4 h-4 text-primary" />
-                {role === 'CEO' ? 'Team Assignment' : 'My Tasks'}
-              </h4>
-              <p className="text-xs text-muted-foreground mt-1">
-                {role === 'CEO' ? 'Assign tasks to team members' : 'View your assigned tasks'}
-              </p>
-            </button>
-            {role === 'CEO' && (
-              <button 
-                className="w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
-                onClick={() => {
-                  setShowResourcesSheet(false);
-                  setLocation('/ceo/investors');
-                }}
-                data-testid="resource-investor-match"
-              >
-                <h4 className="font-medium flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-primary" />
-                  Investor Match
-                </h4>
-                <p className="text-xs text-muted-foreground mt-1">Find matching investors for deals</p>
-              </button>
-            )}
-            <a 
-              href="https://www.equiturn.com/contact"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
-              data-testid="resource-contact-support"
-            >
-              <h4 className="font-medium flex items-center gap-2">
-                <Mail className="w-4 h-4 text-primary" />
-                Contact Support
-              </h4>
-              <p className="text-xs text-muted-foreground mt-1">Get help from our support team</p>
-            </a>
-          </div>
+          <ScrollArea className="h-[calc(100vh-120px)] mt-6 pr-4">
+            <div className="space-y-4">
+              {/* Quick Links */}
+              <div className="grid grid-cols-2 gap-3">
+                <a 
+                  href="https://www.equiturn.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block p-4 bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors cursor-pointer border border-primary/20"
+                  data-testid="resource-my-organization"
+                >
+                  <Briefcase className="w-5 h-5 text-primary mb-2" />
+                  <h4 className="font-medium text-sm">My Organization</h4>
+                  <p className="text-xs text-muted-foreground mt-1">Visit Equiturn's website</p>
+                </a>
+                <a 
+                  href="https://www.equiturn.com/contact"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+                  data-testid="resource-contact-support"
+                >
+                  <Mail className="w-5 h-5 text-primary mb-2" />
+                  <h4 className="font-medium text-sm">Contact Support</h4>
+                  <p className="text-xs text-muted-foreground mt-1">Get help from our team</p>
+                </a>
+              </div>
+
+              <Separator />
+
+              {/* Documentation Sections */}
+              <div>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Documentation</h4>
+                <Accordion type="single" collapsible className="w-full">
+                  {/* Get Started */}
+                  <AccordionItem value="get-started" className="border-border">
+                    <AccordionTrigger className="hover:no-underline py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                          <Rocket className="w-4 h-4 text-green-500" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-medium text-sm">Get Started with OSReaper</p>
+                          <p className="text-xs text-muted-foreground">Learn the basics of the platform</p>
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="text-sm text-muted-foreground space-y-4 pt-2">
+                      <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                        <h5 className="font-medium text-foreground">Welcome to OSReaper</h5>
+                        <p>OSReaper is your comprehensive investment banking operations platform designed to streamline deal management, task assignments, and investor relations.</p>
+                        
+                        <h5 className="font-medium text-foreground mt-4">Quick Start Guide</h5>
+                        <ol className="list-decimal list-inside space-y-2">
+                          <li><strong>Dashboard Overview:</strong> Your central hub showing active deals, tasks, and team performance metrics.</li>
+                          <li><strong>Navigation:</strong> Use the left sidebar to access all platform features. Click the collapse button to minimize the sidebar.</li>
+                          <li><strong>Profile Settings:</strong> Click your avatar in the top-right to access profile, settings, and resources.</li>
+                          <li><strong>Search:</strong> Use the search bar to quickly find deals, tasks, or team members.</li>
+                        </ol>
+
+                        <h5 className="font-medium text-foreground mt-4">Key Features</h5>
+                        <ul className="list-disc list-inside space-y-1">
+                          <li>Real-time deal pipeline tracking</li>
+                          <li>AI-powered document generation</li>
+                          <li>Investor matching algorithm</li>
+                          <li>Team task assignment and tracking</li>
+                          <li>In-platform messaging and collaboration</li>
+                        </ul>
+
+                        <h5 className="font-medium text-foreground mt-4">Getting Help</h5>
+                        <p>If you need assistance, click "Contact Support" above or reach out to your team administrator.</p>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  {/* Managing Deals */}
+                  <AccordionItem value="managing-deals" className="border-border">
+                    <AccordionTrigger className="hover:no-underline py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                          <TrendingUp className="w-4 h-4 text-blue-500" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-medium text-sm">Managing Deals</p>
+                          <p className="text-xs text-muted-foreground">Complete deal lifecycle guide</p>
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="text-sm text-muted-foreground space-y-4 pt-2">
+                      <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                        <h5 className="font-medium text-foreground">Deal Lifecycle Overview</h5>
+                        <p>Successfully closing a deal requires careful management through five key stages:</p>
+                        
+                        <div className="space-y-3 mt-3">
+                          <div className="border-l-2 border-blue-500 pl-3">
+                            <h6 className="font-medium text-foreground">1. Origination</h6>
+                            <p className="text-xs">Identify and qualify potential deals. Create the deal record with client information, sector, and estimated value. Assign initial team members.</p>
+                          </div>
+                          <div className="border-l-2 border-purple-500 pl-3">
+                            <h6 className="font-medium text-foreground">2. Structuring</h6>
+                            <p className="text-xs">Develop the deal structure, valuation models, and preliminary terms. Generate initial documentation and create task assignments for team members.</p>
+                          </div>
+                          <div className="border-l-2 border-yellow-500 pl-3">
+                            <h6 className="font-medium text-foreground">3. Diligence</h6>
+                            <p className="text-xs">Conduct thorough due diligence. Coordinate information requests, review financials, and identify potential risks. Track progress with milestone tasks.</p>
+                          </div>
+                          <div className="border-l-2 border-orange-500 pl-3">
+                            <h6 className="font-medium text-foreground">4. Legal</h6>
+                            <p className="text-xs">Draft and negotiate legal documents. Coordinate with external counsel, manage document revisions, and ensure compliance requirements are met.</p>
+                          </div>
+                          <div className="border-l-2 border-green-500 pl-3">
+                            <h6 className="font-medium text-foreground">5. Close</h6>
+                            <p className="text-xs">Finalize all documentation, complete closing checklists, and execute the transaction. Update deal status and archive relevant materials.</p>
+                          </div>
+                        </div>
+
+                        <h5 className="font-medium text-foreground mt-4">Best Practices</h5>
+                        <ul className="list-disc list-inside space-y-1 text-xs">
+                          <li>Update deal progress regularly to keep stakeholders informed</li>
+                          <li>Assign clear task owners and deadlines for each milestone</li>
+                          <li>Use the document generator for consistent, professional deliverables</li>
+                          <li>Tag relevant investors early using the Investor Match feature</li>
+                        </ul>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  {/* Investor Matching */}
+                  <AccordionItem value="investor-matching" className="border-border">
+                    <AccordionTrigger className="hover:no-underline py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                          <UserCheck className="w-4 h-4 text-purple-500" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-medium text-sm">Investor Matching</p>
+                          <p className="text-xs text-muted-foreground">Find the right investors for deals</p>
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="text-sm text-muted-foreground space-y-4 pt-2">
+                      <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                        <h5 className="font-medium text-foreground">Investor Matching Overview</h5>
+                        <p>OSReaper's intelligent investor matching system helps you identify the most suitable investors for each deal based on multiple criteria.</p>
+                        
+                        <h5 className="font-medium text-foreground mt-4">How Matching Works</h5>
+                        <ol className="list-decimal list-inside space-y-2 text-xs">
+                          <li><strong>Sector Alignment:</strong> The system analyzes investor portfolio history and sector preferences.</li>
+                          <li><strong>Investment Size:</strong> Matches based on typical investment ranges and fund capacity.</li>
+                          <li><strong>Geographic Focus:</strong> Considers regional preferences and portfolio concentration.</li>
+                          <li><strong>Stage Preference:</strong> Aligns deal stage with investor maturity preferences.</li>
+                          <li><strong>Historical Performance:</strong> Factors in past successful investments in similar deals.</li>
+                        </ol>
+
+                        <h5 className="font-medium text-foreground mt-4">Using the Investor Match Feature</h5>
+                        <ol className="list-decimal list-inside space-y-2 text-xs">
+                          <li>Navigate to the Investor Match section from the sidebar</li>
+                          <li>Select or create a deal to match investors against</li>
+                          <li>Review the match scores and investor profiles</li>
+                          <li>Tag promising investors directly to the deal</li>
+                          <li>Track investor outreach and response status</li>
+                        </ol>
+
+                        <h5 className="font-medium text-foreground mt-4">Tips for Success</h5>
+                        <ul className="list-disc list-inside space-y-1 text-xs">
+                          <li>Keep investor profiles updated with recent activity</li>
+                          <li>Use match scores as a guide, not absolute rankings</li>
+                          <li>Consider relationship history when prioritizing outreach</li>
+                          <li>Document all investor interactions for team visibility</li>
+                        </ul>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              </div>
+            </div>
+          </ScrollArea>
         </SheetContent>
       </Sheet>
 

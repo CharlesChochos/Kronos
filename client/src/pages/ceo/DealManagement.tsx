@@ -17,9 +17,9 @@ import {
   Search, Filter, MoreVertical, ArrowRight, Calendar, DollarSign, Briefcase, 
   Pencil, Trash2, Eye, Users, Phone, Mail, MessageSquare, Plus, X, 
   Building2, TrendingUp, FileText, Clock, CheckCircle2, ChevronRight,
-  UserPlus, History
+  UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft
 } from "lucide-react";
-import { useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers } from "@/lib/api";
+import { useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -38,6 +38,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const { data: currentUser } = useCurrentUser();
   const { data: allDeals = [], isLoading } = useDeals();
   const { data: allUsers = [] } = useUsers();
+  const { data: allTasks = [] } = useTasks();
   
   // Filter deals based on role - employees only see deals they're assigned to
   const deals = useMemo(() => {
@@ -69,6 +70,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [viewMode, setViewMode] = useState<'grid' | 'calendar'>('grid');
   
   const [newDeal, setNewDeal] = useState({
     name: '',
@@ -414,6 +416,25 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
             />
           </div>
           <div className="flex gap-2">
+            {/* View Mode Toggle */}
+            <div className="flex items-center bg-card border border-border rounded-md overflow-hidden">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className={cn("rounded-none border-r border-border", viewMode === 'grid' && "bg-primary/10 text-primary")}
+                onClick={() => setViewMode('grid')}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className={cn("rounded-none", viewMode === 'calendar' && "bg-primary/10 text-primary")}
+                onClick={() => setViewMode('calendar')}
+              >
+                <CalendarDays className="w-4 h-4" />
+              </Button>
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="bg-card border-border gap-2">
@@ -440,7 +461,144 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
           </div>
         </div>
 
+        {/* Calendar View */}
+        {viewMode === 'calendar' && (
+          <div className="space-y-6">
+            {/* Stage Timeline Header */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <CalendarDays className="w-5 h-5 text-primary" />
+                  Deal Pipeline Timeline
+                </CardTitle>
+                <CardDescription>View all deals organized by stage with associated tasks</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between gap-2 py-2">
+                  {DEAL_STAGES.map((stage, index) => (
+                    <div key={stage} className="flex-1 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        {index > 0 && <div className="h-0.5 bg-border w-full" />}
+                        <div className={cn(
+                          "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0",
+                          index === 0 ? "bg-blue-500/20 text-blue-400" :
+                          index === 1 ? "bg-indigo-500/20 text-indigo-400" :
+                          index === 2 ? "bg-orange-500/20 text-orange-400" :
+                          index === 3 ? "bg-purple-500/20 text-purple-400" :
+                          index === 4 ? "bg-yellow-500/20 text-yellow-400" :
+                          "bg-green-500/20 text-green-400"
+                        )}>
+                          {index + 1}
+                        </div>
+                        {index < DEAL_STAGES.length - 1 && <div className="h-0.5 bg-border w-full" />}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{stage}</p>
+                      <p className="text-sm font-bold">
+                        {filteredDeals.filter(d => d.stage === stage).length}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Deals by Stage */}
+            <div className="space-y-4">
+              {DEAL_STAGES.map((stage, stageIndex) => {
+                const stageDeals = filteredDeals.filter(d => d.stage === stage);
+                if (stageDeals.length === 0) return null;
+
+                return (
+                  <div key={stage} className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-3 h-3 rounded-full",
+                        stageIndex === 0 ? "bg-blue-500" :
+                        stageIndex === 1 ? "bg-indigo-500" :
+                        stageIndex === 2 ? "bg-orange-500" :
+                        stageIndex === 3 ? "bg-purple-500" :
+                        stageIndex === 4 ? "bg-yellow-500" :
+                        "bg-green-500"
+                      )} />
+                      <h3 className="font-semibold text-lg">{stage}</h3>
+                      <Badge variant="secondary" className="text-xs">{stageDeals.length} deals</Badge>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 pl-6">
+                      {stageDeals.map(deal => {
+                        const dealTasks = allTasks.filter((t: any) => t.dealId === deal.id);
+                        const pendingTasks = dealTasks.filter((t: any) => t.status !== 'Completed');
+                        const completedTasks = dealTasks.filter((t: any) => t.status === 'Completed');
+
+                        return (
+                          <Card 
+                            key={deal.id} 
+                            className="bg-card border-border hover:shadow-md transition-all cursor-pointer"
+                            onClick={() => { setSelectedDeal(deal); setActiveTab("overview"); }}
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between">
+                                <div className="space-y-1">
+                                  <h4 className="font-semibold">{deal.name}</h4>
+                                  <p className="text-sm text-muted-foreground">{deal.client}</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-lg font-bold">${deal.value}M</p>
+                                  <p className="text-xs text-muted-foreground">{deal.sector}</p>
+                                </div>
+                              </div>
+
+                              {/* Progress Bar */}
+                              <div className="mt-3 space-y-1">
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                  <span>Progress</span>
+                                  <span>{deal.progress}%</span>
+                                </div>
+                                <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-primary transition-all"
+                                    style={{ width: `${deal.progress}%` }}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Tasks Summary */}
+                              {dealTasks.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-border flex items-center gap-4 text-xs">
+                                  <div className="flex items-center gap-1 text-muted-foreground">
+                                    <CheckCircle2 className="w-3 h-3 text-green-500" />
+                                    <span>{completedTasks.length} completed</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-muted-foreground">
+                                    <Clock className="w-3 h-3 text-yellow-500" />
+                                    <span>{pendingTasks.length} pending</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Pod Team Summary */}
+                              {(deal.podTeam as PodTeamMember[])?.length > 0 && (
+                                <div className="mt-2 flex items-center gap-1">
+                                  <Users className="w-3 h-3 text-muted-foreground" />
+                                  <span className="text-xs text-muted-foreground">
+                                    {(deal.podTeam as PodTeamMember[]).length} team members
+                                  </span>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Deals Grid */}
+        {viewMode === 'grid' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredDeals.map((deal) => (
             <Card 
@@ -561,6 +719,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
             </Card>
           ))}
         </div>
+        )}
 
         {filteredDeals.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
