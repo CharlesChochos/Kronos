@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
-  FileTemplate, 
+  FileStack, 
   Plus, 
   Search, 
   Copy,
@@ -223,7 +223,7 @@ export default function DealTemplates({ role }: { role: 'CEO' | 'Employee' }) {
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-lg">
-                  <FileTemplate className="w-5 h-5 text-primary" />
+                  <FileStack className="w-5 h-5 text-primary" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{templates.length}</p>
