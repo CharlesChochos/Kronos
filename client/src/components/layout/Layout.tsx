@@ -282,15 +282,19 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                   <BookOpen className="w-4 h-4 mr-2" />
                   Resources
                 </DropdownMenuItem>
-                <DropdownMenuItem 
-                  className="focus:bg-primary/10 focus:text-primary cursor-pointer"
-                  onClick={() => setShowCustomizeSheet(true)}
-                  data-testid="menu-item-customize"
-                >
-                  <Palette className="w-4 h-4 mr-2" />
-                  Customize Dashboard
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-border" />
+                {role === 'CEO' && (
+                  <>
+                    <DropdownMenuItem 
+                      className="focus:bg-primary/10 focus:text-primary cursor-pointer"
+                      onClick={() => setShowCustomizeSheet(true)}
+                      data-testid="menu-item-customize"
+                    >
+                      <Palette className="w-4 h-4 mr-2" />
+                      Customize Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-border" />
+                  </>
+                )}
                 <DropdownMenuItem 
                   className="text-red-400 focus:bg-red-400/10 focus:text-red-400 cursor-pointer" 
                   onClick={handleLogout}

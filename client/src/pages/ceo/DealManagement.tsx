@@ -19,7 +19,7 @@ import {
   Building2, TrendingUp, FileText, Clock, CheckCircle2, ChevronRight,
   UserPlus, History
 } from "lucide-react";
-import { useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal } from "@/lib/api";
+import { useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -29,10 +29,35 @@ const DEAL_STAGES = ['Origination', 'Execution', 'Negotiation', 'Due Diligence',
 const INVESTOR_TYPES = ['PE', 'VC', 'Strategic', 'Family Office', 'Hedge Fund', 'Sovereign Wealth'];
 const INVESTOR_STATUSES = ['Contacted', 'Interested', 'In DD', 'Term Sheet', 'Passed', 'Closed'];
 
-export default function DealManagement() {
+type DealManagementProps = {
+  role?: 'CEO' | 'Employee';
+};
+
+export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const searchString = useSearch();
   const { data: currentUser } = useCurrentUser();
-  const { data: deals = [], isLoading } = useDeals();
+  const { data: allDeals = [], isLoading } = useDeals();
+  const { data: allUsers = [] } = useUsers();
+  
+  // Filter deals based on role - employees only see deals they're assigned to
+  const deals = useMemo(() => {
+    if (role === 'CEO') {
+      return allDeals;
+    }
+    // For employees, filter to only show deals where they are in the pod team
+    // If user data is not yet available, show no deals until we can verify access
+    if (!currentUser?.id && !currentUser?.email && !currentUser?.name) {
+      return [];
+    }
+    return allDeals.filter(deal => {
+      const podTeam = deal.podTeam || [];
+      return podTeam.some((member: PodTeamMember) => 
+        (currentUser.id && member.userId === currentUser.id) || 
+        (currentUser.email && member.email === currentUser.email) ||
+        (currentUser.name && member.name === currentUser.name)
+      );
+    });
+  }, [allDeals, role, currentUser]);
   const createDeal = useCreateDeal();
   const updateDeal = useUpdateDeal();
   const deleteDeal = useDeleteDeal();
@@ -172,6 +197,12 @@ export default function DealManagement() {
       return;
     }
     
+    // Look up the real user ID based on email or name
+    const matchingUser = allUsers.find(user => 
+      (newTeamMember.email && user.email === newTeamMember.email) ||
+      user.name === newTeamMember.name
+    );
+    
     const auditEntry: AuditEntry = {
       id: crypto.randomUUID(),
       timestamp: new Date().toISOString(),
@@ -180,7 +211,9 @@ export default function DealManagement() {
       details: `Added ${newTeamMember.name} (${newTeamMember.role}) to pod team`,
     };
 
-    const updatedPodTeam = [...(selectedDeal.podTeam as PodTeamMember[] || []), { ...newTeamMember, userId: crypto.randomUUID() }];
+    // Use the real user ID if found, otherwise generate a random one for external contacts
+    const userId = matchingUser?.id || crypto.randomUUID();
+    const updatedPodTeam = [...(selectedDeal.podTeam as PodTeamMember[] || []), { ...newTeamMember, userId }];
     
     try {
       await updateDeal.mutateAsync({
@@ -357,7 +390,7 @@ export default function DealManagement() {
 
   if (isLoading) {
     return (
-      <Layout role="CEO" pageTitle="Deal Management" userName={currentUser?.name || ""}>
+      <Layout role={role} pageTitle="Deal Management" userName={currentUser?.name || ""}>
         <div className="flex items-center justify-center h-96">
           <div className="text-muted-foreground">Loading deals...</div>
         </div>
@@ -366,7 +399,7 @@ export default function DealManagement() {
   }
 
   return (
-    <Layout role="CEO" pageTitle="Deal Management" userName={currentUser?.name || ""}>
+    <Layout role={role} pageTitle="Deal Management" userName={currentUser?.name || ""}>
       <div className="space-y-6">
         {/* Header & Filters */}
         <div className="flex flex-col md:flex-row justify-between gap-4">
@@ -395,13 +428,15 @@ export default function DealManagement() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button 
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-              onClick={() => setShowNewDealModal(true)}
-              data-testid="button-new-deal"
-            >
-              <Plus className="w-4 h-4 mr-1" /> New Deal
-            </Button>
+            {role === 'CEO' && (
+              <Button 
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={() => setShowNewDealModal(true)}
+                data-testid="button-new-deal"
+              >
+                <Plus className="w-4 h-4 mr-1" /> New Deal
+              </Button>
+            )}
           </div>
         </div>
 

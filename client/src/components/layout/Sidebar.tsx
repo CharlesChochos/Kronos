@@ -10,6 +10,8 @@ import {
   CheckSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLogout } from "@/lib/api";
+import { toast } from "sonner";
 import logo from "@assets/generated_images/abstract_minimalist_layer_icon_for_fintech_logo.png";
 
 type SidebarProps = {
@@ -17,7 +19,18 @@ type SidebarProps = {
 };
 
 export function Sidebar({ role }: SidebarProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  const logoutMutation = useLogout();
+  
+  const handleLogout = async () => {
+    try {
+      await logoutMutation.mutateAsync();
+      toast.success("Logged out successfully");
+      setLocation("/");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to log out");
+    }
+  };
 
   const isActive = (path: string) => location === path;
 
@@ -32,7 +45,7 @@ export function Sidebar({ role }: SidebarProps) {
   const employeeLinks = [
     { icon: CheckSquare, label: "My Tasks", path: "/employee/tasks" },
     { icon: FileText, label: "Document Generator", path: "/employee/documents" },
-    { icon: Briefcase, label: "Active Deals", path: "/employee/deals" },
+    { icon: Briefcase, label: "Deal Management", path: "/employee/deals" },
   ];
 
   const links = role === 'CEO' ? ceoLinks : employeeLinks;
@@ -73,12 +86,15 @@ export function Sidebar({ role }: SidebarProps) {
       </div>
 
       <div className="p-4 border-t border-sidebar-border">
-        <Link href="/">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-red-400 hover:bg-red-400/10 cursor-pointer transition-colors" data-testid="sidebar-signout">
-            <LogOut className="w-4 h-4" />
-            Sign Out
-          </div>
-        </Link>
+        <button
+          onClick={handleLogout}
+          disabled={logoutMutation.isPending}
+          className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-red-400 hover:bg-red-400/10 cursor-pointer transition-colors w-full text-left disabled:opacity-50"
+          data-testid="sidebar-signout"
+        >
+          <LogOut className="w-4 h-4" />
+          {logoutMutation.isPending ? "Signing Out..." : "Sign Out"}
+        </button>
       </div>
     </div>
   );

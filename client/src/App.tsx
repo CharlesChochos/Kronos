@@ -18,6 +18,8 @@ import { DashboardProvider } from "@/contexts/DashboardContext";
 // Wrapper components to ensure props are passed correctly with wouter
 const CeoDocumentGenerator = () => <DocumentGenerator role="CEO" />;
 const EmployeeDocumentGenerator = () => <DocumentGenerator role="Employee" />;
+const CeoDealManagement = () => <DealManagement role="CEO" />;
+const EmployeeDealManagement = () => <DealManagement role="Employee" />;
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { data: user, isLoading } = useCurrentUser();
@@ -67,7 +69,7 @@ function Router() {
         {() => <ProtectedRoute component={Dashboard} />}
       </Route>
       <Route path="/ceo/deals">
-        {() => <ProtectedRoute component={DealManagement} />}
+        {() => <ProtectedRoute component={CeoDealManagement} />}
       </Route>
       <Route path="/ceo/documents">
         {() => <ProtectedRoute component={CeoDocumentGenerator} />}
@@ -87,7 +89,7 @@ function Router() {
         {() => <ProtectedRoute component={EmployeeDocumentGenerator} />}
       </Route>
       <Route path="/employee/deals">
-        {() => <ProtectedRoute component={DealManagement} />}
+        {() => <ProtectedRoute component={EmployeeDealManagement} />}
       </Route>
 
       <Route component={NotFound} />
