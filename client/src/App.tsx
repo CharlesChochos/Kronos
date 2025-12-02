@@ -24,6 +24,14 @@ import InvestorCRM from "@/pages/ceo/InvestorCRM";
 import TimeTracking from "@/pages/shared/TimeTracking";
 import VacationCalendar from "@/pages/shared/VacationCalendar";
 import SkillMatrix from "@/pages/shared/SkillMatrix";
+import ClientPortal from "@/pages/shared/ClientPortal";
+import DealTemplates from "@/pages/shared/DealTemplates";
+import MentorshipPairing from "@/pages/shared/MentorshipPairing";
+import GoalSettingOKRs from "@/pages/shared/GoalSettingOKRs";
+import DealAnnouncements from "@/pages/shared/DealAnnouncements";
+import QuickPolls from "@/pages/shared/QuickPolls";
+import VoiceNotes from "@/pages/shared/VoiceNotes";
+import StakeholderDirectory from "@/pages/shared/StakeholderDirectory";
 import MyTasks from "@/pages/employee/MyTasks";
 import EmployeeHome from "@/pages/employee/Home";
 import Chat from "@/pages/shared/Chat";
@@ -47,6 +55,22 @@ const CeoVacationCalendar = () => <VacationCalendar role="CEO" />;
 const EmployeeVacationCalendar = () => <VacationCalendar role="Employee" />;
 const CeoSkillMatrix = () => <SkillMatrix role="CEO" />;
 const EmployeeSkillMatrix = () => <SkillMatrix role="Employee" />;
+const CeoClientPortal = () => <ClientPortal role="CEO" />;
+const EmployeeClientPortal = () => <ClientPortal role="Employee" />;
+const CeoDealTemplates = () => <DealTemplates role="CEO" />;
+const EmployeeDealTemplates = () => <DealTemplates role="Employee" />;
+const CeoMentorshipPairing = () => <MentorshipPairing role="CEO" />;
+const EmployeeMentorshipPairing = () => <MentorshipPairing role="Employee" />;
+const CeoGoalSettingOKRs = () => <GoalSettingOKRs role="CEO" />;
+const EmployeeGoalSettingOKRs = () => <GoalSettingOKRs role="Employee" />;
+const CeoDealAnnouncements = () => <DealAnnouncements role="CEO" />;
+const EmployeeDealAnnouncements = () => <DealAnnouncements role="Employee" />;
+const CeoQuickPolls = () => <QuickPolls role="CEO" />;
+const EmployeeQuickPolls = () => <QuickPolls role="Employee" />;
+const CeoVoiceNotes = () => <VoiceNotes role="CEO" />;
+const EmployeeVoiceNotes = () => <VoiceNotes role="Employee" />;
+const CeoStakeholderDirectory = () => <StakeholderDirectory role="CEO" />;
+const EmployeeStakeholderDirectory = () => <StakeholderDirectory role="Employee" />;
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { data: user, isLoading } = useCurrentUser();
@@ -151,6 +175,30 @@ function Router() {
       <Route path="/ceo/skill-matrix">
         {() => <ProtectedRoute component={CeoSkillMatrix} />}
       </Route>
+      <Route path="/ceo/client-portal">
+        {() => <ProtectedRoute component={CeoClientPortal} />}
+      </Route>
+      <Route path="/ceo/deal-templates">
+        {() => <ProtectedRoute component={CeoDealTemplates} />}
+      </Route>
+      <Route path="/ceo/mentorship">
+        {() => <ProtectedRoute component={CeoMentorshipPairing} />}
+      </Route>
+      <Route path="/ceo/okrs">
+        {() => <ProtectedRoute component={CeoGoalSettingOKRs} />}
+      </Route>
+      <Route path="/ceo/announcements">
+        {() => <ProtectedRoute component={CeoDealAnnouncements} />}
+      </Route>
+      <Route path="/ceo/polls">
+        {() => <ProtectedRoute component={CeoQuickPolls} />}
+      </Route>
+      <Route path="/ceo/voice-notes">
+        {() => <ProtectedRoute component={CeoVoiceNotes} />}
+      </Route>
+      <Route path="/ceo/stakeholders">
+        {() => <ProtectedRoute component={CeoStakeholderDirectory} />}
+      </Route>
       
       {/* Employee Routes */}
       <Route path="/employee/home">
@@ -185,6 +233,30 @@ function Router() {
       </Route>
       <Route path="/employee/skill-matrix">
         {() => <ProtectedRoute component={EmployeeSkillMatrix} />}
+      </Route>
+      <Route path="/employee/client-portal">
+        {() => <ProtectedRoute component={EmployeeClientPortal} />}
+      </Route>
+      <Route path="/employee/deal-templates">
+        {() => <ProtectedRoute component={EmployeeDealTemplates} />}
+      </Route>
+      <Route path="/employee/mentorship">
+        {() => <ProtectedRoute component={EmployeeMentorshipPairing} />}
+      </Route>
+      <Route path="/employee/okrs">
+        {() => <ProtectedRoute component={EmployeeGoalSettingOKRs} />}
+      </Route>
+      <Route path="/employee/announcements">
+        {() => <ProtectedRoute component={EmployeeDealAnnouncements} />}
+      </Route>
+      <Route path="/employee/polls">
+        {() => <ProtectedRoute component={EmployeeQuickPolls} />}
+      </Route>
+      <Route path="/employee/voice-notes">
+        {() => <ProtectedRoute component={EmployeeVoiceNotes} />}
+      </Route>
+      <Route path="/employee/stakeholders">
+        {() => <ProtectedRoute component={EmployeeStakeholderDirectory} />}
       </Route>
 
       <Route component={NotFound} />
