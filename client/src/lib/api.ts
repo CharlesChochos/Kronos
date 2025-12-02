@@ -1,6 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { User, Deal, Task, InsertUser, Meeting, Notification, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction } from "@shared/schema";
 
+// Generic API request helper
+export async function apiRequest(method: string, url: string, body?: any): Promise<Response> {
+  const res = await fetch(url, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    throw new Error(`API request failed: ${res.status}`);
+  }
+  return res;
+}
+
 // Auth API
 export function useLogin() {
   const queryClient = useQueryClient();

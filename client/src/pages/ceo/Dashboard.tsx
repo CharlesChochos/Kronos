@@ -75,7 +75,9 @@ import {
   Phone,
   Pencil,
   GripVertical,
-  LayoutDashboard
+  LayoutDashboard,
+  Video,
+  Link as LinkIcon
 } from "lucide-react";
 import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -169,7 +171,19 @@ export default function Dashboard() {
     participants: '',
     dealId: '',
     videoPlatform: '' as '' | 'zoom' | 'google_meet' | 'teams',
+    videoLink: '',
   });
+
+  // Open video conferencing app in new tab
+  const openVideoApp = (platform: 'zoom' | 'google_meet' | 'teams') => {
+    const urls = {
+      zoom: 'https://zoom.us/meeting/schedule',
+      google_meet: 'https://meet.google.com/new',
+      teams: 'https://teams.microsoft.com/l/meeting/new',
+    };
+    window.open(urls[platform], '_blank');
+    setNewMeeting({ ...newMeeting, videoPlatform: platform });
+  };
 
   // Market data from API (refreshes every 30 seconds)
   const { data: marketDataResponse, isLoading: marketLoading } = useMarketData(marketSymbols);
@@ -360,6 +374,7 @@ export default function Dashboard() {
         dealId: newMeeting.dealId || null,
         status: 'scheduled',
         videoPlatform: newMeeting.videoPlatform || null,
+        videoLink: newMeeting.videoLink || null,
         localDate: newMeeting.scheduledFor,
         localTime: newMeeting.scheduledTime,
         organizerTimezone,
@@ -367,7 +382,7 @@ export default function Dashboard() {
       
       toast.success("Meeting scheduled! Notifications sent to participants.");
       setShowScheduleMeetingModal(false);
-      setNewMeeting({ title: '', description: '', scheduledFor: '', scheduledTime: '09:00', duration: 60, location: '', participants: '', dealId: '', videoPlatform: '' });
+      setNewMeeting({ title: '', description: '', scheduledFor: '', scheduledTime: '09:00', duration: 60, location: '', participants: '', dealId: '', videoPlatform: '', videoLink: '' });
     } catch (error: any) {
       toast.error(error.message || "Failed to schedule meeting");
     }
@@ -1595,22 +1610,60 @@ export default function Dashboard() {
               </div>
               <div className="space-y-2">
                 <Label>Video Conference</Label>
-                <Select 
-                  value={newMeeting.videoPlatform || "none"} 
-                  onValueChange={(v) => setNewMeeting({ ...newMeeting, videoPlatform: v === "none" ? '' : v as 'zoom' | 'google_meet' | 'teams' })}
-                >
-                  <SelectTrigger data-testid="select-video-platform">
-                    <SelectValue placeholder="Optional video link" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No video link</SelectItem>
-                    <SelectItem value="zoom">Zoom Meeting</SelectItem>
-                    <SelectItem value="google_meet">Google Meet</SelectItem>
-                    <SelectItem value="teams">Microsoft Teams</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={newMeeting.videoPlatform === 'zoom' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => openVideoApp('zoom')}
+                    className="flex-1"
+                    data-testid="button-zoom"
+                  >
+                    <Video className="w-4 h-4 mr-1" />
+                    Zoom
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={newMeeting.videoPlatform === 'google_meet' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => openVideoApp('google_meet')}
+                    className="flex-1"
+                    data-testid="button-meet"
+                  >
+                    <Video className="w-4 h-4 mr-1" />
+                    Meet
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={newMeeting.videoPlatform === 'teams' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => openVideoApp('teams')}
+                    className="flex-1"
+                    data-testid="button-teams"
+                  >
+                    <Video className="w-4 h-4 mr-1" />
+                    Teams
+                  </Button>
+                </div>
               </div>
             </div>
+            
+            {newMeeting.videoPlatform && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <LinkIcon className="w-4 h-4" /> Meeting Link
+                </Label>
+                <Input 
+                  placeholder="Paste your meeting link here..."
+                  value={newMeeting.videoLink}
+                  onChange={(e) => setNewMeeting({ ...newMeeting, videoLink: e.target.value })}
+                  data-testid="input-video-link"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Create a meeting in the app that opened, then paste the link here.
+                </p>
+              </div>
+            )}
             
             <div className="space-y-2">
               <Label className="flex items-center gap-2">

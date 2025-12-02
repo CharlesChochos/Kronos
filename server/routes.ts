@@ -605,22 +605,20 @@ export async function registerRoutes(
       // Extract email formatting fields before validation (they're not in schema)
       const { localDate, localTime, organizerTimezone, ...meetingData } = req.body;
       
-      // Generate video link based on platform
-      let videoLink: string | null = null;
-      if (meetingData.videoPlatform) {
+      // Use user-provided video link if available, otherwise generate placeholder
+      if (meetingData.videoPlatform && !meetingData.videoLink) {
         const meetingId = crypto.randomUUID().replace(/-/g, '').substring(0, 11);
         switch (meetingData.videoPlatform) {
           case 'zoom':
-            videoLink = `https://zoom.us/j/${meetingId}`;
+            meetingData.videoLink = `https://zoom.us/j/${meetingId}`;
             break;
           case 'google_meet':
-            videoLink = `https://meet.google.com/${meetingId.substring(0, 3)}-${meetingId.substring(3, 7)}-${meetingId.substring(7, 11)}`;
+            meetingData.videoLink = `https://meet.google.com/${meetingId.substring(0, 3)}-${meetingId.substring(3, 7)}-${meetingId.substring(7, 11)}`;
             break;
           case 'teams':
-            videoLink = `https://teams.microsoft.com/l/meetup-join/${meetingId}`;
+            meetingData.videoLink = `https://teams.microsoft.com/l/meetup-join/${meetingId}`;
             break;
         }
-        meetingData.videoLink = videoLink;
       }
       
       const result = insertMeetingSchema.safeParse(meetingData);
@@ -736,6 +734,70 @@ export async function registerRoutes(
       res.json({ message: "Notification deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete notification" });
+    }
+  });
+
+  // Flag task and notify pod team members
+  app.post("/api/notifications/flag", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { taskId, taskTitle, dealId, dealName, flaggedBy } = req.body;
+      
+      if (!taskId || !taskTitle || !dealId || !dealName) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Get the deal to find pod team members
+      const deal = await storage.getDeal(dealId);
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      // Get all users who might be part of the pod team for this deal
+      // This includes the deal lead and anyone with tasks assigned to this deal
+      const allTasks = await storage.getTasks();
+      const dealTasks = allTasks.filter(t => t.dealId === dealId);
+      const assignedUserIds = new Set<string>();
+      
+      // Add deal lead if exists
+      if (deal.lead) {
+        const users = await storage.getUsers();
+        const leadUser = users.find(u => u.name === deal.lead);
+        if (leadUser) {
+          assignedUserIds.add(leadUser.id);
+        }
+      }
+      
+      // Add all users assigned to tasks on this deal
+      dealTasks.forEach(task => {
+        if (task.assignedTo) {
+          assignedUserIds.add(task.assignedTo);
+        }
+      });
+
+      // Remove the current user from notifications (don't notify yourself)
+      assignedUserIds.delete(currentUser.id);
+
+      // Create notifications for all pod team members
+      const notifications = [];
+      for (const userId of assignedUserIds) {
+        const notification = await storage.createNotification({
+          userId,
+          title: 'Task Flagged for War Room',
+          message: `${flaggedBy} flagged "${taskTitle}" on ${dealName} for team attention`,
+          type: 'alert',
+          link: '/war-room',
+        });
+        notifications.push(notification);
+      }
+
+      res.json({ 
+        message: "Pod team notified", 
+        notifiedCount: notifications.length 
+      });
+    } catch (error) {
+      console.error("Error sending flag notifications:", error);
+      res.status(500).json({ error: "Failed to send notifications" });
     }
   });
 

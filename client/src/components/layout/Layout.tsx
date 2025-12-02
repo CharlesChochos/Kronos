@@ -630,13 +630,6 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                 <DropdownMenuSeparator className="bg-border" />
                 <DropdownMenuItem 
                   className="focus:bg-primary/10 focus:text-primary cursor-pointer"
-                  onClick={() => setShowProfileSheet(true)}
-                  data-testid="menu-item-profile"
-                >
-                  Profile
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  className="focus:bg-primary/10 focus:text-primary cursor-pointer"
                   onClick={() => setShowSettingsSheet(true)}
                   data-testid="menu-item-settings"
                 >

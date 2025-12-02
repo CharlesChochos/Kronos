@@ -32,9 +32,10 @@ import {
   ExternalLink,
   X,
   Loader2,
-  Brain
+  Brain,
+  Flag
 } from "lucide-react";
-import { useCurrentUser, useTasks, useDeals, useUpdateTask, useUsers } from "@/lib/api";
+import { useCurrentUser, useTasks, useDeals, useUpdateTask, useUsers, apiRequest } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, parseISO, isToday, isBefore, addDays, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
@@ -63,6 +64,68 @@ export default function MyTasks() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<{action: string, reasoning: string, tools: string[]} | null>(null);
   const [deferredTasks, setDeferredTasks] = useState<string[]>([]);
+  
+  // Flagged tasks - persisted in localStorage and synced with war room
+  const [flaggedTasks, setFlaggedTasks] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('warRoomFlags');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.taskIds || [];
+      }
+    } catch {}
+    return [];
+  });
+  
+  const toggleTaskFlag = async (taskId: string) => {
+    const isCurrentlyFlagged = flaggedTasks.includes(taskId);
+    const newFlaggedTasks = isCurrentlyFlagged
+      ? flaggedTasks.filter(id => id !== taskId)
+      : [...flaggedTasks, taskId];
+    
+    setFlaggedTasks(newFlaggedTasks);
+    
+    // Update war room flags in localStorage
+    try {
+      const saved = localStorage.getItem('warRoomFlags');
+      const current = saved ? JSON.parse(saved) : { dealIds: [], taskIds: [] };
+      current.taskIds = newFlaggedTasks;
+      localStorage.setItem('warRoomFlags', JSON.stringify(current));
+    } catch {}
+    
+    // Send notification to pod team if flagging (not unflagging)
+    if (!isCurrentlyFlagged) {
+      const task = myTasks.find(t => t.id === taskId);
+      if (task && task.dealId) {
+        const deal = getDeal(task.dealId);
+        if (deal) {
+          try {
+            const result = await apiRequest('POST', '/api/notifications/flag', {
+              taskId,
+              taskTitle: task.title,
+              dealId: deal.id,
+              dealName: deal.name,
+              flaggedBy: currentUser?.name || 'Team member',
+            });
+            const data = await result.json();
+            if (data.notifiedCount > 0) {
+              toast.success(`Task flagged! ${data.notifiedCount} team member(s) notified.`);
+            } else {
+              toast.success("Task flagged for War Room!");
+            }
+          } catch (error) {
+            toast.error("Task flagged but failed to notify team. Please try again.");
+          }
+        } else {
+          toast.success("Task flagged for War Room!");
+        }
+      } else {
+        toast.success("Task flagged for War Room!");
+      }
+    } else {
+      toast.info("Task unflagged");
+    }
+  };
   
   const taskRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   
@@ -471,6 +534,8 @@ export default function MyTasks() {
                       dealName={getDealName(task.dealId)}
                       onClick={() => handleTaskClick(task)}
                       highlighted={highlightedTaskId === task.id}
+                      isFlagged={flaggedTasks.includes(task.id)}
+                      onFlag={(e) => { e.stopPropagation(); toggleTaskFlag(task.id); }}
                       ref={(el) => { taskRefs.current[task.id] = el; }}
                     />
                   ))}
@@ -504,6 +569,8 @@ export default function MyTasks() {
                       dealName={getDealName(task.dealId)}
                       onClick={() => handleTaskClick(task)}
                       highlighted={highlightedTaskId === task.id}
+                      isFlagged={flaggedTasks.includes(task.id)}
+                      onFlag={(e) => { e.stopPropagation(); toggleTaskFlag(task.id); }}
                       ref={(el) => { taskRefs.current[task.id] = el; }}
                     />
                   ))}
@@ -537,6 +604,8 @@ export default function MyTasks() {
                       dealName={getDealName(task.dealId)}
                       onClick={() => handleTaskClick(task)}
                       highlighted={highlightedTaskId === task.id}
+                      isFlagged={flaggedTasks.includes(task.id)}
+                      onFlag={(e) => { e.stopPropagation(); toggleTaskFlag(task.id); }}
                       ref={(el) => { taskRefs.current[task.id] = el; }}
                     />
                   ))}
@@ -920,16 +989,19 @@ interface TaskCardProps {
   onClick: () => void;
   highlighted?: boolean;
   completed?: boolean;
+  isFlagged?: boolean;
+  onFlag?: (e: React.MouseEvent) => void;
 }
 
-const TaskCard = ({ task, dealName, onClick, highlighted, completed, ref }: TaskCardProps & { ref?: React.Ref<HTMLDivElement> }) => {
+const TaskCard = ({ task, dealName, onClick, highlighted, completed, isFlagged, onFlag, ref }: TaskCardProps & { ref?: React.Ref<HTMLDivElement> }) => {
   return (
     <Card 
       ref={ref}
       className={cn(
-        "bg-card border-border hover:border-primary/50 transition-all cursor-pointer",
+        "bg-card border-border hover:border-primary/50 transition-all cursor-pointer group",
         highlighted && "ring-2 ring-primary border-primary animate-pulse",
-        completed && "opacity-60"
+        completed && "opacity-60",
+        isFlagged && "border-orange-500/50 bg-orange-500/5"
       )}
       onClick={onClick}
       data-testid={`card-task-${task.id}`}
@@ -945,7 +1017,21 @@ const TaskCard = ({ task, dealName, onClick, highlighted, completed, ref }: Task
           )}>
             {completed ? 'Done' : task.priority}
           </Badge>
-          <Badge variant="secondary" className="text-[10px]">{task.type}</Badge>
+          <div className="flex items-center gap-1">
+            {onFlag && (
+              <button
+                onClick={onFlag}
+                className={cn(
+                  "p-1 rounded hover:bg-secondary/50 transition-colors",
+                  isFlagged ? "text-orange-500" : "text-muted-foreground opacity-0 group-hover:opacity-100"
+                )}
+                data-testid={`flag-task-${task.id}`}
+              >
+                <Flag className="w-3.5 h-3.5" fill={isFlagged ? "currentColor" : "none"} />
+              </button>
+            )}
+            <Badge variant="secondary" className="text-[10px]">{task.type}</Badge>
+          </div>
         </div>
         
         <div>

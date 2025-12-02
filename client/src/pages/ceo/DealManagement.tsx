@@ -76,6 +76,15 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const [selectedCalendarDeal, setSelectedCalendarDeal] = useState<Deal | null>(null);
   const [calendarDealSearch, setCalendarDealSearch] = useState("");
   
+  // Task detail modal for calendar view
+  const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
+  const [selectedCalendarTask, setSelectedCalendarTask] = useState<any>(null);
+  
+  const openTaskDetail = (task: any, deal: Deal) => {
+    setSelectedCalendarTask({ ...task, deal });
+    setShowTaskDetailModal(true);
+  };
+  
   const [newDeal, setNewDeal] = useState({
     name: '',
     client: '',
@@ -730,7 +739,14 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                                       event.type === 'task' && (event.item?.status === 'Completed' ? "bg-green-500/20 text-green-400" : "bg-blue-500/20 text-blue-400"),
                                       event.type === 'milestone' && "bg-purple-500/20 text-purple-400"
                                     )}
-                                    onClick={() => { setSelectedDeal(event.deal); setActiveTab("overview"); }}
+                                    onClick={() => {
+                                      if (event.type === 'task') {
+                                        openTaskDetail(event.item, event.deal);
+                                      } else {
+                                        setSelectedDeal(event.deal); 
+                                        setActiveTab("overview");
+                                      }
+                                    }}
                                   >
                                     <div className="font-medium truncate">{event.type === 'task' ? event.item?.title : event.item?.action}</div>
                                     <div className="text-[10px] opacity-70 truncate">{event.deal.name}</div>
@@ -782,7 +798,14 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                                     event.type === 'task' && (event.item?.status === 'Completed' ? "bg-green-500/10" : "bg-blue-500/10"),
                                     event.type === 'milestone' && "bg-purple-500/10"
                                   )}
-                                  onClick={() => { setSelectedDeal(deal); setActiveTab("overview"); }}
+                                  onClick={() => {
+                                    if (event.type === 'task') {
+                                      openTaskDetail(event.item, deal);
+                                    } else {
+                                      setSelectedDeal(deal); 
+                                      setActiveTab("overview");
+                                    }
+                                  }}
                                 >
                                   <div className={cn(
                                     "w-8 h-8 rounded-full flex items-center justify-center",
@@ -1634,6 +1657,82 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
               {updateDeal.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task Detail Modal for Calendar View */}
+      <Dialog open={showTaskDetailModal} onOpenChange={setShowTaskDetailModal}>
+        <DialogContent className="bg-card border-border max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-primary" />
+              Task Details
+            </DialogTitle>
+            <DialogDescription>
+              {selectedCalendarTask?.deal?.name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedCalendarTask && (
+            <div className="space-y-4 py-4">
+              <div>
+                <h3 className="text-lg font-semibold">{selectedCalendarTask.title}</h3>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-secondary/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Priority</p>
+                  <Badge variant={selectedCalendarTask.priority === 'High' ? 'destructive' : 'secondary'} className="mt-1">
+                    {selectedCalendarTask.priority}
+                  </Badge>
+                </div>
+                <div className="bg-secondary/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <Badge variant={selectedCalendarTask.status === 'Completed' ? 'default' : 'secondary'} className="mt-1">
+                    {selectedCalendarTask.status}
+                  </Badge>
+                </div>
+                <div className="bg-secondary/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Due Date</p>
+                  <p className="text-sm font-medium mt-1">
+                    {selectedCalendarTask.dueDate ? format(parseISO(selectedCalendarTask.dueDate), 'MMM d, yyyy') : 'Not set'}
+                  </p>
+                </div>
+                <div className="bg-secondary/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Assigned To</p>
+                  <p className="text-sm font-medium mt-1">
+                    {allUsers.find((u: any) => u.id === selectedCalendarTask.assignedTo)?.name || 'Unassigned'}
+                  </p>
+                </div>
+              </div>
+              
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Related Deal</p>
+                <div className="p-3 bg-secondary/30 rounded-lg">
+                  <p className="font-medium">{selectedCalendarTask.deal?.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedCalendarTask.deal?.client} • {selectedCalendarTask.deal?.sector}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => {
+                    setSelectedDeal(selectedCalendarTask.deal);
+                    setActiveTab("overview");
+                    setShowTaskDetailModal(false);
+                  }}
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  View Deal
+                </Button>
+                <Button variant="outline" onClick={() => setShowTaskDetailModal(false)}>Close</Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </Layout>
