@@ -2075,13 +2075,14 @@ Guidelines:
       const limit = parseInt(req.query.limit as string) || 500;
       const logs = await storage.getAuditLogs(limit);
       
-      // Enrich with user names
+      // Enrich with user names and add timestamp alias
       const users = await storage.getAllUsers();
       const enrichedLogs = logs.map((log: any) => {
         const logUser = users.find(u => u.id === log.userId);
         return {
           ...log,
           userName: logUser?.name || 'System',
+          timestamp: log.createdAt, // Alias for frontend compatibility
         };
       });
       
@@ -2097,13 +2098,14 @@ Guidelines:
     try {
       const logs = await storage.getAuditLogsByEntity(req.params.entityType, req.params.entityId);
       
-      // Enrich with user names
+      // Enrich with user names and add timestamp alias
       const users = await storage.getAllUsers();
       const enrichedLogs = logs.map((log: any) => {
         const logUser = users.find(u => u.id === log.userId);
         return {
           ...log,
           userName: logUser?.name || 'System',
+          timestamp: log.createdAt, // Alias for frontend compatibility
         };
       });
       

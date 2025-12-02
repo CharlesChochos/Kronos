@@ -297,11 +297,11 @@ export type TimeEntry = typeof timeEntries.$inferSelect;
 export const timeOffRequests = pgTable("time_off_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
-  type: text("type").notNull().default('Vacation'), // Vacation, Sick Leave, Personal, WFH
+  type: text("type").notNull().default('Vacation'), // Vacation, Sick, Personal, WFH
   startDate: text("start_date").notNull(), // YYYY-MM-DD
   endDate: text("end_date").notNull(), // YYYY-MM-DD
-  reason: text("reason"),
-  status: text("status").notNull().default('Pending'), // Pending, Approved, Rejected
+  notes: text("notes"),
+  status: text("status").notNull().default('Pending'), // Pending, Approved, Denied
   approvedBy: varchar("approved_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -340,14 +340,17 @@ export const investors = pgTable("investors", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   firm: text("firm").notNull(),
-  type: text("type").notNull().default('PE'), // PE, VC, Strategic, Family Office, Sovereign Wealth
+  type: text("type").notNull().default('PE'), // PE, VC, Strategic, Family Office, Sovereign Wealth, Hedge Fund
   email: text("email"),
   phone: text("phone"),
   linkedIn: text("linkedin"),
   location: text("location"),
-  investmentFocus: text("investment_focus"), // sectors of interest
-  ticketSize: text("ticket_size"), // typical investment range
-  status: text("status").notNull().default('Active'), // Active, Inactive, Relationship Building
+  sectors: jsonb("sectors").default([]).$type<string[]>(), // Array of sector interests
+  minDealSize: integer("min_deal_size"), // Minimum deal size in millions
+  maxDealSize: integer("max_deal_size"), // Maximum deal size in millions
+  status: text("status").notNull().default('Active'), // Active, Warm, Cold, Inactive
+  relationshipScore: integer("relationship_score").default(50), // 0-100
+  dealsParticipated: integer("deals_participated").default(0),
   notes: text("notes"),
   lastContactDate: text("last_contact_date"), // YYYY-MM-DD
   createdAt: timestamp("created_at").defaultNow(),
