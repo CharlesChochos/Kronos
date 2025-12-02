@@ -23,8 +23,8 @@ import MentorshipPairing from "@/pages/shared/MentorshipPairing";
 import GoalSettingOKRs from "@/pages/shared/GoalSettingOKRs";
 import DealAnnouncements from "@/pages/shared/DealAnnouncements";
 import QuickPolls from "@/pages/shared/QuickPolls";
-import VoiceNotes from "@/pages/shared/VoiceNotes";
 import StakeholderDirectory from "@/pages/shared/StakeholderDirectory";
+import EventCalendar from "@/pages/shared/EventCalendar";
 import MyTasks from "@/pages/employee/MyTasks";
 import EmployeeHome from "@/pages/employee/Home";
 import Chat from "@/pages/shared/Chat";
@@ -41,23 +41,19 @@ const EmployeeChat = () => <Chat role="Employee" />;
 const CeoWarRoom = () => <WarRoom role="CEO" />;
 const EmployeeWarRoom = () => <WarRoom role="Employee" />;
 const CeoDealComparison = () => <DealComparison role="CEO" />;
-const EmployeeDealComparison = () => <DealComparison role="Employee" />;
 const CeoVacationCalendar = () => <VacationCalendar role="CEO" />;
 const EmployeeVacationCalendar = () => <VacationCalendar role="Employee" />;
 const CeoClientPortal = () => <ClientPortal role="CEO" />;
-const EmployeeClientPortal = () => <ClientPortal role="Employee" />;
 const CeoMentorshipPairing = () => <MentorshipPairing role="CEO" />;
-const EmployeeMentorshipPairing = () => <MentorshipPairing role="Employee" />;
 const CeoGoalSettingOKRs = () => <GoalSettingOKRs role="CEO" />;
 const EmployeeGoalSettingOKRs = () => <GoalSettingOKRs role="Employee" />;
 const CeoDealAnnouncements = () => <DealAnnouncements role="CEO" />;
 const EmployeeDealAnnouncements = () => <DealAnnouncements role="Employee" />;
 const CeoQuickPolls = () => <QuickPolls role="CEO" />;
-const EmployeeQuickPolls = () => <QuickPolls role="Employee" />;
-const CeoVoiceNotes = () => <VoiceNotes role="CEO" />;
-const EmployeeVoiceNotes = () => <VoiceNotes role="Employee" />;
 const CeoStakeholderDirectory = () => <StakeholderDirectory role="CEO" />;
 const EmployeeStakeholderDirectory = () => <StakeholderDirectory role="Employee" />;
+const CeoEventCalendar = () => <EventCalendar role="CEO" />;
+const EmployeeEventCalendar = () => <EventCalendar role="Employee" />;
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { data: user, isLoading } = useCurrentUser();
@@ -160,8 +156,8 @@ function Router() {
       <Route path="/ceo/polls">
         {() => <ProtectedRoute component={CeoQuickPolls} />}
       </Route>
-      <Route path="/ceo/voice-notes">
-        {() => <ProtectedRoute component={CeoVoiceNotes} />}
+      <Route path="/ceo/calendar">
+        {() => <ProtectedRoute component={CeoEventCalendar} />}
       </Route>
       <Route path="/ceo/stakeholders">
         {() => <ProtectedRoute component={CeoStakeholderDirectory} />}
@@ -189,29 +185,17 @@ function Router() {
       <Route path="/employee/war-room">
         {() => <ProtectedRoute component={EmployeeWarRoom} />}
       </Route>
-      <Route path="/employee/deal-comparison">
-        {() => <ProtectedRoute component={EmployeeDealComparison} />}
+      <Route path="/employee/calendar">
+        {() => <ProtectedRoute component={EmployeeEventCalendar} />}
       </Route>
       <Route path="/employee/vacation-calendar">
         {() => <ProtectedRoute component={EmployeeVacationCalendar} />}
-      </Route>
-      <Route path="/employee/client-portal">
-        {() => <ProtectedRoute component={EmployeeClientPortal} />}
-      </Route>
-      <Route path="/employee/mentorship">
-        {() => <ProtectedRoute component={EmployeeMentorshipPairing} />}
       </Route>
       <Route path="/employee/okrs">
         {() => <ProtectedRoute component={EmployeeGoalSettingOKRs} />}
       </Route>
       <Route path="/employee/announcements">
         {() => <ProtectedRoute component={EmployeeDealAnnouncements} />}
-      </Route>
-      <Route path="/employee/polls">
-        {() => <ProtectedRoute component={EmployeeQuickPolls} />}
-      </Route>
-      <Route path="/employee/voice-notes">
-        {() => <ProtectedRoute component={EmployeeVoiceNotes} />}
       </Route>
       <Route path="/employee/stakeholders">
         {() => <ProtectedRoute component={EmployeeStakeholderDirectory} />}
