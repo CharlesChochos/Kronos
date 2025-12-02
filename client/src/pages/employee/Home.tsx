@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,23 @@ import { format, isToday, isTomorrow, parseISO, subDays } from "date-fns";
 import { toast } from "sonner";
 import type { PodTeamMember, Task } from "@shared/schema";
 
+type WidgetSize = {
+  width?: number;
+  height?: number;
+  minWidth?: number;
+  minHeight?: number;
+};
+
+type WidgetSizes = Record<string, WidgetSize>;
+
+const DEFAULT_EMPLOYEE_WIDGET_SIZES: WidgetSizes = {
+  quickStats: { minWidth: 200, minHeight: 80 },
+  myTasks: { minWidth: 300, minHeight: 250 },
+  myProjects: { minWidth: 300, minHeight: 200 },
+  schedule: { minWidth: 300, minHeight: 200 },
+  quickActions: { minWidth: 200, minHeight: 150 },
+};
+
 export default function EmployeeHome() {
   const { data: currentUser } = useCurrentUser();
   const { data: allTasks = [] } = useTasks();
@@ -102,6 +119,16 @@ export default function EmployeeHome() {
     return localStorage.getItem('employeeHomeBgColor') || 'default';
   });
   
+  // Widget sizes - load from localStorage
+  const [widgetSizes, setWidgetSizes] = useState<WidgetSizes>(() => {
+    const saved = localStorage.getItem('employeeHomeWidgetSizes');
+    return saved ? { ...DEFAULT_EMPLOYEE_WIDGET_SIZES, ...JSON.parse(saved) } : DEFAULT_EMPLOYEE_WIDGET_SIZES;
+  });
+  
+  // Resize state
+  const [isResizing, setIsResizing] = useState<string | null>(null);
+  const [resizeStart, setResizeStart] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  
   // Save settings to localStorage when they change
   useEffect(() => {
     localStorage.setItem('employeeHomeWidgetOrder', JSON.stringify(widgetOrder));
@@ -114,6 +141,98 @@ export default function EmployeeHome() {
   useEffect(() => {
     localStorage.setItem('employeeHomeBgColor', bgColor);
   }, [bgColor]);
+  
+  // Save widget sizes to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem('employeeHomeWidgetSizes', JSON.stringify(widgetSizes));
+  }, [widgetSizes]);
+  
+  // Handle resize start
+  const handleResizeStart = (e: React.MouseEvent, widgetId: string, currentWidth: number, currentHeight: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(widgetId);
+    setResizeStart({ x: e.clientX, y: e.clientY, width: currentWidth, height: currentHeight });
+  };
+  
+  // Handle resize move
+  useEffect(() => {
+    if (!isResizing || !resizeStart) return;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - resizeStart.x;
+      const deltaY = e.clientY - resizeStart.y;
+      const minWidth = widgetSizes[isResizing]?.minWidth || 150;
+      const minHeight = widgetSizes[isResizing]?.minHeight || 100;
+      
+      setWidgetSizes(prev => ({
+        ...prev,
+        [isResizing]: {
+          ...prev[isResizing],
+          width: Math.max(minWidth, resizeStart.width + deltaX),
+          height: Math.max(minHeight, resizeStart.height + deltaY),
+        }
+      }));
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizing(null);
+      setResizeStart(null);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, resizeStart, widgetSizes]);
+  
+  // Resizable widget wrapper component
+  const ResizableWidget = ({ 
+    id, 
+    children, 
+    className = '' 
+  }: { 
+    id: string; 
+    children: React.ReactNode; 
+    className?: string;
+  }) => {
+    const size = widgetSizes[id];
+    const widgetRef = useRef<HTMLDivElement>(null);
+    
+    return (
+      <div 
+        ref={widgetRef}
+        className={cn("relative group", className)}
+        style={{
+          width: size?.width ? `${size.width}px` : undefined,
+          height: size?.height ? `${size.height}px` : undefined,
+        }}
+      >
+        {children}
+        {/* Resize handle */}
+        <div
+          className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          onMouseDown={(e) => {
+            const rect = widgetRef.current?.getBoundingClientRect();
+            if (rect) {
+              handleResizeStart(e, id, rect.width, rect.height);
+            }
+          }}
+        >
+          <svg 
+            className="w-4 h-4 text-muted-foreground/50 hover:text-primary transition-colors"
+            viewBox="0 0 16 16" 
+            fill="currentColor"
+          >
+            <path d="M11 11V13H13V11H11ZM7 11V13H9V11H7ZM11 7V9H13V7H11ZM7 7V9H9V7H7ZM11 3V5H13V3H11Z" />
+          </svg>
+        </div>
+      </div>
+    );
+  };
 
   const openTaskDetail = (task: Task) => {
     setSelectedTask(task);
@@ -309,21 +428,22 @@ export default function EmployeeHome() {
   );
 
   const renderMyTasks = () => widgetSettings.showMyTasks && (
-    <Card className="bg-card border-border" key="myTasks">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <div>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <CheckSquare className="w-5 h-5 text-primary" />
-            My Tasks
-          </CardTitle>
-          <CardDescription>Your tasks organized by status</CardDescription>
-        </div>
-        <Link href="/employee/tasks">
-          <Button variant="ghost" size="sm">
-            View All <ArrowRight className="w-4 h-4 ml-1" />
-          </Button>
-        </Link>
-      </CardHeader>
+    <ResizableWidget id="myTasks" key="myTasks">
+      <Card className="bg-card border-border h-full">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CheckSquare className="w-5 h-5 text-primary" />
+              My Tasks
+            </CardTitle>
+            <CardDescription>Your tasks organized by status</CardDescription>
+          </div>
+          <Link href="/employee/tasks">
+            <Button variant="ghost" size="sm">
+              View All <ArrowRight className="w-4 h-4 ml-1" />
+            </Button>
+          </Link>
+        </CardHeader>
       <CardContent>
         <Tabs defaultValue="active" className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-4">
@@ -497,25 +617,27 @@ export default function EmployeeHome() {
           <Progress value={taskCompletionRate} className="h-2" />
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </ResizableWidget>
   );
 
   const renderMyProjects = () => widgetSettings.showMyProjects && (
-    <Card className="bg-card border-border" key="myProjects">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Briefcase className="w-5 h-5 text-primary" />
-            My Projects
-          </CardTitle>
-          <CardDescription>Deals you're assigned to</CardDescription>
-        </div>
-        <Link href="/employee/deals">
-          <Button variant="ghost" size="sm">
-            View All <ArrowRight className="w-4 h-4 ml-1" />
-          </Button>
-        </Link>
-      </CardHeader>
+    <ResizableWidget id="myProjects" key="myProjects">
+      <Card className="bg-card border-border h-full">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-primary" />
+              My Projects
+            </CardTitle>
+            <CardDescription>Deals you're assigned to</CardDescription>
+          </div>
+          <Link href="/employee/deals">
+            <Button variant="ghost" size="sm">
+              View All <ArrowRight className="w-4 h-4 ml-1" />
+            </Button>
+          </Link>
+        </CardHeader>
       <CardContent>
         {myDeals.length > 0 ? (
           <div className="space-y-3">
@@ -545,7 +667,8 @@ export default function EmployeeHome() {
           </div>
         )}
       </CardContent>
-    </Card>
+      </Card>
+    </ResizableWidget>
   );
 
   const renderSchedule = () => widgetSettings.showSchedule && (

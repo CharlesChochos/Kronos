@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -90,6 +90,28 @@ type WidgetConfig = {
   enabled: boolean;
 };
 
+type WidgetSize = {
+  width?: number;
+  height?: number;
+  minWidth?: number;
+  minHeight?: number;
+};
+
+type WidgetSizes = Record<string, WidgetSize>;
+
+const DEFAULT_WIDGET_SIZES: WidgetSizes = {
+  quickActions: { minWidth: 200, minHeight: 200 },
+  activeDeals: { minWidth: 200, minHeight: 280 },
+  marketPulse: { minWidth: 300, minHeight: 250 },
+  marketIntelligence: { minWidth: 300, minHeight: 200 },
+  teamTaskProgress: { minWidth: 300, minHeight: 250 },
+  velocityScoreboard: { minWidth: 300, minHeight: 200 },
+  upcomingMeetings: { minWidth: 200, minHeight: 150 },
+  recentActivity: { minWidth: 200, minHeight: 150 },
+  dealPipeline: { minWidth: 300, minHeight: 200 },
+  performanceMetrics: { minWidth: 300, minHeight: 200 },
+};
+
 const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'quickActions', name: 'Quick Actions', enabled: true },
   { id: 'activeDeals', name: 'Active Deals Analytics', enabled: true },
@@ -134,10 +156,112 @@ export default function Dashboard() {
     return saved ? JSON.parse(saved) : DEFAULT_WIDGETS;
   });
   
+  // Widget sizes - load from localStorage
+  const [widgetSizes, setWidgetSizes] = useState<WidgetSizes>(() => {
+    const saved = localStorage.getItem('ceoDashboardWidgetSizes');
+    return saved ? { ...DEFAULT_WIDGET_SIZES, ...JSON.parse(saved) } : DEFAULT_WIDGET_SIZES;
+  });
+  
+  // Resize state
+  const [isResizing, setIsResizing] = useState<string | null>(null);
+  const [resizeStart, setResizeStart] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  
   // Save widget order to localStorage when it changes
   useEffect(() => {
     localStorage.setItem('ceoDashboardWidgets', JSON.stringify(widgets));
   }, [widgets]);
+  
+  // Save widget sizes to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem('ceoDashboardWidgetSizes', JSON.stringify(widgetSizes));
+  }, [widgetSizes]);
+  
+  // Handle resize start
+  const handleResizeStart = (e: React.MouseEvent, widgetId: string, currentWidth: number, currentHeight: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(widgetId);
+    setResizeStart({ x: e.clientX, y: e.clientY, width: currentWidth, height: currentHeight });
+  };
+  
+  // Handle resize move
+  useEffect(() => {
+    if (!isResizing || !resizeStart) return;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - resizeStart.x;
+      const deltaY = e.clientY - resizeStart.y;
+      const minWidth = widgetSizes[isResizing]?.minWidth || 150;
+      const minHeight = widgetSizes[isResizing]?.minHeight || 100;
+      
+      setWidgetSizes(prev => ({
+        ...prev,
+        [isResizing]: {
+          ...prev[isResizing],
+          width: Math.max(minWidth, resizeStart.width + deltaX),
+          height: Math.max(minHeight, resizeStart.height + deltaY),
+        }
+      }));
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizing(null);
+      setResizeStart(null);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, resizeStart, widgetSizes]);
+  
+  // Resizable widget wrapper component
+  const ResizableWidget = ({ 
+    id, 
+    children, 
+    className = '' 
+  }: { 
+    id: string; 
+    children: React.ReactNode; 
+    className?: string;
+  }) => {
+    const size = widgetSizes[id];
+    const widgetRef = useRef<HTMLDivElement>(null);
+    
+    return (
+      <div 
+        ref={widgetRef}
+        className={cn("relative group", className)}
+        style={{
+          width: size?.width ? `${size.width}px` : undefined,
+          height: size?.height ? `${size.height}px` : undefined,
+        }}
+      >
+        {children}
+        {/* Resize handle */}
+        <div
+          className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          onMouseDown={(e) => {
+            const rect = widgetRef.current?.getBoundingClientRect();
+            if (rect) {
+              handleResizeStart(e, id, rect.width, rect.height);
+            }
+          }}
+        >
+          <svg 
+            className="w-4 h-4 text-muted-foreground/50 hover:text-primary transition-colors"
+            viewBox="0 0 16 16" 
+            fill="currentColor"
+          >
+            <path d="M11 11V13H13V11H11ZM7 11V13H9V11H7ZM11 7V9H13V7H11ZM7 7V9H9V7H7ZM11 3V5H13V3H11Z" />
+          </svg>
+        </div>
+      </div>
+    );
+  };
   
   // Market symbols state
   const [marketSymbols, setMarketSymbols] = useState<string[]>(['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY']);
@@ -883,55 +1007,58 @@ export default function Dashboard() {
             {/* Left Column: Quick Actions & Active Deals Analytics */}
             <div className="col-span-12 md:col-span-3 space-y-6">
           {widgets.find(w => w.id === 'quickActions')?.enabled && (
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start gap-2 bg-secondary/50 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/20 transition-all"
-                  onClick={() => setShowNewDealModal(true)}
-                  data-testid="button-new-deal"
-                >
-                  <Plus className="w-4 h-4" /> New Deal
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start gap-2 bg-secondary/50 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/20 transition-all"
-                  onClick={handleGenerateReport}
-                  data-testid="button-generate-report"
-                >
-                  <FileText className="w-4 h-4" /> Generate Report
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start gap-2 bg-secondary/50 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/20 transition-all"
-                  onClick={() => setLocation('/ceo/team')}
-                  data-testid="button-assign-team"
-                >
-                  <Users className="w-4 h-4" /> Assign Team
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start gap-2 bg-secondary/50 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/20 transition-all"
-                  onClick={() => setShowScheduleMeetingModal(true)}
-                  data-testid="button-schedule-meeting"
-                >
-                  <Calendar className="w-4 h-4" /> Schedule Meeting
-                </Button>
-              </CardContent>
-            </Card>
+            <ResizableWidget id="quickActions">
+              <Card className="bg-card border-border h-full">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start gap-2 bg-secondary/50 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/20 transition-all"
+                    onClick={() => setShowNewDealModal(true)}
+                    data-testid="button-new-deal"
+                  >
+                    <Plus className="w-4 h-4" /> New Deal
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start gap-2 bg-secondary/50 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/20 transition-all"
+                    onClick={handleGenerateReport}
+                    data-testid="button-generate-report"
+                  >
+                    <FileText className="w-4 h-4" /> Generate Report
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start gap-2 bg-secondary/50 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/20 transition-all"
+                    onClick={() => setLocation('/ceo/team')}
+                    data-testid="button-assign-team"
+                  >
+                    <Users className="w-4 h-4" /> Assign Team
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start gap-2 bg-secondary/50 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/20 transition-all"
+                    onClick={() => setShowScheduleMeetingModal(true)}
+                    data-testid="button-schedule-meeting"
+                  >
+                    <Calendar className="w-4 h-4" /> Schedule Meeting
+                  </Button>
+                </CardContent>
+              </Card>
+            </ResizableWidget>
           )}
 
           {widgets.find(w => w.id === 'activeDeals')?.enabled && (
-            <Card className="bg-card border-border overflow-hidden">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider truncate">Active Deals</CardTitle>
-                <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setLocation('/ceo/deals')}>
-                  <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
-                </Button>
-              </CardHeader>
+            <ResizableWidget id="activeDeals">
+              <Card className="bg-card border-border overflow-hidden h-full">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider truncate">Active Deals</CardTitle>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setLocation('/ceo/deals')}>
+                    <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+                </CardHeader>
               <CardContent className="space-y-4 overflow-hidden">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-secondary/30 rounded-lg p-2 text-center overflow-hidden">
@@ -985,7 +1112,8 @@ export default function Dashboard() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+              </Card>
+            </ResizableWidget>
           )}
           
           {widgets.find(w => w.id === 'marketPulse')?.enabled && (
