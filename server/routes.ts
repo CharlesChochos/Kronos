@@ -1049,16 +1049,17 @@ Consider common investment banking tasks like:
         return res.status(403).json({ error: "Access denied" });
       }
       
-      const { content } = req.body;
+      const { content, attachments } = req.body;
       if (!content || typeof content !== 'string') {
         return res.status(400).json({ error: "Message content is required" });
       }
       
-      // Save user message
+      // Save user message with attachments
       const userMessage = await storage.createAssistantMessage({
         conversationId: req.params.id,
         role: 'user',
         content,
+        attachments: attachments || [],
       });
       
       // Gather context for the AI

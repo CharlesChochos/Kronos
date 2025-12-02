@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MessageCircle, X, Send, Plus, Trash2, ChevronLeft, Loader2, Bot, User, Sparkles } from "lucide-react";
+import { MessageCircle, X, Send, Plus, Trash2, ChevronLeft, Loader2, Bot, User, Sparkles, Paperclip, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 
 type AssistantConversation = {
   id: string;
@@ -15,11 +16,21 @@ type AssistantConversation = {
   updatedAt: string;
 };
 
+type AssistantAttachment = {
+  id: string;
+  filename: string;
+  url: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string;
+};
+
 type AssistantMessage = {
   id: string;
   conversationId: string;
   role: 'user' | 'assistant';
   content: string;
+  attachments?: AssistantAttachment[];
   context?: any;
   createdAt: string;
 };
@@ -30,8 +41,11 @@ export function ReaperAssistant() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<AssistantAttachment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<AssistantConversation[]>({
@@ -73,13 +87,13 @@ export function ReaperAssistant() {
   });
 
   const sendMessage = useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async ({ content, attachments }: { content: string; attachments?: AssistantAttachment[] }) => {
       if (!activeConversationId) throw new Error("No active conversation");
       const response = await fetch(`/api/assistant/conversations/${activeConversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, attachments }),
       });
       if (!response.ok) throw new Error("Failed to send message");
       return response.json();
@@ -91,11 +105,64 @@ export function ReaperAssistant() {
       queryClient.invalidateQueries({ queryKey: [`/api/assistant/conversations/${activeConversationId}/messages`] });
       queryClient.invalidateQueries({ queryKey: ["/api/assistant/conversations"] });
       setInputValue("");
+      setPendingFiles([]);
     },
     onSettled: () => {
       setIsTyping(false);
     },
   });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    const newAttachments: AssistantAttachment[] = [];
+
+    for (const file of Array.from(files)) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Upload failed');
+        }
+
+        const data = await response.json();
+        newAttachments.push({
+          id: data.id,
+          filename: data.filename,
+          url: data.url,
+          mimeType: data.type,
+          size: data.size,
+          uploadedAt: data.uploadedAt,
+        });
+      } catch (error: any) {
+        toast.error(`Failed to upload ${file.name}: ${error.message}`);
+      }
+    }
+
+    if (newAttachments.length > 0) {
+      setPendingFiles(prev => [...prev, ...newAttachments]);
+      toast.success(`${newAttachments.length} file(s) attached`);
+    }
+
+    setIsUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removePendingFile = (fileId: string) => {
+    setPendingFiles(prev => prev.filter(f => f.id !== fileId));
+  };
 
   const deleteConversation = useMutation({
     mutationFn: async (id: string) => {
@@ -128,8 +195,19 @@ export function ReaperAssistant() {
   }, [isOpen, showConversations]);
 
   const handleSend = () => {
-    if (!inputValue.trim() || sendMessage.isPending) return;
-    sendMessage.mutate(inputValue.trim());
+    if ((!inputValue.trim() && pendingFiles.length === 0) || sendMessage.isPending) return;
+    
+    // Build message content with file references for AI context
+    let messageContent = inputValue.trim();
+    if (pendingFiles.length > 0) {
+      const fileInfo = pendingFiles.map(f => `[Attached file: ${f.filename} (${f.url})]`).join('\n');
+      messageContent = messageContent ? `${messageContent}\n\n${fileInfo}` : fileInfo;
+    }
+    
+    sendMessage.mutate({ 
+      content: messageContent,
+      attachments: pendingFiles.length > 0 ? pendingFiles : undefined,
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -348,7 +426,27 @@ export function ReaperAssistant() {
                                 : "bg-secondary/50"
                             )}>
                               {msg.role === 'user' ? (
-                                <p className="text-sm">{msg.content}</p>
+                                <div>
+                                  <p className="text-sm">{msg.content.replace(/\[Attached file: [^\]]+\]/g, '').trim()}</p>
+                                  {msg.attachments && msg.attachments.length > 0 && (
+                                    <div className="mt-2 space-y-1">
+                                      {msg.attachments.map((att) => (
+                                        <a
+                                          key={att.id}
+                                          href={att.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex items-center gap-1.5 text-xs bg-primary-foreground/10 px-2 py-1 rounded hover:bg-primary-foreground/20 transition-colors"
+                                          data-testid={`attachment-${att.id}`}
+                                        >
+                                          <FileText className="w-3 h-3" />
+                                          <span className="truncate max-w-[150px]">{att.filename}</span>
+                                          <Download className="w-3 h-3 ml-auto" />
+                                        </a>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                               ) : (
                                 <div className="prose prose-sm dark:prose-invert max-w-none">
                                   {formatMessageContent(msg.content)}
@@ -377,7 +475,52 @@ export function ReaperAssistant() {
                   </ScrollArea>
                   
                   <div className="p-3 border-t border-border">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+                      multiple
+                      data-testid="input-file-upload"
+                    />
+                    
+                    {pendingFiles.length > 0 && (
+                      <div className="mb-2 flex flex-wrap gap-1">
+                        {pendingFiles.map((file) => (
+                          <div
+                            key={file.id}
+                            className="flex items-center gap-1 bg-secondary/50 text-xs px-2 py-1 rounded-md group"
+                          >
+                            <FileText className="w-3 h-3 text-muted-foreground" />
+                            <span className="truncate max-w-[120px]">{file.filename}</span>
+                            <button
+                              onClick={() => removePendingFile(file.id)}
+                              className="ml-1 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                              data-testid={`remove-file-${file.id}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
                     <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-11 w-11 flex-shrink-0"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={sendMessage.isPending || isUploading}
+                        data-testid="button-attach-file"
+                      >
+                        {isUploading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Paperclip className="w-4 h-4" />
+                        )}
+                      </Button>
                       <Textarea
                         ref={inputRef}
                         value={inputValue}
@@ -390,7 +533,7 @@ export function ReaperAssistant() {
                       />
                       <Button
                         onClick={handleSend}
-                        disabled={!inputValue.trim() || sendMessage.isPending}
+                        disabled={(!inputValue.trim() && pendingFiles.length === 0) || sendMessage.isPending}
                         size="icon"
                         className="h-11 w-11 flex-shrink-0"
                         data-testid="button-send-message"
