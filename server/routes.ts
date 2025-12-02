@@ -514,6 +514,69 @@ export async function registerRoutes(
     }
   });
 
+  // ===== USER PROFILE ROUTES =====
+  
+  app.patch("/api/users/:id/profile", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      // Users can only update their own profile
+      if (currentUser.id !== req.params.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const { name, email, phone } = req.body;
+      const updates: { name?: string; email?: string; phone?: string } = {};
+      
+      if (name) updates.name = name;
+      if (email) updates.email = email;
+      if (phone !== undefined) updates.phone = phone;
+      
+      const updatedUser = await storage.updateUserProfile(req.params.id, updates);
+      res.json(updatedUser);
+    } catch (error: any) {
+      if (error.code === '23505') {
+        return res.status(400).json({ error: "Email already exists" });
+      }
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  app.patch("/api/users/:id/password", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      // Users can only change their own password
+      if (currentUser.id !== req.params.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Current password and new password are required" });
+      }
+      
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: "New password must be at least 6 characters" });
+      }
+      
+      // Verify current password
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+      if (!isValidPassword) {
+        return res.status(400).json({ error: "Current password is incorrect" });
+      }
+      
+      await storage.updateUserPassword(req.params.id, newPassword);
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update password" });
+    }
+  });
+
   // ===== MARKET DATA ROUTE =====
   
   app.get("/api/market-data", requireAuth, async (req, res) => {
