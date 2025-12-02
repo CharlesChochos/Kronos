@@ -13,6 +13,7 @@ import InvestorMatching from "@/pages/ceo/InvestorMatching";
 import TeamAssignment from "@/pages/ceo/TeamAssignment";
 import MyTasks from "@/pages/employee/MyTasks";
 import { useEffect } from "react";
+import { DashboardProvider } from "@/contexts/DashboardContext";
 
 // Wrapper components to ensure props are passed correctly with wouter
 const CeoDocumentGenerator = () => <DocumentGenerator role="CEO" />;
@@ -97,10 +98,12 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <DashboardProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </DashboardProvider>
     </QueryClientProvider>
   );
 }

@@ -8,10 +8,12 @@ import {
   PieChart, 
   Settings, 
   LogOut,
-  CheckSquare
+  CheckSquare,
+  BookOpen
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import logo from "@assets/generated_images/abstract_minimalist_layer_icon_for_fintech_logo.png";
+import { useDashboardContext } from "@/contexts/DashboardContext";
 
 type SidebarProps = {
   role: 'CEO' | 'Employee';
@@ -19,6 +21,7 @@ type SidebarProps = {
 
 export function Sidebar({ role }: SidebarProps) {
   const [location] = useLocation();
+  const { setShowSettingsSheet, setShowResourcesSheet } = useDashboardContext();
 
   const isActive = (path: string) => location === path;
 
@@ -63,6 +66,7 @@ export function Sidebar({ role }: SidebarProps) {
                   ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_0_hsl(var(--primary))]"
                   : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
               )}
+              data-testid={`sidebar-link-${link.path.split('/').pop()}`}
             >
               <link.icon className={cn("w-4 h-4", isActive(link.path) ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
               {link.label}
@@ -73,19 +77,27 @@ export function Sidebar({ role }: SidebarProps) {
         <div className="px-3 mt-8 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           System
         </div>
-        <div className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground cursor-pointer transition-colors">
+        <div 
+          className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground cursor-pointer transition-colors"
+          onClick={() => setShowSettingsSheet(true)}
+          data-testid="sidebar-settings"
+        >
           <Settings className="w-4 h-4" />
           Settings
         </div>
-        <div className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground cursor-pointer transition-colors">
-          <Users className="w-4 h-4" />
+        <div 
+          className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground cursor-pointer transition-colors"
+          onClick={() => setShowResourcesSheet(true)}
+          data-testid="sidebar-resources"
+        >
+          <BookOpen className="w-4 h-4" />
           Resources
         </div>
       </div>
 
       <div className="p-4 border-t border-sidebar-border">
         <Link href="/">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-red-400 hover:bg-red-400/10 cursor-pointer transition-colors">
+          <div className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-red-400 hover:bg-red-400/10 cursor-pointer transition-colors" data-testid="sidebar-signout">
             <LogOut className="w-4 h-4" />
             Sign Out
           </div>
