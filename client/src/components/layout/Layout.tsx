@@ -200,25 +200,54 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     
     const query = searchQuery.toLowerCase();
     
-    const filteredDeals = (deals as any[]).filter((deal: any) => 
+    // For employees, filter to only show deals where they're on the pod team
+    let accessibleDeals = deals as any[];
+    if (role === 'Employee' && currentUser) {
+      accessibleDeals = (deals as any[]).filter((deal: any) => {
+        if (!deal.podTeam || !Array.isArray(deal.podTeam)) return false;
+        return deal.podTeam.some((member: any) => 
+          (currentUser.id && member.userId === currentUser.id) ||
+          (currentUser.email && member.email === currentUser.email) ||
+          (currentUser.name && member.name === currentUser.name)
+        );
+      });
+    }
+    
+    const filteredDeals = accessibleDeals.filter((deal: any) => 
       deal.name?.toLowerCase().includes(query) ||
       deal.client?.toLowerCase().includes(query) ||
       deal.sector?.toLowerCase().includes(query)
     ).slice(0, 5);
     
-    const filteredTasks = (tasks as any[]).filter((task: any) => 
+    // For employees, filter to only show their own tasks
+    let accessibleTasks = tasks as any[];
+    if (role === 'Employee' && currentUser) {
+      accessibleTasks = (tasks as any[]).filter((task: any) => 
+        task.assigneeId === currentUser.id
+      );
+    }
+    
+    const filteredTasks = accessibleTasks.filter((task: any) => 
       task.title?.toLowerCase().includes(query) ||
       task.description?.toLowerCase().includes(query)
     ).slice(0, 5);
     
-    const filteredUsers = (users as any[]).filter((user: any) => 
+    // For employees, only show team members (not CEO search capability)
+    let accessibleUsers = users as any[];
+    if (role === 'Employee') {
+      accessibleUsers = (users as any[]).filter((user: any) => 
+        user.role !== 'CEO'
+      );
+    }
+    
+    const filteredUsers = accessibleUsers.filter((user: any) => 
       user.name?.toLowerCase().includes(query) ||
       user.email?.toLowerCase().includes(query) ||
       user.role?.toLowerCase().includes(query)
     ).slice(0, 5);
     
     return { deals: filteredDeals, tasks: filteredTasks, users: filteredUsers };
-  }, [searchQuery, deals, tasks, users]);
+  }, [searchQuery, deals, tasks, users, role, currentUser]);
   
   const hasResults = searchResults.deals.length > 0 || searchResults.tasks.length > 0 || searchResults.users.length > 0;
   
@@ -317,7 +346,18 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                           {searchResults.users.map((user: any) => (
                             <button
                               key={user.id}
-                              onClick={() => { setLocation(`/ceo/team?id=${user.id}`); setShowSearchResults(false); setSearchQuery(""); }}
+                              onClick={() => { 
+                                if (role === 'CEO') {
+                                  setLocation(`/ceo/team?id=${user.id}`);
+                                } else {
+                                  toast.info(`${user.name}`, {
+                                    description: `${user.role} • ${user.email}`,
+                                    duration: 3000,
+                                  });
+                                }
+                                setShowSearchResults(false); 
+                                setSearchQuery(""); 
+                              }}
                               className="w-full px-3 py-2 text-left hover:bg-primary/10 flex items-center gap-3"
                               data-testid={`search-result-user-${user.id}`}
                             >
@@ -367,7 +407,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                   </Avatar>
                   <div className="text-left hidden md:block">
                     <p className="text-sm font-medium leading-none">{userName}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{role}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{currentUser?.role || role}</p>
                   </div>
                 </div>
               </DropdownMenuTrigger>
@@ -744,41 +784,97 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
             <SheetDescription>Help documentation and useful resources.</SheetDescription>
           </SheetHeader>
           <div className="mt-6 space-y-4">
-            <div className="p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer">
+            <button 
+              className="w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+              onClick={() => {
+                toast.info("User Guide", {
+                  description: "OSReaper helps you manage investment banking operations. Use the sidebar to navigate between Dashboard, Deals, Documents, and more.",
+                  duration: 5000,
+                });
+              }}
+              data-testid="resource-user-guide"
+            >
               <h4 className="font-medium flex items-center gap-2">
                 <FileText className="w-4 h-4 text-primary" />
                 User Guide
               </h4>
               <p className="text-xs text-muted-foreground mt-1">Complete guide to using OSReaper</p>
-            </div>
-            <div className="p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer">
+            </button>
+            <button 
+              className="w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+              onClick={() => {
+                setShowResourcesSheet(false);
+                setLocation(`${rolePrefix}/deals`);
+                toast.success("Navigating to Deal Management");
+              }}
+              data-testid="resource-deal-management"
+            >
               <h4 className="font-medium flex items-center gap-2">
                 <Target className="w-4 h-4 text-primary" />
                 Deal Management
               </h4>
               <p className="text-xs text-muted-foreground mt-1">Learn how to manage deals effectively</p>
-            </div>
-            <div className="p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer">
+            </button>
+            <button 
+              className="w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+              onClick={() => {
+                setShowResourcesSheet(false);
+                if (role === 'CEO') {
+                  setLocation('/ceo/team');
+                  toast.success("Navigating to Team Assignment");
+                } else {
+                  setLocation('/employee/deals');
+                  toast.success("Navigating to your assigned deals");
+                }
+              }}
+              data-testid="resource-team-collaboration"
+            >
               <h4 className="font-medium flex items-center gap-2">
                 <Users className="w-4 h-4 text-primary" />
-                Team Collaboration
+                {role === 'CEO' ? 'Team Assignment' : 'My Team Deals'}
               </h4>
-              <p className="text-xs text-muted-foreground mt-1">Best practices for team coordination</p>
-            </div>
-            <div className="p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer">
+              <p className="text-xs text-muted-foreground mt-1">
+                {role === 'CEO' ? 'Manage team assignments and coordination' : 'View deals assigned to your pod team'}
+              </p>
+            </button>
+            <button 
+              className="w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+              onClick={() => {
+                setShowResourcesSheet(false);
+                if (role === 'CEO') {
+                  setLocation('/ceo/dashboard');
+                  toast.success("Navigating to Dashboard Analytics");
+                } else {
+                  setLocation('/employee/tasks');
+                  toast.success("Navigating to your tasks");
+                }
+              }}
+              data-testid="resource-analytics"
+            >
               <h4 className="font-medium flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-primary" />
-                Analytics & Reporting
+                {role === 'CEO' ? 'Analytics & Reporting' : 'My Task Progress'}
               </h4>
-              <p className="text-xs text-muted-foreground mt-1">Understanding your dashboard metrics</p>
-            </div>
-            <div className="p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer">
+              <p className="text-xs text-muted-foreground mt-1">
+                {role === 'CEO' ? 'Understanding your dashboard metrics' : 'Track your assigned tasks and progress'}
+              </p>
+            </button>
+            <button 
+              className="w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+              onClick={() => {
+                toast.success("Support Contact", {
+                  description: "For assistance, email support@osreaper.com or reach out to your team lead.",
+                  duration: 5000,
+                });
+              }}
+              data-testid="resource-contact-support"
+            >
               <h4 className="font-medium flex items-center gap-2">
                 <Mail className="w-4 h-4 text-primary" />
                 Contact Support
               </h4>
               <p className="text-xs text-muted-foreground mt-1">Get help from our support team</p>
-            </div>
+            </button>
           </div>
         </SheetContent>
       </Sheet>
