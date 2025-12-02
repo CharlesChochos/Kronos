@@ -416,6 +416,40 @@ export function useMarketData(symbols?: string[]) {
   });
 }
 
+// Market News API
+export type MarketNewsItem = {
+  id: string;
+  headline: string;
+  summary: string;
+  source: string;
+  url: string;
+  image?: string;
+  datetime: string;
+  category: string;
+  related?: string;
+};
+
+export type MarketNewsResponse = {
+  source: 'live' | 'sample';
+  data: MarketNewsItem[];
+};
+
+export function useMarketNews(category?: string) {
+  return useQuery({
+    queryKey: ["market-news", category],
+    queryFn: async () => {
+      const url = category 
+        ? `/api/market-news?category=${category}`
+        : "/api/market-news";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch market news");
+      return res.json() as Promise<MarketNewsResponse>;
+    },
+    refetchInterval: 60000, // Refresh every minute
+    staleTime: 30000, // Consider data stale after 30 seconds
+  });
+}
+
 // AI Document Generation
 export function useGenerateDocument() {
   return useMutation({

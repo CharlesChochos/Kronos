@@ -53,7 +53,7 @@ import {
   Phone,
   Pencil
 } from "lucide-react";
-import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData } from "@/lib/api";
+import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -71,6 +71,7 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'quickActions', name: 'Quick Actions', enabled: true },
   { id: 'activeDeals', name: 'Active Deals Analytics', enabled: true },
   { id: 'marketPulse', name: 'Market Pulse', enabled: true },
+  { id: 'marketIntelligence', name: 'Market Intelligence', enabled: true },
   { id: 'teamTaskProgress', name: 'Team Task Progress', enabled: true },
   { id: 'velocityScoreboard', name: 'Live Velocity Scoreboard', enabled: true },
   { id: 'upcomingMeetings', name: 'Upcoming Meetings', enabled: true },
@@ -141,6 +142,11 @@ export default function Dashboard() {
   const { data: marketDataResponse, isLoading: marketLoading } = useMarketData(marketSymbols);
   const marketData = marketDataResponse?.data || [];
   const marketSource = marketDataResponse?.source || 'simulated';
+  
+  // Market news from API (refreshes every minute)
+  const { data: marketNewsResponse, isLoading: newsLoading } = useMarketNews();
+  const marketNews = marketNewsResponse?.data || [];
+  const newsSource = marketNewsResponse?.source || 'sample';
 
   // Compute analytics
   const activeDeals = deals.filter(d => d.status === 'Active');
@@ -833,14 +839,89 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           )}
+
+          {/* Market Intelligence Widget */}
+          {widgets.find(w => w.id === 'marketIntelligence')?.enabled && (
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Market Intelligence</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
+                    {newsSource === 'live' ? (
+                      <span className="text-green-400 flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div> Live
+                      </span>
+                    ) : (
+                      <span className="text-yellow-400">Sample</span>
+                    )}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {newsLoading ? (
+                  <div className="text-center py-4 text-muted-foreground text-sm">Loading news...</div>
+                ) : (
+                  <ScrollArea className="h-[280px]">
+                    <div className="space-y-3 pr-3">
+                      {marketNews.slice(0, 5).map((news) => (
+                        <a 
+                          key={news.id}
+                          href={news.url !== '#' ? news.url : undefined}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors group"
+                        >
+                          <div className="flex items-start gap-3">
+                            {news.image && (
+                              <img 
+                                src={news.image} 
+                                alt="" 
+                                className="w-16 h-12 object-cover rounded flex-shrink-0"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors">
+                                {news.headline}
+                              </h4>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] text-muted-foreground">{news.source}</span>
+                                <span className="text-[10px] text-muted-foreground">•</span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {format(new Date(news.datetime), 'h:mm a')}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </a>
+                      ))}
+                      {marketNews.length === 0 && (
+                        <div className="text-center py-4 text-muted-foreground text-xs">
+                          No news available
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                )}
+                <div className="text-[10px] text-muted-foreground text-center pt-2 border-t border-border/50">
+                  {newsSource === 'sample' && <span className="text-yellow-500">Add FINNHUB_API_KEY for live news • </span>}
+                  Real-time financial news
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Middle Column: Main Content */}
         <div className="col-span-12 md:col-span-6 space-y-6">
           {/* Welcome Banner */}
-          <div>
-            <h1 className="text-2xl font-display font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">Welcome back, {currentUser?.name?.split(' ')[0]}. Here's your personalized command center.</p>
+          <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-6 border border-primary/20">
+            <p className="text-sm text-muted-foreground mb-1">
+              {format(new Date(), 'EEEE, MMMM d, yyyy')}
+            </p>
+            <h1 className="text-3xl font-display font-bold">
+              Welcome back, {currentUser?.name?.split(' ')[0]}!
+            </h1>
+            <p className="text-muted-foreground mt-1">Here's your personalized command center.</p>
           </div>
 
           <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 text-green-500 text-xs font-medium rounded border border-green-500/20">

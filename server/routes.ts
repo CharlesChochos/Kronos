@@ -753,6 +753,93 @@ Generate only the document content, no additional commentary.`;
     }
   });
 
+  // ===== MARKET NEWS ROUTE =====
+  
+  app.get("/api/market-news", requireAuth, async (req, res) => {
+    try {
+      const finnhubKey = process.env.FINNHUB_API_KEY;
+      const category = (req.query.category as string) || 'general';
+      
+      if (finnhubKey) {
+        // Fetch real news from Finnhub
+        const response = await fetch(
+          `https://finnhub.io/api/v1/news?category=${category}&token=${finnhubKey}`
+        );
+        const news = await response.json();
+        
+        if (Array.isArray(news) && news.length > 0) {
+          const formattedNews = news.slice(0, 10).map((item: any) => ({
+            id: item.id?.toString() || crypto.randomUUID(),
+            headline: item.headline,
+            summary: item.summary,
+            source: item.source,
+            url: item.url,
+            image: item.image,
+            datetime: new Date(item.datetime * 1000).toISOString(),
+            category: item.category,
+            related: item.related,
+          }));
+          
+          return res.json({ source: 'live', data: formattedNews });
+        }
+      }
+      
+      // Fallback to sample news data
+      const sampleNews = [
+        {
+          id: '1',
+          headline: 'Fed Signals Potential Rate Cuts in 2024',
+          summary: 'Federal Reserve officials indicated they may begin cutting interest rates next year as inflation continues to cool.',
+          source: 'Reuters',
+          url: '#',
+          datetime: new Date().toISOString(),
+          category: 'general',
+        },
+        {
+          id: '2',
+          headline: 'Tech Giants Report Strong Q4 Earnings',
+          summary: 'Major technology companies exceeded Wall Street expectations with robust quarterly results.',
+          source: 'Bloomberg',
+          url: '#',
+          datetime: new Date(Date.now() - 3600000).toISOString(),
+          category: 'technology',
+        },
+        {
+          id: '3',
+          headline: 'M&A Activity Surges in Financial Sector',
+          summary: 'Investment banks report increased merger and acquisition activity as market conditions improve.',
+          source: 'WSJ',
+          url: '#',
+          datetime: new Date(Date.now() - 7200000).toISOString(),
+          category: 'merger',
+        },
+        {
+          id: '4',
+          headline: 'Global Markets Rally on Economic Data',
+          summary: 'Stock markets worldwide advance as economic indicators point to continued growth.',
+          source: 'CNBC',
+          url: '#',
+          datetime: new Date(Date.now() - 10800000).toISOString(),
+          category: 'general',
+        },
+        {
+          id: '5',
+          headline: 'IPO Market Shows Signs of Recovery',
+          summary: 'Initial public offerings are gaining momentum as investor confidence returns.',
+          source: 'Financial Times',
+          url: '#',
+          datetime: new Date(Date.now() - 14400000).toISOString(),
+          category: 'ipo',
+        },
+      ];
+      
+      res.json({ source: 'sample', data: sampleNews });
+    } catch (error) {
+      console.error('Market news error:', error);
+      res.status(500).json({ error: "Failed to fetch market news" });
+    }
+  });
+
   return httpServer;
 }
 
