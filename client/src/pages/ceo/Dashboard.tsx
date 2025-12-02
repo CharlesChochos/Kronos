@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { 
   TrendingUp, 
@@ -250,6 +251,15 @@ export default function Dashboard() {
         progress: newDeal.progress || 0,
         description: newDeal.description || null,
         attachments: attachmentMeta,
+        podTeam: [],
+        taggedInvestors: [],
+        auditTrail: [{
+          id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+          action: 'Deal Created',
+          user: currentUser?.name || 'System',
+          details: `Deal "${newDeal.name}" created`,
+        }],
       });
       toast.success("Deal created successfully!");
       setShowNewDealModal(false);
@@ -537,26 +547,8 @@ export default function Dashboard() {
     <Layout role="CEO" pageTitle="Dashboard" userName={currentUser?.name || ""}>
       <div className="grid grid-cols-12 gap-6">
         
-        {/* Left Column: User Profile, Quick Actions & Active Deals Analytics */}
+        {/* Left Column: Quick Actions & Active Deals Analytics */}
         <div className="col-span-12 md:col-span-3 space-y-6">
-          {/* User Profile Widget */}
-          <Card className="bg-card border-border">
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-lg font-bold text-primary">
-                  {currentUser?.name?.split(' ').map(n => n[0]).join('') || 'U'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold truncate">{currentUser?.name}</h3>
-                  <p className="text-xs text-muted-foreground">{currentUser?.role}</p>
-                  <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-                    {activeDeals.length} active deals • {tasks.filter(t => t.status !== 'Completed').length} pending tasks
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {widgets.find(w => w.id === 'quickActions')?.enabled && (
             <Card className="bg-card border-border">
               <CardHeader>
@@ -1320,34 +1312,74 @@ export default function Dashboard() {
               <Palette className="w-5 h-5 text-primary" />
               Customize Dashboard
             </SheetTitle>
-            <SheetDescription>Show or hide dashboard widgets.</SheetDescription>
+            <SheetDescription>Show or hide widgets and configure market data.</SheetDescription>
           </SheetHeader>
-          <div className="mt-6 space-y-4">
-            {widgets.map((widget) => (
-              <div key={widget.id} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
-                <div>
-                  <Label>{widget.name}</Label>
+          <ScrollArea className="h-[calc(100vh-150px)] mt-6">
+            <div className="space-y-6 pr-4">
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">WIDGETS</h4>
+                <div className="space-y-2">
+                  {widgets.map((widget) => (
+                    <div key={widget.id} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                      <div>
+                        <Label className="text-sm">{widget.name}</Label>
+                      </div>
+                      <Switch 
+                        checked={widget.enabled}
+                        onCheckedChange={() => handleWidgetToggle(widget.id)}
+                      />
+                    </div>
+                  ))}
                 </div>
-                <Switch 
-                  checked={widget.enabled}
-                  onCheckedChange={() => handleWidgetToggle(widget.id)}
-                />
               </div>
-            ))}
-            
-            <Separator />
-            
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={() => {
-                setWidgets(DEFAULT_WIDGETS);
-                toast.success("Widgets reset to defaults");
-              }}
-            >
-              Reset to Defaults
-            </Button>
-          </div>
+              
+              <Separator />
+              
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">MARKET PULSE SYMBOLS</h4>
+                <p className="text-xs text-muted-foreground mb-3">Select which market symbols to display in the Market Pulse widget.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { symbol: 'AAPL', name: 'Apple' },
+                    { symbol: 'GOOGL', name: 'Alphabet' },
+                    { symbol: 'MSFT', name: 'Microsoft' },
+                    { symbol: 'AMZN', name: 'Amazon' },
+                    { symbol: 'TSLA', name: 'Tesla' },
+                    { symbol: 'SPY', name: 'S&P 500 ETF' },
+                    { symbol: 'NVDA', name: 'NVIDIA' },
+                    { symbol: 'META', name: 'Meta' },
+                  ].map((item) => (
+                    <div key={item.symbol} className="flex items-center gap-2 p-2 bg-secondary/30 rounded-lg">
+                      <Checkbox 
+                        id={`symbol-${item.symbol}`}
+                        defaultChecked={['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY'].includes(item.symbol)}
+                      />
+                      <Label htmlFor={`symbol-${item.symbol}`} className="text-xs cursor-pointer">
+                        <span className="font-mono font-bold">{item.symbol}</span>
+                        <span className="text-muted-foreground ml-1">- {item.name}</span>
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-2">
+                  {marketSource === 'live' ? 'Live data from Finnhub' : 'Demo mode - add FINNHUB_API_KEY for live data'}
+                </p>
+              </div>
+              
+              <Separator />
+              
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => {
+                  setWidgets(DEFAULT_WIDGETS);
+                  toast.success("Widgets reset to defaults");
+                }}
+              >
+                Reset to Defaults
+              </Button>
+            </div>
+          </ScrollArea>
         </SheetContent>
       </Sheet>
 

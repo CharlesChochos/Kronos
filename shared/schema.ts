@@ -25,6 +25,35 @@ export const insertUserSchema = createInsertSchema(users).omit({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
+// Pod Team Member type
+export type PodTeamMember = {
+  userId?: string;
+  name: string;
+  role: string;
+  email?: string;
+  phone?: string;
+  slack?: string;
+};
+
+// Investor type
+export type TaggedInvestor = {
+  id: string;
+  name: string;
+  firm: string;
+  type: string; // e.g., 'PE', 'VC', 'Strategic', 'Family Office'
+  status: string; // e.g., 'Contacted', 'Interested', 'Passed', 'In DD'
+  notes?: string;
+};
+
+// Audit Trail Entry type
+export type AuditEntry = {
+  id: string;
+  timestamp: string;
+  action: string;
+  user: string;
+  details: string;
+};
+
 // Deals table
 export const deals = pgTable("deals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -38,6 +67,9 @@ export const deals = pgTable("deals", {
   status: text("status").notNull().default('Active'),
   description: text("description"),
   attachments: jsonb("attachments").default([]),
+  podTeam: jsonb("pod_team").default([]).$type<PodTeamMember[]>(),
+  taggedInvestors: jsonb("tagged_investors").default([]).$type<TaggedInvestor[]>(),
+  auditTrail: jsonb("audit_trail").default([]).$type<AuditEntry[]>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
