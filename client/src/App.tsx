@@ -67,6 +67,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={AuthPage} />
+      <Route path="/auth" component={AuthPage} />
       
       {/* CEO Routes */}
       <Route path="/ceo/dashboard">
