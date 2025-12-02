@@ -12,7 +12,6 @@ import {
   FileText,
   Search,
   Download,
-  Filter,
   Calendar as CalendarIcon,
   User,
   Briefcase,
@@ -21,163 +20,113 @@ import {
   AlertTriangle,
   Shield,
   Clock,
-  ChevronRight,
-  Eye
+  PlusCircle,
+  Edit,
+  Trash2,
+  Eye,
+  Loader2
 } from "lucide-react";
-import { useCurrentUser, useDeals, useTasks, useUsers } from "@/lib/api";
+import { useCurrentUser, useAuditLogs } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { format, subDays, isAfter, isBefore } from "date-fns";
-
-type AuditEvent = {
-  id: string;
-  timestamp: Date;
-  userId: string;
-  userName: string;
-  action: 'create' | 'update' | 'delete' | 'view' | 'export' | 'login' | 'logout' | 'assign' | 'complete';
-  entity: 'deal' | 'task' | 'document' | 'user' | 'message' | 'system';
-  entityId?: string;
-  entityName?: string;
-  details: string;
-  ipAddress: string;
-  severity: 'info' | 'warning' | 'critical';
-};
-
-const generateDemoAuditEvents = (): AuditEvent[] => {
-  const events: AuditEvent[] = [];
-  const users = ['Josh Orlinsky', 'Sarah Johnson', 'Michael Chen', 'Emily Davis', 'James Wilson'];
-  const actions: AuditEvent['action'][] = ['create', 'update', 'view', 'export', 'assign', 'complete'];
-  const entities: AuditEvent['entity'][] = ['deal', 'task', 'document', 'user', 'message'];
-  
-  for (let i = 0; i < 50; i++) {
-    const user = users[Math.floor(Math.random() * users.length)];
-    const action = actions[Math.floor(Math.random() * actions.length)];
-    const entity = entities[Math.floor(Math.random() * entities.length)];
-    
-    let details = '';
-    let severity: AuditEvent['severity'] = 'info';
-    
-    switch (action) {
-      case 'create': 
-        details = `Created new ${entity}`; 
-        break;
-      case 'update': 
-        details = `Updated ${entity} information`; 
-        severity = 'warning';
-        break;
-      case 'delete': 
-        details = `Deleted ${entity}`; 
-        severity = 'critical';
-        break;
-      case 'view': 
-        details = `Viewed ${entity} details`; 
-        break;
-      case 'export': 
-        details = `Exported ${entity} data`; 
-        severity = 'warning';
-        break;
-      case 'assign': 
-        details = `Assigned ${entity} to team member`; 
-        break;
-      case 'complete': 
-        details = `Marked ${entity} as complete`; 
-        break;
-    }
-    
-    events.push({
-      id: `audit-${i}`,
-      timestamp: subDays(new Date(), Math.floor(Math.random() * 30)),
-      userId: `user-${i % 5}`,
-      userName: user,
-      action,
-      entity,
-      entityId: `${entity}-${i}`,
-      entityName: `${entity.charAt(0).toUpperCase() + entity.slice(1)} #${i + 1}`,
-      details,
-      ipAddress: `192.168.1.${Math.floor(Math.random() * 255)}`,
-      severity,
-    });
-  }
-  
-  return events.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-};
+import { format, subDays, isAfter, isBefore, parseISO } from "date-fns";
 
 const actionIcons: Record<string, React.ElementType> = {
-  deal: Briefcase,
-  task: CheckSquare,
-  document: FileText,
-  user: User,
-  message: MessageSquare,
-  system: Shield,
+  Deal: Briefcase,
+  Task: CheckSquare,
+  Document: FileText,
+  User: User,
+  Message: MessageSquare,
+  System: Shield,
+  TimeEntry: Clock,
+  TimeOffRequest: CalendarIcon,
+  Investor: User,
+  InvestorInteraction: MessageSquare,
 };
 
 const actionColors: Record<string, string> = {
-  create: 'text-green-500',
-  update: 'text-blue-500',
-  delete: 'text-red-500',
-  view: 'text-gray-500',
-  export: 'text-purple-500',
-  login: 'text-green-500',
-  logout: 'text-gray-500',
-  assign: 'text-yellow-500',
-  complete: 'text-green-500',
+  CREATE: 'text-green-500',
+  UPDATE: 'text-blue-500',
+  DELETE: 'text-red-500',
+  VIEW: 'text-gray-500',
+  EXPORT: 'text-purple-500',
+  LOGIN: 'text-green-500',
+  LOGOUT: 'text-gray-500',
+  ASSIGN: 'text-yellow-500',
+  COMPLETE: 'text-green-500',
+};
+
+const actionIconMap: Record<string, React.ElementType> = {
+  CREATE: PlusCircle,
+  UPDATE: Edit,
+  DELETE: Trash2,
+  VIEW: Eye,
 };
 
 export default function AuditTrail() {
   const { data: currentUser } = useCurrentUser();
-  const { data: users = [] } = useUsers();
+  const { data: auditLogs = [], isLoading } = useAuditLogs(500);
   
-  const [events] = useState<AuditEvent[]>(generateDemoAuditEvents);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterAction, setFilterAction] = useState<string>("all");
   const [filterEntity, setFilterEntity] = useState<string>("all");
-  const [filterUser, setFilterUser] = useState<string>("all");
-  const [filterSeverity, setFilterSeverity] = useState<string>("all");
   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
-    from: subDays(new Date(), 7),
+    from: subDays(new Date(), 30),
     to: new Date(),
   });
 
-  const filteredEvents = useMemo(() => {
-    return events.filter(event => {
-      if (searchQuery && !event.details.toLowerCase().includes(searchQuery.toLowerCase()) && 
-          !event.userName.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
+  const logs = useMemo(() => {
+    return auditLogs.map(log => ({
+      ...log,
+      timestampObj: parseISO(log.timestamp),
+    }));
+  }, [auditLogs]);
+
+  const filteredLogs = useMemo(() => {
+    return logs.filter(log => {
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        if (!log.details?.toLowerCase().includes(query) && 
+            !log.userName?.toLowerCase().includes(query) &&
+            !log.entityType?.toLowerCase().includes(query)) {
+          return false;
+        }
       }
-      if (filterAction !== 'all' && event.action !== filterAction) return false;
-      if (filterEntity !== 'all' && event.entity !== filterEntity) return false;
-      if (filterUser !== 'all' && event.userName !== filterUser) return false;
-      if (filterSeverity !== 'all' && event.severity !== filterSeverity) return false;
-      if (dateRange.from && isBefore(event.timestamp, dateRange.from)) return false;
-      if (dateRange.to && isAfter(event.timestamp, dateRange.to)) return false;
+      if (filterAction !== 'all' && log.action !== filterAction) return false;
+      if (filterEntity !== 'all' && log.entityType !== filterEntity) return false;
+      if (dateRange.from && isBefore(log.timestampObj, dateRange.from)) return false;
+      if (dateRange.to && isAfter(log.timestampObj, dateRange.to)) return false;
       return true;
     });
-  }, [events, searchQuery, filterAction, filterEntity, filterUser, filterSeverity, dateRange]);
+  }, [logs, searchQuery, filterAction, filterEntity, dateRange]);
 
   const stats = useMemo(() => {
     const today = new Date();
-    const todayEvents = events.filter(e => format(e.timestamp, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'));
-    const criticalEvents = events.filter(e => e.severity === 'critical');
-    const uniqueUsers = new Set(events.map(e => e.userId)).size;
+    const todayLogs = logs.filter(l => format(l.timestampObj, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'));
+    const deleteActions = logs.filter(l => l.action === 'DELETE');
+    const uniqueUsers = new Set(logs.map(l => l.userId)).size;
     
     return {
-      total: events.length,
-      today: todayEvents.length,
-      critical: criticalEvents.length,
+      total: logs.length,
+      today: todayLogs.length,
+      deletes: deleteActions.length,
       activeUsers: uniqueUsers,
     };
-  }, [events]);
+  }, [logs]);
+
+  const uniqueEntityTypes = useMemo(() => {
+    return [...new Set(logs.map(l => l.entityType))].filter(Boolean);
+  }, [logs]);
 
   const exportAuditLog = () => {
     const csv = [
-      ['Timestamp', 'User', 'Action', 'Entity', 'Details', 'IP Address', 'Severity'],
-      ...filteredEvents.map(e => [
-        format(e.timestamp, 'yyyy-MM-dd HH:mm:ss'),
-        e.userName,
-        e.action,
-        e.entity,
-        e.details,
-        e.ipAddress,
-        e.severity,
+      ['Timestamp', 'User', 'Action', 'Entity Type', 'Entity ID', 'Details'],
+      ...filteredLogs.map(l => [
+        format(l.timestampObj, 'yyyy-MM-dd HH:mm:ss'),
+        l.userName || 'Unknown',
+        l.action,
+        l.entityType,
+        l.entityId,
+        l.details || '',
       ])
     ].map(row => row.join(',')).join('\n');
     
@@ -189,10 +138,15 @@ export default function AuditTrail() {
     a.click();
   };
 
+  const getSeverity = (action: string) => {
+    if (action === 'DELETE') return 'critical';
+    if (action === 'UPDATE' || action === 'EXPORT') return 'warning';
+    return 'info';
+  };
+
   return (
     <Layout role="CEO" pageTitle="Audit Trail" userName={currentUser?.name || ""}>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -207,7 +161,6 @@ export default function AuditTrail() {
           </Button>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="bg-card border-border">
             <CardContent className="p-4">
@@ -235,8 +188,8 @@ export default function AuditTrail() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Critical Events</p>
-                  <p className="text-2xl font-bold text-red-500">{stats.critical}</p>
+                  <p className="text-sm text-muted-foreground">Delete Actions</p>
+                  <p className="text-2xl font-bold text-red-500">{stats.deletes}</p>
                 </div>
                 <AlertTriangle className="w-5 h-5 text-red-500" />
               </div>
@@ -255,7 +208,6 @@ export default function AuditTrail() {
           </Card>
         </div>
 
-        {/* Filters */}
         <Card className="bg-card border-border">
           <CardContent className="p-4">
             <div className="flex flex-wrap gap-4">
@@ -277,37 +229,22 @@ export default function AuditTrail() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Actions</SelectItem>
-                  <SelectItem value="create">Create</SelectItem>
-                  <SelectItem value="update">Update</SelectItem>
-                  <SelectItem value="delete">Delete</SelectItem>
-                  <SelectItem value="view">View</SelectItem>
-                  <SelectItem value="export">Export</SelectItem>
-                  <SelectItem value="assign">Assign</SelectItem>
-                  <SelectItem value="complete">Complete</SelectItem>
+                  <SelectItem value="CREATE">Create</SelectItem>
+                  <SelectItem value="UPDATE">Update</SelectItem>
+                  <SelectItem value="DELETE">Delete</SelectItem>
+                  <SelectItem value="VIEW">View</SelectItem>
+                  <SelectItem value="EXPORT">Export</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={filterEntity} onValueChange={setFilterEntity}>
-                <SelectTrigger className="w-32" data-testid="select-filter-entity">
+                <SelectTrigger className="w-40" data-testid="select-filter-entity">
                   <SelectValue placeholder="Entity" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Entities</SelectItem>
-                  <SelectItem value="deal">Deals</SelectItem>
-                  <SelectItem value="task">Tasks</SelectItem>
-                  <SelectItem value="document">Documents</SelectItem>
-                  <SelectItem value="user">Users</SelectItem>
-                  <SelectItem value="message">Messages</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={filterSeverity} onValueChange={setFilterSeverity}>
-                <SelectTrigger className="w-32" data-testid="select-filter-severity">
-                  <SelectValue placeholder="Severity" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Levels</SelectItem>
-                  <SelectItem value="info">Info</SelectItem>
-                  <SelectItem value="warning">Warning</SelectItem>
-                  <SelectItem value="critical">Critical</SelectItem>
+                  {uniqueEntityTypes.map(type => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Popover>
@@ -332,76 +269,80 @@ export default function AuditTrail() {
           </CardContent>
         </Card>
 
-        {/* Event Log */}
         <Card className="bg-card border-border">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-primary" />
-              Activity Log ({filteredEvents.length} events)
+              Activity Log ({filteredLogs.length} events)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[500px]">
-              <div className="space-y-2">
-                {filteredEvents.map((event) => {
-                  const Icon = actionIcons[event.entity] || FileText;
-                  return (
-                    <div
-                      key={event.id}
-                      className={cn(
-                        "flex items-center gap-4 p-3 rounded-lg border transition-colors hover:bg-secondary/50",
-                        event.severity === 'critical' && "border-red-500/30 bg-red-500/5",
-                        event.severity === 'warning' && "border-yellow-500/30 bg-yellow-500/5",
-                        event.severity === 'info' && "border-border"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-10 h-10 rounded-full flex items-center justify-center",
-                        event.severity === 'critical' && "bg-red-500/20",
-                        event.severity === 'warning' && "bg-yellow-500/20",
-                        event.severity === 'info' && "bg-primary/20"
-                      )}>
-                        <Icon className={cn(
-                          "w-5 h-5",
-                          event.severity === 'critical' && "text-red-500",
-                          event.severity === 'warning' && "text-yellow-500",
-                          event.severity === 'info' && "text-primary"
-                        )} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{event.userName}</span>
-                          <Badge variant="secondary" className={cn("text-xs capitalize", actionColors[event.action])}>
-                            {event.action}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">{event.entity}</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground truncate">{event.details}</p>
-                        {event.entityName && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Entity: {event.entityName}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground">
-                          {format(event.timestamp, 'MMM d, h:mm a')}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          IP: {event.ipAddress}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-                {filteredEvents.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p>No events match your filters</p>
-                  </div>
-                )}
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
               </div>
-            </ScrollArea>
+            ) : (
+              <ScrollArea className="h-[500px]">
+                <div className="space-y-2">
+                  {filteredLogs.map((log) => {
+                    const EntityIcon = actionIcons[log.entityType] || FileText;
+                    const ActionIcon = actionIconMap[log.action] || FileText;
+                    const severity = getSeverity(log.action);
+                    
+                    return (
+                      <div
+                        key={log.id}
+                        className={cn(
+                          "flex items-center gap-4 p-3 rounded-lg border transition-colors hover:bg-secondary/50",
+                          severity === 'critical' && "border-red-500/30 bg-red-500/5",
+                          severity === 'warning' && "border-yellow-500/30 bg-yellow-500/5",
+                          severity === 'info' && "border-border"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-10 h-10 rounded-full flex items-center justify-center",
+                          severity === 'critical' && "bg-red-500/20",
+                          severity === 'warning' && "bg-yellow-500/20",
+                          severity === 'info' && "bg-primary/20"
+                        )}>
+                          <EntityIcon className={cn(
+                            "w-5 h-5",
+                            severity === 'critical' && "text-red-500",
+                            severity === 'warning' && "text-yellow-500",
+                            severity === 'info' && "text-primary"
+                          )} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{log.userName || 'System'}</span>
+                            <Badge variant="secondary" className={cn("text-xs capitalize", actionColors[log.action])}>
+                              {log.action}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">{log.entityType}</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate">{log.details || `${log.action} ${log.entityType}`}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Entity ID: {log.entityId}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">
+                            {format(log.timestampObj, 'MMM d, h:mm a')}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {filteredLogs.length === 0 && !isLoading && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p>No audit events found</p>
+                      <p className="text-sm mt-1">Actions will be logged here as they occur</p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            )}
           </CardContent>
         </Card>
       </div>

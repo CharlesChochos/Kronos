@@ -17,101 +17,51 @@ import {
   Users,
   Plane,
   Home,
-  Briefcase,
   AlertTriangle,
   Clock
 } from "lucide-react";
-import { useCurrentUser, useUsers } from "@/lib/api";
+import { useCurrentUser, useTimeOffRequests, useCreateTimeOffRequest, useUpdateTimeOffRequest } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, isWithinInterval, addDays } from "date-fns";
-
-type TimeOffRequest = {
-  id: string;
-  userId: string;
-  userName: string;
-  type: 'vacation' | 'sick' | 'personal' | 'wfh';
-  startDate: Date;
-  endDate: Date;
-  status: 'pending' | 'approved' | 'denied';
-  notes?: string;
-};
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, subMonths, isToday, isWithinInterval, parseISO } from "date-fns";
+import { toast } from "sonner";
 
 type VacationCalendarProps = {
   role: 'CEO' | 'Employee';
 };
 
 const typeColors: Record<string, string> = {
-  vacation: 'bg-blue-500',
-  sick: 'bg-red-500',
-  personal: 'bg-purple-500',
-  wfh: 'bg-green-500',
+  Vacation: 'bg-blue-500',
+  Sick: 'bg-red-500',
+  Personal: 'bg-purple-500',
+  WFH: 'bg-green-500',
 };
 
 const typeLabels: Record<string, string> = {
-  vacation: 'Vacation',
-  sick: 'Sick Leave',
-  personal: 'Personal',
-  wfh: 'Work from Home',
+  Vacation: 'Vacation',
+  Sick: 'Sick Leave',
+  Personal: 'Personal',
+  WFH: 'Work from Home',
 };
 
 const typeIcons: Record<string, React.ElementType> = {
-  vacation: Plane,
-  sick: AlertTriangle,
-  personal: Clock,
-  wfh: Home,
+  Vacation: Plane,
+  Sick: AlertTriangle,
+  Personal: Clock,
+  WFH: Home,
 };
-
-const demoRequests: TimeOffRequest[] = [
-  {
-    id: '1',
-    userId: '1',
-    userName: 'Sarah Johnson',
-    type: 'vacation',
-    startDate: addDays(new Date(), 5),
-    endDate: addDays(new Date(), 12),
-    status: 'approved',
-  },
-  {
-    id: '2',
-    userId: '2',
-    userName: 'Michael Chen',
-    type: 'wfh',
-    startDate: addDays(new Date(), 1),
-    endDate: addDays(new Date(), 1),
-    status: 'approved',
-  },
-  {
-    id: '3',
-    userId: '3',
-    userName: 'Emily Davis',
-    type: 'personal',
-    startDate: addDays(new Date(), 3),
-    endDate: addDays(new Date(), 3),
-    status: 'pending',
-  },
-  {
-    id: '4',
-    userId: '4',
-    userName: 'James Wilson',
-    type: 'sick',
-    startDate: new Date(),
-    endDate: addDays(new Date(), 1),
-    status: 'approved',
-  },
-];
 
 export default function VacationCalendar({ role }: VacationCalendarProps) {
   const { data: currentUser } = useCurrentUser();
-  const { data: users = [] } = useUsers();
+  const { data: timeOffRequests = [], isLoading } = useTimeOffRequests();
+  const createRequest = useCreateTimeOffRequest();
+  const updateRequest = useUpdateTimeOffRequest();
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [requests, setRequests] = useState<TimeOffRequest[]>(demoRequests);
   const [showAddRequest, setShowAddRequest] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
-  const [selectedRequest, setSelectedRequest] = useState<TimeOffRequest | null>(null);
   
   const [newRequest, setNewRequest] = useState({
-    type: 'vacation' as TimeOffRequest['type'],
+    type: 'Vacation',
     startDate: '',
     endDate: '',
     notes: '',
@@ -123,6 +73,14 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
   const startPadding = monthStart.getDay();
   const paddedDays = [...Array(startPadding).fill(null), ...daysInMonth];
 
+  const requests = useMemo(() => {
+    return timeOffRequests.map(r => ({
+      ...r,
+      startDateObj: parseISO(r.startDate),
+      endDateObj: parseISO(r.endDate),
+    }));
+  }, [timeOffRequests]);
+
   const filteredRequests = useMemo(() => {
     return requests.filter(req => {
       if (filterType !== 'all' && req.type !== filterType) return false;
@@ -132,67 +90,79 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
 
   const getRequestsForDate = (date: Date) => {
     return filteredRequests.filter(req => 
-      isWithinInterval(date, { start: req.startDate, end: req.endDate }) &&
-      req.status === 'approved'
+      isWithinInterval(date, { start: req.startDateObj, end: req.endDateObj }) &&
+      req.status === 'Approved'
     );
   };
 
   const upcomingRequests = useMemo(() => {
+    const today = new Date();
     return filteredRequests
-      .filter(r => r.startDate >= new Date() && r.status === 'approved')
-      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
+      .filter(r => r.startDateObj >= today && r.status === 'Approved')
+      .sort((a, b) => a.startDateObj.getTime() - b.startDateObj.getTime())
       .slice(0, 10);
   }, [filteredRequests]);
 
   const pendingRequests = useMemo(() => {
-    return requests.filter(r => r.status === 'pending');
+    return requests.filter(r => r.status === 'Pending');
   }, [requests]);
 
   const stats = useMemo(() => {
     const today = new Date();
     const outToday = requests.filter(r => 
-      r.status === 'approved' && isWithinInterval(today, { start: r.startDate, end: r.endDate })
+      r.status === 'Approved' && isWithinInterval(today, { start: r.startDateObj, end: r.endDateObj })
     ).length;
     
     const thisMonth = requests.filter(r => 
-      r.status === 'approved' && 
-      (isSameMonth(r.startDate, currentMonth) || isSameMonth(r.endDate, currentMonth))
+      r.status === 'Approved' && 
+      (isSameMonth(r.startDateObj, currentMonth) || isSameMonth(r.endDateObj, currentMonth))
     ).length;
     
     return { outToday, thisMonth, pending: pendingRequests.length };
   }, [requests, currentMonth, pendingRequests]);
 
-  const handleAddRequest = () => {
-    if (!newRequest.startDate || !newRequest.endDate) return;
+  const handleAddRequest = async () => {
+    if (!newRequest.startDate || !newRequest.endDate) {
+      toast.error('Please select start and end dates');
+      return;
+    }
     
-    const request: TimeOffRequest = {
-      id: `req-${Date.now()}`,
-      userId: currentUser?.id || '',
-      userName: currentUser?.name || '',
-      type: newRequest.type,
-      startDate: new Date(newRequest.startDate),
-      endDate: new Date(newRequest.endDate),
-      status: 'pending',
-      notes: newRequest.notes,
-    };
-    
-    setRequests(prev => [...prev, request]);
-    setShowAddRequest(false);
-    setNewRequest({ type: 'vacation', startDate: '', endDate: '', notes: '' });
+    try {
+      await createRequest.mutateAsync({
+        type: newRequest.type,
+        startDate: newRequest.startDate,
+        endDate: newRequest.endDate,
+        notes: newRequest.notes || undefined,
+      });
+      toast.success('Time off request submitted');
+      setShowAddRequest(false);
+      setNewRequest({ type: 'Vacation', startDate: '', endDate: '', notes: '' });
+    } catch (error) {
+      toast.error('Failed to submit request');
+    }
   };
 
-  const handleApprove = (id: string) => {
-    setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'approved' as const } : r));
+  const handleApprove = async (id: string) => {
+    try {
+      await updateRequest.mutateAsync({ id, updates: { status: 'Approved' } });
+      toast.success('Request approved');
+    } catch (error) {
+      toast.error('Failed to approve request');
+    }
   };
 
-  const handleDeny = (id: string) => {
-    setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'denied' as const } : r));
+  const handleDeny = async (id: string) => {
+    try {
+      await updateRequest.mutateAsync({ id, updates: { status: 'Denied' } });
+      toast.success('Request denied');
+    } catch (error) {
+      toast.error('Failed to deny request');
+    }
   };
 
   return (
     <Layout role={role} pageTitle="Vacation Calendar" userName={currentUser?.name || ""}>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -207,7 +177,6 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
           </Button>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-card border-border">
             <CardContent className="p-4">
@@ -245,7 +214,6 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Calendar */}
           <Card className="lg:col-span-2 bg-card border-border">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
@@ -260,10 +228,10 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="vacation">Vacation</SelectItem>
-                      <SelectItem value="sick">Sick Leave</SelectItem>
-                      <SelectItem value="personal">Personal</SelectItem>
-                      <SelectItem value="wfh">Work from Home</SelectItem>
+                      <SelectItem value="Vacation">Vacation</SelectItem>
+                      <SelectItem value="Sick">Sick Leave</SelectItem>
+                      <SelectItem value="Personal">Personal</SelectItem>
+                      <SelectItem value="WFH">Work from Home</SelectItem>
                     </SelectContent>
                   </Select>
                   <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
@@ -276,7 +244,6 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
               </div>
             </CardHeader>
             <CardContent>
-              {/* Days of week header */}
               <div className="grid grid-cols-7 gap-1 mb-2">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                   <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
@@ -285,7 +252,6 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
                 ))}
               </div>
               
-              {/* Calendar grid */}
               <div className="grid grid-cols-7 gap-1">
                 {paddedDays.map((day, idx) => {
                   if (!day) {
@@ -315,10 +281,10 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
                             key={req.id}
                             className={cn(
                               "text-xs px-1 py-0.5 rounded truncate text-white",
-                              typeColors[req.type]
+                              typeColors[req.type] || 'bg-blue-500'
                             )}
                           >
-                            {req.userName.split(' ')[0]}
+                            {(req.userName || 'User').split(' ')[0]}
                           </div>
                         ))}
                         {dayRequests.length > 2 && (
@@ -330,7 +296,6 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
                 })}
               </div>
               
-              {/* Legend */}
               <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border">
                 {Object.entries(typeLabels).map(([type, label]) => (
                   <div key={type} className="flex items-center gap-1">
@@ -342,9 +307,7 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
             </CardContent>
           </Card>
 
-          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Pending Approvals (CEO only) */}
             {role === 'CEO' && pendingRequests.length > 0 && (
               <Card className="bg-yellow-500/5 border-yellow-500/20">
                 <CardHeader className="pb-2">
@@ -360,13 +323,13 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
                         <div className="flex items-center gap-2">
                           <Avatar className="w-6 h-6">
                             <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                              {req.userName.split(' ').map(n => n[0]).join('')}
+                              {(req.userName || 'U').split(' ').map(n => n[0]).join('')}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="font-medium text-sm">{req.userName}</span>
+                          <span className="font-medium text-sm">{req.userName || 'Unknown'}</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {typeLabels[req.type]} • {format(req.startDate, 'MMM d')} - {format(req.endDate, 'MMM d')}
+                          {typeLabels[req.type] || req.type} • {format(req.startDateObj, 'MMM d')} - {format(req.endDateObj, 'MMM d')}
                         </p>
                         <div className="flex items-center gap-2 mt-2">
                           <Button 
@@ -374,6 +337,7 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
                             variant="outline" 
                             className="h-6 text-xs"
                             onClick={() => handleApprove(req.id)}
+                            disabled={updateRequest.isPending}
                           >
                             Approve
                           </Button>
@@ -382,6 +346,7 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
                             variant="ghost" 
                             className="h-6 text-xs text-red-500"
                             onClick={() => handleDeny(req.id)}
+                            disabled={updateRequest.isPending}
                           >
                             Deny
                           </Button>
@@ -393,7 +358,6 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
               </Card>
             )}
 
-            {/* Upcoming Time Off */}
             <Card className="bg-card border-border">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm">
@@ -402,43 +366,46 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ScrollArea className="h-64">
-                  <div className="space-y-2">
-                    {upcomingRequests.map(req => {
-                      const Icon = typeIcons[req.type];
-                      return (
-                        <div key={req.id} className="p-2 rounded border border-border hover:bg-secondary/50">
-                          <div className="flex items-center gap-2">
-                            <Avatar className="w-6 h-6">
-                              <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                                {req.userName.split(' ').map(n => n[0]).join('')}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">{req.userName}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {format(req.startDate, 'MMM d')} - {format(req.endDate, 'MMM d')}
-                              </p>
+                {isLoading ? (
+                  <div className="text-center py-4 text-muted-foreground">Loading...</div>
+                ) : (
+                  <ScrollArea className="h-64">
+                    <div className="space-y-2">
+                      {upcomingRequests.map(req => {
+                        const Icon = typeIcons[req.type] || Plane;
+                        return (
+                          <div key={req.id} className="p-2 rounded border border-border hover:bg-secondary/50">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="w-6 h-6">
+                                <AvatarFallback className="text-xs bg-primary/20 text-primary">
+                                  {(req.userName || 'U').split(' ').map(n => n[0]).join('')}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate">{req.userName || 'Unknown'}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {format(req.startDateObj, 'MMM d')} - {format(req.endDateObj, 'MMM d')}
+                                </p>
+                              </div>
+                              <Badge className={cn("text-white text-xs", typeColors[req.type] || 'bg-blue-500')}>
+                                {typeLabels[req.type] || req.type}
+                              </Badge>
                             </div>
-                            <Badge className={cn("text-white text-xs", typeColors[req.type])}>
-                              {typeLabels[req.type]}
-                            </Badge>
                           </div>
-                        </div>
-                      );
-                    })}
-                    {upcomingRequests.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-4">No upcoming time off</p>
-                    )}
-                  </div>
-                </ScrollArea>
+                        );
+                      })}
+                      {upcomingRequests.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">No upcoming time off</p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                )}
               </CardContent>
             </Card>
           </div>
         </div>
       </div>
 
-      {/* Add Request Dialog */}
       <Dialog open={showAddRequest} onOpenChange={setShowAddRequest}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -447,15 +414,15 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Type</Label>
-              <Select value={newRequest.type} onValueChange={(v) => setNewRequest(prev => ({ ...prev, type: v as TimeOffRequest['type'] }))}>
+              <Select value={newRequest.type} onValueChange={(v) => setNewRequest(prev => ({ ...prev, type: v }))}>
                 <SelectTrigger data-testid="select-request-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="vacation">Vacation</SelectItem>
-                  <SelectItem value="sick">Sick Leave</SelectItem>
-                  <SelectItem value="personal">Personal</SelectItem>
-                  <SelectItem value="wfh">Work from Home</SelectItem>
+                  <SelectItem value="Vacation">Vacation</SelectItem>
+                  <SelectItem value="Sick">Sick Leave</SelectItem>
+                  <SelectItem value="Personal">Personal</SelectItem>
+                  <SelectItem value="WFH">Work from Home</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -491,7 +458,13 @@ export default function VacationCalendar({ role }: VacationCalendarProps) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddRequest(false)}>Cancel</Button>
-            <Button onClick={handleAddRequest} data-testid="button-submit-request">Submit Request</Button>
+            <Button 
+              onClick={handleAddRequest} 
+              disabled={createRequest.isPending}
+              data-testid="button-submit-request"
+            >
+              {createRequest.isPending ? 'Submitting...' : 'Submit Request'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

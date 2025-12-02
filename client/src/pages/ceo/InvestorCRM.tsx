@@ -18,139 +18,19 @@ import {
   Mail,
   Phone,
   MapPin,
-  Calendar,
+  Clock,
   DollarSign,
   TrendingUp,
   Star,
   MessageSquare,
-  Clock,
-  ExternalLink,
-  Edit2,
   Users,
-  Briefcase
+  Briefcase,
+  Loader2
 } from "lucide-react";
-import { useCurrentUser, useDeals } from "@/lib/api";
+import { useCurrentUser, useInvestors, useInvestor, useCreateInvestor, useCreateInvestorInteraction } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { format, subDays } from "date-fns";
-
-type Investor = {
-  id: string;
-  name: string;
-  firm: string;
-  type: 'PE' | 'VC' | 'Strategic' | 'Family Office' | 'Hedge Fund' | 'Sovereign Wealth';
-  email: string;
-  phone: string;
-  location: string;
-  sectors: string[];
-  minDealSize: number;
-  maxDealSize: number;
-  status: 'Active' | 'Warm' | 'Cold' | 'Inactive';
-  lastContact: Date;
-  dealsParticipated: number;
-  relationshipScore: number;
-  notes: string;
-  interactions: { date: Date; type: string; summary: string }[];
-};
-
-const demoInvestors: Investor[] = [
-  {
-    id: '1',
-    name: 'Michael Roberts',
-    firm: 'Blackstone',
-    type: 'PE',
-    email: 'mroberts@blackstone.com',
-    phone: '+1 (212) 555-0101',
-    location: 'New York, NY',
-    sectors: ['Technology', 'Healthcare', 'Financial Services'],
-    minDealSize: 100,
-    maxDealSize: 500,
-    status: 'Active',
-    lastContact: subDays(new Date(), 3),
-    dealsParticipated: 4,
-    relationshipScore: 95,
-    notes: 'Key relationship, very responsive',
-    interactions: [
-      { date: subDays(new Date(), 3), type: 'Meeting', summary: 'Discussed TechCorp opportunity' },
-      { date: subDays(new Date(), 14), type: 'Call', summary: 'Quarterly check-in' },
-    ]
-  },
-  {
-    id: '2',
-    name: 'Sarah Chen',
-    firm: 'Sequoia Capital',
-    type: 'VC',
-    email: 'schen@sequoia.com',
-    phone: '+1 (650) 555-0102',
-    location: 'Menlo Park, CA',
-    sectors: ['Technology', 'SaaS', 'AI/ML'],
-    minDealSize: 20,
-    maxDealSize: 100,
-    status: 'Active',
-    lastContact: subDays(new Date(), 7),
-    dealsParticipated: 2,
-    relationshipScore: 88,
-    notes: 'Focus on early-stage tech',
-    interactions: [
-      { date: subDays(new Date(), 7), type: 'Email', summary: 'Sent FinServe pitch deck' },
-    ]
-  },
-  {
-    id: '3',
-    name: 'James Wilson',
-    firm: 'KKR',
-    type: 'PE',
-    email: 'jwilson@kkr.com',
-    phone: '+1 (212) 555-0103',
-    location: 'New York, NY',
-    sectors: ['Consumer', 'Retail', 'Manufacturing'],
-    minDealSize: 50,
-    maxDealSize: 300,
-    status: 'Warm',
-    lastContact: subDays(new Date(), 21),
-    dealsParticipated: 1,
-    relationshipScore: 72,
-    notes: 'Prefers operational turnarounds',
-    interactions: []
-  },
-  {
-    id: '4',
-    name: 'Emily Thompson',
-    firm: 'First Round Capital',
-    type: 'VC',
-    email: 'ethompson@firstround.com',
-    phone: '+1 (415) 555-0104',
-    location: 'San Francisco, CA',
-    sectors: ['Technology', 'Consumer Tech'],
-    minDealSize: 5,
-    maxDealSize: 25,
-    status: 'Active',
-    lastContact: subDays(new Date(), 5),
-    dealsParticipated: 3,
-    relationshipScore: 90,
-    notes: 'Strong network, quick decisions',
-    interactions: [
-      { date: subDays(new Date(), 5), type: 'Meeting', summary: 'Portfolio company intro' },
-    ]
-  },
-  {
-    id: '5',
-    name: 'David Park',
-    firm: 'Andreessen Horowitz',
-    type: 'VC',
-    email: 'dpark@a16z.com',
-    phone: '+1 (650) 555-0105',
-    location: 'Menlo Park, CA',
-    sectors: ['Technology', 'Fintech', 'Crypto'],
-    minDealSize: 10,
-    maxDealSize: 150,
-    status: 'Warm',
-    lastContact: subDays(new Date(), 14),
-    dealsParticipated: 0,
-    relationshipScore: 65,
-    notes: 'Looking to expand PE investments',
-    interactions: []
-  },
-];
+import { format, parseISO, differenceInDays } from "date-fns";
+import { toast } from "sonner";
 
 const statusColors: Record<string, string> = {
   'Active': 'bg-green-500',
@@ -161,15 +41,34 @@ const statusColors: Record<string, string> = {
 
 export default function InvestorCRM() {
   const { data: currentUser } = useCurrentUser();
-  const { data: deals = [] } = useDeals();
+  const { data: investors = [], isLoading } = useInvestors();
   
-  const [investors, setInvestors] = useState<Investor[]>(demoInvestors);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [selectedInvestor, setSelectedInvestor] = useState<Investor | null>(null);
+  const [selectedInvestorId, setSelectedInvestorId] = useState<string | null>(null);
+  const [showAddInvestor, setShowAddInvestor] = useState(false);
   const [showAddInteraction, setShowAddInteraction] = useState(false);
-  const [newInteraction, setNewInteraction] = useState({ type: 'Call', summary: '' });
+  
+  const { data: selectedInvestorData } = useInvestor(selectedInvestorId || '');
+  const createInvestor = useCreateInvestor();
+  const createInteraction = useCreateInvestorInteraction();
+
+  const [newInvestor, setNewInvestor] = useState({
+    name: '',
+    firm: '',
+    type: 'PE' as string,
+    email: '',
+    phone: '',
+    location: '',
+    sectors: '',
+    minDealSize: '',
+    maxDealSize: '',
+    status: 'Active' as string,
+    notes: '',
+  });
+
+  const [newInteraction, setNewInteraction] = useState({ type: 'Call', notes: '' });
 
   const filteredInvestors = useMemo(() => {
     return investors.filter(inv => {
@@ -177,7 +76,7 @@ export default function InvestorCRM() {
         const query = searchQuery.toLowerCase();
         if (!inv.name.toLowerCase().includes(query) && 
             !inv.firm.toLowerCase().includes(query) &&
-            !inv.sectors.some(s => s.toLowerCase().includes(query))) {
+            !(inv.sectors || []).some((s: string) => s.toLowerCase().includes(query))) {
           return false;
         }
       }
@@ -187,50 +86,81 @@ export default function InvestorCRM() {
     });
   }, [investors, searchQuery, filterType, filterStatus]);
 
-  const stats = useMemo(() => ({
-    total: investors.length,
-    active: investors.filter(i => i.status === 'Active').length,
-    avgScore: Math.round(investors.reduce((sum, i) => sum + i.relationshipScore, 0) / investors.length),
-    recentContacts: investors.filter(i => {
-      const daysSince = Math.floor((new Date().getTime() - i.lastContact.getTime()) / (1000 * 60 * 60 * 24));
-      return daysSince <= 7;
-    }).length,
-  }), [investors]);
+  const stats = useMemo(() => {
+    const now = new Date();
+    return {
+      total: investors.length,
+      active: investors.filter(i => i.status === 'Active').length,
+      avgScore: investors.length > 0 
+        ? Math.round(investors.reduce((sum, i) => sum + (i.relationshipScore || 0), 0) / investors.length)
+        : 0,
+      recentContacts: investors.filter(i => {
+        if (!i.lastContactDate) return false;
+        const daysSince = differenceInDays(now, parseISO(i.lastContactDate));
+        return daysSince <= 7;
+      }).length,
+    };
+  }, [investors]);
 
-  const handleAddInteraction = () => {
-    if (!selectedInvestor || !newInteraction.summary) return;
+  const handleAddInvestor = async () => {
+    if (!newInvestor.name || !newInvestor.firm) {
+      toast.error('Please enter name and firm');
+      return;
+    }
     
-    const updatedInvestors = investors.map(inv => {
-      if (inv.id === selectedInvestor.id) {
-        return {
-          ...inv,
-          lastContact: new Date(),
-          interactions: [
-            { date: new Date(), type: newInteraction.type, summary: newInteraction.summary },
-            ...inv.interactions,
-          ],
-        };
-      }
-      return inv;
-    });
-    
-    setInvestors(updatedInvestors);
-    setSelectedInvestor({
-      ...selectedInvestor,
-      lastContact: new Date(),
-      interactions: [
-        { date: new Date(), type: newInteraction.type, summary: newInteraction.summary },
-        ...selectedInvestor.interactions,
-      ],
-    });
-    setShowAddInteraction(false);
-    setNewInteraction({ type: 'Call', summary: '' });
+    try {
+      await createInvestor.mutateAsync({
+        name: newInvestor.name,
+        firm: newInvestor.firm,
+        type: newInvestor.type,
+        email: newInvestor.email || undefined,
+        phone: newInvestor.phone || undefined,
+        location: newInvestor.location || undefined,
+        sectors: newInvestor.sectors ? newInvestor.sectors.split(',').map(s => s.trim()) : undefined,
+        minDealSize: newInvestor.minDealSize ? parseInt(newInvestor.minDealSize) : undefined,
+        maxDealSize: newInvestor.maxDealSize ? parseInt(newInvestor.maxDealSize) : undefined,
+        status: newInvestor.status,
+        notes: newInvestor.notes || undefined,
+      });
+      toast.success('Investor added');
+      setShowAddInvestor(false);
+      setNewInvestor({
+        name: '', firm: '', type: 'PE', email: '', phone: '', location: '',
+        sectors: '', minDealSize: '', maxDealSize: '', status: 'Active', notes: '',
+      });
+    } catch (error) {
+      toast.error('Failed to add investor');
+    }
   };
+
+  const handleAddInteraction = async () => {
+    if (!selectedInvestorId || !newInteraction.notes) {
+      toast.error('Please enter interaction details');
+      return;
+    }
+    
+    try {
+      await createInteraction.mutateAsync({
+        investorId: selectedInvestorId,
+        interaction: {
+          type: newInteraction.type,
+          date: format(new Date(), 'yyyy-MM-dd'),
+          notes: newInteraction.notes,
+        },
+      });
+      toast.success('Interaction logged');
+      setShowAddInteraction(false);
+      setNewInteraction({ type: 'Call', notes: '' });
+    } catch (error) {
+      toast.error('Failed to log interaction');
+    }
+  };
+
+  const selectedInvestor = selectedInvestorData || investors.find(i => i.id === selectedInvestorId);
 
   return (
     <Layout role="CEO" pageTitle="Investor CRM" userName={currentUser?.name || ""}>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -239,13 +169,12 @@ export default function InvestorCRM() {
             </h1>
             <p className="text-muted-foreground">Manage investor relationships and interactions</p>
           </div>
-          <Button data-testid="button-add-investor">
+          <Button onClick={() => setShowAddInvestor(true)} data-testid="button-add-investor">
             <Plus className="w-4 h-4 mr-2" />
             Add Investor
           </Button>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="bg-card border-border">
             <CardContent className="p-4">
@@ -294,7 +223,6 @@ export default function InvestorCRM() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Investor List */}
           <Card className="lg:col-span-1 bg-card border-border">
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
@@ -320,6 +248,7 @@ export default function InvestorCRM() {
                     <SelectItem value="VC">VC</SelectItem>
                     <SelectItem value="Strategic">Strategic</SelectItem>
                     <SelectItem value="Family Office">Family Office</SelectItem>
+                    <SelectItem value="Hedge Fund">Hedge Fund</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -337,46 +266,59 @@ export default function InvestorCRM() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <ScrollArea className="h-[600px]">
-                <div className="p-2 space-y-2">
-                  {filteredInvestors.map(investor => (
-                    <button
-                      key={investor.id}
-                      onClick={() => setSelectedInvestor(investor)}
-                      className={cn(
-                        "w-full p-3 rounded-lg border text-left transition-colors",
-                        selectedInvestor?.id === investor.id 
-                          ? "border-primary bg-primary/10" 
-                          : "border-border hover:bg-secondary/50"
-                      )}
-                      data-testid={`investor-card-${investor.id}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Avatar className="w-10 h-10">
-                          <AvatarFallback className="bg-primary/20 text-primary">
-                            {investor.name.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{investor.name}</p>
-                          <p className="text-sm text-muted-foreground truncate">{investor.firm}</p>
-                        </div>
-                        <div className={cn("w-2 h-2 rounded-full", statusColors[investor.status])} />
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="secondary" className="text-xs">{investor.type}</Badge>
-                        <span className="text-xs text-muted-foreground">
-                          Score: {investor.relationshipScore}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
                 </div>
-              </ScrollArea>
+              ) : (
+                <ScrollArea className="h-[600px]">
+                  <div className="p-2 space-y-2">
+                    {filteredInvestors.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p>No investors found</p>
+                        <p className="text-sm mt-1">Add your first investor to get started</p>
+                      </div>
+                    ) : (
+                      filteredInvestors.map(investor => (
+                        <button
+                          key={investor.id}
+                          onClick={() => setSelectedInvestorId(investor.id)}
+                          className={cn(
+                            "w-full p-3 rounded-lg border text-left transition-colors",
+                            selectedInvestorId === investor.id 
+                              ? "border-primary bg-primary/10" 
+                              : "border-border hover:bg-secondary/50"
+                          )}
+                          data-testid={`investor-card-${investor.id}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Avatar className="w-10 h-10">
+                              <AvatarFallback className="bg-primary/20 text-primary">
+                                {investor.name.split(' ').map(n => n[0]).join('')}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{investor.name}</p>
+                              <p className="text-sm text-muted-foreground truncate">{investor.firm}</p>
+                            </div>
+                            <div className={cn("w-2 h-2 rounded-full", statusColors[investor.status] || 'bg-gray-500')} />
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant="secondary" className="text-xs">{investor.type}</Badge>
+                            <span className="text-xs text-muted-foreground">
+                              Score: {investor.relationshipScore || 0}
+                            </span>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+              )}
             </CardContent>
           </Card>
 
-          {/* Investor Details */}
           <Card className="lg:col-span-2 bg-card border-border">
             {selectedInvestor ? (
               <>
@@ -393,7 +335,7 @@ export default function InvestorCRM() {
                         <p className="text-muted-foreground">{selectedInvestor.firm}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="secondary">{selectedInvestor.type}</Badge>
-                          <Badge className={cn("text-white", statusColors[selectedInvestor.status])}>
+                          <Badge className={cn("text-white", statusColors[selectedInvestor.status] || 'bg-gray-500')}>
                             {selectedInvestor.status}
                           </Badge>
                         </div>
@@ -416,55 +358,73 @@ export default function InvestorCRM() {
                     <TabsContent value="overview" className="mt-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-4">
-                          <div className="p-3 rounded-lg bg-secondary/30">
-                            <p className="text-sm text-muted-foreground flex items-center gap-2">
-                              <Mail className="w-4 h-4" /> Email
-                            </p>
-                            <p className="font-medium">{selectedInvestor.email}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-secondary/30">
-                            <p className="text-sm text-muted-foreground flex items-center gap-2">
-                              <Phone className="w-4 h-4" /> Phone
-                            </p>
-                            <p className="font-medium">{selectedInvestor.phone}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-secondary/30">
-                            <p className="text-sm text-muted-foreground flex items-center gap-2">
-                              <MapPin className="w-4 h-4" /> Location
-                            </p>
-                            <p className="font-medium">{selectedInvestor.location}</p>
-                          </div>
+                          {selectedInvestor.email && (
+                            <div className="p-3 rounded-lg bg-secondary/30">
+                              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                                <Mail className="w-4 h-4" /> Email
+                              </p>
+                              <p className="font-medium">{selectedInvestor.email}</p>
+                            </div>
+                          )}
+                          {selectedInvestor.phone && (
+                            <div className="p-3 rounded-lg bg-secondary/30">
+                              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                                <Phone className="w-4 h-4" /> Phone
+                              </p>
+                              <p className="font-medium">{selectedInvestor.phone}</p>
+                            </div>
+                          )}
+                          {selectedInvestor.location && (
+                            <div className="p-3 rounded-lg bg-secondary/30">
+                              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                                <MapPin className="w-4 h-4" /> Location
+                              </p>
+                              <p className="font-medium">{selectedInvestor.location}</p>
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-4">
-                          <div className="p-3 rounded-lg bg-secondary/30">
-                            <p className="text-sm text-muted-foreground flex items-center gap-2">
-                              <DollarSign className="w-4 h-4" /> Deal Size Range
-                            </p>
-                            <p className="font-medium">${selectedInvestor.minDealSize}M - ${selectedInvestor.maxDealSize}M</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-secondary/30">
-                            <p className="text-sm text-muted-foreground flex items-center gap-2">
-                              <Building className="w-4 h-4" /> Sectors
-                            </p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {selectedInvestor.sectors.map(sector => (
-                                <Badge key={sector} variant="outline" className="text-xs">{sector}</Badge>
-                              ))}
+                          {(selectedInvestor.minDealSize || selectedInvestor.maxDealSize) && (
+                            <div className="p-3 rounded-lg bg-secondary/30">
+                              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                                <DollarSign className="w-4 h-4" /> Deal Size Range
+                              </p>
+                              <p className="font-medium">
+                                ${selectedInvestor.minDealSize || 0}M - ${selectedInvestor.maxDealSize || '∞'}M
+                              </p>
                             </div>
-                          </div>
-                          <div className="p-3 rounded-lg bg-secondary/30">
-                            <p className="text-sm text-muted-foreground flex items-center gap-2">
-                              <Clock className="w-4 h-4" /> Last Contact
-                            </p>
-                            <p className="font-medium">{format(selectedInvestor.lastContact, 'MMM d, yyyy')}</p>
-                          </div>
+                          )}
+                          {selectedInvestor.sectors && selectedInvestor.sectors.length > 0 && (
+                            <div className="p-3 rounded-lg bg-secondary/30">
+                              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                                <Building className="w-4 h-4" /> Sectors
+                              </p>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {selectedInvestor.sectors.map((sector: string) => (
+                                  <Badge key={sector} variant="outline" className="text-xs">{sector}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {selectedInvestor.lastContactDate && (
+                            <div className="p-3 rounded-lg bg-secondary/30">
+                              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                                <Clock className="w-4 h-4" /> Last Contact
+                              </p>
+                              <p className="font-medium">
+                                {format(parseISO(selectedInvestor.lastContactDate), 'MMM d, yyyy')}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                       
-                      <div className="mt-4 p-4 rounded-lg bg-secondary/30">
-                        <p className="text-sm text-muted-foreground mb-2">Notes</p>
-                        <p>{selectedInvestor.notes}</p>
-                      </div>
+                      {selectedInvestor.notes && (
+                        <div className="mt-4 p-4 rounded-lg bg-secondary/30">
+                          <p className="text-sm text-muted-foreground mb-2">Notes</p>
+                          <p>{selectedInvestor.notes}</p>
+                        </div>
+                      )}
                       
                       <div className="mt-4 grid grid-cols-2 gap-4">
                         <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
@@ -472,14 +432,14 @@ export default function InvestorCRM() {
                             <Star className="w-5 h-5 text-primary" />
                             <span className="text-sm text-muted-foreground">Relationship Score</span>
                           </div>
-                          <p className="text-3xl font-bold mt-2">{selectedInvestor.relationshipScore}/100</p>
+                          <p className="text-3xl font-bold mt-2">{selectedInvestor.relationshipScore || 0}/100</p>
                         </div>
                         <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
                           <div className="flex items-center gap-2">
                             <Briefcase className="w-5 h-5 text-green-500" />
                             <span className="text-sm text-muted-foreground">Deals Participated</span>
                           </div>
-                          <p className="text-3xl font-bold mt-2">{selectedInvestor.dealsParticipated}</p>
+                          <p className="text-3xl font-bold mt-2">{selectedInvestor.dealsParticipated || 0}</p>
                         </div>
                       </div>
                     </TabsContent>
@@ -487,18 +447,21 @@ export default function InvestorCRM() {
                     <TabsContent value="interactions" className="mt-4">
                       <ScrollArea className="h-64">
                         <div className="space-y-3">
-                          {selectedInvestor.interactions.map((interaction, idx) => (
-                            <div key={idx} className="p-3 rounded-lg border border-border">
+                          {selectedInvestorData?.interactions?.map((interaction: any) => (
+                            <div key={interaction.id} className="p-3 rounded-lg border border-border">
                               <div className="flex items-center justify-between">
                                 <Badge variant="secondary">{interaction.type}</Badge>
                                 <span className="text-sm text-muted-foreground">
-                                  {format(interaction.date, 'MMM d, yyyy')}
+                                  {format(parseISO(interaction.date), 'MMM d, yyyy')}
                                 </span>
                               </div>
-                              <p className="mt-2 text-sm">{interaction.summary}</p>
+                              <p className="mt-2 text-sm">{interaction.notes}</p>
+                              {interaction.userName && (
+                                <p className="mt-1 text-xs text-muted-foreground">By: {interaction.userName}</p>
+                              )}
                             </div>
                           ))}
-                          {selectedInvestor.interactions.length === 0 && (
+                          {(!selectedInvestorData?.interactions || selectedInvestorData.interactions.length === 0) && (
                             <div className="text-center py-8 text-muted-foreground">
                               <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
                               <p>No interactions logged yet</p>
@@ -530,7 +493,141 @@ export default function InvestorCRM() {
         </div>
       </div>
 
-      {/* Add Interaction Dialog */}
+      <Dialog open={showAddInvestor} onOpenChange={setShowAddInvestor}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add New Investor</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Name *</Label>
+                <Input
+                  value={newInvestor.name}
+                  onChange={(e) => setNewInvestor(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="John Smith"
+                  data-testid="input-investor-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Firm *</Label>
+                <Input
+                  value={newInvestor.firm}
+                  onChange={(e) => setNewInvestor(prev => ({ ...prev, firm: e.target.value }))}
+                  placeholder="Blackstone"
+                  data-testid="input-investor-firm"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={newInvestor.type} onValueChange={(v) => setNewInvestor(prev => ({ ...prev, type: v }))}>
+                  <SelectTrigger data-testid="select-investor-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PE">Private Equity</SelectItem>
+                    <SelectItem value="VC">Venture Capital</SelectItem>
+                    <SelectItem value="Strategic">Strategic</SelectItem>
+                    <SelectItem value="Family Office">Family Office</SelectItem>
+                    <SelectItem value="Hedge Fund">Hedge Fund</SelectItem>
+                    <SelectItem value="Sovereign Wealth">Sovereign Wealth</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={newInvestor.status} onValueChange={(v) => setNewInvestor(prev => ({ ...prev, status: v }))}>
+                  <SelectTrigger data-testid="select-investor-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Warm">Warm</SelectItem>
+                    <SelectItem value="Cold">Cold</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={newInvestor.email}
+                  onChange={(e) => setNewInvestor(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="john@firm.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input
+                  value={newInvestor.phone}
+                  onChange={(e) => setNewInvestor(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Location</Label>
+              <Input
+                value={newInvestor.location}
+                onChange={(e) => setNewInvestor(prev => ({ ...prev, location: e.target.value }))}
+                placeholder="New York, NY"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Sectors (comma-separated)</Label>
+              <Input
+                value={newInvestor.sectors}
+                onChange={(e) => setNewInvestor(prev => ({ ...prev, sectors: e.target.value }))}
+                placeholder="Technology, Healthcare, Financial Services"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Min Deal Size ($M)</Label>
+                <Input
+                  type="number"
+                  value={newInvestor.minDealSize}
+                  onChange={(e) => setNewInvestor(prev => ({ ...prev, minDealSize: e.target.value }))}
+                  placeholder="10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Max Deal Size ($M)</Label>
+                <Input
+                  type="number"
+                  value={newInvestor.maxDealSize}
+                  onChange={(e) => setNewInvestor(prev => ({ ...prev, maxDealSize: e.target.value }))}
+                  placeholder="500"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                value={newInvestor.notes}
+                onChange={(e) => setNewInvestor(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Any relevant notes about this investor..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddInvestor(false)}>Cancel</Button>
+            <Button 
+              onClick={handleAddInvestor}
+              disabled={createInvestor.isPending}
+              data-testid="button-save-investor"
+            >
+              {createInvestor.isPending ? 'Saving...' : 'Add Investor'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showAddInteraction} onOpenChange={setShowAddInteraction}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -540,7 +637,7 @@ export default function InvestorCRM() {
             <div className="space-y-2">
               <Label>Type</Label>
               <Select value={newInteraction.type} onValueChange={(v) => setNewInteraction(prev => ({ ...prev, type: v }))}>
-                <SelectTrigger>
+                <SelectTrigger data-testid="select-interaction-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -552,17 +649,24 @@ export default function InvestorCRM() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Summary</Label>
+              <Label>Notes</Label>
               <Textarea
                 placeholder="Describe the interaction..."
-                value={newInteraction.summary}
-                onChange={(e) => setNewInteraction(prev => ({ ...prev, summary: e.target.value }))}
+                value={newInteraction.notes}
+                onChange={(e) => setNewInteraction(prev => ({ ...prev, notes: e.target.value }))}
+                data-testid="input-interaction-notes"
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddInteraction(false)}>Cancel</Button>
-            <Button onClick={handleAddInteraction}>Save</Button>
+            <Button 
+              onClick={handleAddInteraction}
+              disabled={createInteraction.isPending}
+              data-testid="button-save-interaction"
+            >
+              {createInteraction.isPending ? 'Saving...' : 'Save'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
