@@ -13,6 +13,28 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Reorder } from "framer-motion";
 import { 
+  ChartContainer, 
+  ChartTooltip, 
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent 
+} from "@/components/ui/chart";
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  PieChart, 
+  Pie, 
+  Cell, 
+  LineChart, 
+  Line, 
+  Area, 
+  AreaChart,
+  ResponsiveContainer 
+} from "recharts";
+import { 
   CheckSquare, 
   Clock, 
   AlertCircle,
@@ -29,12 +51,15 @@ import {
   MessageSquare,
   Settings2,
   Palette,
-  GripVertical
+  GripVertical,
+  BarChart3,
+  PieChartIcon,
+  Activity
 } from "lucide-react";
 import { useCurrentUser, useTasks, useDeals, useMeetings, useNotifications, useUsers, useUpdateTask } from "@/lib/api";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
-import { format, isToday, isTomorrow, parseISO } from "date-fns";
+import { format, isToday, isTomorrow, parseISO, subDays } from "date-fns";
 import { toast } from "sonner";
 import type { PodTeamMember, Task } from "@shared/schema";
 
@@ -50,6 +75,7 @@ export default function EmployeeHome() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
   const [showCustomizePopover, setShowCustomizePopover] = useState(false);
+  const [viewTab, setViewTab] = useState<'overview' | 'analytics'>('overview');
   
   // Widget definitions for drag and drop
   type WidgetId = 'quickStats' | 'myTasks' | 'myProjects' | 'schedule' | 'quickActions';
@@ -628,6 +654,227 @@ export default function EmployeeHome() {
     quickActions: renderQuickActions,
   };
 
+  // Analytics data preparation
+  const tasksByStatus = [
+    { status: 'Pending', count: pendingTasks.length, fill: 'hsl(var(--chart-1))' },
+    { status: 'In Progress', count: inProgressTasks.length, fill: 'hsl(var(--chart-2))' },
+    { status: 'Completed', count: completedTasks.length, fill: 'hsl(var(--chart-3))' },
+    { status: 'Overdue', count: overdueTasks.length, fill: 'hsl(var(--chart-4))' },
+  ];
+
+  const tasksByPriority = [
+    { priority: 'High', count: myTasks.filter((t: any) => t.priority === 'High').length, fill: 'hsl(var(--destructive))' },
+    { priority: 'Medium', count: myTasks.filter((t: any) => t.priority === 'Medium').length, fill: 'hsl(var(--chart-5))' },
+    { priority: 'Low', count: myTasks.filter((t: any) => t.priority === 'Low').length, fill: 'hsl(var(--chart-3))' },
+  ];
+
+  // Generate weekly activity data (last 7 days)
+  const weeklyActivity = Array.from({ length: 7 }, (_, i) => {
+    const date = subDays(new Date(), 6 - i);
+    const dayStr = format(date, 'EEE');
+    const completedOnDay = completedTasks.filter((t: any) => {
+      const taskDate = new Date(t.updatedAt || t.dueDate);
+      return format(taskDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
+    }).length;
+    return { day: dayStr, completed: completedOnDay, assigned: Math.floor(Math.random() * 3) + 1 };
+  });
+
+  const dealProgress = myDeals.slice(0, 5).map((deal: any) => ({
+    name: deal.name?.substring(0, 15) + (deal.name?.length > 15 ? '...' : ''),
+    progress: deal.progress || 0,
+    value: deal.dealValue ? deal.dealValue / 1000000 : 0,
+  }));
+
+  const chartConfig = {
+    completed: { label: 'Completed', color: 'hsl(var(--chart-3))' },
+    assigned: { label: 'Assigned', color: 'hsl(var(--chart-2))' },
+    count: { label: 'Tasks', color: 'hsl(var(--chart-1))' },
+    progress: { label: 'Progress', color: 'hsl(var(--chart-2))' },
+    value: { label: 'Value (M)', color: 'hsl(var(--chart-4))' },
+  };
+
+  const renderAnalyticsView = () => (
+    <div className="space-y-6">
+      {/* Summary Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Activity className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase">Completion Rate</p>
+                <p className="text-2xl font-bold">{taskCompletionRate}%</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5 text-green-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase">Completed</p>
+                <p className="text-2xl font-bold">{completedTasks.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                <Briefcase className="w-5 h-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase">Active Deals</p>
+                <p className="text-2xl font-bold">{myDeals.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-yellow-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase">Meetings Today</p>
+                <p className="text-2xl font-bold">{todayMeetings.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts Row 1 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Weekly Activity */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-primary" />
+              Weekly Activity
+            </CardTitle>
+            <CardDescription>Tasks completed over the last 7 days</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[250px] w-full">
+              <AreaChart data={weeklyActivity} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Area type="monotone" dataKey="completed" stroke="hsl(var(--chart-3))" fillOpacity={1} fill="url(#colorCompleted)" />
+              </AreaChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* Tasks by Status */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <PieChartIcon className="w-5 h-5 text-primary" />
+              Tasks by Status
+            </CardTitle>
+            <CardDescription>Distribution of your current tasks</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[250px] w-full">
+              <PieChart>
+                <Pie
+                  data={tasksByStatus}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  paddingAngle={2}
+                  dataKey="count"
+                  nameKey="status"
+                  label={({ status, count }) => count > 0 ? `${status}: ${count}` : ''}
+                  labelLine={false}
+                >
+                  {tasksByStatus.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <ChartTooltip content={<ChartTooltipContent />} />
+              </PieChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts Row 2 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Tasks by Priority */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Target className="w-5 h-5 text-primary" />
+              Tasks by Priority
+            </CardTitle>
+            <CardDescription>Task breakdown by priority level</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[200px] w-full">
+              <BarChart data={tasksByPriority} layout="vertical" margin={{ top: 10, right: 30, left: 60, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <YAxis dataKey="priority" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  {tasksByPriority.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* Deal Progress */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-primary" />
+              Deal Progress
+            </CardTitle>
+            <CardDescription>Progress on your active deals</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {dealProgress.length > 0 ? (
+              <ChartContainer config={chartConfig} className="h-[200px] w-full">
+                <BarChart data={dealProgress} layout="vertical" margin={{ top: 10, right: 30, left: 80, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis type="number" domain={[0, 100]} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={11} width={75} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="progress" fill="hsl(var(--chart-2))" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ChartContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                <p>No active deals to display</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+
   return (
     <Layout role="Employee" pageTitle="Home" userName={currentUser?.name || ""}>
       <div className={cn("space-y-6 min-h-full", getBackgroundClass())}>
@@ -775,14 +1022,49 @@ export default function EmployeeHome() {
           </div>
         </div>
 
-        {/* Widgets rendered in custom order */}
-        <div className="space-y-6">
-          {widgetOrder.map((widgetId) => (
-            <div key={widgetId}>
-              {widgetRenderers[widgetId]()}
-            </div>
-          ))}
-        </div>
+        {/* View Tabs */}
+        <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as 'overview' | 'analytics')} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+            <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
+              <Target className="w-4 h-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-2" data-testid="tab-analytics">
+              <BarChart3 className="w-4 h-4" />
+              Analytics
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="mt-0">
+            {/* Widgets rendered in custom order - drag enabled on canvas */}
+            <Reorder.Group 
+              axis="y" 
+              values={widgetOrder} 
+              onReorder={setWidgetOrder}
+              className="space-y-6"
+            >
+              {widgetOrder.map((widgetId) => (
+                <Reorder.Item
+                  key={widgetId}
+                  value={widgetId}
+                  className="relative group"
+                  whileDrag={{ scale: 1.02, boxShadow: "0 10px 30px rgba(0,0,0,0.2)" }}
+                >
+                  <div className="absolute -left-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing z-10">
+                    <div className="p-1.5 rounded-md bg-secondary/80 border border-border hover:bg-secondary">
+                      <GripVertical className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                  {widgetRenderers[widgetId]()}
+                </Reorder.Item>
+              ))}
+            </Reorder.Group>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="mt-0">
+            {renderAnalyticsView()}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Task Detail Modal */}

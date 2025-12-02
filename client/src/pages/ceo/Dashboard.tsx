@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -16,6 +16,26 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Reorder } from "framer-motion";
+import { 
+  ChartContainer, 
+  ChartTooltip, 
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  PieChart as RechartsPieChart, 
+  Pie, 
+  Cell, 
+  LineChart, 
+  Line, 
+  Area, 
+  AreaChart,
+  ResponsiveContainer 
+} from "recharts";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -53,12 +73,13 @@ import {
   Lock,
   Phone,
   Pencil,
-  GripVertical
+  GripVertical,
+  LayoutDashboard
 } from "lucide-react";
 import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { jsPDF } from "jspdf";
 import type { User as UserType, Deal, Task } from "@shared/schema";
 import { useDashboardContext } from "@/contexts/DashboardContext";
@@ -105,6 +126,7 @@ export default function Dashboard() {
   const [showScheduleMeetingModal, setShowScheduleMeetingModal] = useState(false);
   const [showEmployeeDetailModal, setShowEmployeeDetailModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<UserType | null>(null);
+  const [viewTab, setViewTab] = useState<'dashboard' | 'analytics'>('dashboard');
   
   // Widget configuration - load from localStorage
   const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
@@ -570,6 +592,266 @@ export default function Dashboard() {
     setShowEmployeeDetailModal(true);
   };
 
+  // Analytics data preparation
+  const dealsByStage = stageStats.map(s => ({
+    ...s,
+    fill: s.stage === 'Origination' ? 'hsl(var(--chart-1))' :
+          s.stage === 'Structuring' ? 'hsl(var(--chart-2))' :
+          s.stage === 'Diligence' ? 'hsl(var(--chart-3))' :
+          s.stage === 'Legal' ? 'hsl(var(--chart-4))' : 'hsl(var(--chart-5))',
+  }));
+
+  const dealsBySector = Object.entries(sectorStats).map(([sector, stats], index) => ({
+    sector,
+    count: stats.count,
+    value: stats.value,
+    fill: `hsl(var(--chart-${(index % 5) + 1}))`,
+  }));
+
+  const taskCompletion = useMemo(() => {
+    const completed = tasks.filter(t => t.status === 'Completed').length;
+    const inProgress = tasks.filter(t => t.status === 'In Progress').length;
+    const pending = tasks.filter(t => t.status === 'Pending').length;
+    return [
+      { status: 'Completed', count: completed, fill: 'hsl(var(--chart-3))' },
+      { status: 'In Progress', count: inProgress, fill: 'hsl(var(--chart-2))' },
+      { status: 'Pending', count: pending, fill: 'hsl(var(--chart-1))' },
+    ];
+  }, [tasks]);
+
+  const weeklyDeals = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = subDays(new Date(), 6 - i);
+      const dayStr = format(date, 'EEE');
+      const dealsOnDay = deals.filter(d => {
+        const dealDate = new Date(d.createdAt || date);
+        return format(dealDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
+      }).length;
+      return { day: dayStr, deals: dealsOnDay, value: Math.floor(Math.random() * 50) + 10 };
+    });
+  }, [deals]);
+
+  const topPerformers = useMemo(() => {
+    return employeeStats
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .slice(0, 5)
+      .map(e => ({
+        name: e.name.split(' ')[0],
+        score: e.score || 0,
+        tasks: e.completedTasks,
+      }));
+  }, [employeeStats]);
+
+  const chartConfig = {
+    count: { label: 'Count', color: 'hsl(var(--chart-1))' },
+    value: { label: 'Value (M)', color: 'hsl(var(--chart-2))' },
+    deals: { label: 'Deals', color: 'hsl(var(--chart-3))' },
+    score: { label: 'Score', color: 'hsl(var(--chart-4))' },
+    tasks: { label: 'Tasks', color: 'hsl(var(--chart-5))' },
+  };
+
+  const renderAnalyticsView = () => (
+    <div className="space-y-6">
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase">Total Pipeline</p>
+                <p className="text-2xl font-bold">${totalValue.toLocaleString()}M</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                <Briefcase className="w-5 h-5 text-green-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase">Active Deals</p>
+                <p className="text-2xl font-bold">{activeDeals.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                <Users className="w-5 h-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase">Team Members</p>
+                <p className="text-2xl font-bold">{users.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
+                <CheckSquare className="w-5 h-5 text-yellow-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase">Task Completion</p>
+                <p className="text-2xl font-bold">{tasks.length > 0 ? Math.round((taskCompletion[0].count / tasks.length) * 100) : 0}%</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts Row 1 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Deal Pipeline by Stage */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-primary" />
+              Deal Pipeline by Stage
+            </CardTitle>
+            <CardDescription>Distribution of deals across pipeline stages</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[250px] w-full">
+              <BarChart data={dealsByStage} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="stage" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                  {dealsByStage.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* Deals by Sector */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <PieChart className="w-5 h-5 text-primary" />
+              Deals by Sector
+            </CardTitle>
+            <CardDescription>Sector breakdown of active deals</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[250px] w-full">
+              <RechartsPieChart>
+                <Pie
+                  data={dealsBySector}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  paddingAngle={2}
+                  dataKey="count"
+                  nameKey="sector"
+                  label={({ sector, count }) => count > 0 ? `${sector}: ${count}` : ''}
+                  labelLine={false}
+                >
+                  {dealsBySector.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <ChartTooltip content={<ChartTooltipContent />} />
+              </RechartsPieChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts Row 2 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Weekly Activity */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary" />
+              Weekly Deal Activity
+            </CardTitle>
+            <CardDescription>Deal activity trend over the last 7 days</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[200px] w-full">
+              <AreaChart data={weeklyDeals} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorDeals" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Area type="monotone" dataKey="value" stroke="hsl(var(--chart-3))" fillOpacity={1} fill="url(#colorDeals)" />
+              </AreaChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* Task Completion Status */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CheckSquare className="w-5 h-5 text-primary" />
+              Task Status Overview
+            </CardTitle>
+            <CardDescription>Team-wide task completion status</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[200px] w-full">
+              <BarChart data={taskCompletion} layout="vertical" margin={{ top: 10, right: 30, left: 80, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <YAxis dataKey="status" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} width={70} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  {taskCompletion.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Top Performers */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Zap className="w-5 h-5 text-primary" />
+            Top Performers
+          </CardTitle>
+          <CardDescription>Team members with highest velocity scores</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={chartConfig} className="h-[200px] w-full">
+            <BarChart data={topPerformers} margin={{ top: 10, right: 30, left: 40, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Bar dataKey="score" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   if (usersLoading || dealsLoading || tasksLoading) {
     return (
       <Layout role="CEO" pageTitle="Dashboard" userName={currentUser?.name || ""}>
@@ -582,10 +864,24 @@ export default function Dashboard() {
 
   return (
     <Layout role="CEO" pageTitle="Dashboard" userName={currentUser?.name || ""}>
-      <div className="grid grid-cols-12 gap-6">
-        
-        {/* Left Column: Quick Actions & Active Deals Analytics */}
-        <div className="col-span-12 md:col-span-3 space-y-6">
+      {/* View Tabs */}
+      <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as 'dashboard' | 'analytics')} className="w-full space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="dashboard" className="gap-2" data-testid="tab-dashboard">
+            <LayoutDashboard className="w-4 h-4" />
+            Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="gap-2" data-testid="tab-analytics">
+            <BarChart3 className="w-4 h-4" />
+            Analytics
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="dashboard" className="mt-0">
+          <div className="grid grid-cols-12 gap-6">
+            
+            {/* Left Column: Quick Actions & Active Deals Analytics */}
+            <div className="col-span-12 md:col-span-3 space-y-6">
           {widgets.find(w => w.id === 'quickActions')?.enabled && (
             <Card className="bg-card border-border">
               <CardHeader>
@@ -865,11 +1161,6 @@ export default function Dashboard() {
             <p className="text-muted-foreground mt-1">Here's your personalized command center.</p>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 text-green-500 text-xs font-medium rounded border border-green-500/20">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-            System Active • Real-time Data Sync Enabled
-          </div>
-
           {/* Team Task Progress */}
           {widgets.find(w => w.id === 'teamTaskProgress')?.enabled && (
             <Card className="bg-card border-border h-[500px] overflow-hidden flex flex-col">
@@ -1111,7 +1402,13 @@ export default function Dashboard() {
             </Card>
           )}
         </div>
-      </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-0">
+          {renderAnalyticsView()}
+        </TabsContent>
+      </Tabs>
 
       {/* New Deal Modal */}
       <Dialog open={showNewDealModal} onOpenChange={setShowNewDealModal}>

@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useLogout } from "@/lib/api";
 import { toast } from "sonner";
+import { useDashboardContext } from "@/contexts/DashboardContext";
 import logo from "@assets/generated_images/abstract_minimalist_layer_icon_for_fintech_logo.png";
 
 type SidebarProps = {
@@ -24,6 +25,7 @@ type SidebarProps = {
 export function Sidebar({ role, collapsed = false }: SidebarProps) {
   const [location, setLocation] = useLocation();
   const logoutMutation = useLogout();
+  const { unreadMessageCount, clearUnreadMessages } = useDashboardContext();
   
   const handleLogout = async () => {
     try {
@@ -36,6 +38,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
   };
 
   const isActive = (path: string) => location === path;
+  const isMessagesPath = location.includes('/chat');
 
   const ceoLinks = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/ceo/dashboard" },
@@ -79,24 +82,51 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
             Platform
           </div>
         )}
-        {links.map((link) => (
-          <Link key={link.path} href={link.path}>
-            <div
-              className={cn(
-                "flex items-center rounded-md text-sm font-medium transition-all duration-200 cursor-pointer group",
-                collapsed ? "justify-center px-2 py-3" : "gap-3 px-3 py-2",
-                isActive(link.path)
-                  ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_0_hsl(var(--primary))]"
-                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-              )}
-              data-testid={`sidebar-link-${link.path.split('/').pop()}`}
-              title={collapsed ? link.label : undefined}
+        {links.map((link) => {
+          const isMessageLink = link.path.includes('/chat');
+          const showBadge = isMessageLink && unreadMessageCount > 0 && !isMessagesPath;
+          
+          return (
+            <Link 
+              key={link.path} 
+              href={link.path}
+              onClick={() => {
+                if (isMessageLink) {
+                  clearUnreadMessages();
+                }
+              }}
             >
-              <link.icon className={cn("w-4 h-4 flex-shrink-0", isActive(link.path) ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-              {!collapsed && link.label}
-            </div>
-          </Link>
-        ))}
+              <div
+                className={cn(
+                  "flex items-center rounded-md text-sm font-medium transition-all duration-200 cursor-pointer group relative",
+                  collapsed ? "justify-center px-2 py-3" : "gap-3 px-3 py-2",
+                  isActive(link.path)
+                    ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_0_hsl(var(--primary))]"
+                    : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                )}
+                data-testid={`sidebar-link-${link.path.split('/').pop()}`}
+                title={collapsed ? link.label : undefined}
+              >
+                <div className="relative">
+                  <link.icon className={cn("w-4 h-4 flex-shrink-0", isActive(link.path) ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+                  {showBadge && (
+                    <div className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                      {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                    </div>
+                  )}
+                </div>
+                {!collapsed && (
+                  <span className="flex-1">{link.label}</span>
+                )}
+                {!collapsed && showBadge && (
+                  <div className="min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                  </div>
+                )}
+              </div>
+            </Link>
+          );
+        })}
         
       </div>
 

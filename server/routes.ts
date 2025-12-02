@@ -525,13 +525,30 @@ export async function registerRoutes(
         return res.status(403).json({ error: "Access denied" });
       }
       
-      const { name, email, phone, avatar } = req.body;
-      const updates: { name?: string; email?: string; phone?: string; avatar?: string } = {};
+      const { name, email, phone, avatar, role } = req.body;
+      const updates: { name?: string; email?: string; phone?: string; avatar?: string; role?: string } = {};
       
       if (name) updates.name = name;
       if (email) updates.email = email;
       if (phone !== undefined) updates.phone = phone;
       if (avatar !== undefined) updates.avatar = avatar;
+      
+      // Handle role change with validation
+      if (role) {
+        const validRoles = ['Analyst', 'Associate', 'Director', 'Managing Director', 'CEO'];
+        if (!validRoles.includes(role)) {
+          return res.status(400).json({ error: "Invalid role" });
+        }
+        // Prevent escalation to CEO (only existing CEOs can be CEO)
+        if (role === 'CEO' && currentUser.role !== 'CEO') {
+          return res.status(403).json({ error: "Cannot escalate to CEO role" });
+        }
+        // Prevent CEO from changing their own role (to prevent lockout)
+        if (currentUser.role === 'CEO' && role !== 'CEO') {
+          return res.status(403).json({ error: "CEO cannot change their own role" });
+        }
+        updates.role = role;
+      }
       
       const updatedUser = await storage.updateUserProfile(req.params.id, updates);
       res.json(updatedUser);

@@ -23,6 +23,7 @@ import {
   Check
 } from "lucide-react";
 import { useCurrentUser, useUsers } from "@/lib/api";
+import { useDashboardContext } from "@/contexts/DashboardContext";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -54,6 +55,7 @@ type Conversation = {
 export default function Chat({ role }: ChatProps) {
   const { data: currentUser } = useCurrentUser();
   const { data: allUsers = [] } = useUsers();
+  const { clearUnreadMessages } = useDashboardContext();
   const [searchQuery, setSearchQuery] = useState("");
   const [messageInput, setMessageInput] = useState("");
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -113,6 +115,10 @@ export default function Chat({ role }: ChatProps) {
   useEffect(() => {
     scrollToBottom();
   }, [selectedConversation?.messages]);
+
+  useEffect(() => {
+    clearUnreadMessages();
+  }, [clearUnreadMessages]);
 
   const handleSendMessage = () => {
     if (!messageInput.trim() || !selectedConversation) return;

@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDashboardContext } from "@/contexts/DashboardContext";
 import { useNotifications, useDeals, useTasks, useUsers, useLogout, useCurrentUser, useMarkNotificationRead, useUpdateUserProfile, useChangePassword } from "@/lib/api";
 import { toast } from "sonner";
@@ -52,6 +53,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     name: '',
     email: '',
     phone: '',
+    role: '',
   });
   
   // Password change state
@@ -108,13 +110,14 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
       name: currentUser?.name || '',
       email: currentUser?.email || '',
       phone: (currentUser as any)?.phone || '',
+      role: currentUser?.role || '',
     });
     setIsEditingProfile(true);
   };
 
   const handleCancelEditProfile = () => {
     setIsEditingProfile(false);
-    setProfileForm({ name: '', email: '', phone: '' });
+    setProfileForm({ name: '', email: '', phone: '', role: '' });
   };
 
   const handleSaveProfile = async () => {
@@ -129,13 +132,20 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     }
     
     try {
+      const updates: { name: string; email: string; phone: string; role?: string } = {
+        name: profileForm.name,
+        email: profileForm.email,
+        phone: profileForm.phone,
+      };
+      
+      // Only include role if user is not CEO and role has changed
+      if (currentUser.role !== 'CEO' && profileForm.role && profileForm.role !== currentUser.role) {
+        updates.role = profileForm.role;
+      }
+      
       await updateUserProfile.mutateAsync({
         userId: currentUser.id,
-        updates: {
-          name: profileForm.name,
-          email: profileForm.email,
-          phone: profileForm.phone,
-        },
+        updates,
       });
       toast.success("Profile updated successfully");
       setIsEditingProfile(false);
@@ -580,11 +590,12 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
             name: currentUser?.name || '',
             email: currentUser?.email || '',
             phone: (currentUser as any)?.phone || '',
+            role: currentUser?.role || '',
           });
         } else {
           setIsEditingProfile(false);
           setIsChangingPassword(false);
-          setProfileForm({ name: '', email: '', phone: '' });
+          setProfileForm({ name: '', email: '', phone: '', role: '' });
           setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
         }
       }}>
@@ -815,6 +826,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
             name: currentUser.name || '',
             email: currentUser.email || '',
             phone: (currentUser as any)?.phone || '',
+            role: currentUser.role || '',
           });
         }
       }}>
@@ -911,7 +923,27 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Role</Label>
-                  <Input value={currentUser?.role || ''} disabled />
+                  {currentUser?.role === 'CEO' ? (
+                    <Input value="CEO" disabled className="bg-muted/50" />
+                  ) : (
+                    <Select 
+                      value={profileForm.role} 
+                      onValueChange={(value) => setProfileForm(prev => ({ ...prev, role: value }))}
+                    >
+                      <SelectTrigger data-testid="select-role">
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Analyst">Analyst</SelectItem>
+                        <SelectItem value="Associate">Associate</SelectItem>
+                        <SelectItem value="Director">Director</SelectItem>
+                        <SelectItem value="Managing Director">Managing Director</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {currentUser?.role === 'CEO' ? 'CEO role cannot be changed' : 'Select your role in the organization'}
+                  </p>
                 </div>
               </div>
               
