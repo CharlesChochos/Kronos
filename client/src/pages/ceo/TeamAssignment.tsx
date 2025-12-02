@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useSearch } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,13 +25,34 @@ import { toast } from "sonner";
 import type { Deal, User } from "@shared/schema";
 
 export default function TeamAssignment() {
+  const searchString = useSearch();
   const { data: currentUser } = useCurrentUser();
   const { data: users = [], isLoading: usersLoading } = useUsers();
   const { data: deals = [], isLoading: dealsLoading } = useDeals();
   const { data: tasks = [] } = useTasks();
   const createTask = useCreateTask();
+  const [highlightedUserId, setHighlightedUserId] = useState<string | null>(null);
+  const userRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   const [selectedDeal, setSelectedDeal] = useState<string | null>(null);
+  
+  // Handle URL query parameter for highlighting a specific user
+  useEffect(() => {
+    if (searchString && users.length > 0) {
+      const params = new URLSearchParams(searchString);
+      const userId = params.get('id');
+      if (userId) {
+        setHighlightedUserId(userId);
+        setTimeout(() => {
+          const element = userRefs.current[userId];
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
+        setTimeout(() => setHighlightedUserId(null), 3000);
+      }
+    }
+  }, [searchString, users]);
   const [filterAvailability, setFilterAvailability] = useState<string | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -212,7 +234,14 @@ export default function TeamAssignment() {
                         const availability = getUserAvailability(user.id);
                         const taskCount = getUserTaskCount(user.id);
                         return (
-                          <Card key={user.id} className="bg-secondary/20 border-border hover:border-primary/50 transition-colors">
+                          <Card 
+                            key={user.id}
+                            ref={(el) => { userRefs.current[user.id] = el; }}
+                            className={cn(
+                              "bg-secondary/20 border-border hover:border-primary/50 transition-all",
+                              highlightedUserId === user.id && "ring-2 ring-primary border-primary animate-pulse"
+                            )}
+                          >
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center gap-3">

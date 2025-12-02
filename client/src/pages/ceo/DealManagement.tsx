@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearch } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ const INVESTOR_TYPES = ['PE', 'VC', 'Strategic', 'Family Office', 'Hedge Fund', 
 const INVESTOR_STATUSES = ['Contacted', 'Interested', 'In DD', 'Term Sheet', 'Passed', 'Closed'];
 
 export default function DealManagement() {
+  const searchString = useSearch();
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [], isLoading } = useDeals();
   const createDeal = useCreateDeal();
@@ -69,6 +71,20 @@ export default function DealManagement() {
     status: 'Contacted',
     notes: '',
   });
+
+  // Handle URL query parameter for selecting a specific deal
+  useEffect(() => {
+    if (searchString && deals.length > 0) {
+      const params = new URLSearchParams(searchString);
+      const dealId = params.get('id');
+      if (dealId) {
+        const deal = deals.find(d => d.id === dealId);
+        if (deal) {
+          setSelectedDeal(deal);
+        }
+      }
+    }
+  }, [searchString, deals]);
 
   const filteredDeals = useMemo(() => {
     return deals.filter(deal => {

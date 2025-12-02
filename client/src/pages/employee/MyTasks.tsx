@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useSearch } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,10 +19,33 @@ import { toast } from "sonner";
 import type { Task } from "@shared/schema";
 
 export default function MyTasks() {
+  const searchString = useSearch();
   const { data: currentUser } = useCurrentUser();
   const { data: allTasks = [], isLoading } = useTasks();
   const { data: deals = [] } = useDeals();
   const updateTask = useUpdateTask();
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
+  const taskRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  
+  // Handle URL query parameter for highlighting a specific task
+  useEffect(() => {
+    if (searchString && allTasks.length > 0) {
+      const params = new URLSearchParams(searchString);
+      const taskId = params.get('id');
+      if (taskId) {
+        setHighlightedTaskId(taskId);
+        // Scroll to the task after a short delay
+        setTimeout(() => {
+          const element = taskRefs.current[taskId];
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
+        // Remove highlight after 3 seconds
+        setTimeout(() => setHighlightedTaskId(null), 3000);
+      }
+    }
+  }, [searchString, allTasks]);
   
   const myTasks = currentUser ? allTasks.filter(t => t.assignedTo === currentUser.id) : [];
   const pendingTasks = myTasks.filter(t => t.status === 'Pending');
@@ -137,7 +161,15 @@ export default function MyTasks() {
                   todayTasks.map((task) => {
                     const taskWithDeal = getTaskWithDealName(task);
                     return (
-                      <Card key={task.id} className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group" data-testid={`card-task-${task.id}`}>
+                      <Card 
+                        key={task.id} 
+                        ref={(el) => { taskRefs.current[task.id] = el; }}
+                        className={cn(
+                          "bg-card border-border hover:border-primary/50 transition-all cursor-pointer group",
+                          highlightedTaskId === task.id && "ring-2 ring-primary border-primary animate-pulse"
+                        )} 
+                        data-testid={`card-task-${task.id}`}
+                      >
                           <CardContent className="p-4 space-y-3">
                               <div className="flex justify-between items-start">
                                   <Badge variant="outline" className={cn(
@@ -211,7 +243,14 @@ export default function MyTasks() {
                   upcomingTasks.map((task) => {
                     const taskWithDeal = getTaskWithDealName(task);
                     return (
-                      <Card key={task.id} className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group opacity-80 hover:opacity-100">
+                      <Card 
+                        key={task.id}
+                        ref={(el) => { taskRefs.current[task.id] = el; }}
+                        className={cn(
+                          "bg-card border-border hover:border-primary/50 transition-all cursor-pointer group opacity-80 hover:opacity-100",
+                          highlightedTaskId === task.id && "ring-2 ring-primary border-primary animate-pulse opacity-100"
+                        )}
+                      >
                           <CardContent className="p-4 space-y-3">
                               <div className="flex justify-between items-start">
                                   <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 bg-secondary text-muted-foreground border-border">
@@ -252,7 +291,14 @@ export default function MyTasks() {
                   completedTasks.map((task) => {
                     const taskWithDeal = getTaskWithDealName(task);
                     return (
-                      <Card key={task.id} className="bg-card/50 border-border border-dashed">
+                      <Card 
+                        key={task.id}
+                        ref={(el) => { taskRefs.current[task.id] = el; }}
+                        className={cn(
+                          "bg-card/50 border-border border-dashed",
+                          highlightedTaskId === task.id && "ring-2 ring-primary border-primary animate-pulse"
+                        )}
+                      >
                           <CardContent className="p-4 space-y-3 opacity-60">
                                <div className="flex justify-between items-start">
                                       <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 bg-green-500/10 text-green-500 border-green-500/20">

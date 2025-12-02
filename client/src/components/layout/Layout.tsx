@@ -142,7 +142,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                           {searchResults.deals.map((deal: any) => (
                             <button
                               key={deal.id}
-                              onClick={() => { setLocation(`${rolePrefix}/deals`); setShowSearchResults(false); setSearchQuery(""); }}
+                              onClick={() => { setLocation(`${rolePrefix}/deals?id=${deal.id}`); setShowSearchResults(false); setSearchQuery(""); }}
                               className="w-full px-3 py-2 text-left hover:bg-primary/10 flex items-center gap-3"
                               data-testid={`search-result-deal-${deal.id}`}
                             >
@@ -166,7 +166,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                           {searchResults.tasks.map((task: any) => (
                             <button
                               key={task.id}
-                              onClick={() => { setLocation(`${role === 'CEO' ? '/ceo/deals' : '/employee/tasks'}`); setShowSearchResults(false); setSearchQuery(""); }}
+                              onClick={() => { setLocation(`${role === 'CEO' ? '/ceo/deals' : '/employee/tasks'}?id=${task.id}`); setShowSearchResults(false); setSearchQuery(""); }}
                               className="w-full px-3 py-2 text-left hover:bg-primary/10 flex items-center gap-3"
                               data-testid={`search-result-task-${task.id}`}
                             >
@@ -190,7 +190,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                           {searchResults.users.map((user: any) => (
                             <button
                               key={user.id}
-                              onClick={() => { setLocation('/ceo/team'); setShowSearchResults(false); setSearchQuery(""); }}
+                              onClick={() => { setLocation(`/ceo/team?id=${user.id}`); setShowSearchResults(false); setSearchQuery(""); }}
                               className="w-full px-3 py-2 text-left hover:bg-primary/10 flex items-center gap-3"
                               data-testid={`search-result-user-${user.id}`}
                             >
