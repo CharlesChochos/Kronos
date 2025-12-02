@@ -63,23 +63,6 @@ import { format, isToday, isTomorrow, parseISO, subDays } from "date-fns";
 import { toast } from "sonner";
 import type { PodTeamMember, Task } from "@shared/schema";
 
-type WidgetSize = {
-  width?: number;
-  height?: number;
-  minWidth?: number;
-  minHeight?: number;
-};
-
-type WidgetSizes = Record<string, WidgetSize>;
-
-const DEFAULT_EMPLOYEE_WIDGET_SIZES: WidgetSizes = {
-  quickStats: { minWidth: 200, minHeight: 80 },
-  myTasks: { minWidth: 300, minHeight: 250 },
-  myProjects: { minWidth: 300, minHeight: 200 },
-  schedule: { minWidth: 300, minHeight: 200 },
-  quickActions: { minWidth: 200, minHeight: 150 },
-};
-
 export default function EmployeeHome() {
   const { data: currentUser } = useCurrentUser();
   const { data: allTasks = [] } = useTasks();
@@ -119,17 +102,6 @@ export default function EmployeeHome() {
     return localStorage.getItem('employeeHomeBgColor') || 'default';
   });
   
-  // Widget sizes - load from localStorage
-  const [widgetSizes, setWidgetSizes] = useState<WidgetSizes>(() => {
-    const saved = localStorage.getItem('employeeHomeWidgetSizes');
-    return saved ? { ...DEFAULT_EMPLOYEE_WIDGET_SIZES, ...JSON.parse(saved) } : DEFAULT_EMPLOYEE_WIDGET_SIZES;
-  });
-  
-  // Resize state with direction support
-  const [isResizing, setIsResizing] = useState<string | null>(null);
-  const [resizeDirection, setResizeDirection] = useState<string>('se');
-  const [resizeStart, setResizeStart] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-  
   // Save settings to localStorage when they change
   useEffect(() => {
     localStorage.setItem('employeeHomeWidgetOrder', JSON.stringify(widgetOrder));
@@ -142,144 +114,6 @@ export default function EmployeeHome() {
   useEffect(() => {
     localStorage.setItem('employeeHomeBgColor', bgColor);
   }, [bgColor]);
-  
-  // Save widget sizes to localStorage when they change
-  useEffect(() => {
-    localStorage.setItem('employeeHomeWidgetSizes', JSON.stringify(widgetSizes));
-  }, [widgetSizes]);
-  
-  // Handle resize start with direction
-  const handleResizeStart = (e: React.MouseEvent, widgetId: string, currentWidth: number, currentHeight: number, direction: string = 'se') => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsResizing(widgetId);
-    setResizeDirection(direction);
-    setResizeStart({ x: e.clientX, y: e.clientY, width: currentWidth, height: currentHeight });
-  };
-  
-  // Handle resize move with direction-aware logic
-  useEffect(() => {
-    if (!isResizing || !resizeStart) return;
-    
-    let animationFrameId: number;
-    let lastUpdate = 0;
-    const throttleMs = 16; // ~60fps
-    
-    const handleMouseMove = (e: MouseEvent) => {
-      const now = Date.now();
-      if (now - lastUpdate < throttleMs) return;
-      lastUpdate = now;
-      
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = requestAnimationFrame(() => {
-        const deltaX = e.clientX - resizeStart.x;
-        const deltaY = e.clientY - resizeStart.y;
-        const minWidth = widgetSizes[isResizing]?.minWidth || 150;
-        const minHeight = widgetSizes[isResizing]?.minHeight || 100;
-        
-        let newWidth = resizeStart.width;
-        let newHeight = resizeStart.height;
-        
-        // Handle different resize directions
-        if (resizeDirection.includes('e')) {
-          newWidth = Math.max(minWidth, resizeStart.width + deltaX);
-        }
-        if (resizeDirection.includes('w')) {
-          newWidth = Math.max(minWidth, resizeStart.width - deltaX);
-        }
-        if (resizeDirection.includes('s')) {
-          newHeight = Math.max(minHeight, resizeStart.height + deltaY);
-        }
-        if (resizeDirection.includes('n')) {
-          newHeight = Math.max(minHeight, resizeStart.height - deltaY);
-        }
-        
-        setWidgetSizes(prev => ({
-          ...prev,
-          [isResizing]: {
-            ...prev[isResizing],
-            width: newWidth,
-            height: newHeight,
-          }
-        }));
-      });
-    };
-    
-    const handleMouseUp = () => {
-      cancelAnimationFrame(animationFrameId);
-      setIsResizing(null);
-      setResizeStart(null);
-    };
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizing, resizeStart, resizeDirection, widgetSizes]);
-  
-  // Resizable widget wrapper component
-  const ResizableWidget = ({ 
-    id, 
-    children, 
-    className = '' 
-  }: { 
-    id: string; 
-    children: React.ReactNode; 
-    className?: string;
-  }) => {
-    const size = widgetSizes[id];
-    const widgetRef = useRef<HTMLDivElement>(null);
-    
-    return (
-      <div 
-        ref={widgetRef}
-        className={cn("relative group", className)}
-        style={{
-          width: size?.width ? `${size.width}px` : undefined,
-          height: size?.height ? `${size.height}px` : undefined,
-        }}
-      >
-        {children}
-        
-        {/* Right edge resize */}
-        <div
-          className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-primary/30 rounded-r"
-          onMouseDown={(e) => {
-            const rect = widgetRef.current?.getBoundingClientRect();
-            if (rect) handleResizeStart(e, id, rect.width, rect.height, 'e');
-          }}
-        />
-        {/* Bottom edge resize */}
-        <div
-          className="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-primary/30 rounded-b"
-          onMouseDown={(e) => {
-            const rect = widgetRef.current?.getBoundingClientRect();
-            if (rect) handleResizeStart(e, id, rect.width, rect.height, 's');
-          }}
-        />
-        {/* SE corner resize with visible grip */}
-        <div
-          className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center"
-          onMouseDown={(e) => {
-            const rect = widgetRef.current?.getBoundingClientRect();
-            if (rect) handleResizeStart(e, id, rect.width, rect.height, 'se');
-          }}
-        >
-          <svg 
-            className="w-4 h-4 text-muted-foreground/60 hover:text-primary transition-colors"
-            viewBox="0 0 16 16" 
-            fill="currentColor"
-          >
-            <path d="M11 11V13H13V11H11ZM7 11V13H9V11H7ZM11 7V9H13V7H11ZM7 7V9H9V7H7ZM11 3V5H13V3H11Z" />
-          </svg>
-        </div>
-      </div>
-    );
-  };
 
   const openTaskDetail = (task: Task) => {
     setSelectedTask(task);
@@ -475,8 +309,7 @@ export default function EmployeeHome() {
   );
 
   const renderMyTasks = () => widgetSettings.showMyTasks && (
-    <ResizableWidget id="myTasks" key="myTasks">
-      <Card className="bg-card border-border h-full">
+      <Card className="bg-card border-border" key="myTasks">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -665,12 +498,10 @@ export default function EmployeeHome() {
         </div>
       </CardContent>
       </Card>
-    </ResizableWidget>
   );
 
   const renderMyProjects = () => widgetSettings.showMyProjects && (
-    <ResizableWidget id="myProjects" key="myProjects">
-      <Card className="bg-card border-border h-full">
+      <Card className="bg-card border-border" key="myProjects">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -715,7 +546,6 @@ export default function EmployeeHome() {
         )}
       </CardContent>
       </Card>
-    </ResizableWidget>
   );
 
   const renderSchedule = () => widgetSettings.showSchedule && (

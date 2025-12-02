@@ -90,28 +90,6 @@ type WidgetConfig = {
   enabled: boolean;
 };
 
-type WidgetSize = {
-  width?: number;
-  height?: number;
-  minWidth?: number;
-  minHeight?: number;
-};
-
-type WidgetSizes = Record<string, WidgetSize>;
-
-const DEFAULT_WIDGET_SIZES: WidgetSizes = {
-  quickActions: { minWidth: 200, minHeight: 200 },
-  activeDeals: { minWidth: 200, minHeight: 280 },
-  marketPulse: { minWidth: 300, minHeight: 250 },
-  marketIntelligence: { minWidth: 300, minHeight: 200 },
-  teamTaskProgress: { minWidth: 300, minHeight: 250 },
-  velocityScoreboard: { minWidth: 300, minHeight: 200 },
-  upcomingMeetings: { minWidth: 200, minHeight: 150 },
-  recentActivity: { minWidth: 200, minHeight: 150 },
-  dealPipeline: { minWidth: 300, minHeight: 200 },
-  performanceMetrics: { minWidth: 300, minHeight: 200 },
-};
-
 const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'quickActions', name: 'Quick Actions', enabled: true },
   { id: 'activeDeals', name: 'Active Deals Analytics', enabled: true },
@@ -156,159 +134,10 @@ export default function Dashboard() {
     return saved ? JSON.parse(saved) : DEFAULT_WIDGETS;
   });
   
-  // Widget sizes - load from localStorage
-  const [widgetSizes, setWidgetSizes] = useState<WidgetSizes>(() => {
-    const saved = localStorage.getItem('ceoDashboardWidgetSizes');
-    return saved ? { ...DEFAULT_WIDGET_SIZES, ...JSON.parse(saved) } : DEFAULT_WIDGET_SIZES;
-  });
-  
-  // Resize state with direction support
-  const [isResizing, setIsResizing] = useState<string | null>(null);
-  const [resizeDirection, setResizeDirection] = useState<string>('se');
-  const [resizeStart, setResizeStart] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-  
   // Save widget order to localStorage when it changes
   useEffect(() => {
     localStorage.setItem('ceoDashboardWidgets', JSON.stringify(widgets));
   }, [widgets]);
-  
-  // Save widget sizes to localStorage when they change
-  useEffect(() => {
-    localStorage.setItem('ceoDashboardWidgetSizes', JSON.stringify(widgetSizes));
-  }, [widgetSizes]);
-  
-  // Handle resize start with direction
-  const handleResizeStart = (e: React.MouseEvent, widgetId: string, currentWidth: number, currentHeight: number, direction: string = 'se') => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsResizing(widgetId);
-    setResizeDirection(direction);
-    setResizeStart({ x: e.clientX, y: e.clientY, width: currentWidth, height: currentHeight });
-  };
-  
-  // Handle resize move with direction-aware logic
-  useEffect(() => {
-    if (!isResizing || !resizeStart) return;
-    
-    let animationFrameId: number;
-    let lastUpdate = 0;
-    const throttleMs = 16; // ~60fps
-    
-    const handleMouseMove = (e: MouseEvent) => {
-      const now = Date.now();
-      if (now - lastUpdate < throttleMs) return;
-      lastUpdate = now;
-      
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = requestAnimationFrame(() => {
-        const deltaX = e.clientX - resizeStart.x;
-        const deltaY = e.clientY - resizeStart.y;
-        const minWidth = widgetSizes[isResizing]?.minWidth || 150;
-        const minHeight = widgetSizes[isResizing]?.minHeight || 100;
-        
-        let newWidth = resizeStart.width;
-        let newHeight = resizeStart.height;
-        
-        // Handle different resize directions
-        if (resizeDirection.includes('e')) {
-          newWidth = Math.max(minWidth, resizeStart.width + deltaX);
-        }
-        if (resizeDirection.includes('w')) {
-          newWidth = Math.max(minWidth, resizeStart.width - deltaX);
-        }
-        if (resizeDirection.includes('s')) {
-          newHeight = Math.max(minHeight, resizeStart.height + deltaY);
-        }
-        if (resizeDirection.includes('n')) {
-          newHeight = Math.max(minHeight, resizeStart.height - deltaY);
-        }
-        
-        setWidgetSizes(prev => ({
-          ...prev,
-          [isResizing]: {
-            ...prev[isResizing],
-            width: newWidth,
-            height: newHeight,
-          }
-        }));
-      });
-    };
-    
-    const handleMouseUp = () => {
-      cancelAnimationFrame(animationFrameId);
-      setIsResizing(null);
-      setResizeStart(null);
-    };
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizing, resizeStart, resizeDirection, widgetSizes]);
-  
-  // Resizable widget wrapper component
-  const ResizableWidget = ({ 
-    id, 
-    children, 
-    className = '' 
-  }: { 
-    id: string; 
-    children: React.ReactNode; 
-    className?: string;
-  }) => {
-    const size = widgetSizes[id];
-    const widgetRef = useRef<HTMLDivElement>(null);
-    
-    return (
-      <div 
-        ref={widgetRef}
-        className={cn("relative group", className)}
-        style={{
-          width: size?.width ? `${size.width}px` : undefined,
-          height: size?.height ? `${size.height}px` : undefined,
-        }}
-      >
-        {children}
-        
-        {/* Right edge resize */}
-        <div
-          className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-primary/30 rounded-r"
-          onMouseDown={(e) => {
-            const rect = widgetRef.current?.getBoundingClientRect();
-            if (rect) handleResizeStart(e, id, rect.width, rect.height, 'e');
-          }}
-        />
-        {/* Bottom edge resize */}
-        <div
-          className="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-primary/30 rounded-b"
-          onMouseDown={(e) => {
-            const rect = widgetRef.current?.getBoundingClientRect();
-            if (rect) handleResizeStart(e, id, rect.width, rect.height, 's');
-          }}
-        />
-        {/* SE corner resize with visible grip */}
-        <div
-          className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center"
-          onMouseDown={(e) => {
-            const rect = widgetRef.current?.getBoundingClientRect();
-            if (rect) handleResizeStart(e, id, rect.width, rect.height, 'se');
-          }}
-        >
-          <svg 
-            className="w-4 h-4 text-muted-foreground/60 hover:text-primary transition-colors"
-            viewBox="0 0 16 16" 
-            fill="currentColor"
-          >
-            <path d="M11 11V13H13V11H11ZM7 11V13H9V11H7ZM11 7V9H13V7H11ZM7 7V9H9V7H7ZM11 3V5H13V3H11Z" />
-          </svg>
-        </div>
-      </div>
-    );
-  };
   
   // Market symbols state
   const [marketSymbols, setMarketSymbols] = useState<string[]>(['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY']);
@@ -1054,8 +883,7 @@ export default function Dashboard() {
             {/* Left Column: Quick Actions & Active Deals Analytics */}
             <div className="col-span-12 md:col-span-3 space-y-6">
           {widgets.find(w => w.id === 'quickActions')?.enabled && (
-            <ResizableWidget id="quickActions">
-              <Card className="bg-card border-border h-full">
+              <Card className="bg-card border-border">
                 <CardHeader>
                   <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Quick Actions</CardTitle>
                 </CardHeader>
@@ -1094,12 +922,10 @@ export default function Dashboard() {
                   </Button>
                 </CardContent>
               </Card>
-            </ResizableWidget>
           )}
 
           {widgets.find(w => w.id === 'activeDeals')?.enabled && (
-            <ResizableWidget id="activeDeals">
-              <Card className="bg-card border-border overflow-hidden h-full">
+              <Card className="bg-card border-border overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider truncate">Active Deals</CardTitle>
                   <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setLocation('/ceo/deals')}>
@@ -1160,7 +986,6 @@ export default function Dashboard() {
                 </div>
               </CardContent>
               </Card>
-            </ResizableWidget>
           )}
           
           {widgets.find(w => w.id === 'marketPulse')?.enabled && (
