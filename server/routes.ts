@@ -8,6 +8,7 @@ import bcrypt from "bcryptjs";
 import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import { sendMeetingInvite } from "./email";
+import OpenAI from "openai";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -577,15 +578,89 @@ export async function registerRoutes(
     }
   });
 
+  // ===== AI DOCUMENT GENERATION =====
+  
+  app.post("/api/generate-document", requireAuth, async (req, res) => {
+    try {
+      const { templateName, dealData, complianceOptions } = req.body;
+      
+      if (!templateName) {
+        return res.status(400).json({ error: "Template name is required" });
+      }
+      
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+      
+      const complianceText = [
+        complianceOptions?.sec && 'SEC compliance requirements',
+        complianceOptions?.finra && 'FINRA regulatory standards',
+        complianceOptions?.legal && 'legal review requirements',
+      ].filter(Boolean).join(', ') || 'standard legal compliance';
+      
+      const dealContext = dealData ? `
+Deal Information:
+- Project Name: ${dealData.name || 'N/A'}
+- Client: ${dealData.client || 'N/A'}
+- Sector: ${dealData.sector || 'N/A'}
+- Transaction Value: $${dealData.value || 0}M
+- Current Stage: ${dealData.stage || 'N/A'}
+- Description: ${dealData.description || 'N/A'}
+` : 'No specific deal context provided.';
+
+      const prompt = `You are a professional investment banking document generator for OSReaper platform.
+
+Generate a complete, professional ${templateName} document based on the following context:
+
+${dealContext}
+
+Compliance Requirements: ${complianceText}
+
+Requirements:
+1. Use formal investment banking language and terminology
+2. Include all standard sections appropriate for a ${templateName}
+3. Format with clear headers and professional structure
+4. Include placeholder fields where specific data is needed [in brackets]
+5. Make it ready for executive review
+6. Current date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+7. The document should be from "Equiturn Holdings LLC" (the acquiring/investing party)
+
+Generate only the document content, no additional commentary.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "You are an expert investment banking document specialist who creates professional legal and financial documents." },
+          { role: "user", content: prompt }
+        ],
+        max_tokens: 2000,
+        temperature: 0.7,
+      });
+      
+      const content = response.choices[0]?.message?.content || 'Failed to generate content';
+      
+      res.json({ content });
+    } catch (error: any) {
+      console.error('Document generation error:', error);
+      res.status(500).json({ error: error.message || "Failed to generate document" });
+    }
+  });
+
   // ===== MARKET DATA ROUTE =====
   
   app.get("/api/market-data", requireAuth, async (req, res) => {
     try {
       const finnhubKey = process.env.FINNHUB_API_KEY;
       
+      // Accept symbols from query parameter or use defaults
+      const requestedSymbols = req.query.symbols 
+        ? (req.query.symbols as string).split(',').map(s => s.trim().toUpperCase())
+        : ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY'];
+      
       if (finnhubKey) {
         // Fetch real data from Finnhub
-        const symbols = ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY'];
+        const symbols = requestedSymbols;
         const quotes = await Promise.all(
           symbols.map(async (symbol) => {
             try {
@@ -629,29 +704,44 @@ export async function registerRoutes(
         }
       }
       
-      // Fallback to simulated data
-      const baseData = [
-        { name: 'S&P 500', symbol: 'SPY', baseValue: 4567.89, description: 'US Large Cap' },
-        { name: 'NASDAQ', symbol: 'QQQ', baseValue: 15234.56, description: 'Tech Heavy' },
-        { name: 'Dow Jones', symbol: 'DIA', baseValue: 35678.90, description: 'Blue Chips' },
-        { name: 'Apple', symbol: 'AAPL', baseValue: 178.50, description: 'Tech Giant' },
-        { name: 'Microsoft', symbol: 'MSFT', baseValue: 378.20, description: 'Enterprise Tech' },
-        { name: 'Tesla', symbol: 'TSLA', baseValue: 245.60, description: 'EV Leader' },
-      ];
+      // Fallback to simulated data for requested symbols
+      const baseDataMap: Record<string, { name: string, baseValue: number, description: string }> = {
+        'SPY': { name: 'S&P 500', baseValue: 4567.89, description: 'US Large Cap' },
+        'QQQ': { name: 'NASDAQ', baseValue: 15234.56, description: 'Tech Heavy' },
+        'DIA': { name: 'Dow Jones', baseValue: 35678.90, description: 'Blue Chips' },
+        'AAPL': { name: 'Apple', baseValue: 178.50, description: 'Tech Giant' },
+        'MSFT': { name: 'Microsoft', baseValue: 378.20, description: 'Enterprise Tech' },
+        'TSLA': { name: 'Tesla', baseValue: 245.60, description: 'EV Leader' },
+        'GOOGL': { name: 'Alphabet', baseValue: 138.25, description: 'Search & Cloud' },
+        'AMZN': { name: 'Amazon', baseValue: 185.60, description: 'E-commerce' },
+        'NVDA': { name: 'NVIDIA', baseValue: 480.75, description: 'AI & GPUs' },
+        'META': { name: 'Meta', baseValue: 505.40, description: 'Social Media' },
+        'JPM': { name: 'JPMorgan', baseValue: 195.30, description: 'Banking' },
+        'V': { name: 'Visa', baseValue: 267.80, description: 'Payments' },
+        'GS': { name: 'Goldman Sachs', baseValue: 385.20, description: 'Investment Bank' },
+        'MS': { name: 'Morgan Stanley', baseValue: 95.40, description: 'Investment Bank' },
+        'BRK.B': { name: 'Berkshire', baseValue: 365.50, description: 'Conglomerate' },
+        'WMT': { name: 'Walmart', baseValue: 165.20, description: 'Retail' },
+        'JNJ': { name: 'Johnson & Johnson', baseValue: 158.40, description: 'Healthcare' },
+        'PG': { name: 'Procter & Gamble', baseValue: 156.80, description: 'Consumer Goods' },
+        'UNH': { name: 'UnitedHealth', baseValue: 525.30, description: 'Healthcare' },
+        'XOM': { name: 'Exxon Mobil', baseValue: 105.60, description: 'Energy' },
+      };
       
-      const simulatedData = baseData.map(item => {
+      const simulatedData = requestedSymbols.map(symbol => {
+        const baseData = baseDataMap[symbol] || { name: symbol, baseValue: 100 + Math.random() * 400, description: 'Stock' };
         const changePercent = (Math.random() - 0.5) * 4;
-        const newValue = item.baseValue * (1 + changePercent / 100);
+        const newValue = baseData.baseValue * (1 + changePercent / 100);
         
         return {
-          name: item.name,
-          symbol: item.symbol,
+          name: baseData.name,
+          symbol: symbol,
           value: newValue < 100 
             ? `$${newValue.toFixed(2)}` 
             : `$${newValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
           change: `${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%`,
           trend: changePercent >= 0 ? 'up' : 'down',
-          description: item.description,
+          description: baseData.description,
         };
       });
       

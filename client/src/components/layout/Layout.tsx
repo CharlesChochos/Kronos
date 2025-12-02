@@ -1,5 +1,7 @@
+import { useState, useMemo, useRef, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Sidebar } from "./Sidebar";
-import { Bell, Search, User, BookOpen, Palette } from "lucide-react";
+import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -10,7 +12,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDashboardContext } from "@/contexts/DashboardContext";
-import { useNotifications } from "@/lib/api";
+import { useNotifications, useDeals, useTasks, useUsers } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type LayoutProps = {
   children: React.ReactNode;
@@ -20,6 +23,11 @@ type LayoutProps = {
 };
 
 export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", pageTitle }: LayoutProps) {
+  const [, setLocation] = useLocation();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  
   const { 
     setShowProfileSheet, 
     setShowSettingsSheet, 
@@ -29,7 +37,63 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   } = useDashboardContext();
   
   const { data: notifications = [] } = useNotifications();
+  const { data: deals = [] } = useDeals();
+  const { data: tasks = [] } = useTasks();
+  const { data: users = [] } = useUsers();
   const unreadCount = notifications.filter((n: any) => !n.read).length;
+  
+  // Get role-based route prefixes
+  const rolePrefix = role === 'CEO' ? '/ceo' : '/employee';
+  
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchResults(false);
+      }
+    };
+    
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowSearchResults(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+  
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return { deals: [], tasks: [], users: [] };
+    
+    const query = searchQuery.toLowerCase();
+    
+    const filteredDeals = (deals as any[]).filter((deal: any) => 
+      deal.name?.toLowerCase().includes(query) ||
+      deal.client?.toLowerCase().includes(query) ||
+      deal.sector?.toLowerCase().includes(query)
+    ).slice(0, 5);
+    
+    const filteredTasks = (tasks as any[]).filter((task: any) => 
+      task.title?.toLowerCase().includes(query) ||
+      task.description?.toLowerCase().includes(query)
+    ).slice(0, 5);
+    
+    const filteredUsers = (users as any[]).filter((user: any) => 
+      user.name?.toLowerCase().includes(query) ||
+      user.email?.toLowerCase().includes(query) ||
+      user.role?.toLowerCase().includes(query)
+    ).slice(0, 5);
+    
+    return { deals: filteredDeals, tasks: filteredTasks, users: filteredUsers };
+  }, [searchQuery, deals, tasks, users]);
+  
+  const hasResults = searchResults.deals.length > 0 || searchResults.tasks.length > 0 || searchResults.users.length > 0;
   
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
@@ -43,14 +107,115 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
           </div>
           
           <div className="flex items-center gap-4">
-            <div className="relative">
+            <div className="relative" ref={searchRef}>
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input 
                 type="text" 
-                placeholder="Search anything..." 
-                className="bg-secondary/50 border border-border rounded-full pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary w-64 transition-all hover:bg-secondary"
+                placeholder="Search deals, tasks, users..." 
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowSearchResults(e.target.value.length > 0);
+                }}
+                onFocus={() => searchQuery && setShowSearchResults(true)}
+                className="bg-secondary/50 border border-border rounded-full pl-9 pr-8 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary w-72 transition-all hover:bg-secondary"
                 data-testid="input-search"
               />
+              {searchQuery && (
+                <button 
+                  onClick={() => { setSearchQuery(""); setShowSearchResults(false); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+              
+              {showSearchResults && searchQuery && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-card border border-border rounded-lg shadow-xl overflow-hidden z-50">
+                  {hasResults ? (
+                    <div className="max-h-80 overflow-y-auto">
+                      {searchResults.deals.length > 0 && (
+                        <div>
+                          <div className="px-3 py-2 bg-secondary/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                            <Briefcase className="w-3 h-3" /> Deals
+                          </div>
+                          {searchResults.deals.map((deal: any) => (
+                            <button
+                              key={deal.id}
+                              onClick={() => { setLocation(`${rolePrefix}/deals`); setShowSearchResults(false); setSearchQuery(""); }}
+                              className="w-full px-3 py-2 text-left hover:bg-primary/10 flex items-center gap-3"
+                              data-testid={`search-result-deal-${deal.id}`}
+                            >
+                              <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+                                <Briefcase className="w-4 h-4 text-blue-500" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">{deal.name}</p>
+                                <p className="text-xs text-muted-foreground">{deal.client} • {deal.sector}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {searchResults.tasks.length > 0 && (
+                        <div>
+                          <div className="px-3 py-2 bg-secondary/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                            <CheckSquare className="w-3 h-3" /> Tasks
+                          </div>
+                          {searchResults.tasks.map((task: any) => (
+                            <button
+                              key={task.id}
+                              onClick={() => { setLocation(`${role === 'CEO' ? '/ceo/deals' : '/employee/tasks'}`); setShowSearchResults(false); setSearchQuery(""); }}
+                              className="w-full px-3 py-2 text-left hover:bg-primary/10 flex items-center gap-3"
+                              data-testid={`search-result-task-${task.id}`}
+                            >
+                              <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
+                                <CheckSquare className="w-4 h-4 text-green-500" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">{task.title}</p>
+                                <p className="text-xs text-muted-foreground truncate max-w-48">{task.description || 'No description'}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {searchResults.users.length > 0 && (
+                        <div>
+                          <div className="px-3 py-2 bg-secondary/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                            <Users className="w-3 h-3" /> Team Members
+                          </div>
+                          {searchResults.users.map((user: any) => (
+                            <button
+                              key={user.id}
+                              onClick={() => { setLocation('/ceo/team'); setShowSearchResults(false); setSearchQuery(""); }}
+                              className="w-full px-3 py-2 text-left hover:bg-primary/10 flex items-center gap-3"
+                              data-testid={`search-result-user-${user.id}`}
+                            >
+                              <Avatar className="w-8 h-8">
+                                <AvatarFallback className="bg-purple-500/10 text-purple-500 text-xs">
+                                  {user.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="text-sm font-medium">{user.name}</p>
+                                <p className="text-xs text-muted-foreground">{user.role} • {user.email}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="px-4 py-6 text-center text-muted-foreground">
+                      <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No results found for "{searchQuery}"</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             
             <button 

@@ -165,7 +165,7 @@ export default function Dashboard() {
   });
 
   // Market data from API (refreshes every 30 seconds)
-  const { data: marketDataResponse, isLoading: marketLoading } = useMarketData();
+  const { data: marketDataResponse, isLoading: marketLoading } = useMarketData(marketSymbols);
   const marketData = marketDataResponse?.data || [];
   const marketSource = marketDataResponse?.source || 'simulated';
 

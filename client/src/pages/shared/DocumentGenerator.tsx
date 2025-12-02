@@ -22,9 +22,10 @@ import {
   ChevronRight,
   Loader2
 } from "lucide-react";
-import { useCurrentUser, useDeals } from "@/lib/api";
+import { useCurrentUser, useDeals, useGenerateDocument } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { jsPDF } from "jspdf";
 
 const TEMPLATES = [
   { id: 1, name: "Term Sheet", description: "Standard term sheet template for initial deal terms", lastUsed: "2025-12-01", complexity: "Medium" },
@@ -42,9 +43,9 @@ type DocumentGeneratorProps = {
 export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorProps) {
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [], isLoading } = useDeals();
+  const generateDocument = useGenerateDocument();
   
   const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDeal, setSelectedDeal] = useState<string>("");
@@ -74,114 +75,29 @@ export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorPro
       return;
     }
     
-    setIsGenerating(true);
     setGeneratedContent(null);
-    
-    // Simulate AI generation
-    await new Promise(resolve => setTimeout(resolve, 2000));
     
     const template = TEMPLATES.find(t => t.id === selectedTemplate);
     const deal = deals.find(d => d.id === selectedDeal);
     
-    const content = generateDocumentContent(template?.name || '', deal);
-    setGeneratedContent(content);
-    setIsGenerating(false);
-    toast.success("Document generated successfully!");
-  };
-
-  const generateDocumentContent = (templateName: string, deal: any) => {
-    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const companyName = deal?.client || '[Client Name]';
-    const dealValue = deal?.value ? `$${deal.value}M` : '[Deal Value]';
-    const dealName = deal?.name || '[Project Name]';
-    
-    switch (templateName) {
-      case 'Term Sheet':
-        return `TERM SHEET
-
-Date: ${date}
-Project: ${dealName}
-
-PARTIES:
-- Buyer: Equiturn Holdings LLC
-- Target: ${companyName}
-
-TRANSACTION OVERVIEW:
-Transaction Type: [Acquisition/Investment]
-Proposed Valuation: ${dealValue}
-Equity Consideration: [X]%
-
-KEY TERMS:
-1. Purchase Price: ${dealValue}
-2. Payment Structure: [Cash/Stock/Mixed]
-3. Closing Conditions: [To be determined]
-4. Due Diligence Period: 60 days
-5. Exclusivity Period: 90 days
-
-This term sheet is non-binding and subject to final documentation.`;
-
-      case 'NDA':
-        return `NON-DISCLOSURE AGREEMENT
-
-Date: ${date}
-
-BETWEEN:
-Equiturn Holdings LLC ("Disclosing Party")
-AND
-${companyName} ("Receiving Party")
-
-PURPOSE: Evaluation of potential transaction related to ${dealName}
-
-CONFIDENTIAL INFORMATION includes all non-public information disclosed in connection with this transaction.
-
-OBLIGATIONS:
-1. Maintain strict confidentiality
-2. Use information solely for evaluation purposes
-3. Limit disclosure to authorized personnel
-4. Return or destroy upon request
-
-TERM: 2 years from date of signature
-
-[Signature blocks to follow]`;
-
-      case 'Letter of Intent':
-        return `LETTER OF INTENT
-
-Date: ${date}
-Re: ${dealName}
-
-Dear [Recipient],
-
-Equiturn Holdings LLC is pleased to submit this non-binding Letter of Intent regarding the potential acquisition of ${companyName}.
-
-PROPOSED TERMS:
-- Transaction Value: ${dealValue}
-- Structure: [Asset/Stock Purchase]
-- Financing: [Details]
-
-NEXT STEPS:
-1. Execute mutual NDA
-2. Conduct preliminary due diligence
-3. Negotiate definitive agreements
-
-We look forward to working with you on this opportunity.
-
-Sincerely,
-${currentUser?.name || '[Authorized Signatory]'}
-Equiturn Holdings LLC`;
-
-      default:
-        return `${templateName.toUpperCase()}
-
-Date: ${date}
-Project: ${dealName}
-Client: ${companyName}
-Value: ${dealValue}
-
-[Document content will be populated based on deal parameters and compliance requirements]
-
-Generated via OSReaper Document Generator
-Compliance Review: ${complianceOptions.sec ? 'SEC ' : ''}${complianceOptions.finra ? 'FINRA ' : ''}${complianceOptions.legal ? 'Legal' : ''}`;
+    try {
+      const result = await generateDocument.mutateAsync({
+        templateName: template?.name || '',
+        dealData: deal ? {
+          name: deal.name,
+          client: deal.client,
+          sector: deal.sector,
+          value: deal.value,
+          stage: deal.stage,
+          description: deal.description,
+        } : null,
+        complianceOptions,
+      });
+      
+      setGeneratedContent(result.content);
+      toast.success("Document generated with AI!");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to generate document");
     }
   };
 
@@ -191,14 +107,89 @@ Compliance Review: ${complianceOptions.sec ? 'SEC ' : ''}${complianceOptions.fin
       return;
     }
     
-    // Create downloadable text file
-    const blob = new Blob([generatedContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${TEMPLATES.find(t => t.id === selectedTemplate)?.name || 'document'}.${format === 'pdf' ? 'txt' : 'txt'}`;
-    a.click();
-    toast.success(`Document exported as ${format.toUpperCase()}`);
+    const templateName = TEMPLATES.find(t => t.id === selectedTemplate)?.name || 'document';
+    const fileName = templateName.replace(/\s+/g, '_');
+    
+    if (format === 'pdf') {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 20;
+      const maxWidth = pageWidth - margin * 2;
+      
+      doc.setFillColor(26, 26, 46);
+      doc.rect(0, 0, pageWidth, 30, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text(templateName.toUpperCase(), margin, 20);
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      const lines = doc.splitTextToSize(generatedContent, maxWidth);
+      let y = 45;
+      const lineHeight = 5;
+      
+      const addHeader = () => {
+        doc.setFillColor(26, 26, 46);
+        doc.rect(0, 0, pageWidth, 25, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text(templateName.toUpperCase(), margin, 16);
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+      };
+      
+      for (const line of lines) {
+        if (y > doc.internal.pageSize.getHeight() - margin) {
+          doc.addPage();
+          addHeader();
+          y = 35;
+        }
+        doc.text(line, margin, y);
+        y += lineHeight;
+      }
+      
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      doc.text(`Generated by OSReaper - ${new Date().toLocaleDateString()}`, margin, doc.internal.pageSize.getHeight() - 10);
+      
+      doc.save(`${fileName}.pdf`);
+      toast.success("PDF exported successfully!");
+    } else {
+      const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${templateName}</title>
+  <style>
+    body { font-family: 'Calibri', sans-serif; margin: 40px; line-height: 1.6; }
+    h1 { color: #1a1a2e; border-bottom: 2px solid #1a1a2e; padding-bottom: 10px; }
+    pre { white-space: pre-wrap; font-family: 'Calibri', sans-serif; }
+    .footer { margin-top: 40px; color: #888; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>${templateName}</h1>
+  <pre>${generatedContent}</pre>
+  <div class="footer">Generated by OSReaper - ${new Date().toLocaleDateString()}</div>
+</body>
+</html>`;
+      
+      const blob = new Blob([htmlContent], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${fileName}.doc`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Word document exported successfully!");
+    }
   };
 
   const handlePreview = () => {
@@ -275,7 +266,7 @@ Compliance Review: ${complianceOptions.sec ? 'SEC ' : ''}${complianceOptions.fin
                 {selectedTemplate ? (
                     <>
                         <div className="absolute top-0 left-0 w-full h-1 bg-primary/20">
-                            {isGenerating && <div className="h-full bg-primary animate-pulse w-full"></div>}
+                            {generateDocument.isPending && <div className="h-full bg-primary animate-pulse w-full"></div>}
                         </div>
                         <CardHeader className="border-b border-border/50 pb-4">
                             <div className="flex justify-between items-center">
@@ -299,10 +290,10 @@ Compliance Review: ${complianceOptions.sec ? 'SEC ' : ''}${complianceOptions.fin
                                       size="sm" 
                                       className="gap-2" 
                                       onClick={handleGenerate} 
-                                      disabled={isGenerating}
+                                      disabled={generateDocument.isPending}
                                       data-testid="button-generate"
                                     >
-                                        {isGenerating ? (
+                                        {generateDocument.isPending ? (
                                             <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
                                         ) : (
                                             <><Sparkles className="w-4 h-4" /> Generate with AI</>
@@ -322,7 +313,7 @@ Compliance Review: ${complianceOptions.sec ? 'SEC ' : ''}${complianceOptions.fin
                                 <div className="space-y-4 text-sm leading-relaxed font-serif text-gray-800 whitespace-pre-wrap">
                                     {generatedContent ? (
                                       generatedContent
-                                    ) : isGenerating ? (
+                                    ) : generateDocument.isPending ? (
                                         <div className="space-y-2 mt-4 animate-pulse">
                                             <div className="h-2 bg-gray-200 rounded w-full"></div>
                                             <div className="h-2 bg-gray-200 rounded w-5/6"></div>

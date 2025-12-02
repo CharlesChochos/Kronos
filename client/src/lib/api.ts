@@ -400,16 +400,41 @@ export type MarketDataResponse = {
   data: MarketDataItem[];
 };
 
-export function useMarketData() {
+export function useMarketData(symbols?: string[]) {
   return useQuery({
-    queryKey: ["market-data"],
+    queryKey: ["market-data", symbols?.join(',')],
     queryFn: async () => {
-      const res = await fetch("/api/market-data");
+      const url = symbols && symbols.length > 0 
+        ? `/api/market-data?symbols=${symbols.join(',')}`
+        : "/api/market-data";
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch market data");
       return res.json() as Promise<MarketDataResponse>;
     },
     refetchInterval: 30000, // Refresh every 30 seconds
     staleTime: 15000, // Consider data stale after 15 seconds
+  });
+}
+
+// AI Document Generation
+export function useGenerateDocument() {
+  return useMutation({
+    mutationFn: async ({ templateName, dealData, complianceOptions }: { 
+      templateName: string; 
+      dealData: any; 
+      complianceOptions: { sec: boolean; finra: boolean; legal: boolean } 
+    }) => {
+      const res = await fetch("/api/generate-document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateName, dealData, complianceOptions }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to generate document");
+      }
+      return res.json() as Promise<{ content: string }>;
+    },
   });
 }
 
