@@ -2,7 +2,7 @@ import { eq, and, desc, gt } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@shared/schema";
-import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken } from "@shared/schema";
+import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -57,6 +57,17 @@ export interface IStorage {
   createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<PasswordResetToken>;
   getValidPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
   markPasswordResetTokenUsed(id: string): Promise<void>;
+  
+  // Assistant conversation operations
+  getAssistantConversation(id: string): Promise<AssistantConversation | undefined>;
+  getAssistantConversationsByUser(userId: string): Promise<AssistantConversation[]>;
+  createAssistantConversation(conversation: InsertAssistantConversation): Promise<AssistantConversation>;
+  updateAssistantConversationTitle(id: string, title: string): Promise<AssistantConversation | undefined>;
+  deleteAssistantConversation(id: string): Promise<void>;
+  
+  // Assistant message operations
+  getAssistantMessages(conversationId: string): Promise<AssistantMessage[]>;
+  createAssistantMessage(message: InsertAssistantMessage): Promise<AssistantMessage>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -270,6 +281,55 @@ export class DatabaseStorage implements IStorage {
     await db.update(schema.passwordResetTokens)
       .set({ used: true })
       .where(eq(schema.passwordResetTokens.id, id));
+  }
+  
+  // Assistant conversation operations
+  async getAssistantConversation(id: string): Promise<AssistantConversation | undefined> {
+    const [conversation] = await db.select().from(schema.assistantConversations).where(eq(schema.assistantConversations.id, id));
+    return conversation;
+  }
+  
+  async getAssistantConversationsByUser(userId: string): Promise<AssistantConversation[]> {
+    return await db.select().from(schema.assistantConversations)
+      .where(eq(schema.assistantConversations.userId, userId))
+      .orderBy(desc(schema.assistantConversations.updatedAt));
+  }
+  
+  async createAssistantConversation(conversation: InsertAssistantConversation): Promise<AssistantConversation> {
+    const [created] = await db.insert(schema.assistantConversations)
+      .values(conversation)
+      .returning();
+    return created;
+  }
+  
+  async updateAssistantConversationTitle(id: string, title: string): Promise<AssistantConversation | undefined> {
+    const [updated] = await db.update(schema.assistantConversations)
+      .set({ title, updatedAt: new Date() })
+      .where(eq(schema.assistantConversations.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteAssistantConversation(id: string): Promise<void> {
+    await db.delete(schema.assistantMessages).where(eq(schema.assistantMessages.conversationId, id));
+    await db.delete(schema.assistantConversations).where(eq(schema.assistantConversations.id, id));
+  }
+  
+  // Assistant message operations
+  async getAssistantMessages(conversationId: string): Promise<AssistantMessage[]> {
+    return await db.select().from(schema.assistantMessages)
+      .where(eq(schema.assistantMessages.conversationId, conversationId))
+      .orderBy(schema.assistantMessages.createdAt);
+  }
+  
+  async createAssistantMessage(message: InsertAssistantMessage): Promise<AssistantMessage> {
+    const [created] = await db.insert(schema.assistantMessages)
+      .values(message)
+      .returning();
+    await db.update(schema.assistantConversations)
+      .set({ updatedAt: new Date() })
+      .where(eq(schema.assistantConversations.id, message.conversationId));
+    return created;
   }
 }
 

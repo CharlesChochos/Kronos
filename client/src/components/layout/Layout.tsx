@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import { Sidebar } from "./Sidebar";
+import { ReaperAssistant } from "../assistant/ReaperAssistant";
 import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check, Rocket, TrendingUp, UserCheck, ChevronRight, PanelLeftClose, PanelLeft, Camera, Trash2, Calendar, Paperclip, ExternalLink } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -1535,6 +1536,9 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Reaper AI Assistant - Global access */}
+      <ReaperAssistant />
     </div>
   );
 }

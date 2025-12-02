@@ -234,3 +234,39 @@ export const insertMessageSchema = createInsertSchema(messages).omit({
 
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messages.$inferSelect;
+
+// Reaper Assistant Conversations table
+export const assistantConversations = pgTable("assistant_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  title: text("title").default('New Conversation'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAssistantConversationSchema = createInsertSchema(assistantConversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAssistantConversation = z.infer<typeof insertAssistantConversationSchema>;
+export type AssistantConversation = typeof assistantConversations.$inferSelect;
+
+// Reaper Assistant Messages table
+export const assistantMessages = pgTable("assistant_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").references(() => assistantConversations.id).notNull(),
+  role: text("role").notNull(), // 'user' or 'assistant'
+  content: text("content").notNull(),
+  context: jsonb("context").default({}), // stores any context used for the response
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAssistantMessageSchema = createInsertSchema(assistantMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAssistantMessage = z.infer<typeof insertAssistantMessageSchema>;
+export type AssistantMessage = typeof assistantMessages.$inferSelect;

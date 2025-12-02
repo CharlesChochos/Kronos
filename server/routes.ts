@@ -5,7 +5,7 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
 import bcrypt from "bcryptjs";
-import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema } from "@shared/schema";
+import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema, insertAssistantConversationSchema, insertAssistantMessageSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import { sendMeetingInvite, sendPasswordResetEmail } from "./email";
 import OpenAI from "openai";
@@ -13,6 +13,13 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import multer from "multer";
+
+// Initialize OpenAI client with Replit AI Integrations
+// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+const openai = new OpenAI({
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY
+});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -967,6 +974,292 @@ Consider common investment banking tasks like:
         reasoning: "Unable to analyze the task automatically at this time.",
         tools: ["Document Editor", "Email Client", "Calendar"]
       });
+    }
+  });
+
+  // ===== REAPER ASSISTANT ROUTES =====
+  
+  // Get user's assistant conversations
+  app.get("/api/assistant/conversations", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const conversations = await storage.getAssistantConversationsByUser(currentUser.id);
+      res.json(conversations);
+    } catch (error) {
+      console.error('Error fetching assistant conversations:', error);
+      res.status(500).json({ error: "Failed to fetch conversations" });
+    }
+  });
+  
+  // Create new assistant conversation
+  app.post("/api/assistant/conversations", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      
+      // Validate and sanitize title
+      let title = 'New Conversation';
+      if (req.body.title && typeof req.body.title === 'string') {
+        title = req.body.title.trim().slice(0, 100); // Limit to 100 chars
+      }
+      
+      const conversation = await storage.createAssistantConversation({
+        userId: currentUser.id,
+        title,
+      });
+      res.json(conversation);
+    } catch (error) {
+      console.error('Error creating assistant conversation:', error);
+      res.status(500).json({ error: "Failed to create conversation" });
+    }
+  });
+  
+  // Get messages for a conversation
+  app.get("/api/assistant/conversations/:id/messages", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const conversation = await storage.getAssistantConversation(req.params.id);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      
+      if (conversation.userId !== currentUser.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const messages = await storage.getAssistantMessages(req.params.id);
+      res.json(messages);
+    } catch (error) {
+      console.error('Error fetching assistant messages:', error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+  
+  // Send message to Reaper and get AI response
+  app.post("/api/assistant/conversations/:id/messages", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const conversation = await storage.getAssistantConversation(req.params.id);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      
+      if (conversation.userId !== currentUser.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const { content } = req.body;
+      if (!content || typeof content !== 'string') {
+        return res.status(400).json({ error: "Message content is required" });
+      }
+      
+      // Save user message
+      const userMessage = await storage.createAssistantMessage({
+        conversationId: req.params.id,
+        role: 'user',
+        content,
+      });
+      
+      // Gather context for the AI
+      const [deals, tasks, users, allTasks] = await Promise.all([
+        storage.getAllDeals(),
+        storage.getTasksByUser(currentUser.id),
+        storage.getAllUsers(),
+        storage.getAllTasks(),
+      ]);
+      
+      // Build context about the platform state
+      const platformContext = {
+        currentUser: { 
+          id: currentUser.id, 
+          name: currentUser.name, 
+          role: currentUser.role,
+          activeDeals: currentUser.activeDeals,
+          completedTasks: currentUser.completedTasks,
+        },
+        dealsSummary: {
+          total: deals.length,
+          active: deals.filter(d => d.status === 'Active').length,
+          stages: deals.reduce((acc, d) => {
+            acc[d.stage] = (acc[d.stage] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>),
+          totalValue: deals.reduce((sum, d) => sum + d.value, 0),
+        },
+        myTasks: {
+          total: tasks.length,
+          pending: tasks.filter(t => t.status === 'Pending').length,
+          inProgress: tasks.filter(t => t.status === 'In Progress').length,
+          completed: tasks.filter(t => t.status === 'Completed').length,
+          overdue: tasks.filter(t => new Date(t.dueDate) < new Date() && t.status !== 'Completed').length,
+        },
+        teamMembers: users.map(u => ({ 
+          id: u.id, 
+          name: u.name, 
+          role: u.role,
+          activeDeals: u.activeDeals,
+          completedTasks: u.completedTasks,
+        })),
+        recentDeals: deals.slice(0, 5).map(d => ({
+          id: d.id,
+          name: d.name,
+          stage: d.stage,
+          value: d.value,
+          client: d.client,
+          sector: d.sector,
+          lead: d.lead,
+          progress: d.progress,
+          status: d.status,
+        })),
+        upcomingTasks: tasks
+          .filter(t => t.status !== 'Completed')
+          .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+          .slice(0, 5)
+          .map(t => ({
+            id: t.id,
+            title: t.title,
+            priority: t.priority,
+            dueDate: t.dueDate,
+            status: t.status,
+            type: t.type,
+          })),
+      };
+      
+      // Get conversation history for context
+      const previousMessages = await storage.getAssistantMessages(req.params.id);
+      const conversationHistory = previousMessages
+        .filter(m => m.id !== userMessage.id)
+        .slice(-10) // Last 10 messages for context
+        .map(m => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        }));
+      
+      // Build the system prompt
+      const systemPrompt = `You are Reaper, an AI assistant for OSReaper - an investment banking operations platform. You help ${currentUser.role === 'CEO' ? 'executives' : 'team members'} manage deals, tasks, and collaborate with their team.
+
+Your capabilities:
+- Answer questions about deals, tasks, and team activities
+- Provide insights on deal progress and pipeline status
+- Help with task prioritization and workload management
+- Offer advice on deal strategies and next steps
+- Explain platform features and how to use them
+- Summarize team member activities and workloads
+
+Current Platform Context:
+${JSON.stringify(platformContext, null, 2)}
+
+Guidelines:
+- Be concise but thorough
+- Use specific data from the context when relevant
+- Format responses with clear structure (use markdown)
+- If asked about something not in your context, say so clearly
+- Be professional but approachable
+- When discussing values, note they are in millions (e.g., $50M)
+- Reference team members by name when relevant
+- For task and deal queries, provide actionable insights`;
+      
+      // Call OpenAI API
+      try {
+        const completion = await openai.chat.completions.create({
+          model: "gpt-5", // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...conversationHistory,
+            { role: "user", content },
+          ],
+          max_completion_tokens: 2048,
+        });
+        
+        const assistantContent = completion.choices[0]?.message?.content || "I apologize, but I couldn't generate a response. Please try again.";
+        
+        // Save assistant response
+        const assistantMessage = await storage.createAssistantMessage({
+          conversationId: req.params.id,
+          role: 'assistant',
+          content: assistantContent,
+          context: platformContext as any,
+        });
+        
+        // Update conversation title if it's the first message
+        if (previousMessages.length === 0) {
+          const titleWords = content.split(' ').slice(0, 5).join(' ');
+          const title = titleWords.length > 30 ? titleWords.substring(0, 30) + '...' : titleWords;
+          await storage.updateAssistantConversationTitle(req.params.id, title);
+        }
+        
+        res.json({
+          userMessage,
+          assistantMessage,
+        });
+      } catch (aiError: any) {
+        console.error('OpenAI API error:', aiError);
+        
+        // Still save a fallback response
+        const fallbackMessage = await storage.createAssistantMessage({
+          conversationId: req.params.id,
+          role: 'assistant',
+          content: "I'm having trouble connecting right now. Please try again in a moment.",
+        });
+        
+        res.json({
+          userMessage,
+          assistantMessage: fallbackMessage,
+        });
+      }
+    } catch (error) {
+      console.error('Error in assistant chat:', error);
+      res.status(500).json({ error: "Failed to process message" });
+    }
+  });
+  
+  // Update conversation title
+  app.patch("/api/assistant/conversations/:id", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const conversation = await storage.getAssistantConversation(req.params.id);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      
+      if (conversation.userId !== currentUser.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const { title } = req.body;
+      if (!title || typeof title !== 'string') {
+        return res.status(400).json({ error: "Title is required" });
+      }
+      
+      const updated = await storage.updateAssistantConversationTitle(req.params.id, title);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating conversation:', error);
+      res.status(500).json({ error: "Failed to update conversation" });
+    }
+  });
+  
+  // Delete conversation
+  app.delete("/api/assistant/conversations/:id", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const conversation = await storage.getAssistantConversation(req.params.id);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      
+      if (conversation.userId !== currentUser.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      await storage.deleteAssistantConversation(req.params.id);
+      res.json({ message: "Conversation deleted successfully" });
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      res.status(500).json({ error: "Failed to delete conversation" });
     }
   });
 
