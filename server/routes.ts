@@ -1146,6 +1146,13 @@ Your capabilities:
 - Offer advice on deal strategies and next steps
 - Explain platform features and how to use them
 - Summarize team member activities and workloads
+- SEND IN-APP MESSAGES to team members (use send_message function)
+- Share files and documents with team members
+
+IMPORTANT - Sending Messages:
+When the user asks you to send a message to someone, you MUST use the send_message function.
+Extract the recipient name and the message content from the user's request.
+Example: "Send a message to Emily saying hello" -> call send_message with recipientName="Emily" and content="hello"
 
 Current Platform Context:
 ${JSON.stringify(platformContext, null, 2)}
@@ -1158,21 +1165,148 @@ Guidelines:
 - Be professional but approachable
 - When discussing values, note they are in millions (e.g., $50M)
 - Reference team members by name when relevant
-- For task and deal queries, provide actionable insights`;
+- For task and deal queries, provide actionable insights
+- When asked to send a message, ALWAYS use the send_message function`;
       
-      // Call OpenAI API
+      // Define tools for the assistant
+      const tools: any[] = [
+        {
+          type: "function",
+          function: {
+            name: "send_message",
+            description: "Send an in-app message to a team member. Use this when the user asks to message, contact, or communicate with someone.",
+            parameters: {
+              type: "object",
+              properties: {
+                recipientName: {
+                  type: "string",
+                  description: "The name of the person to send the message to"
+                },
+                content: {
+                  type: "string",
+                  description: "The message content to send"
+                }
+              },
+              required: ["recipientName", "content"]
+            }
+          }
+        }
+      ];
+      
+      // Call OpenAI API with function calling
       try {
         const completion = await openai.chat.completions.create({
-          model: "gpt-5", // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+          model: "gpt-5",
           messages: [
             { role: "system", content: systemPrompt },
             ...conversationHistory,
             { role: "user", content },
           ],
+          tools,
+          tool_choice: "auto",
           max_completion_tokens: 2048,
         });
         
-        const assistantContent = completion.choices[0]?.message?.content || "I apologize, but I couldn't generate a response. Please try again.";
+        const responseMessage = completion.choices[0]?.message;
+        let assistantContent = responseMessage?.content || "";
+        
+        // Handle function calls
+        if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
+          const toolResults: any[] = [];
+          
+          for (const toolCall of responseMessage.tool_calls) {
+            const functionCall = (toolCall as any).function;
+            if (functionCall?.name === "send_message") {
+              try {
+                const args = JSON.parse(functionCall.arguments);
+                
+                // Find recipient user
+                const allUsers = await storage.getAllUsers();
+                const recipient = allUsers.find(u => 
+                  u.name.toLowerCase() === args.recipientName.toLowerCase() ||
+                  u.name.toLowerCase().includes(args.recipientName.toLowerCase())
+                );
+                
+                if (recipient && recipient.id !== currentUser.id) {
+                  // Get or create conversation
+                  let conversation = await storage.getConversationBetweenUsers(currentUser.id, recipient.id);
+                  
+                  if (!conversation) {
+                    conversation = await storage.createConversation({
+                      name: recipient.name,
+                      isGroup: false,
+                      createdBy: currentUser.id,
+                    });
+                    
+                    await storage.addConversationMember(conversation.id, currentUser.id);
+                    await storage.addConversationMember(conversation.id, recipient.id);
+                  }
+                  
+                  // Send message
+                  await storage.createMessage({
+                    conversationId: conversation.id,
+                    senderId: currentUser.id,
+                    content: args.content,
+                  });
+                  
+                  // Create notification
+                  await storage.createNotification({
+                    userId: recipient.id,
+                    title: 'New Message',
+                    message: `${currentUser.name}: ${args.content.slice(0, 50)}${args.content.length > 50 ? '...' : ''}`,
+                    type: 'info',
+                    link: '/chat',
+                  });
+                  
+                  toolResults.push({
+                    tool_call_id: toolCall.id,
+                    result: `Message sent successfully to ${recipient.name}`
+                  });
+                } else if (recipient?.id === currentUser.id) {
+                  toolResults.push({
+                    tool_call_id: toolCall.id,
+                    result: "Cannot send message to yourself"
+                  });
+                } else {
+                  toolResults.push({
+                    tool_call_id: toolCall.id,
+                    result: `User "${args.recipientName}" not found. Available team members: ${allUsers.filter(u => u.id !== currentUser.id).map(u => u.name).join(', ')}`
+                  });
+                }
+              } catch (parseError) {
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: "Failed to parse message parameters"
+                });
+              }
+            }
+          }
+          
+          // Get final response after tool execution
+          const toolMessages = responseMessage.tool_calls.map((tc, i) => ({
+            role: "tool" as const,
+            tool_call_id: tc.id,
+            content: toolResults[i]?.result || "Function executed"
+          }));
+          
+          const followUpCompletion = await openai.chat.completions.create({
+            model: "gpt-5",
+            messages: [
+              { role: "system", content: systemPrompt },
+              ...conversationHistory,
+              { role: "user", content },
+              { role: "assistant", content: null, tool_calls: responseMessage.tool_calls },
+              ...toolMessages,
+            ],
+            max_completion_tokens: 2048,
+          });
+          
+          assistantContent = followUpCompletion.choices[0]?.message?.content || "I've completed the action.";
+        }
+        
+        if (!assistantContent) {
+          assistantContent = "I apologize, but I couldn't generate a response. Please try again.";
+        }
         
         // Save assistant response
         const assistantMessage = await storage.createAssistantMessage({
@@ -1260,6 +1394,272 @@ Guidelines:
     } catch (error) {
       console.error('Error deleting conversation:', error);
       res.status(500).json({ error: "Failed to delete conversation" });
+    }
+  });
+
+  // ===== CHAT SYSTEM ROUTES =====
+  
+  // Get user's conversations
+  app.get("/api/chat/conversations", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const conversations = await storage.getConversationsByUser(currentUser.id);
+      
+      // Enrich conversations with member details and last message
+      const enrichedConversations = await Promise.all(
+        conversations.map(async (conv) => {
+          const members = await storage.getConversationMembers(conv.id);
+          const messages = await storage.getMessages(conv.id);
+          const lastMessage = messages[messages.length - 1];
+          
+          const memberDetails = await Promise.all(
+            members.map(async (m) => {
+              const user = await storage.getUser(m.userId);
+              return user ? { id: user.id, name: user.name, avatar: user.avatar } : null;
+            })
+          );
+          
+          return {
+            ...conv,
+            members: memberDetails.filter(Boolean),
+            lastMessage: lastMessage ? {
+              content: lastMessage.content,
+              senderId: lastMessage.senderId,
+              createdAt: lastMessage.createdAt,
+            } : null,
+            unreadCount: 0, // Will be calculated client-side or enhanced later
+          };
+        })
+      );
+      
+      res.json(enrichedConversations);
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+      res.status(500).json({ error: "Failed to fetch conversations" });
+    }
+  });
+  
+  // Create new conversation or get existing one
+  app.post("/api/chat/conversations", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { participantId, isGroup, name, participantIds } = req.body;
+      
+      if (isGroup) {
+        // Create group conversation
+        if (!participantIds || participantIds.length < 2) {
+          return res.status(400).json({ error: "Group requires at least 2 participants" });
+        }
+        
+        const conversation = await storage.createConversation({
+          name: name || 'Group Chat',
+          isGroup: true,
+          createdBy: currentUser.id,
+        });
+        
+        // Add all members including creator
+        await storage.addConversationMember(conversation.id, currentUser.id);
+        for (const pid of participantIds) {
+          if (pid !== currentUser.id) {
+            await storage.addConversationMember(conversation.id, pid);
+          }
+        }
+        
+        res.json(conversation);
+      } else {
+        // Direct message - check if conversation already exists
+        if (!participantId) {
+          return res.status(400).json({ error: "participantId is required for direct messages" });
+        }
+        
+        let conversation = await storage.getConversationBetweenUsers(currentUser.id, participantId);
+        
+        if (!conversation) {
+          // Create new conversation
+          const participant = await storage.getUser(participantId);
+          conversation = await storage.createConversation({
+            name: participant?.name || 'Direct Message',
+            isGroup: false,
+            createdBy: currentUser.id,
+          });
+          
+          await storage.addConversationMember(conversation.id, currentUser.id);
+          await storage.addConversationMember(conversation.id, participantId);
+        }
+        
+        res.json(conversation);
+      }
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+      res.status(500).json({ error: "Failed to create conversation" });
+    }
+  });
+  
+  // Get messages for a conversation
+  app.get("/api/chat/conversations/:id/messages", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const conversation = await storage.getConversation(req.params.id);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      
+      // Verify user is a member
+      const members = await storage.getConversationMembers(req.params.id);
+      if (!members.some(m => m.userId === currentUser.id)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const messages = await storage.getMessages(req.params.id);
+      
+      // Enrich messages with sender details
+      const enrichedMessages = await Promise.all(
+        messages.map(async (msg) => {
+          const sender = await storage.getUser(msg.senderId);
+          return {
+            ...msg,
+            senderName: sender?.name || 'Unknown',
+            senderAvatar: sender?.avatar,
+          };
+        })
+      );
+      
+      // Mark as read
+      await storage.markMessagesAsRead(req.params.id, currentUser.id);
+      
+      res.json(enrichedMessages);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+  
+  // Send message
+  app.post("/api/chat/conversations/:id/messages", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { content, attachments } = req.body;
+      
+      if (!content || typeof content !== 'string' || content.trim().length === 0) {
+        return res.status(400).json({ error: "Message content is required" });
+      }
+      
+      const conversation = await storage.getConversation(req.params.id);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      
+      // Verify user is a member
+      const members = await storage.getConversationMembers(req.params.id);
+      if (!members.some(m => m.userId === currentUser.id)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const message = await storage.createMessage({
+        conversationId: req.params.id,
+        senderId: currentUser.id,
+        content: content.trim(),
+        attachments: attachments || [],
+      });
+      
+      // Create notifications for other members
+      for (const member of members) {
+        if (member.userId !== currentUser.id) {
+          await storage.createNotification({
+            userId: member.userId,
+            title: 'New Message',
+            message: `${currentUser.name}: ${content.slice(0, 50)}${content.length > 50 ? '...' : ''}`,
+            type: 'info',
+            link: '/chat',
+          });
+        }
+      }
+      
+      res.json({
+        ...message,
+        senderName: currentUser.name,
+        senderAvatar: currentUser.avatar,
+      });
+    } catch (error) {
+      console.error('Error sending message:', error);
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+  
+  // Send message to user by name (for Reaper assistant integration)
+  app.post("/api/chat/send-to-user", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { recipientName, content, attachments } = req.body;
+      
+      if (!recipientName || typeof recipientName !== 'string') {
+        return res.status(400).json({ error: "Recipient name is required" });
+      }
+      
+      if (!content || typeof content !== 'string' || content.trim().length === 0) {
+        return res.status(400).json({ error: "Message content is required" });
+      }
+      
+      // Find user by name (case insensitive)
+      const allUsers = await storage.getAllUsers();
+      const recipient = allUsers.find(u => 
+        u.name.toLowerCase() === recipientName.toLowerCase() ||
+        u.name.toLowerCase().includes(recipientName.toLowerCase())
+      );
+      
+      if (!recipient) {
+        return res.status(404).json({ error: `User "${recipientName}" not found` });
+      }
+      
+      if (recipient.id === currentUser.id) {
+        return res.status(400).json({ error: "Cannot send message to yourself" });
+      }
+      
+      // Get or create conversation
+      let conversation = await storage.getConversationBetweenUsers(currentUser.id, recipient.id);
+      
+      if (!conversation) {
+        conversation = await storage.createConversation({
+          name: recipient.name,
+          isGroup: false,
+          createdBy: currentUser.id,
+        });
+        
+        await storage.addConversationMember(conversation.id, currentUser.id);
+        await storage.addConversationMember(conversation.id, recipient.id);
+      }
+      
+      // Send message
+      const message = await storage.createMessage({
+        conversationId: conversation.id,
+        senderId: currentUser.id,
+        content: content.trim(),
+        attachments: attachments || [],
+      });
+      
+      // Create notification for recipient
+      await storage.createNotification({
+        userId: recipient.id,
+        title: 'New Message',
+        message: `${currentUser.name}: ${content.slice(0, 50)}${content.length > 50 ? '...' : ''}`,
+        type: 'info',
+        link: '/chat',
+      });
+      
+      res.json({
+        success: true,
+        message: {
+          ...message,
+          senderName: currentUser.name,
+          recipientName: recipient.name,
+        },
+        conversationId: conversation.id,
+      });
+    } catch (error) {
+      console.error('Error sending message to user:', error);
+      res.status(500).json({ error: "Failed to send message" });
     }
   });
 

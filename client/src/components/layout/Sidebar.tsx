@@ -9,7 +9,14 @@ import {
   LogOut,
   CheckSquare,
   Home,
-  MessageCircle
+  MessageCircle,
+  TrendingUp,
+  Calendar,
+  BarChart3,
+  Shield,
+  GitCompare,
+  Clock,
+  Target
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLogout } from "@/lib/api";
@@ -43,7 +50,18 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
   const ceoLinks = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/ceo/dashboard" },
     { icon: Briefcase, label: "Deal Management", path: "/ceo/deals" },
-    { icon: FileText, label: "Document Generator", path: "/ceo/documents" },
+    { icon: TrendingUp, label: "Pipeline Forecast", path: "/ceo/forecasting" },
+    { icon: Calendar, label: "Capital Calendar", path: "/ceo/capital-calendar" },
+    { icon: BarChart3, label: "Team Performance", path: "/ceo/team-performance" },
+    { icon: Shield, label: "War Room", path: "/ceo/war-room" },
+    { icon: GitCompare, label: "Deal Comparison", path: "/ceo/deal-comparison" },
+    { icon: Target, label: "Win/Loss Analysis", path: "/ceo/win-loss" },
+    { icon: Users, label: "Investor CRM", path: "/ceo/investor-crm" },
+    { icon: Clock, label: "Time Tracking", path: "/ceo/time-tracking" },
+    { icon: Calendar, label: "Vacation Calendar", path: "/ceo/vacation-calendar" },
+    { icon: Users, label: "Skill Matrix", path: "/ceo/skill-matrix" },
+    { icon: Clock, label: "Audit Trail", path: "/ceo/audit-trail" },
+    { icon: FileText, label: "Documents", path: "/ceo/documents" },
     { icon: PieChart, label: "Investor Match", path: "/ceo/investors" },
     { icon: Users, label: "Team Assignment", path: "/ceo/team" },
     { icon: MessageCircle, label: "Messages", path: "/ceo/chat" },
@@ -52,7 +70,12 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
   const employeeLinks = [
     { icon: Home, label: "Home", path: "/employee/home" },
     { icon: CheckSquare, label: "My Tasks", path: "/employee/tasks" },
-    { icon: FileText, label: "Document Generator", path: "/employee/documents" },
+    { icon: Shield, label: "War Room", path: "/employee/war-room" },
+    { icon: GitCompare, label: "Deal Comparison", path: "/employee/deal-comparison" },
+    { icon: Clock, label: "Time Tracking", path: "/employee/time-tracking" },
+    { icon: Calendar, label: "Vacation Calendar", path: "/employee/vacation-calendar" },
+    { icon: Users, label: "Skill Matrix", path: "/employee/skill-matrix" },
+    { icon: FileText, label: "Documents", path: "/employee/documents" },
     { icon: Briefcase, label: "Deal Management", path: "/employee/deals" },
     { icon: PieChart, label: "Investor Match", path: "/employee/investors" },
     { icon: MessageCircle, label: "Messages", path: "/employee/chat" },

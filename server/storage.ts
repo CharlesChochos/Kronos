@@ -2,7 +2,7 @@ import { eq, and, desc, gt } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@shared/schema";
-import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage } from "@shared/schema";
+import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -68,6 +68,20 @@ export interface IStorage {
   // Assistant message operations
   getAssistantMessages(conversationId: string): Promise<AssistantMessage[]>;
   createAssistantMessage(message: InsertAssistantMessage): Promise<AssistantMessage>;
+  
+  // Chat conversation operations
+  getConversation(id: string): Promise<Conversation | undefined>;
+  getConversationsByUser(userId: string): Promise<Conversation[]>;
+  getConversationBetweenUsers(userId1: string, userId2: string): Promise<Conversation | undefined>;
+  createConversation(conversation: InsertConversation): Promise<Conversation>;
+  addConversationMember(conversationId: string, userId: string): Promise<ConversationMember>;
+  getConversationMembers(conversationId: string): Promise<ConversationMember[]>;
+  
+  // Chat message operations
+  getMessages(conversationId: string): Promise<Message[]>;
+  createMessage(message: InsertMessage): Promise<Message>;
+  getUnreadMessageCount(userId: string): Promise<number>;
+  markMessagesAsRead(conversationId: string, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -330,6 +344,116 @@ export class DatabaseStorage implements IStorage {
       .set({ updatedAt: new Date() })
       .where(eq(schema.assistantConversations.id, message.conversationId));
     return created;
+  }
+  
+  // Chat conversation operations
+  async getConversation(id: string): Promise<Conversation | undefined> {
+    const [conversation] = await db.select().from(schema.conversations).where(eq(schema.conversations.id, id));
+    return conversation;
+  }
+  
+  async getConversationsByUser(userId: string): Promise<Conversation[]> {
+    const memberships = await db.select()
+      .from(schema.conversationMembers)
+      .where(eq(schema.conversationMembers.userId, userId));
+    
+    if (memberships.length === 0) return [];
+    
+    const conversationIds = memberships.map(m => m.conversationId);
+    const conversations: Conversation[] = [];
+    
+    for (const convId of conversationIds) {
+      const [conv] = await db.select().from(schema.conversations).where(eq(schema.conversations.id, convId));
+      if (conv) conversations.push(conv);
+    }
+    
+    return conversations.sort((a, b) => 
+      (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
+    );
+  }
+  
+  async getConversationBetweenUsers(userId1: string, userId2: string): Promise<Conversation | undefined> {
+    const user1Convs = await this.getConversationsByUser(userId1);
+    
+    for (const conv of user1Convs) {
+      if (conv.isGroup) continue;
+      const members = await this.getConversationMembers(conv.id);
+      const memberIds = members.map(m => m.userId);
+      if (memberIds.includes(userId2) && memberIds.length === 2) {
+        return conv;
+      }
+    }
+    return undefined;
+  }
+  
+  async createConversation(conversation: InsertConversation): Promise<Conversation> {
+    const [created] = await db.insert(schema.conversations)
+      .values(conversation)
+      .returning();
+    return created;
+  }
+  
+  async addConversationMember(conversationId: string, userId: string): Promise<ConversationMember> {
+    const [member] = await db.insert(schema.conversationMembers)
+      .values({ conversationId, userId })
+      .returning();
+    return member;
+  }
+  
+  async getConversationMembers(conversationId: string): Promise<ConversationMember[]> {
+    return await db.select()
+      .from(schema.conversationMembers)
+      .where(eq(schema.conversationMembers.conversationId, conversationId));
+  }
+  
+  // Chat message operations
+  async getMessages(conversationId: string): Promise<Message[]> {
+    return await db.select()
+      .from(schema.messages)
+      .where(eq(schema.messages.conversationId, conversationId))
+      .orderBy(schema.messages.createdAt);
+  }
+  
+  async createMessage(message: InsertMessage): Promise<Message> {
+    const [created] = await db.insert(schema.messages)
+      .values(message)
+      .returning();
+    await db.update(schema.conversations)
+      .set({ updatedAt: new Date() })
+      .where(eq(schema.conversations.id, message.conversationId));
+    return created;
+  }
+  
+  async getUnreadMessageCount(userId: string): Promise<number> {
+    const memberships = await db.select()
+      .from(schema.conversationMembers)
+      .where(eq(schema.conversationMembers.userId, userId));
+    
+    let unreadCount = 0;
+    for (const membership of memberships) {
+      const lastRead = membership.lastReadAt || new Date(0);
+      const messages = await db.select()
+        .from(schema.messages)
+        .where(
+          and(
+            eq(schema.messages.conversationId, membership.conversationId),
+            gt(schema.messages.createdAt, lastRead)
+          )
+        );
+      unreadCount += messages.filter(m => m.senderId !== userId).length;
+    }
+    return unreadCount;
+  }
+  
+  async markMessagesAsRead(conversationId: string, userId: string): Promise<void> {
+    await db.update(schema.conversationMembers)
+      .set({ lastReadAt: new Date() })
+      .where(
+        and(
+          eq(schema.conversationMembers.conversationId, conversationId),
+          eq(schema.conversationMembers.userId, userId)
+        )
+      );
   }
 }
 

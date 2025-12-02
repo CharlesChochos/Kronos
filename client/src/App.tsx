@@ -13,6 +13,17 @@ import DocumentGenerator from "@/pages/shared/DocumentGenerator";
 import InvestorMatching from "@/pages/ceo/InvestorMatching";
 import EmployeeInvestorMatching from "@/pages/employee/InvestorMatching";
 import TeamAssignment from "@/pages/ceo/TeamAssignment";
+import PipelineForecasting from "@/pages/ceo/PipelineForecasting";
+import CapitalRaisingCalendar from "@/pages/ceo/CapitalRaisingCalendar";
+import TeamPerformance from "@/pages/ceo/TeamPerformance";
+import WarRoom from "@/pages/shared/WarRoom";
+import DealComparison from "@/pages/shared/DealComparison";
+import AuditTrail from "@/pages/ceo/AuditTrail";
+import WinLossAnalysis from "@/pages/ceo/WinLossAnalysis";
+import InvestorCRM from "@/pages/ceo/InvestorCRM";
+import TimeTracking from "@/pages/shared/TimeTracking";
+import VacationCalendar from "@/pages/shared/VacationCalendar";
+import SkillMatrix from "@/pages/shared/SkillMatrix";
 import MyTasks from "@/pages/employee/MyTasks";
 import EmployeeHome from "@/pages/employee/Home";
 import Chat from "@/pages/shared/Chat";
@@ -26,6 +37,16 @@ const CeoDealManagement = () => <DealManagement role="CEO" />;
 const EmployeeDealManagement = () => <DealManagement role="Employee" />;
 const CeoChat = () => <Chat role="CEO" />;
 const EmployeeChat = () => <Chat role="Employee" />;
+const CeoWarRoom = () => <WarRoom role="CEO" />;
+const EmployeeWarRoom = () => <WarRoom role="Employee" />;
+const CeoDealComparison = () => <DealComparison role="CEO" />;
+const EmployeeDealComparison = () => <DealComparison role="Employee" />;
+const CeoTimeTracking = () => <TimeTracking role="CEO" />;
+const EmployeeTimeTracking = () => <TimeTracking role="Employee" />;
+const CeoVacationCalendar = () => <VacationCalendar role="CEO" />;
+const EmployeeVacationCalendar = () => <VacationCalendar role="Employee" />;
+const CeoSkillMatrix = () => <SkillMatrix role="CEO" />;
+const EmployeeSkillMatrix = () => <SkillMatrix role="Employee" />;
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { data: user, isLoading } = useCurrentUser();
@@ -97,6 +118,39 @@ function Router() {
       <Route path="/ceo/chat">
         {() => <ProtectedRoute component={CeoChat} />}
       </Route>
+      <Route path="/ceo/forecasting">
+        {() => <ProtectedRoute component={PipelineForecasting} />}
+      </Route>
+      <Route path="/ceo/capital-calendar">
+        {() => <ProtectedRoute component={CapitalRaisingCalendar} />}
+      </Route>
+      <Route path="/ceo/team-performance">
+        {() => <ProtectedRoute component={TeamPerformance} />}
+      </Route>
+      <Route path="/ceo/war-room">
+        {() => <ProtectedRoute component={CeoWarRoom} />}
+      </Route>
+      <Route path="/ceo/deal-comparison">
+        {() => <ProtectedRoute component={CeoDealComparison} />}
+      </Route>
+      <Route path="/ceo/audit-trail">
+        {() => <ProtectedRoute component={AuditTrail} />}
+      </Route>
+      <Route path="/ceo/win-loss">
+        {() => <ProtectedRoute component={WinLossAnalysis} />}
+      </Route>
+      <Route path="/ceo/investor-crm">
+        {() => <ProtectedRoute component={InvestorCRM} />}
+      </Route>
+      <Route path="/ceo/time-tracking">
+        {() => <ProtectedRoute component={CeoTimeTracking} />}
+      </Route>
+      <Route path="/ceo/vacation-calendar">
+        {() => <ProtectedRoute component={CeoVacationCalendar} />}
+      </Route>
+      <Route path="/ceo/skill-matrix">
+        {() => <ProtectedRoute component={CeoSkillMatrix} />}
+      </Route>
       
       {/* Employee Routes */}
       <Route path="/employee/home">
@@ -116,6 +170,21 @@ function Router() {
       </Route>
       <Route path="/employee/chat">
         {() => <ProtectedRoute component={EmployeeChat} />}
+      </Route>
+      <Route path="/employee/war-room">
+        {() => <ProtectedRoute component={EmployeeWarRoom} />}
+      </Route>
+      <Route path="/employee/deal-comparison">
+        {() => <ProtectedRoute component={EmployeeDealComparison} />}
+      </Route>
+      <Route path="/employee/time-tracking">
+        {() => <ProtectedRoute component={EmployeeTimeTracking} />}
+      </Route>
+      <Route path="/employee/vacation-calendar">
+        {() => <ProtectedRoute component={EmployeeVacationCalendar} />}
+      </Route>
+      <Route path="/employee/skill-matrix">
+        {() => <ProtectedRoute component={EmployeeSkillMatrix} />}
       </Route>
 
       <Route component={NotFound} />

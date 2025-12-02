@@ -20,13 +20,15 @@ import {
   Users,
   MessageCircle,
   X,
-  Check
+  Check,
+  Loader2
 } from "lucide-react";
 import { useCurrentUser, useUsers } from "@/lib/api";
 import { useDashboardContext } from "@/contexts/DashboardContext";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 type ChatProps = {
   role: 'CEO' | 'Employee';
@@ -36,29 +38,41 @@ type Message = {
   id: string;
   senderId: string;
   senderName: string;
+  senderAvatar?: string;
   content: string;
-  timestamp: Date;
-  attachments?: { name: string; type: string; size: number }[];
+  createdAt: string;
+  attachments?: { id: string; filename: string; url: string; size: number; type: string }[];
+};
+
+type ConversationMember = {
+  id: string;
+  name: string;
+  avatar?: string;
 };
 
 type Conversation = {
   id: string;
-  name: string;
-  isGroup: boolean;
-  participants: { id: string; name: string }[];
-  lastMessage?: string;
-  lastMessageTime?: Date;
+  name: string | null;
+  isGroup: boolean | null;
+  createdBy: string | null;
+  members: ConversationMember[];
+  lastMessage: {
+    content: string;
+    senderId: string;
+    createdAt: string;
+  } | null;
   unreadCount: number;
-  messages: Message[];
 };
 
 export default function Chat({ role }: ChatProps) {
   const { data: currentUser } = useCurrentUser();
   const { data: allUsers = [] } = useUsers();
   const { clearUnreadMessages } = useDashboardContext();
+  const queryClient = useQueryClient();
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [messageInput, setMessageInput] = useState("");
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [showNewGroupModal, setShowNewGroupModal] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -66,44 +80,55 @@ export default function Chat({ role }: ChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Demo conversations (in production, these would come from the database)
-  const [conversations, setConversations] = useState<Conversation[]>([
-    {
-      id: "1",
-      name: "Deal Team Alpha",
-      isGroup: true,
-      participants: [
-        { id: "1", name: "John Smith" },
-        { id: "2", name: "Sarah Johnson" },
-      ],
-      lastMessage: "Let's review the Q4 projections",
-      lastMessageTime: new Date(Date.now() - 3600000),
-      unreadCount: 2,
-      messages: [
-        {
-          id: "m1",
-          senderId: "1",
-          senderName: "John Smith",
-          content: "Hi team, have you reviewed the latest deal terms?",
-          timestamp: new Date(Date.now() - 7200000),
-        },
-        {
-          id: "m2",
-          senderId: "2",
-          senderName: "Sarah Johnson",
-          content: "Yes, I've gone through them. The valuation looks reasonable.",
-          timestamp: new Date(Date.now() - 5400000),
-        },
-        {
-          id: "m3",
-          senderId: "1",
-          senderName: "John Smith",
-          content: "Let's review the Q4 projections",
-          timestamp: new Date(Date.now() - 3600000),
-        },
-      ],
+  // Fetch conversations from database
+  const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
+    queryKey: ["/api/chat/conversations"],
+  });
+
+  // Fetch messages for selected conversation
+  const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
+    queryKey: [`/api/chat/conversations/${selectedConversationId}/messages`],
+    enabled: !!selectedConversationId,
+  });
+
+  // Create conversation mutation
+  const createConversationMutation = useMutation({
+    mutationFn: async (data: { participantId?: string; isGroup?: boolean; name?: string; participantIds?: string[] }) => {
+      const res = await fetch("/api/chat/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create conversation");
+      return res.json();
     },
-  ]);
+    onSuccess: (conversation) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      setSelectedConversationId(conversation.id);
+      setShowNewChatModal(false);
+      setShowNewGroupModal(false);
+      setGroupName("");
+      setSelectedUsers([]);
+    },
+  });
+
+  // Send message mutation
+  const sendMessageMutation = useMutation({
+    mutationFn: async ({ conversationId, content, attachments }: { conversationId: string; content: string; attachments?: any[] }) => {
+      const res = await fetch(`/api/chat/conversations/${conversationId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, attachments }),
+      });
+      if (!res.ok) throw new Error("Failed to send message");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/chat/conversations/${selectedConversationId}/messages`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      setMessageInput("");
+    },
+  });
 
   // Filter users excluding current user
   const availableUsers = allUsers.filter(u => u.id !== currentUser?.id);
@@ -114,141 +139,92 @@ export default function Chat({ role }: ChatProps) {
 
   useEffect(() => {
     scrollToBottom();
-  }, [selectedConversation?.messages]);
+  }, [messages]);
 
   useEffect(() => {
     clearUnreadMessages();
   }, [clearUnreadMessages]);
 
-  const handleSendMessage = () => {
-    if (!messageInput.trim() || !selectedConversation) return;
+  // Auto-select first conversation if none selected
+  useEffect(() => {
+    if (conversations.length > 0 && !selectedConversationId) {
+      setSelectedConversationId(conversations[0].id);
+    }
+  }, [conversations, selectedConversationId]);
 
-    const newMessage: Message = {
-      id: crypto.randomUUID(),
-      senderId: currentUser?.id || "",
-      senderName: currentUser?.name || "You",
-      content: messageInput,
-      timestamp: new Date(),
-    };
+  const handleSendMessage = async () => {
+    if (!messageInput.trim() || !selectedConversationId) return;
 
-    setConversations(prev => prev.map(conv => {
-      if (conv.id === selectedConversation.id) {
-        return {
-          ...conv,
-          messages: [...conv.messages, newMessage],
-          lastMessage: messageInput,
-          lastMessageTime: new Date(),
-        };
-      }
-      return conv;
-    }));
-
-    setSelectedConversation(prev => prev ? {
-      ...prev,
-      messages: [...prev.messages, newMessage],
-      lastMessage: messageInput,
-      lastMessageTime: new Date(),
-    } : null);
-
-    setMessageInput("");
+    try {
+      await sendMessageMutation.mutateAsync({
+        conversationId: selectedConversationId,
+        content: messageInput.trim(),
+      });
+    } catch (error) {
+      toast.error("Failed to send message");
+    }
   };
 
-  const handleCreateChat = (userId: string) => {
+  const handleCreateChat = async (userId: string) => {
     const user = availableUsers.find(u => u.id === userId);
     if (!user) return;
 
-    // Check if conversation already exists
-    const existingConv = conversations.find(c => 
-      !c.isGroup && c.participants.some(p => p.id === userId)
-    );
-
-    if (existingConv) {
-      setSelectedConversation(existingConv);
-      setShowNewChatModal(false);
-      return;
+    try {
+      await createConversationMutation.mutateAsync({ participantId: userId });
+      toast.success(`Started conversation with ${user.name}`);
+    } catch (error) {
+      toast.error("Failed to create conversation");
     }
-
-    const newConversation: Conversation = {
-      id: crypto.randomUUID(),
-      name: user.name,
-      isGroup: false,
-      participants: [{ id: user.id, name: user.name }],
-      unreadCount: 0,
-      messages: [],
-    };
-
-    setConversations(prev => [newConversation, ...prev]);
-    setSelectedConversation(newConversation);
-    setShowNewChatModal(false);
-    toast.success(`Started conversation with ${user.name}`);
   };
 
-  const handleCreateGroup = () => {
+  const handleCreateGroup = async () => {
     if (!groupName.trim() || selectedUsers.length < 2) {
       toast.error("Please enter a group name and select at least 2 members");
       return;
     }
 
-    const participants = selectedUsers.map(id => {
-      const user = availableUsers.find(u => u.id === id);
-      return { id, name: user?.name || "Unknown" };
-    });
-
-    const newGroup: Conversation = {
-      id: crypto.randomUUID(),
-      name: groupName,
-      isGroup: true,
-      participants,
-      unreadCount: 0,
-      messages: [],
-    };
-
-    setConversations(prev => [newGroup, ...prev]);
-    setSelectedConversation(newGroup);
-    setShowNewGroupModal(false);
-    setGroupName("");
-    setSelectedUsers([]);
-    toast.success(`Created group: ${groupName}`);
+    try {
+      await createConversationMutation.mutateAsync({
+        isGroup: true,
+        name: groupName.trim(),
+        participantIds: selectedUsers,
+      });
+      toast.success(`Created group: ${groupName}`);
+    } catch (error) {
+      toast.error("Failed to create group");
+    }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || !selectedConversation) return;
+    if (!files || !selectedConversationId) return;
 
-    Array.from(files).forEach(file => {
-      const newMessage: Message = {
-        id: crypto.randomUUID(),
-        senderId: currentUser?.id || "",
-        senderName: currentUser?.name || "You",
-        content: `Shared a file: ${file.name}`,
-        timestamp: new Date(),
-        attachments: [{ name: file.name, type: file.type, size: file.size }],
-      };
-
-      setConversations(prev => prev.map(conv => {
-        if (conv.id === selectedConversation.id) {
-          return {
-            ...conv,
-            messages: [...conv.messages, newMessage],
-            lastMessage: `Shared a file: ${file.name}`,
-            lastMessageTime: new Date(),
-          };
-        }
-        return conv;
-      }));
-
-      setSelectedConversation(prev => prev ? {
-        ...prev,
-        messages: [...prev.messages, newMessage],
-      } : null);
-    });
-
-    toast.success("File uploaded successfully");
+    for (const file of Array.from(files)) {
+      try {
+        await sendMessageMutation.mutateAsync({
+          conversationId: selectedConversationId,
+          content: `Shared a file: ${file.name}`,
+          attachments: [{ filename: file.name, type: file.type, size: file.size }],
+        });
+        toast.success("File shared successfully");
+      } catch (error) {
+        toast.error("Failed to share file");
+      }
+    }
   };
 
   const filteredConversations = conversations.filter(conv =>
-    conv.name.toLowerCase().includes(searchQuery.toLowerCase())
+    (conv.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    conv.members.some(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  const selectedConversation = conversations.find(c => c.id === selectedConversationId);
+
+  const getConversationDisplayName = (conv: Conversation) => {
+    if (conv.isGroup) return conv.name || "Group Chat";
+    const otherMember = conv.members.find(m => m.id !== currentUser?.id);
+    return otherMember?.name || conv.name || "Direct Message";
+  };
 
   return (
     <Layout role={role} pageTitle="Messages" userName={currentUser?.name || ""}>
@@ -267,6 +243,7 @@ export default function Chat({ role }: ChatProps) {
                   size="icon" 
                   className="h-8 w-8"
                   onClick={() => setShowNewChatModal(true)}
+                  data-testid="button-new-chat"
                 >
                   <Plus className="w-4 h-4" />
                 </Button>
@@ -275,6 +252,7 @@ export default function Chat({ role }: ChatProps) {
                   size="icon" 
                   className="h-8 w-8"
                   onClick={() => setShowNewGroupModal(true)}
+                  data-testid="button-new-group"
                 >
                   <Users className="w-4 h-4" />
                 </Button>
@@ -287,60 +265,64 @@ export default function Chat({ role }: ChatProps) {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 bg-secondary/50"
+                data-testid="input-search-conversations"
               />
             </div>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden p-0">
             <ScrollArea className="h-full">
               <div className="px-2 pb-2">
-                {filteredConversations.length > 0 ? (
+                {conversationsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : filteredConversations.length > 0 ? (
                   filteredConversations.map(conv => (
                     <button
                       key={conv.id}
-                      onClick={() => setSelectedConversation(conv)}
+                      onClick={() => setSelectedConversationId(conv.id)}
                       className={cn(
                         "w-full p-3 rounded-lg flex items-start gap-3 transition-colors text-left",
-                        selectedConversation?.id === conv.id 
+                        selectedConversationId === conv.id 
                           ? "bg-primary/10 border border-primary/20" 
                           : "hover:bg-secondary/50"
                       )}
+                      data-testid={`conversation-item-${conv.id}`}
                     >
                       <Avatar className="w-10 h-10">
                         <AvatarFallback className={cn(
                           "text-xs",
                           conv.isGroup ? "bg-primary/20 text-primary" : "bg-blue-500/20 text-blue-500"
                         )}>
-                          {conv.isGroup 
-                            ? conv.name.split(' ').map(n => n[0]).join('').slice(0, 2)
-                            : conv.name.split(' ').map(n => n[0]).join('').slice(0, 2)
-                          }
+                          {getConversationDisplayName(conv).split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <p className="font-medium text-sm truncate">{conv.name}</p>
-                          {conv.lastMessageTime && (
+                          <p className="font-medium text-sm truncate">{getConversationDisplayName(conv)}</p>
+                          {conv.lastMessage?.createdAt && (
                             <span className="text-xs text-muted-foreground">
-                              {format(conv.lastMessageTime, 'HH:mm')}
+                              {format(new Date(conv.lastMessage.createdAt), 'HH:mm')}
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center justify-between mt-0.5">
-                          <p className="text-xs text-muted-foreground truncate">
-                            {conv.lastMessage || "No messages yet"}
-                          </p>
-                          {conv.unreadCount > 0 && (
-                            <Badge className="h-5 w-5 p-0 flex items-center justify-center text-[10px]">
-                              {conv.unreadCount}
-                            </Badge>
-                          )}
-                        </div>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          {conv.lastMessage?.content || "No messages yet"}
+                        </p>
                         {conv.isGroup && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {conv.participants.length} members
-                          </p>
+                          <div className="flex items-center gap-1 mt-1">
+                            <Users className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">
+                              {conv.members.length} members
+                            </span>
+                          </div>
                         )}
                       </div>
+                      {conv.unreadCount > 0 && (
+                        <Badge variant="default" className="h-5 min-w-5 text-xs px-1.5">
+                          {conv.unreadCount}
+                        </Badge>
+                      )}
                     </button>
                   ))
                 ) : (
@@ -377,14 +359,14 @@ export default function Chat({ role }: ChatProps) {
                           ? "bg-primary/20 text-primary" 
                           : "bg-blue-500/20 text-blue-500"
                       )}>
-                        {selectedConversation.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        {getConversationDisplayName(selectedConversation).split(' ').map(n => n[0]).join('').slice(0, 2)}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium">{selectedConversation.name}</p>
+                      <p className="font-medium">{getConversationDisplayName(selectedConversation)}</p>
                       <p className="text-xs text-muted-foreground">
                         {selectedConversation.isGroup 
-                          ? `${selectedConversation.participants.length} members`
+                          ? `${selectedConversation.members.length} members`
                           : "Direct message"
                         }
                       </p>
@@ -399,88 +381,83 @@ export default function Chat({ role }: ChatProps) {
               {/* Messages */}
               <CardContent className="flex-1 overflow-hidden p-0">
                 <ScrollArea className="h-full p-4">
-                  <div className="space-y-4">
-                    {selectedConversation.messages.map(message => {
-                      const isOwnMessage = message.senderId === currentUser?.id;
-                      return (
-                        <div
-                          key={message.id}
-                          className={cn(
-                            "flex gap-3",
-                            isOwnMessage && "flex-row-reverse"
-                          )}
-                        >
-                          {!isOwnMessage && (
+                  {messagesLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : messages.length > 0 ? (
+                    <div className="space-y-4">
+                      {messages.map(message => {
+                        const isOwnMessage = message.senderId === currentUser?.id;
+                        return (
+                          <div 
+                            key={message.id} 
+                            className={cn("flex gap-3", isOwnMessage && "flex-row-reverse")}
+                          >
                             <Avatar className="w-8 h-8">
-                              <AvatarFallback className="bg-secondary text-xs">
-                                {message.senderName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                              <AvatarFallback className="text-xs bg-secondary">
+                                {message.senderName?.split(' ').map(n => n[0]).join('').slice(0, 2) || '??'}
                               </AvatarFallback>
                             </Avatar>
-                          )}
-                          <div className={cn(
-                            "max-w-[70%]",
-                            isOwnMessage && "text-right"
-                          )}>
-                            {!isOwnMessage && selectedConversation.isGroup && (
-                              <p className="text-xs text-muted-foreground mb-1">
-                                {message.senderName}
+                            <div className={cn("max-w-[70%]", isOwnMessage && "text-right")}>
+                              <div className={cn(
+                                "rounded-lg p-3",
+                                isOwnMessage 
+                                  ? "bg-primary text-primary-foreground" 
+                                  : "bg-secondary"
+                              )}>
+                                {!isOwnMessage && (
+                                  <p className="text-xs font-medium mb-1 opacity-70">{message.senderName}</p>
+                                )}
+                                <p className="text-sm">{message.content}</p>
+                                {message.attachments && message.attachments.length > 0 && (
+                                  <div className="mt-2 space-y-1">
+                                    {message.attachments.map((att, idx) => (
+                                      <div key={idx} className="flex items-center gap-2 text-xs opacity-80">
+                                        <File className="w-3 h-3" />
+                                        <span>{att.filename}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <p className={cn(
+                                "text-xs text-muted-foreground mt-1",
+                                isOwnMessage && "text-right"
+                              )}>
+                                {format(new Date(message.createdAt), 'HH:mm')}
                               </p>
-                            )}
-                            <div className={cn(
-                              "rounded-lg p-3",
-                              isOwnMessage 
-                                ? "bg-primary text-primary-foreground" 
-                                : "bg-secondary"
-                            )}>
-                              <p className="text-sm">{message.content}</p>
-                              {message.attachments && message.attachments.length > 0 && (
-                                <div className="mt-2 space-y-1">
-                                  {message.attachments.map((att, i) => (
-                                    <div 
-                                      key={i}
-                                      className={cn(
-                                        "flex items-center gap-2 text-xs p-2 rounded",
-                                        isOwnMessage 
-                                          ? "bg-primary-foreground/10" 
-                                          : "bg-background/50"
-                                      )}
-                                    >
-                                      <File className="w-3 h-3" />
-                                      <span className="truncate">{att.name}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
                             </div>
-                            <p className={cn(
-                              "text-xs text-muted-foreground mt-1",
-                              isOwnMessage && "text-right"
-                            )}>
-                              {format(message.timestamp, 'HH:mm')}
-                            </p>
                           </div>
-                        </div>
-                      );
-                    })}
-                    <div ref={messagesEndRef} />
-                  </div>
+                        );
+                      })}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                      <MessageCircle className="w-12 h-12 mb-2 opacity-50" />
+                      <p>No messages yet</p>
+                      <p className="text-sm">Send a message to start the conversation</p>
+                    </div>
+                  )}
                 </ScrollArea>
               </CardContent>
 
               {/* Message Input */}
               <div className="p-4 border-t border-border">
-                <div className="flex items-center gap-2">
+                <div className="flex gap-2">
                   <input
-                    type="file"
                     ref={fileInputRef}
+                    type="file"
+                    className="hidden"
                     onChange={handleFileUpload}
                     multiple
-                    className="hidden"
                   />
                   <Button 
                     variant="ghost" 
                     size="icon"
                     onClick={() => fileInputRef.current?.click()}
+                    data-testid="button-attach-file"
                   >
                     <Paperclip className="w-4 h-4" />
                   </Button>
@@ -488,22 +465,37 @@ export default function Chat({ role }: ChatProps) {
                     placeholder="Type a message..."
                     value={messageInput}
                     onChange={(e) => setMessageInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
                     className="flex-1"
+                    data-testid="input-message"
                   />
-                  <Button onClick={handleSendMessage} disabled={!messageInput.trim()}>
-                    <Send className="w-4 h-4" />
+                  <Button 
+                    onClick={handleSendMessage}
+                    disabled={!messageInput.trim() || sendMessageMutation.isPending}
+                    data-testid="button-send-message"
+                  >
+                    {sendMessageMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center text-muted-foreground">
-                <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                <h3 className="text-lg font-medium mb-2">No conversation selected</h3>
-                <p className="text-sm">Select a conversation or start a new chat</p>
-              </div>
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+              <MessageCircle className="w-16 h-16 mb-4 opacity-50" />
+              <p className="text-lg font-medium">Select a conversation</p>
+              <p className="text-sm">Choose from your existing chats or start a new one</p>
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => setShowNewChatModal(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                New Chat
+              </Button>
             </div>
           )}
         </Card>
@@ -511,26 +503,27 @@ export default function Chat({ role }: ChatProps) {
 
       {/* New Chat Modal */}
       <Dialog open={showNewChatModal} onOpenChange={setShowNewChatModal}>
-        <DialogContent className="bg-card border-border">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>New Conversation</DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground mb-4">Select a team member to start chatting</p>
-            <ScrollArea className="h-64">
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">Select a team member to start chatting</p>
+            <ScrollArea className="h-60">
               <div className="space-y-2">
                 {availableUsers.map(user => (
                   <button
                     key={user.id}
                     onClick={() => handleCreateChat(user.id)}
-                    className="w-full p-3 rounded-lg flex items-center gap-3 hover:bg-secondary/50 transition-colors text-left"
+                    className="w-full p-3 rounded-lg flex items-center gap-3 hover:bg-secondary transition-colors"
+                    data-testid={`select-user-${user.id}`}
                   >
                     <Avatar className="w-10 h-10">
-                      <AvatarFallback className="bg-primary/20 text-primary text-xs">
-                        {user.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                      <AvatarFallback className="bg-blue-500/20 text-blue-500 text-sm">
+                        {user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                       </AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="text-left">
                       <p className="font-medium text-sm">{user.name}</p>
                       <p className="text-xs text-muted-foreground">{user.role}</p>
                     </div>
@@ -544,50 +537,45 @@ export default function Chat({ role }: ChatProps) {
 
       {/* New Group Modal */}
       <Dialog open={showNewGroupModal} onOpenChange={setShowNewGroupModal}>
-        <DialogContent className="bg-card border-border">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create Group</DialogTitle>
+            <DialogTitle>Create Group Chat</DialogTitle>
           </DialogHeader>
-          <div className="py-4 space-y-4">
+          <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Group Name</Label>
+              <Label htmlFor="groupName">Group Name</Label>
               <Input
-                placeholder="Enter group name"
+                id="groupName"
+                placeholder="Enter group name..."
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
+                data-testid="input-group-name"
               />
             </div>
             <div className="space-y-2">
-              <Label>Select Members (minimum 2)</Label>
-              <ScrollArea className="h-48 border border-border rounded-lg p-2">
-                <div className="space-y-2">
-                  {availableUsers.map(user => (
-                    <label
-                      key={user.id}
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary/50 cursor-pointer"
-                    >
-                      <Checkbox
-                        checked={selectedUsers.includes(user.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedUsers(prev => [...prev, user.id]);
-                          } else {
-                            setSelectedUsers(prev => prev.filter(id => id !== user.id));
-                          }
-                        }}
-                      />
-                      <Avatar className="w-8 h-8">
-                        <AvatarFallback className="bg-primary/20 text-primary text-xs">
-                          {user.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-sm">{user.name}</p>
-                        <p className="text-xs text-muted-foreground">{user.role}</p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
+              <Label>Select Members (at least 2)</Label>
+              <ScrollArea className="h-48 border rounded-lg p-2">
+                {availableUsers.map(user => (
+                  <div key={user.id} className="flex items-center gap-3 p-2 hover:bg-secondary rounded">
+                    <Checkbox
+                      checked={selectedUsers.includes(user.id)}
+                      onCheckedChange={(checked) => {
+                        setSelectedUsers(prev => 
+                          checked 
+                            ? [...prev, user.id]
+                            : prev.filter(id => id !== user.id)
+                        );
+                      }}
+                      data-testid={`checkbox-user-${user.id}`}
+                    />
+                    <Avatar className="w-8 h-8">
+                      <AvatarFallback className="bg-blue-500/20 text-blue-500 text-xs">
+                        {user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm">{user.name}</span>
+                  </div>
+                ))}
               </ScrollArea>
             </div>
           </div>
@@ -595,7 +583,14 @@ export default function Chat({ role }: ChatProps) {
             <Button variant="outline" onClick={() => setShowNewGroupModal(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateGroup} disabled={!groupName.trim() || selectedUsers.length < 2}>
+            <Button 
+              onClick={handleCreateGroup}
+              disabled={!groupName.trim() || selectedUsers.length < 2 || createConversationMutation.isPending}
+              data-testid="button-create-group"
+            >
+              {createConversationMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
               Create Group
             </Button>
           </DialogFooter>
