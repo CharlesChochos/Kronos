@@ -111,6 +111,11 @@ export default function Dashboard() {
   // Widget configuration
   const [widgets, setWidgets] = useState<WidgetConfig[]>(DEFAULT_WIDGETS);
   
+  // Market symbols state
+  const [marketSymbols, setMarketSymbols] = useState<string[]>(['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY']);
+  const [marketSearchQuery, setMarketSearchQuery] = useState('');
+  const [showMarketSearch, setShowMarketSearch] = useState(false);
+  
   // New deal form
   const [newDeal, setNewDeal] = useState({
     name: '',
@@ -660,6 +665,15 @@ export default function Dashboard() {
                <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Market Pulse</CardTitle>
                 <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 w-6 p-0"
+                    onClick={() => setShowMarketSearch(!showMarketSearch)}
+                    data-testid="button-market-search-toggle"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                  </Button>
                   <Badge variant={marketSource === 'live' ? 'default' : 'secondary'} className="text-[9px] px-1.5 py-0">
                     {marketSource === 'live' ? 'Live' : 'Demo'}
                   </Badge>
@@ -667,24 +681,135 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
+                {showMarketSearch && (
+                  <div className="space-y-2 pb-2 border-b border-border/50">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                      <Input
+                        placeholder="Search stock, index, or asset..."
+                        value={marketSearchQuery}
+                        onChange={(e) => setMarketSearchQuery(e.target.value.toUpperCase())}
+                        className="h-8 pl-8 text-xs"
+                        data-testid="input-market-search"
+                      />
+                    </div>
+                    {marketSearchQuery && (
+                      <div className="space-y-1">
+                        {[
+                          { symbol: marketSearchQuery, name: `Add ${marketSearchQuery}` },
+                          ...([
+                            { symbol: 'AAPL', name: 'Apple Inc.' },
+                            { symbol: 'GOOGL', name: 'Alphabet Inc.' },
+                            { symbol: 'MSFT', name: 'Microsoft Corp.' },
+                            { symbol: 'AMZN', name: 'Amazon.com Inc.' },
+                            { symbol: 'TSLA', name: 'Tesla Inc.' },
+                            { symbol: 'SPY', name: 'S&P 500 ETF' },
+                            { symbol: 'NVDA', name: 'NVIDIA Corp.' },
+                            { symbol: 'META', name: 'Meta Platforms' },
+                            { symbol: 'JPM', name: 'JPMorgan Chase' },
+                            { symbol: 'V', name: 'Visa Inc.' },
+                            { symbol: 'QQQ', name: 'Nasdaq 100 ETF' },
+                            { symbol: 'DIA', name: 'Dow Jones ETF' },
+                            { symbol: 'GS', name: 'Goldman Sachs' },
+                            { symbol: 'MS', name: 'Morgan Stanley' },
+                          ].filter(s => 
+                            s.symbol.includes(marketSearchQuery) || 
+                            s.name.toUpperCase().includes(marketSearchQuery)
+                          ))
+                        ].slice(0, 5).map((item) => (
+                          <div 
+                            key={item.symbol} 
+                            className={cn(
+                              "flex items-center justify-between p-2 rounded text-xs cursor-pointer transition-colors",
+                              marketSymbols.includes(item.symbol) 
+                                ? "bg-primary/10 text-primary" 
+                                : "bg-secondary/30 hover:bg-secondary/50"
+                            )}
+                            onClick={() => {
+                              if (marketSymbols.includes(item.symbol)) {
+                                setMarketSymbols(prev => prev.filter(s => s !== item.symbol));
+                                toast.success(`Removed ${item.symbol} from watchlist`);
+                              } else {
+                                setMarketSymbols(prev => [...prev, item.symbol]);
+                                toast.success(`Added ${item.symbol} to watchlist`);
+                              }
+                              setMarketSearchQuery('');
+                            }}
+                            data-testid={`market-search-result-${item.symbol}`}
+                          >
+                            <div>
+                              <span className="font-mono font-bold">{item.symbol}</span>
+                              <span className="text-muted-foreground ml-2">{item.name}</span>
+                            </div>
+                            {marketSymbols.includes(item.symbol) ? (
+                              <X className="w-3 h-3 text-red-400" />
+                            ) : (
+                              <Plus className="w-3 h-3 text-green-400" />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {!marketSearchQuery && marketSymbols.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {marketSymbols.map(symbol => (
+                          <Badge 
+                            key={symbol} 
+                            variant="secondary" 
+                            className="text-[10px] cursor-pointer hover:bg-destructive/20 hover:text-destructive transition-colors"
+                            onClick={() => {
+                              setMarketSymbols(prev => prev.filter(s => s !== symbol));
+                              toast.success(`Removed ${symbol} from watchlist`);
+                            }}
+                            data-testid={`market-symbol-badge-${symbol}`}
+                          >
+                            {symbol} <X className="w-2.5 h-2.5 ml-1" />
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {marketLoading ? (
                   <div className="text-center py-4 text-muted-foreground text-sm">Loading market data...</div>
                 ) : (
-                  marketData.map((metric) => (
-                    <div key={metric.name} className="flex items-center justify-between cursor-pointer hover:bg-secondary/30 p-2 rounded -mx-2 transition-colors">
+                  marketData
+                    .filter(metric => marketSymbols.some(s => metric.name.toUpperCase().includes(s)))
+                    .map((metric) => (
+                    <div key={metric.name} className="flex items-center justify-between hover:bg-secondary/30 p-2 rounded -mx-2 transition-colors group">
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium truncate">{metric.name}</div>
                         <div className="text-[10px] text-muted-foreground truncate">{metric.description}</div>
                       </div>
-                      <div className="text-right flex-shrink-0 ml-2">
-                        <div className="text-sm font-bold">{metric.value}</div>
-                        <div className={cn("text-xs flex items-center gap-1 justify-end", metric.trend === 'up' ? "text-green-400" : "text-red-400")}>
-                          {metric.trend === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                          {metric.change}
+                      <div className="text-right flex-shrink-0 ml-2 flex items-center gap-2">
+                        <div>
+                          <div className="text-sm font-bold">{metric.value}</div>
+                          <div className={cn("text-xs flex items-center gap-1 justify-end", metric.trend === 'up' ? "text-green-400" : "text-red-400")}>
+                            {metric.trend === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                            {metric.change}
+                          </div>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => {
+                            const symbol = metric.name.split(' ')[0].toUpperCase();
+                            setMarketSymbols(prev => prev.filter(s => s !== symbol));
+                            toast.success(`Removed ${symbol} from watchlist`);
+                          }}
+                          data-testid={`button-remove-market-${metric.name}`}
+                        >
+                          <X className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                        </Button>
                       </div>
                     </div>
                   ))
+                )}
+                {!marketLoading && marketData.filter(metric => marketSymbols.some(s => metric.name.toUpperCase().includes(s))).length === 0 && (
+                  <div className="text-center py-4 text-muted-foreground text-xs">
+                    No symbols tracked. Click the search icon to add stocks.
+                  </div>
                 )}
                 <div className="text-[10px] text-muted-foreground text-center pt-2 border-t border-border/50">
                   {marketSource === 'simulated' && <span className="text-yellow-500">Add FINNHUB_API_KEY for live data • </span>}
@@ -1331,39 +1456,6 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
-              </div>
-              
-              <Separator />
-              
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-3">MARKET PULSE SYMBOLS</h4>
-                <p className="text-xs text-muted-foreground mb-3">Select which market symbols to display in the Market Pulse widget.</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { symbol: 'AAPL', name: 'Apple' },
-                    { symbol: 'GOOGL', name: 'Alphabet' },
-                    { symbol: 'MSFT', name: 'Microsoft' },
-                    { symbol: 'AMZN', name: 'Amazon' },
-                    { symbol: 'TSLA', name: 'Tesla' },
-                    { symbol: 'SPY', name: 'S&P 500 ETF' },
-                    { symbol: 'NVDA', name: 'NVIDIA' },
-                    { symbol: 'META', name: 'Meta' },
-                  ].map((item) => (
-                    <div key={item.symbol} className="flex items-center gap-2 p-2 bg-secondary/30 rounded-lg">
-                      <Checkbox 
-                        id={`symbol-${item.symbol}`}
-                        defaultChecked={['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY'].includes(item.symbol)}
-                      />
-                      <Label htmlFor={`symbol-${item.symbol}`} className="text-xs cursor-pointer">
-                        <span className="font-mono font-bold">{item.symbol}</span>
-                        <span className="text-muted-foreground ml-1">- {item.name}</span>
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-[10px] text-muted-foreground mt-2">
-                  {marketSource === 'live' ? 'Live data from Finnhub' : 'Demo mode - add FINNHUB_API_KEY for live data'}
-                </p>
               </div>
               
               <Separator />
