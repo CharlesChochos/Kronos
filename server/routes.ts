@@ -514,5 +514,118 @@ export async function registerRoutes(
     }
   });
 
+  // ===== MARKET DATA ROUTE =====
+  
+  app.get("/api/market-data", requireAuth, async (req, res) => {
+    try {
+      const finnhubKey = process.env.FINNHUB_API_KEY;
+      
+      if (finnhubKey) {
+        // Fetch real data from Finnhub
+        const symbols = ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY'];
+        const quotes = await Promise.all(
+          symbols.map(async (symbol) => {
+            try {
+              const response = await fetch(
+                `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${finnhubKey}`
+              );
+              const data = await response.json();
+              return {
+                symbol,
+                name: getSymbolName(symbol),
+                description: getSymbolDescription(symbol),
+                currentPrice: data.c,
+                change: data.d,
+                changePercent: data.dp,
+                high: data.h,
+                low: data.l,
+                open: data.o,
+                previousClose: data.pc,
+              };
+            } catch (err) {
+              return null;
+            }
+          })
+        );
+        
+        const validQuotes = quotes.filter((q): q is NonNullable<typeof q> => q !== null && q.currentPrice > 0);
+        
+        if (validQuotes.length > 0) {
+          const marketData = validQuotes.map(q => ({
+            name: q!.name,
+            symbol: q!.symbol,
+            value: q!.currentPrice < 100 
+              ? `$${q!.currentPrice.toFixed(2)}` 
+              : `$${q!.currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            change: `${q!.changePercent >= 0 ? '+' : ''}${q!.changePercent.toFixed(2)}%`,
+            trend: q!.changePercent >= 0 ? 'up' : 'down',
+            description: q!.description,
+          }));
+          
+          return res.json({ source: 'live', data: marketData });
+        }
+      }
+      
+      // Fallback to simulated data
+      const baseData = [
+        { name: 'S&P 500', symbol: 'SPY', baseValue: 4567.89, description: 'US Large Cap' },
+        { name: 'NASDAQ', symbol: 'QQQ', baseValue: 15234.56, description: 'Tech Heavy' },
+        { name: 'Dow Jones', symbol: 'DIA', baseValue: 35678.90, description: 'Blue Chips' },
+        { name: 'Apple', symbol: 'AAPL', baseValue: 178.50, description: 'Tech Giant' },
+        { name: 'Microsoft', symbol: 'MSFT', baseValue: 378.20, description: 'Enterprise Tech' },
+        { name: 'Tesla', symbol: 'TSLA', baseValue: 245.60, description: 'EV Leader' },
+      ];
+      
+      const simulatedData = baseData.map(item => {
+        const changePercent = (Math.random() - 0.5) * 4;
+        const newValue = item.baseValue * (1 + changePercent / 100);
+        
+        return {
+          name: item.name,
+          symbol: item.symbol,
+          value: newValue < 100 
+            ? `$${newValue.toFixed(2)}` 
+            : `$${newValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          change: `${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%`,
+          trend: changePercent >= 0 ? 'up' : 'down',
+          description: item.description,
+        };
+      });
+      
+      res.json({ source: 'simulated', data: simulatedData });
+    } catch (error) {
+      console.error('Market data error:', error);
+      res.status(500).json({ error: "Failed to fetch market data" });
+    }
+  });
+
   return httpServer;
+}
+
+function getSymbolName(symbol: string): string {
+  const names: Record<string, string> = {
+    'AAPL': 'Apple Inc.',
+    'GOOGL': 'Alphabet',
+    'MSFT': 'Microsoft',
+    'AMZN': 'Amazon',
+    'TSLA': 'Tesla',
+    'SPY': 'S&P 500 ETF',
+    'QQQ': 'NASDAQ ETF',
+    'DIA': 'Dow Jones ETF',
+  };
+  return names[symbol] || symbol;
+}
+
+function getSymbolDescription(symbol: string): string {
+  const descriptions: Record<string, string> = {
+    'AAPL': 'Tech Giant',
+    'GOOGL': 'Search & Cloud',
+    'MSFT': 'Enterprise Tech',
+    'AMZN': 'E-commerce',
+    'TSLA': 'EV Leader',
+    'SPY': 'US Large Cap',
+    'QQQ': 'Tech Heavy',
+    'DIA': 'Blue Chips',
+  };
+  return descriptions[symbol] || '';
 }

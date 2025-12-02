@@ -48,7 +48,7 @@ import {
   Info,
   Paperclip
 } from "lucide-react";
-import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useMarkNotificationRead, useCreateMeeting, useMeetings, useUpdateUserPreferences } from "@/lib/api";
+import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useMarkNotificationRead, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -68,6 +68,10 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'marketPulse', name: 'Market Pulse', enabled: true },
   { id: 'teamTaskProgress', name: 'Team Task Progress', enabled: true },
   { id: 'velocityScoreboard', name: 'Live Velocity Scoreboard', enabled: true },
+  { id: 'upcomingMeetings', name: 'Upcoming Meetings', enabled: true },
+  { id: 'recentActivity', name: 'Recent Activity', enabled: true },
+  { id: 'dealPipeline', name: 'Deal Pipeline Overview', enabled: false },
+  { id: 'performanceMetrics', name: 'Performance Metrics', enabled: false },
 ];
 
 export default function Dashboard() {
@@ -132,69 +136,10 @@ export default function Dashboard() {
     dealId: '',
   });
 
-  // Market data state
-  const [marketData, setMarketData] = useState<any[]>([]);
-  const [marketLoading, setMarketLoading] = useState(true);
-
-  // Fetch live market data
-  useEffect(() => {
-    const fetchMarketData = async () => {
-      setMarketLoading(true);
-      try {
-        // Simulate live data with realistic random variations
-        // In production, replace with actual API call (e.g., Finnhub, Alpha Vantage)
-        const baseData = [
-          { name: 'S&P 500', symbol: 'SPY', baseValue: 4567.89, description: 'US Large Cap' },
-          { name: 'NASDAQ', symbol: 'QQQ', baseValue: 15234.56, description: 'Tech Heavy' },
-          { name: 'Dow Jones', symbol: 'DIA', baseValue: 35678.90, description: 'Blue Chips' },
-          { name: 'VIX', symbol: 'VIX', baseValue: 18.45, description: 'Volatility Index' },
-          { name: '10Y Treasury', symbol: 'TNX', baseValue: 4.25, description: 'Yield', isPercent: true },
-          { name: 'Gold', symbol: 'GLD', baseValue: 2045.30, description: 'Spot Price', isCurrency: true },
-        ];
-        
-        const liveData = baseData.map(item => {
-          // Generate realistic random change (-2% to +2%)
-          const changePercent = (Math.random() - 0.5) * 4;
-          const newValue = item.baseValue * (1 + changePercent / 100);
-          const trend = changePercent >= 0 ? 'up' : 'down';
-          
-          let displayValue: string;
-          let displayChange: string;
-          
-          if (item.isPercent) {
-            displayValue = `${newValue.toFixed(2)}%`;
-            displayChange = `${changePercent >= 0 ? '+' : ''}${(changePercent / 100).toFixed(2)}`;
-          } else if (item.isCurrency) {
-            displayValue = `$${newValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-            displayChange = `${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(1)}%`;
-          } else {
-            displayValue = newValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            displayChange = `${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(1)}%`;
-          }
-          
-          return {
-            name: item.name,
-            symbol: item.symbol,
-            value: displayValue,
-            change: displayChange,
-            trend,
-            description: item.description,
-          };
-        });
-        
-        setMarketData(liveData);
-      } catch (error) {
-        console.error('Failed to fetch market data:', error);
-      } finally {
-        setMarketLoading(false);
-      }
-    };
-    
-    fetchMarketData();
-    // Refresh every 30 seconds for more dynamic updates
-    const interval = setInterval(fetchMarketData, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  // Market data from API (refreshes every 30 seconds)
+  const { data: marketDataResponse, isLoading: marketLoading } = useMarketData();
+  const marketData = marketDataResponse?.data || [];
+  const marketSource = marketDataResponse?.source || 'simulated';
 
   // Compute analytics
   const activeDeals = deals.filter(d => d.status === 'Active');
@@ -592,8 +537,43 @@ export default function Dashboard() {
     <Layout role="CEO" pageTitle="Dashboard" userName={currentUser?.name || ""}>
       <div className="grid grid-cols-12 gap-6">
         
-        {/* Left Column: Quick Actions & Active Deals Analytics */}
+        {/* Left Column: User Profile, Quick Actions & Active Deals Analytics */}
         <div className="col-span-12 md:col-span-3 space-y-6">
+          {/* User Profile Widget */}
+          <Card className="bg-card border-border">
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-lg font-bold text-primary">
+                  {currentUser?.name?.split(' ').map(n => n[0]).join('') || 'U'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold truncate">{currentUser?.name}</h3>
+                  <p className="text-xs text-muted-foreground">{currentUser?.role}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full justify-start gap-2 h-9 text-xs bg-secondary/50 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/20 transition-all"
+                  onClick={() => setShowResourcesSheet(true)}
+                  data-testid="button-resources"
+                >
+                  <BookOpen className="w-3.5 h-3.5" /> Resources
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full justify-start gap-2 h-9 text-xs bg-secondary/50 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/20 transition-all"
+                  onClick={() => setShowCustomizeSheet(true)}
+                  data-testid="button-customize"
+                >
+                  <Palette className="w-3.5 h-3.5" /> Customize
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           {widgets.find(w => w.id === 'quickActions')?.enabled && (
             <Card className="bg-card border-border">
               <CardHeader>
@@ -637,38 +617,38 @@ export default function Dashboard() {
           )}
 
           {widgets.find(w => w.id === 'activeDeals')?.enabled && (
-            <Card className="bg-card border-border">
+            <Card className="bg-card border-border overflow-hidden">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Active Deals Analytics</CardTitle>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLocation('/ceo/deals')}>
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider truncate">Active Deals</CardTitle>
+                <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setLocation('/ceo/deals')}>
                   <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
                 </Button>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-secondary/30 rounded-lg p-3 text-center">
-                    <div className="text-2xl font-bold text-primary">{activeDeals.length}</div>
-                    <div className="text-[10px] text-muted-foreground uppercase">Total Active</div>
+              <CardContent className="space-y-4 overflow-hidden">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-secondary/30 rounded-lg p-2 text-center overflow-hidden">
+                    <div className="text-xl font-bold text-primary truncate">{activeDeals.length}</div>
+                    <div className="text-[9px] text-muted-foreground uppercase truncate">Active</div>
                   </div>
-                  <div className="bg-secondary/30 rounded-lg p-3 text-center">
-                    <div className="text-2xl font-bold text-green-400">${activeValue.toLocaleString()}M</div>
-                    <div className="text-[10px] text-muted-foreground uppercase">Total Value</div>
+                  <div className="bg-secondary/30 rounded-lg p-2 text-center overflow-hidden">
+                    <div className="text-xl font-bold text-green-400 truncate">${activeValue.toLocaleString()}M</div>
+                    <div className="text-[9px] text-muted-foreground uppercase truncate">Value</div>
                   </div>
                 </div>
 
                 <Separator className="bg-border/50" />
                 
-                <div>
+                <div className="overflow-hidden">
                   <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                    <PieChart className="w-3 h-3" /> By Sector
+                    <PieChart className="w-3 h-3 flex-shrink-0" /> <span className="truncate">By Sector</span>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5 max-h-24 overflow-y-auto">
                     {Object.entries(sectorStats).map(([sector, stats]) => (
-                      <div key={sector} className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">{sector}</span>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="text-[10px]">{stats.count}</Badge>
-                          <span className="text-green-400 font-mono">${stats.value}M</span>
+                      <div key={sector} className="flex items-center justify-between text-xs gap-1">
+                        <span className="text-muted-foreground truncate flex-1 min-w-0">{sector}</span>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <Badge variant="secondary" className="text-[9px] px-1">{stats.count}</Badge>
+                          <span className="text-green-400 font-mono text-[10px]">${stats.value}M</span>
                         </div>
                       </div>
                     ))}
@@ -677,21 +657,21 @@ export default function Dashboard() {
 
                 <Separator className="bg-border/50" />
                 
-                <div>
+                <div className="overflow-hidden">
                   <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                    <BarChart3 className="w-3 h-3" /> By Stage
+                    <BarChart3 className="w-3 h-3 flex-shrink-0" /> <span className="truncate">By Stage</span>
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 max-h-24 overflow-y-auto">
                     {stageStats.map(({ stage, count }) => (
-                      <div key={stage} className="flex items-center gap-2">
-                        <span className="text-[10px] text-muted-foreground w-20">{stage}</span>
-                        <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+                      <div key={stage} className="flex items-center gap-1">
+                        <span className="text-[9px] text-muted-foreground w-16 truncate flex-shrink-0">{stage}</span>
+                        <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden min-w-0">
                           <div 
                             className="h-full bg-primary/60 rounded-full transition-all"
                             style={{ width: `${activeDeals.length > 0 ? (count / activeDeals.length) * 100 : 0}%` }}
                           />
                         </div>
-                        <span className="text-xs font-mono w-6 text-right">{count}</span>
+                        <span className="text-[10px] font-mono w-4 text-right flex-shrink-0">{count}</span>
                       </div>
                     ))}
                   </div>
@@ -705,8 +685,10 @@ export default function Dashboard() {
                <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Market Pulse</CardTitle>
                 <div className="flex items-center gap-2">
-                  <div className="text-[10px] text-muted-foreground">Live</div>
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                  <Badge variant={marketSource === 'live' ? 'default' : 'secondary'} className="text-[9px] px-1.5 py-0">
+                    {marketSource === 'live' ? 'Live' : 'Demo'}
+                  </Badge>
+                  <div className={cn("w-2 h-2 rounded-full animate-pulse", marketSource === 'live' ? "bg-green-500" : "bg-yellow-500")}></div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -715,11 +697,11 @@ export default function Dashboard() {
                 ) : (
                   marketData.map((metric) => (
                     <div key={metric.name} className="flex items-center justify-between cursor-pointer hover:bg-secondary/30 p-2 rounded -mx-2 transition-colors">
-                      <div>
-                        <div className="text-sm font-medium">{metric.name}</div>
-                        <div className="text-[10px] text-muted-foreground">{metric.description}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">{metric.name}</div>
+                        <div className="text-[10px] text-muted-foreground truncate">{metric.description}</div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex-shrink-0 ml-2">
                         <div className="text-sm font-bold">{metric.value}</div>
                         <div className={cn("text-xs flex items-center gap-1 justify-end", metric.trend === 'up' ? "text-green-400" : "text-red-400")}>
                           {metric.trend === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
@@ -730,7 +712,8 @@ export default function Dashboard() {
                   ))
                 )}
                 <div className="text-[10px] text-muted-foreground text-center pt-2 border-t border-border/50">
-                  Last updated: {format(new Date(), 'HH:mm:ss')}
+                  {marketSource === 'simulated' && <span className="text-yellow-500">Add FINNHUB_API_KEY for live data • </span>}
+                  Updated: {format(new Date(), 'HH:mm:ss')}
                 </div>
               </CardContent>
             </Card>
@@ -739,21 +722,10 @@ export default function Dashboard() {
 
         {/* Middle Column: Main Content */}
         <div className="col-span-12 md:col-span-6 space-y-6">
-          {/* Welcome Banner with Customize Button */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-display font-bold">Dashboard</h1>
-              <p className="text-muted-foreground">Welcome back, {currentUser?.name?.split(' ')[0]}. Here's your personalized command center.</p>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-8 text-xs bg-secondary/50 border-border"
-              onClick={() => setShowCustomizeSheet(true)}
-              data-testid="button-customize"
-            >
-              <Palette className="w-3 h-3 mr-1" /> Customize
-            </Button>
+          {/* Welcome Banner */}
+          <div>
+            <h1 className="text-2xl font-display font-bold">Dashboard</h1>
+            <p className="text-muted-foreground">Welcome back, {currentUser?.name?.split(' ')[0]}. Here's your personalized command center.</p>
           </div>
 
           <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 text-green-500 text-xs font-medium rounded border border-green-500/20">
@@ -832,20 +804,20 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Right Column: Velocity Scoreboard */}
+        {/* Right Column: Velocity Scoreboard & Additional Widgets */}
         <div className="col-span-12 md:col-span-3 space-y-6">
           {widgets.find(w => w.id === 'velocityScoreboard')?.enabled && (
-            <Card className="bg-card border-border h-full">
+            <Card className="bg-card border-border">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Live Velocity Scoreboard</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Velocity Board</CardTitle>
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="space-y-1">
-                  {topUsers.map((user, index) => (
+                <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                  {topUsers.slice(0, 5).map((user, index) => (
                     <div 
                       key={user.id} 
-                      className="p-4 border-l-2 border-transparent hover:border-primary hover:bg-secondary/30 transition-all cursor-pointer"
+                      className="p-3 border-l-2 border-transparent hover:border-primary hover:bg-secondary/30 transition-all cursor-pointer"
                       onClick={() => openEmployeeDetail(user)}
                     >
                       <div className="flex items-center justify-between mb-1">
@@ -858,39 +830,91 @@ export default function Dashboard() {
                           {user.velocityScore}
                         </span>
                       </div>
-                      <div className="font-medium text-sm flex items-center gap-1">
+                      <div className="font-medium text-sm flex items-center gap-1 truncate">
                         {user.name}
                         <ChevronRight className="w-3 h-3 text-muted-foreground" />
                       </div>
-                      <div className="text-xs text-muted-foreground mb-2">{user.role}</div>
-                      
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className="bg-secondary/50 rounded py-1">
-                          <div className="text-[10px] text-muted-foreground">Done</div>
-                          <div className="text-xs font-bold text-green-400">{user.completedTasks}</div>
-                        </div>
-                        <div className="bg-secondary/50 rounded py-1">
-                          <div className="text-[10px] text-muted-foreground">Active</div>
-                          <div className="text-xs font-bold text-yellow-400">{user.inProgressTasks}</div>
-                        </div>
-                        <div className="bg-secondary/50 rounded py-1">
-                          <div className="text-[10px] text-muted-foreground">Deals</div>
-                          <div className="text-xs font-bold">{Object.keys(user.tasksByDeal).length}</div>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-2 h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                        <div 
-                          className={cn(
-                            "h-full rounded-full transition-all",
-                            index === 0 ? "bg-accent" : "bg-primary/60"
-                          )}
-                          style={{ width: `${user.velocityScore}%` }}
-                        />
-                      </div>
+                      <div className="text-xs text-muted-foreground">{user.role}</div>
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Upcoming Meetings Widget */}
+          {widgets.find(w => w.id === 'upcomingMeetings')?.enabled && (
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Upcoming</CardTitle>
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {meetings.length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground text-xs">No upcoming meetings</div>
+                ) : (
+                  meetings.slice(0, 3).map((meeting) => (
+                    <div key={meeting.id} className="p-2 bg-secondary/30 rounded-lg">
+                      <div className="text-sm font-medium truncate">{meeting.title}</div>
+                      <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
+                        <Clock className="w-3 h-3" />
+                        {meeting.scheduledFor ? format(new Date(meeting.scheduledFor), 'MMM d, h:mm a') : 'TBD'}
+                      </div>
+                      {meeting.location && (
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          <span className="truncate">{meeting.location}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="w-full text-xs text-muted-foreground hover:text-primary"
+                  onClick={() => setShowScheduleMeetingModal(true)}
+                >
+                  <Plus className="w-3 h-3 mr-1" /> Schedule Meeting
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Recent Activity Widget */}
+          {widgets.find(w => w.id === 'recentActivity')?.enabled && (
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Activity</CardTitle>
+                <Activity className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {notifications.length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground text-xs">No recent activity</div>
+                ) : (
+                  notifications.slice(0, 4).map((notification) => (
+                    <div 
+                      key={notification.id} 
+                      className={cn(
+                        "p-2 rounded-lg text-xs",
+                        notification.read ? "bg-secondary/20" : "bg-primary/10 border border-primary/20"
+                      )}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className={cn(
+                          "w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0",
+                          notification.type === 'success' ? "bg-green-500" :
+                          notification.type === 'warning' ? "bg-yellow-500" :
+                          notification.type === 'alert' ? "bg-red-500" : "bg-blue-500"
+                        )} />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium truncate">{notification.title}</div>
+                          <div className="text-muted-foreground text-[10px] truncate">{notification.message}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </CardContent>
             </Card>
           )}

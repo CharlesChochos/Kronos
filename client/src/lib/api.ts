@@ -384,3 +384,31 @@ export function useUpdateUserPreferences() {
     },
   });
 }
+
+// Market Data API
+export type MarketDataItem = {
+  name: string;
+  symbol: string;
+  value: string;
+  change: string;
+  trend: 'up' | 'down';
+  description: string;
+};
+
+export type MarketDataResponse = {
+  source: 'live' | 'simulated';
+  data: MarketDataItem[];
+};
+
+export function useMarketData() {
+  return useQuery({
+    queryKey: ["market-data"],
+    queryFn: async () => {
+      const res = await fetch("/api/market-data");
+      if (!res.ok) throw new Error("Failed to fetch market data");
+      return res.json() as Promise<MarketDataResponse>;
+    },
+    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 15000, // Consider data stale after 15 seconds
+  });
+}
