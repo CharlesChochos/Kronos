@@ -200,7 +200,7 @@ export default function VoiceNotes({ role }: { role: 'CEO' | 'Employee' }) {
 
     setVoiceNotes(voiceNotes.map(n =>
       n.id === selectedNote.id
-        ? { ...n, sharedWith: [...new Set([...n.sharedWith, ...shareWith])] }
+        ? { ...n, sharedWith: Array.from(new Set([...n.sharedWith, ...shareWith])) }
         : n
     ));
     setShowShareModal(false);
@@ -465,12 +465,12 @@ export default function VoiceNotes({ role }: { role: 'CEO' | 'Employee' }) {
             </div>
             <div>
               <Label>Related Deal (optional)</Label>
-              <Select value={newNote.dealId} onValueChange={(v) => setNewNote({ ...newNote, dealId: v })} disabled={isRecording}>
+              <Select value={newNote.dealId || "none"} onValueChange={(v) => setNewNote({ ...newNote, dealId: v === "none" ? '' : v })} disabled={isRecording}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a deal" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {deals.map((deal) => (
                     <SelectItem key={deal.id} value={deal.id}>{deal.name}</SelectItem>
                   ))}

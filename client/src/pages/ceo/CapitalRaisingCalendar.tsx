@@ -512,12 +512,12 @@ export default function CapitalRaisingCalendar() {
             </div>
             <div className="space-y-2">
               <Label>Related Deal (optional)</Label>
-              <Select value={newEvent.deal} onValueChange={(v) => setNewEvent(prev => ({ ...prev, deal: v }))}>
+              <Select value={newEvent.deal || "none"} onValueChange={(v) => setNewEvent(prev => ({ ...prev, deal: v === "none" ? '' : v }))}>
                 <SelectTrigger data-testid="select-deal">
                   <SelectValue placeholder="Select a deal..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {deals.map(deal => (
                     <SelectItem key={deal.id} value={deal.name}>{deal.name}</SelectItem>
                   ))}

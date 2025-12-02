@@ -505,12 +505,12 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
               </div>
               <div>
                 <Label>Related Deal</Label>
-                <Select value={newAnnouncement.dealId} onValueChange={(v) => setNewAnnouncement({ ...newAnnouncement, dealId: v })}>
+                <Select value={newAnnouncement.dealId || "none"} onValueChange={(v) => setNewAnnouncement({ ...newAnnouncement, dealId: v === "none" ? '' : v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select deal (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {deals.map((deal) => (
                       <SelectItem key={deal.id} value={deal.id}>{deal.name}</SelectItem>
                     ))}

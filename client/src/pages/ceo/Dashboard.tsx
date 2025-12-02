@@ -1596,14 +1596,14 @@ export default function Dashboard() {
               <div className="space-y-2">
                 <Label>Video Conference</Label>
                 <Select 
-                  value={newMeeting.videoPlatform} 
-                  onValueChange={(v) => setNewMeeting({ ...newMeeting, videoPlatform: v as '' | 'zoom' | 'google_meet' | 'teams' })}
+                  value={newMeeting.videoPlatform || "none"} 
+                  onValueChange={(v) => setNewMeeting({ ...newMeeting, videoPlatform: v === "none" ? '' : v as 'zoom' | 'google_meet' | 'teams' })}
                 >
                   <SelectTrigger data-testid="select-video-platform">
                     <SelectValue placeholder="Optional video link" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No video link</SelectItem>
+                    <SelectItem value="none">No video link</SelectItem>
                     <SelectItem value="zoom">Zoom Meeting</SelectItem>
                     <SelectItem value="google_meet">Google Meet</SelectItem>
                     <SelectItem value="teams">Microsoft Teams</SelectItem>
