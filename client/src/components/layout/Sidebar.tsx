@@ -7,7 +7,9 @@ import {
   UserPlus, 
   PieChart, 
   LogOut,
-  CheckSquare
+  CheckSquare,
+  Home,
+  MessageCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLogout } from "@/lib/api";
@@ -40,12 +42,15 @@ export function Sidebar({ role }: SidebarProps) {
     { icon: FileText, label: "Document Generator", path: "/ceo/documents" },
     { icon: PieChart, label: "Investor Match", path: "/ceo/investors" },
     { icon: Users, label: "Team Assignment", path: "/ceo/team" },
+    { icon: MessageCircle, label: "Messages", path: "/ceo/chat" },
   ];
 
   const employeeLinks = [
+    { icon: Home, label: "Home", path: "/employee/home" },
     { icon: CheckSquare, label: "My Tasks", path: "/employee/tasks" },
     { icon: FileText, label: "Document Generator", path: "/employee/documents" },
     { icon: Briefcase, label: "Deal Management", path: "/employee/deals" },
+    { icon: MessageCircle, label: "Messages", path: "/employee/chat" },
   ];
 
   const links = role === 'CEO' ? ceoLinks : employeeLinks;

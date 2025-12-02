@@ -19,6 +19,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { useDashboardContext } from "@/contexts/DashboardContext";
 import { useNotifications, useDeals, useTasks, useUsers, useLogout, useCurrentUser, useMarkNotificationRead, useUpdateUserProfile, useChangePassword } from "@/lib/api";
 import { toast } from "sonner";
@@ -709,67 +711,203 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
       </Sheet>
 
       {/* Settings Sheet */}
-      <Sheet open={showSettingsSheet} onOpenChange={setShowSettingsSheet}>
-        <SheetContent className="bg-card border-border">
+      <Sheet open={showSettingsSheet} onOpenChange={(open) => {
+        setShowSettingsSheet(open);
+        if (open && currentUser) {
+          setProfileForm({
+            name: currentUser.name || '',
+            email: currentUser.email || '',
+            phone: (currentUser as any)?.phone || '',
+          });
+        }
+      }}>
+        <SheetContent className="bg-card border-border w-[450px] sm:max-w-[450px]">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <Settings className="w-5 h-5 text-primary" />
               Settings
             </SheetTitle>
-            <SheetDescription>Configure your dashboard preferences.</SheetDescription>
+            <SheetDescription>Manage your account and preferences</SheetDescription>
           </SheetHeader>
-          <div className="mt-6 space-y-6">
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Display</h4>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Compact View</Label>
-                  <p className="text-xs text-muted-foreground">Show more data in less space</p>
-                </div>
-                <Switch />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Show Animations</Label>
-                  <p className="text-xs text-muted-foreground">Enable UI animations</p>
-                </div>
-                <Switch defaultChecked />
-              </div>
-            </div>
+          
+          <Tabs defaultValue="profile" className="mt-6">
+            <TabsList className="grid w-full grid-cols-4 bg-secondary/50">
+              <TabsTrigger value="profile" className="text-xs">Profile</TabsTrigger>
+              <TabsTrigger value="notifications" className="text-xs">Alerts</TabsTrigger>
+              <TabsTrigger value="display" className="text-xs">Display</TabsTrigger>
+              <TabsTrigger value="account" className="text-xs">Account</TabsTrigger>
+            </TabsList>
             
-            <Separator />
-            
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Notifications</h4>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Email Notifications</Label>
-                  <p className="text-xs text-muted-foreground">Receive email updates</p>
+            {/* Profile Tab */}
+            <TabsContent value="profile" className="mt-4 space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-xl font-bold text-primary">
+                  {currentUser?.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'U'}
                 </div>
-                <Switch defaultChecked />
-              </div>
-              <div className="flex items-center justify-between">
                 <div>
-                  <Label>Desktop Notifications</Label>
-                  <p className="text-xs text-muted-foreground">Browser push notifications</p>
+                  <Button variant="outline" size="sm">Upload Photo</Button>
+                  <p className="text-xs text-muted-foreground mt-1">JPG, PNG. Max 2MB</p>
                 </div>
-                <Switch />
               </div>
-            </div>
-            
-            <Separator />
-            
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Data</h4>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Auto-refresh</Label>
-                  <p className="text-xs text-muted-foreground">Update data every 5 minutes</p>
+              
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Full Name</Label>
+                  <Input 
+                    value={profileForm.name} 
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Your full name" 
+                  />
                 </div>
-                <Switch defaultChecked />
+                <div className="space-y-1">
+                  <Label className="text-xs">Email</Label>
+                  <Input 
+                    type="email" 
+                    value={profileForm.email} 
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Role</Label>
+                  <Input value={currentUser?.role || ''} disabled />
+                </div>
               </div>
-            </div>
-          </div>
+              
+              <Button 
+                className="w-full" 
+                size="sm" 
+                onClick={handleSaveProfile}
+                disabled={updateUserProfile.isPending}
+              >
+                {updateUserProfile.isPending ? "Saving..." : "Save Profile"}
+              </Button>
+            </TabsContent>
+            
+            {/* Notifications Tab */}
+            <TabsContent value="notifications" className="mt-4 space-y-4">
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium">Email Preferences</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm">Deal Updates</Label>
+                      <p className="text-xs text-muted-foreground">Notifications about deals you're assigned to</p>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm">Task Reminders</Label>
+                      <p className="text-xs text-muted-foreground">Reminders for upcoming due dates</p>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm">Team Activity</Label>
+                      <p className="text-xs text-muted-foreground">Updates when teammates make changes</p>
+                    </div>
+                    <Switch />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm">Weekly Summary</Label>
+                      <p className="text-xs text-muted-foreground">Weekly digest of your activity</p>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium">Push Notifications</h4>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm">Desktop Alerts</Label>
+                    <p className="text-xs text-muted-foreground">Browser push notifications</p>
+                  </div>
+                  <Switch />
+                </div>
+              </div>
+            </TabsContent>
+            
+            {/* Display Tab */}
+            <TabsContent value="display" className="mt-4 space-y-4">
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium">Appearance</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm">Dark Mode</Label>
+                      <p className="text-xs text-muted-foreground">Use dark theme</p>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm">Compact View</Label>
+                      <p className="text-xs text-muted-foreground">Show more data in less space</p>
+                    </div>
+                    <Switch />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm">Animations</Label>
+                      <p className="text-xs text-muted-foreground">Enable UI animations</p>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium">Data</h4>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm">Auto-refresh</Label>
+                    <p className="text-xs text-muted-foreground">Update data automatically</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+              </div>
+            </TabsContent>
+            
+            {/* Account Tab */}
+            <TabsContent value="account" className="mt-4 space-y-4">
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium">Security</h4>
+                <Button variant="outline" className="w-full justify-start" onClick={() => setIsChangingPassword(true)}>
+                  <Lock className="w-4 h-4 mr-2" /> Change Password
+                </Button>
+                <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                  <div>
+                    <Label className="text-sm">Two-Factor Authentication</Label>
+                    <p className="text-xs text-muted-foreground">Add an extra layer of security</p>
+                  </div>
+                  <Switch />
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium text-red-400">Danger Zone</h4>
+                <Button variant="outline" className="w-full justify-start text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/10">
+                  Deactivate Account
+                </Button>
+                <Button variant="outline" className="w-full justify-start text-red-500 border-red-500/30 hover:bg-red-500/10">
+                  Delete Account
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Deleting your account is permanent and cannot be undone. Contact support if you need assistance.
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
         </SheetContent>
       </Sheet>
 
@@ -784,28 +922,38 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
             <SheetDescription>Help documentation and useful resources.</SheetDescription>
           </SheetHeader>
           <div className="mt-6 space-y-4">
+            <a 
+              href="https://www.equiturn.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full text-left p-4 bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors cursor-pointer border border-primary/20"
+              data-testid="resource-my-organization"
+            >
+              <h4 className="font-medium flex items-center gap-2">
+                <Briefcase className="w-4 h-4 text-primary" />
+                My Organization
+              </h4>
+              <p className="text-xs text-muted-foreground mt-1">Visit Equiturn's main website</p>
+            </a>
             <button 
               className="w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
               onClick={() => {
-                toast.info("User Guide", {
-                  description: "OSReaper helps you manage investment banking operations. Use the sidebar to navigate between Dashboard, Deals, Documents, and more.",
-                  duration: 5000,
-                });
+                setShowResourcesSheet(false);
+                setLocation(`${rolePrefix}/documents`);
               }}
               data-testid="resource-user-guide"
             >
               <h4 className="font-medium flex items-center gap-2">
                 <FileText className="w-4 h-4 text-primary" />
-                User Guide
+                Document Generator
               </h4>
-              <p className="text-xs text-muted-foreground mt-1">Complete guide to using OSReaper</p>
+              <p className="text-xs text-muted-foreground mt-1">Create and manage documents</p>
             </button>
             <button 
               className="w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
               onClick={() => {
                 setShowResourcesSheet(false);
                 setLocation(`${rolePrefix}/deals`);
-                toast.success("Navigating to Deal Management");
               }}
               data-testid="resource-deal-management"
             >
@@ -813,7 +961,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                 <Target className="w-4 h-4 text-primary" />
                 Deal Management
               </h4>
-              <p className="text-xs text-muted-foreground mt-1">Learn how to manage deals effectively</p>
+              <p className="text-xs text-muted-foreground mt-1">View and manage your deals</p>
             </button>
             <button 
               className="w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
@@ -821,52 +969,41 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                 setShowResourcesSheet(false);
                 if (role === 'CEO') {
                   setLocation('/ceo/team');
-                  toast.success("Navigating to Team Assignment");
                 } else {
-                  setLocation('/employee/deals');
-                  toast.success("Navigating to your assigned deals");
+                  setLocation('/employee/tasks');
                 }
               }}
               data-testid="resource-team-collaboration"
             >
               <h4 className="font-medium flex items-center gap-2">
                 <Users className="w-4 h-4 text-primary" />
-                {role === 'CEO' ? 'Team Assignment' : 'My Team Deals'}
+                {role === 'CEO' ? 'Team Assignment' : 'My Tasks'}
               </h4>
               <p className="text-xs text-muted-foreground mt-1">
-                {role === 'CEO' ? 'Manage team assignments and coordination' : 'View deals assigned to your pod team'}
+                {role === 'CEO' ? 'Assign tasks to team members' : 'View your assigned tasks'}
               </p>
             </button>
-            <button 
-              className="w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
-              onClick={() => {
-                setShowResourcesSheet(false);
-                if (role === 'CEO') {
-                  setLocation('/ceo/dashboard');
-                  toast.success("Navigating to Dashboard Analytics");
-                } else {
-                  setLocation('/employee/tasks');
-                  toast.success("Navigating to your tasks");
-                }
-              }}
-              data-testid="resource-analytics"
-            >
-              <h4 className="font-medium flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-primary" />
-                {role === 'CEO' ? 'Analytics & Reporting' : 'My Task Progress'}
-              </h4>
-              <p className="text-xs text-muted-foreground mt-1">
-                {role === 'CEO' ? 'Understanding your dashboard metrics' : 'Track your assigned tasks and progress'}
-              </p>
-            </button>
-            <button 
-              className="w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
-              onClick={() => {
-                toast.success("Support Contact", {
-                  description: "For assistance, email support@osreaper.com or reach out to your team lead.",
-                  duration: 5000,
-                });
-              }}
+            {role === 'CEO' && (
+              <button 
+                className="w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+                onClick={() => {
+                  setShowResourcesSheet(false);
+                  setLocation('/ceo/investors');
+                }}
+                data-testid="resource-investor-match"
+              >
+                <h4 className="font-medium flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-primary" />
+                  Investor Match
+                </h4>
+                <p className="text-xs text-muted-foreground mt-1">Find matching investors for deals</p>
+              </button>
+            )}
+            <a 
+              href="https://www.equiturn.com/contact"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full text-left p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
               data-testid="resource-contact-support"
             >
               <h4 className="font-medium flex items-center gap-2">
@@ -874,7 +1011,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                 Contact Support
               </h4>
               <p className="text-xs text-muted-foreground mt-1">Get help from our support team</p>
-            </button>
+            </a>
           </div>
         </SheetContent>
       </Sheet>

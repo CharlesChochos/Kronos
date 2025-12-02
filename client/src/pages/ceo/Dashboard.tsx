@@ -177,15 +177,35 @@ export default function Dashboard() {
       const inProgressTasks = userTasks.filter(t => t.status === 'In Progress').length;
       const pendingTasks = userTasks.filter(t => t.status === 'Pending').length;
       
-      // Get tasks by deal
-      const tasksByDeal: Record<string, { dealName: string; completed: number; inProgress: number; pending: number }> = {};
+      // Get tasks by deal with task names
+      const tasksByDeal: Record<string, { 
+        dealName: string; 
+        completed: number; 
+        inProgress: number; 
+        pending: number;
+        taskNames: { id: string; name: string; status: string; priority: string; dueDate?: string }[];
+      }> = {};
+      
       userTasks.forEach(task => {
         if (task.dealId) {
           const deal = deals.find(d => d.id === task.dealId);
           if (deal) {
             if (!tasksByDeal[task.dealId]) {
-              tasksByDeal[task.dealId] = { dealName: deal.name, completed: 0, inProgress: 0, pending: 0 };
+              tasksByDeal[task.dealId] = { 
+                dealName: deal.name, 
+                completed: 0, 
+                inProgress: 0, 
+                pending: 0,
+                taskNames: []
+              };
             }
+            tasksByDeal[task.dealId].taskNames.push({
+              id: task.id,
+              name: task.title,
+              status: task.status,
+              priority: task.priority,
+              dueDate: task.dueDate || undefined,
+            });
             if (task.status === 'Completed') tasksByDeal[task.dealId].completed++;
             else if (task.status === 'In Progress') tasksByDeal[task.dealId].inProgress++;
             else tasksByDeal[task.dealId].pending++;
@@ -213,6 +233,7 @@ export default function Dashboard() {
         pendingTasks,
         totalTasks: userTasks.length,
         tasksByDeal,
+        userTasks,
         velocityScore: Math.min(velocityScore, 100),
       };
     }).sort((a, b) => b.velocityScore - a.velocityScore);
@@ -1382,6 +1403,43 @@ export default function Dashboard() {
                           />
                         </div>
                       </div>
+                      
+                      {/* Task Names List */}
+                      {stats.taskNames && stats.taskNames.length > 0 && (
+                        <div className="mt-3 space-y-1.5">
+                          {stats.taskNames.map((task: any) => (
+                            <div 
+                              key={task.id} 
+                              className="flex items-center justify-between text-xs p-2 bg-background/50 rounded border border-border/50"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className={cn(
+                                  "w-2 h-2 rounded-full",
+                                  task.status === 'Completed' ? "bg-green-400" :
+                                  task.status === 'In Progress' ? "bg-yellow-400" : "bg-muted-foreground"
+                                )} />
+                                <span className={task.status === 'Completed' ? "line-through text-muted-foreground" : ""}>
+                                  {task.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {task.dueDate && (
+                                  <span className="text-muted-foreground text-[10px]">
+                                    {format(new Date(task.dueDate), 'MMM d')}
+                                  </span>
+                                )}
+                                <Badge variant="outline" className={cn(
+                                  "text-[9px] h-4",
+                                  task.priority === 'High' || task.priority === 'Critical' ? "text-red-400 border-red-400/30" :
+                                  task.priority === 'Medium' ? "text-yellow-400 border-yellow-400/30" : ""
+                                )}>
+                                  {task.priority}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                   {(!((selectedEmployee as any).tasksByDeal) || Object.keys((selectedEmployee as any).tasksByDeal).length === 0) && (

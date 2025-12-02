@@ -12,6 +12,8 @@ import DocumentGenerator from "@/pages/shared/DocumentGenerator";
 import InvestorMatching from "@/pages/ceo/InvestorMatching";
 import TeamAssignment from "@/pages/ceo/TeamAssignment";
 import MyTasks from "@/pages/employee/MyTasks";
+import EmployeeHome from "@/pages/employee/Home";
+import Chat from "@/pages/shared/Chat";
 import { useEffect } from "react";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 
@@ -20,6 +22,8 @@ const CeoDocumentGenerator = () => <DocumentGenerator role="CEO" />;
 const EmployeeDocumentGenerator = () => <DocumentGenerator role="Employee" />;
 const CeoDealManagement = () => <DealManagement role="CEO" />;
 const EmployeeDealManagement = () => <DealManagement role="Employee" />;
+const CeoChat = () => <Chat role="CEO" />;
+const EmployeeChat = () => <Chat role="Employee" />;
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { data: user, isLoading } = useCurrentUser();
@@ -55,7 +59,7 @@ function Router() {
       if (user.email.includes("admin") || user.email.includes("josh")) {
         setLocation("/ceo/dashboard");
       } else {
-        setLocation("/employee/tasks");
+        setLocation("/employee/home");
       }
     }
   }, [user, location, setLocation]);
@@ -80,8 +84,14 @@ function Router() {
       <Route path="/ceo/team">
         {() => <ProtectedRoute component={TeamAssignment} />}
       </Route>
+      <Route path="/ceo/chat">
+        {() => <ProtectedRoute component={CeoChat} />}
+      </Route>
       
       {/* Employee Routes */}
+      <Route path="/employee/home">
+        {() => <ProtectedRoute component={EmployeeHome} />}
+      </Route>
       <Route path="/employee/tasks">
         {() => <ProtectedRoute component={MyTasks} />}
       </Route>
@@ -90,6 +100,9 @@ function Router() {
       </Route>
       <Route path="/employee/deals">
         {() => <ProtectedRoute component={EmployeeDealManagement} />}
+      </Route>
+      <Route path="/employee/chat">
+        {() => <ProtectedRoute component={EmployeeChat} />}
       </Route>
 
       <Route component={NotFound} />
