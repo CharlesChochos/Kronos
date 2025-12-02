@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDashboardContext } from "@/contexts/DashboardContext";
-import { useNotifications, useDeals, useTasks, useUsers } from "@/lib/api";
+import { useNotifications, useDeals, useTasks, useUsers, useLogout } from "@/lib/api";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 type LayoutProps = {
@@ -27,6 +28,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const logoutMutation = useLogout();
   
   const { 
     setShowProfileSheet, 
@@ -41,6 +43,16 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   const { data: tasks = [] } = useTasks();
   const { data: users = [] } = useUsers();
   const unreadCount = notifications.filter((n: any) => !n.read).length;
+  
+  const handleLogout = async () => {
+    try {
+      await logoutMutation.mutateAsync();
+      toast.success("Logged out successfully");
+      setLocation("/");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to log out");
+    }
+  };
   
   // Get role-based route prefixes
   const rolePrefix = role === 'CEO' ? '/ceo' : '/employee';
@@ -279,7 +291,14 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                   Customize Dashboard
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-border" />
-                <DropdownMenuItem className="text-red-400 focus:bg-red-400/10 focus:text-red-400 cursor-pointer" data-testid="menu-item-logout">Log out</DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="text-red-400 focus:bg-red-400/10 focus:text-red-400 cursor-pointer" 
+                  onClick={handleLogout}
+                  disabled={logoutMutation.isPending}
+                  data-testid="menu-item-logout"
+                >
+                  {logoutMutation.isPending ? "Logging out..." : "Log out"}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
