@@ -73,6 +73,8 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'calendar'>('grid');
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('week');
   const [calendarDate, setCalendarDate] = useState(new Date());
+  const [selectedCalendarDeal, setSelectedCalendarDeal] = useState<Deal | null>(null);
+  const [calendarDealSearch, setCalendarDealSearch] = useState("");
   
   const [newDeal, setNewDeal] = useState({
     name: '',
@@ -496,26 +498,32 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
           const getEventsForDay = (day: Date) => {
             const events: { type: 'task' | 'milestone' | 'stage_change'; deal: Deal; item?: any; date: Date }[] = [];
             
-            filteredDeals.forEach(deal => {
-              const dealTasks = allTasks.filter((t: any) => t.dealId === deal.id);
-              dealTasks.forEach((task: any) => {
-                if (task.dueDate && isSameDay(parseISO(task.dueDate), day)) {
-                  events.push({ type: 'task', deal, item: task, date: day });
+            if (!selectedCalendarDeal) return events;
+            
+            const deal = selectedCalendarDeal;
+            const dealTasks = allTasks.filter((t: any) => t.dealId === deal.id);
+            dealTasks.forEach((task: any) => {
+              if (task.dueDate && isSameDay(parseISO(task.dueDate), day)) {
+                events.push({ type: 'task', deal, item: task, date: day });
+              }
+            });
+            
+            const auditTrail = deal.auditTrail as AuditEntry[] || [];
+            auditTrail.forEach(entry => {
+              if (entry.timestamp && isSameDay(parseISO(entry.timestamp), day)) {
+                if (entry.action === 'Stage Changed' || entry.action === 'Deal Created') {
+                  events.push({ type: 'milestone', deal, item: entry, date: day });
                 }
-              });
-              
-              const auditTrail = deal.auditTrail as AuditEntry[] || [];
-              auditTrail.forEach(entry => {
-                if (entry.timestamp && isSameDay(parseISO(entry.timestamp), day)) {
-                  if (entry.action === 'Stage Changed' || entry.action === 'Deal Created') {
-                    events.push({ type: 'milestone', deal, item: entry, date: day });
-                  }
-                }
-              });
+              }
             });
             
             return events;
           };
+
+          const filteredCalendarDeals = deals.filter(deal =>
+            deal.name.toLowerCase().includes(calendarDealSearch.toLowerCase()) ||
+            deal.client.toLowerCase().includes(calendarDealSearch.toLowerCase())
+          );
 
           const calendarDays = getCalendarDays();
 
@@ -523,41 +531,94 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
             <div className="space-y-4">
               <Card className="bg-card border-border">
                 <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CalendarDays className="w-5 h-5 text-primary" />
-                      <CardTitle className="text-lg">Deal Calendar</CardTitle>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex bg-secondary rounded-lg p-0.5">
-                        <Button 
-                          variant={calendarView === 'day' ? 'default' : 'ghost'} 
-                          size="sm" 
-                          className="h-7 px-3 text-xs"
-                          onClick={() => setCalendarView('day')}
-                          data-testid="calendar-view-day"
-                        >
-                          Day
-                        </Button>
-                        <Button 
-                          variant={calendarView === 'week' ? 'default' : 'ghost'} 
-                          size="sm" 
-                          className="h-7 px-3 text-xs"
-                          onClick={() => setCalendarView('week')}
-                          data-testid="calendar-view-week"
-                        >
-                          Week
-                        </Button>
-                        <Button 
-                          variant={calendarView === 'month' ? 'default' : 'ghost'} 
-                          size="sm" 
-                          className="h-7 px-3 text-xs"
-                          onClick={() => setCalendarView('month')}
-                          data-testid="calendar-view-month"
-                        >
-                          Month
-                        </Button>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CalendarDays className="w-5 h-5 text-primary" />
+                        <CardTitle className="text-lg">Deal Calendar</CardTitle>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex bg-secondary rounded-lg p-0.5">
+                          <Button 
+                            variant={calendarView === 'day' ? 'default' : 'ghost'} 
+                            size="sm" 
+                            className="h-7 px-3 text-xs"
+                            onClick={() => setCalendarView('day')}
+                            data-testid="calendar-view-day"
+                          >
+                            Day
+                          </Button>
+                          <Button 
+                            variant={calendarView === 'week' ? 'default' : 'ghost'} 
+                            size="sm" 
+                            className="h-7 px-3 text-xs"
+                            onClick={() => setCalendarView('week')}
+                            data-testid="calendar-view-week"
+                          >
+                            Week
+                          </Button>
+                          <Button 
+                            variant={calendarView === 'month' ? 'default' : 'ghost'} 
+                            size="sm" 
+                            className="h-7 px-3 text-xs"
+                            onClick={() => setCalendarView('month')}
+                            data-testid="calendar-view-month"
+                          >
+                            Month
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Deal Selector */}
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search and select a deal..."
+                          value={calendarDealSearch}
+                          onChange={(e) => setCalendarDealSearch(e.target.value)}
+                          className="pl-9 bg-secondary/50 border-border"
+                          data-testid="calendar-deal-search"
+                        />
+                        {calendarDealSearch && (
+                          <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-card border border-border rounded-lg shadow-xl max-h-[200px] overflow-y-auto">
+                            {filteredCalendarDeals.length === 0 ? (
+                              <div className="p-3 text-sm text-muted-foreground text-center">No deals found</div>
+                            ) : (
+                              filteredCalendarDeals.map(deal => (
+                                <div
+                                  key={deal.id}
+                                  className="p-3 hover:bg-secondary/50 cursor-pointer transition-colors border-b border-border/50 last:border-b-0"
+                                  onClick={() => {
+                                    setSelectedCalendarDeal(deal);
+                                    setCalendarDealSearch("");
+                                  }}
+                                  data-testid={`calendar-deal-option-${deal.id}`}
+                                >
+                                  <div className="font-medium text-sm">{deal.name}</div>
+                                  <div className="text-xs text-muted-foreground">{deal.client} • {deal.sector} • {deal.stage}</div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {selectedCalendarDeal && (
+                        <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 border border-primary/30 rounded-lg">
+                          <Briefcase className="w-4 h-4 text-primary" />
+                          <span className="text-sm font-medium">{selectedCalendarDeal.name}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 ml-1"
+                            onClick={() => setSelectedCalendarDeal(null)}
+                            data-testid="calendar-clear-deal"
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -581,7 +642,15 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     </div>
                   </div>
 
-                  {calendarView === 'month' && (
+                  {!selectedCalendarDeal && (
+                    <div className="text-center py-16 text-muted-foreground">
+                      <Briefcase className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                      <h3 className="text-lg font-medium mb-2">Select a Deal</h3>
+                      <p className="text-sm">Use the search box above to select a deal and view its calendar events</p>
+                    </div>
+                  )}
+
+                  {selectedCalendarDeal && calendarView === 'month' && (
                     <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
                       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                         <div key={day} className="bg-secondary p-2 text-center text-xs font-medium text-muted-foreground">
@@ -632,7 +701,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     </div>
                   )}
 
-                  {calendarView === 'week' && (
+                  {selectedCalendarDeal && calendarView === 'week' && (
                     <div className="grid grid-cols-7 gap-2">
                       {calendarDays.map((day, index) => {
                         const events = getEventsForDay(day);
@@ -678,17 +747,13 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     </div>
                   )}
 
-                  {calendarView === 'day' && (
+                  {selectedCalendarDeal && calendarView === 'day' && (
                     <div className="space-y-4">
                       {(() => {
                         const events = getEventsForDay(calendarDate);
-                        const groupedByDeal = events.reduce((acc, event) => {
-                          if (!acc[event.deal.id]) acc[event.deal.id] = { deal: event.deal, events: [] };
-                          acc[event.deal.id].events.push(event);
-                          return acc;
-                        }, {} as Record<string, { deal: Deal; events: typeof events }>);
+                        const deal = selectedCalendarDeal;
 
-                        if (Object.keys(groupedByDeal).length === 0) {
+                        if (events.length === 0) {
                           return (
                             <div className="text-center py-12 text-muted-foreground">
                               <CalendarDays className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -697,8 +762,8 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                           );
                         }
 
-                        return Object.values(groupedByDeal).map(({ deal, events }) => (
-                          <Card key={deal.id} className="bg-secondary/30 border-border">
+                        return (
+                          <Card className="bg-secondary/30 border-border">
                             <CardHeader className="pb-2">
                               <div className="flex items-center justify-between">
                                 <div>
@@ -745,7 +810,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                               ))}
                             </CardContent>
                           </Card>
-                        ));
+                        );
                       })()}
                     </div>
                   )}
