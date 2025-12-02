@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Reorder } from "framer-motion";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -51,7 +52,8 @@ import {
   Search,
   Lock,
   Phone,
-  Pencil
+  Pencil,
+  GripVertical
 } from "lucide-react";
 import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -104,8 +106,16 @@ export default function Dashboard() {
   const [showEmployeeDetailModal, setShowEmployeeDetailModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<UserType | null>(null);
   
-  // Widget configuration
-  const [widgets, setWidgets] = useState<WidgetConfig[]>(DEFAULT_WIDGETS);
+  // Widget configuration - load from localStorage
+  const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
+    const saved = localStorage.getItem('ceoDashboardWidgets');
+    return saved ? JSON.parse(saved) : DEFAULT_WIDGETS;
+  });
+  
+  // Save widget order to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('ceoDashboardWidgets', JSON.stringify(widgets));
+  }, [widgets]);
   
   // Market symbols state
   const [marketSymbols, setMarketSymbols] = useState<string[]>(['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY']);
@@ -1360,20 +1370,30 @@ export default function Dashboard() {
           <ScrollArea className="h-[calc(100vh-150px)] mt-6">
             <div className="space-y-6 pr-4">
               <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-3">WIDGETS</h4>
-                <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">WIDGETS (drag to reorder)</h4>
+                <Reorder.Group 
+                  axis="y" 
+                  values={widgets} 
+                  onReorder={setWidgets}
+                  className="space-y-2"
+                >
                   {widgets.map((widget) => (
-                    <div key={widget.id} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
-                      <div>
-                        <Label className="text-sm">{widget.name}</Label>
+                    <Reorder.Item
+                      key={widget.id}
+                      value={widget}
+                      className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg cursor-grab active:cursor-grabbing"
+                    >
+                      <div className="flex items-center gap-2">
+                        <GripVertical className="w-4 h-4 text-muted-foreground" />
+                        <Label className="text-sm cursor-grab">{widget.name}</Label>
                       </div>
                       <Switch 
                         checked={widget.enabled}
                         onCheckedChange={() => handleWidgetToggle(widget.id)}
                       />
-                    </div>
+                    </Reorder.Item>
                   ))}
-                </div>
+                </Reorder.Group>
               </div>
               
               <Separator />
@@ -1383,6 +1403,7 @@ export default function Dashboard() {
                 className="w-full"
                 onClick={() => {
                   setWidgets(DEFAULT_WIDGETS);
+                  localStorage.removeItem('ceoDashboardWidgets');
                   toast.success("Widgets reset to defaults");
                 }}
               >
