@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect, ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import { Sidebar } from "./Sidebar";
-import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check, Rocket, TrendingUp, UserCheck, ChevronRight, PanelLeftClose, PanelLeft, Camera, Trash2 } from "lucide-react";
+import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check, Rocket, TrendingUp, UserCheck, ChevronRight, PanelLeftClose, PanelLeft, Camera, Trash2, Calendar, Paperclip, ExternalLink } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -67,6 +68,10 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   // Photo upload ref
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  
+  // Task detail modal state
+  const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
+  const [selectedSearchTask, setSelectedSearchTask] = useState<any>(null);
   
   const { 
     showProfileSheet,
@@ -290,7 +295,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     let accessibleTasks = tasks as any[];
     if (role === 'Employee' && currentUser) {
       accessibleTasks = (tasks as any[]).filter((task: any) => 
-        task.assigneeId === currentUser.id
+        task.assignedTo === currentUser.id
       );
     }
     
@@ -395,22 +400,38 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                           <div className="px-3 py-2 bg-secondary/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                             <CheckSquare className="w-3 h-3" /> Tasks
                           </div>
-                          {searchResults.tasks.map((task: any) => (
-                            <button
-                              key={task.id}
-                              onClick={() => { setLocation(`${role === 'CEO' ? '/ceo/deals' : '/employee/tasks'}?id=${task.id}`); setShowSearchResults(false); setSearchQuery(""); }}
-                              className="w-full px-3 py-2 text-left hover:bg-primary/10 flex items-center gap-3"
-                              data-testid={`search-result-task-${task.id}`}
-                            >
-                              <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
-                                <CheckSquare className="w-4 h-4 text-green-500" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium">{task.title}</p>
-                                <p className="text-xs text-muted-foreground truncate max-w-48">{task.description || 'No description'}</p>
-                              </div>
-                            </button>
-                          ))}
+                          {searchResults.tasks.map((task: any) => {
+                            const taskDeal = deals.find((d: any) => d.id === task.dealId);
+                            return (
+                              <button
+                                key={task.id}
+                                onClick={() => { 
+                                  setSelectedSearchTask({ ...task, dealName: taskDeal?.name || 'No Deal' }); 
+                                  setShowTaskDetailModal(true); 
+                                  setShowSearchResults(false); 
+                                  setSearchQuery(""); 
+                                }}
+                                className="w-full px-3 py-2 text-left hover:bg-primary/10 flex items-center gap-3"
+                                data-testid={`search-result-task-${task.id}`}
+                              >
+                                <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
+                                  <CheckSquare className="w-4 h-4 text-green-500" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium">{task.title}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{taskDeal?.name || 'No Deal'} • {task.status}</p>
+                                </div>
+                                <Badge variant="outline" className={cn(
+                                  "text-[10px] shrink-0",
+                                  task.priority === 'High' ? "bg-red-500/10 text-red-500 border-red-500/20" : 
+                                  task.priority === 'Medium' ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" :
+                                  "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                                )}>
+                                  {task.priority}
+                                </Badge>
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                       
@@ -1290,6 +1311,100 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
           </ScrollArea>
         </SheetContent>
       </Sheet>
+
+      {/* Task Detail Modal from Search */}
+      <Dialog open={showTaskDetailModal} onOpenChange={setShowTaskDetailModal}>
+        <DialogContent className="bg-card border-border max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{selectedSearchTask?.title}</DialogTitle>
+            <DialogDescription>Task Details</DialogDescription>
+          </DialogHeader>
+          {selectedSearchTask && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className={cn(
+                  "text-xs",
+                  selectedSearchTask.priority === 'High' ? "bg-red-500/10 text-red-500 border-red-500/20" : 
+                  selectedSearchTask.priority === 'Medium' ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" :
+                  "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                )}>
+                  {selectedSearchTask.priority} Priority
+                </Badge>
+                <Badge variant="secondary">{selectedSearchTask.type}</Badge>
+                <Badge variant={selectedSearchTask.status === 'Completed' ? 'default' : 'outline'}>
+                  {selectedSearchTask.status}
+                </Badge>
+              </div>
+              
+              <div>
+                <Label className="text-xs text-muted-foreground">Description</Label>
+                <p className="text-sm mt-1">{selectedSearchTask.description || 'No description provided'}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Project / Deal</Label>
+                  <p className="text-sm mt-1 flex items-center gap-1">
+                    <Briefcase className="w-3 h-3 text-primary" />
+                    {selectedSearchTask.dealName}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Due Date</Label>
+                  <p className="text-sm mt-1 flex items-center gap-1">
+                    <Calendar className="w-3 h-3 text-muted-foreground" />
+                    {selectedSearchTask.dueDate || 'No due date'}
+                  </p>
+                </div>
+              </div>
+              
+              {selectedSearchTask.assignedTo && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Assigned To</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Avatar className="w-6 h-6">
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                        {users.find((u: any) => u.id === selectedSearchTask.assignedTo)?.name?.charAt(0) || '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm">{users.find((u: any) => u.id === selectedSearchTask.assignedTo)?.name || 'Unknown'}</span>
+                  </div>
+                </div>
+              )}
+              
+              {selectedSearchTask.attachments && Array.isArray(selectedSearchTask.attachments) && selectedSearchTask.attachments.length > 0 && (
+                <div>
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Paperclip className="w-3 h-3" /> Attachments
+                  </Label>
+                  <div className="mt-2 space-y-2">
+                    {selectedSearchTask.attachments.map((attachment: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2 p-2 bg-secondary/30 rounded-lg">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm flex-1 truncate">{typeof attachment === 'string' ? attachment : attachment?.name || 'Attachment'}</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                          <ExternalLink className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowTaskDetailModal(false)}>
+              Close
+            </Button>
+            <Button onClick={() => {
+              setLocation(`${role === 'CEO' ? '/ceo/deals' : '/employee/tasks'}?id=${selectedSearchTask?.id}`);
+              setShowTaskDetailModal(false);
+            }}>
+              Go to Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
