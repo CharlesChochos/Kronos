@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -30,12 +31,21 @@ const loginSchema = z.object({
   rememberMe: z.boolean().default(false),
 });
 
+const JOB_TITLE_OPTIONS = [
+  "Junior Analyst",
+  "Analyst", 
+  "Associate",
+  "Senior Associate",
+  "VP",
+  "Other"
+] as const;
+
 const signupSchema = z.object({
   name: z.string().min(2, { message: "Name is required" }),
   email: z.string().email({ message: "Invalid email address" }),
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
   confirmPassword: z.string().min(6, { message: "Password must be at least 6 characters" }),
-  role: z.string().default("Associate"),
+  jobTitle: z.string().min(1, { message: "Please select your job title" }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
@@ -150,7 +160,7 @@ export default function AuthPage() {
       email: "",
       password: "",
       confirmPassword: "",
-      role: "Associate",
+      jobTitle: "",
     },
   });
 
@@ -501,6 +511,37 @@ export default function AuthPage() {
                             data-testid="input-confirm-password"
                           />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={signupForm.control}
+                    name="jobTitle"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Job Title</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger 
+                              className="bg-secondary/50 border-border focus:ring-primary/50"
+                              data-testid="select-job-title"
+                            >
+                              <SelectValue placeholder="Select your role" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {JOB_TITLE_OPTIONS.map((title) => (
+                              <SelectItem 
+                                key={title} 
+                                value={title}
+                                data-testid={`option-job-title-${title.toLowerCase().replace(/\s+/g, '-')}`}
+                              >
+                                {title}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}

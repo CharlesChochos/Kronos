@@ -180,7 +180,7 @@ export async function registerRoutes(
       const user = await storage.createUser(userData);
       
       // Create audit log for signup
-      await createAuditLog(req, 'user_signup', 'user', user.id, user.name, { email: user.email, role: user.role, status: user.status });
+      await createAuditLog(req, 'user_signup', 'user', user.id, user.name, { email: user.email, role: user.role, status: user.status, jobTitle: user.jobTitle });
       
       // If first user (CEO), auto-login
       if (isFirstUser) {
