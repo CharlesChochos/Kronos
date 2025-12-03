@@ -68,7 +68,7 @@ Preferred communication style: Simple, everyday language.
 - Drizzle Kit for schema migrations (output to `/migrations` folder)
 
 **Schema Design**
-- **Users table**: Authentication, roles (CEO/Associate/Director/Managing Director/Analyst), performance metrics (score, active deals, completed tasks), status (active/pending/suspended), 2FA fields (twoFactorEnabled, twoFactorSecret)
+- **Users table**: Authentication, roles (CEO/Associate/Director/Managing Director/Analyst), jobTitle (Junior Analyst/Analyst/Associate/Senior Associate/VP/Other), performance metrics (score, active deals, completed tasks), status (active/pending/suspended), 2FA fields (twoFactorEnabled, twoFactorSecret)
 - **Deals table**: Deal information including stage, value, client, sector, lead, progress percentage, status, and description
 - **Tasks table**: Task assignments with references to users and deals, priority levels, due dates, and status tracking
 - **Meetings table**: Meeting scheduling with title, date/time, attendees, location, deal association, and description

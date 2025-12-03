@@ -100,6 +100,41 @@ export default function EmployeeHome() {
   const [settingsInitialized, setSettingsInitialized] = useState(false);
   const prevSettingsRef = useRef<string | null>(null);
   
+  // Get job-title based default widget configuration
+  const getJobTitleDefaults = (jobTitle: string | undefined) => {
+    const seniorTitles = ['VP', 'Senior Associate'];
+    const midTitles = ['Associate'];
+    const juniorTitles = ['Analyst', 'Junior Analyst'];
+    
+    if (seniorTitles.includes(jobTitle || '')) {
+      return {
+        widgetOrder: ['quickStats', 'myProjects', 'myTasks', 'schedule', 'quickActions'] as WidgetId[],
+        widgetSettings: {
+          showQuickStats: true,
+          showMyTasks: true,
+          showMyProjects: true,
+          showSchedule: true,
+          showQuickActions: true,
+        },
+      };
+    } else if (juniorTitles.includes(jobTitle || '')) {
+      return {
+        widgetOrder: ['myTasks', 'schedule', 'quickStats', 'myProjects', 'quickActions'] as WidgetId[],
+        widgetSettings: {
+          showQuickStats: true,
+          showMyTasks: true,
+          showMyProjects: true,
+          showSchedule: true,
+          showQuickActions: true,
+        },
+      };
+    }
+    return {
+      widgetOrder: defaultWidgetOrder,
+      widgetSettings: defaultWidgetSettings,
+    };
+  };
+  
   // Load settings from user preferences
   useEffect(() => {
     if (!prefsLoading && !settingsInitialized) {
@@ -108,10 +143,14 @@ export default function EmployeeHome() {
         if (employeeSettings.widgetOrder) setWidgetOrder(employeeSettings.widgetOrder);
         if (employeeSettings.widgetSettings) setWidgetSettings(employeeSettings.widgetSettings);
         if (employeeSettings.bgColor) setBgColor(employeeSettings.bgColor);
+      } else if (currentUser?.jobTitle) {
+        const defaults = getJobTitleDefaults(currentUser.jobTitle);
+        setWidgetOrder(defaults.widgetOrder);
+        setWidgetSettings(defaults.widgetSettings);
       }
       setSettingsInitialized(true);
     }
-  }, [prefsLoading, userPrefs, settingsInitialized]);
+  }, [prefsLoading, userPrefs, settingsInitialized, currentUser?.jobTitle]);
   
   // Save settings to database (debounced)
   useEffect(() => {
@@ -249,6 +288,24 @@ export default function EmployeeHome() {
     if (hour < 12) return "Good morning";
     if (hour < 18) return "Good afternoon";
     return "Good evening";
+  };
+
+  const getJobTitleMessage = () => {
+    const jobTitle = currentUser?.jobTitle;
+    if (!jobTitle) return null;
+    
+    const seniorTitles = ['VP', 'Senior Associate'];
+    const midTitles = ['Associate'];
+    const juniorTitles = ['Analyst', 'Junior Analyst'];
+    
+    if (seniorTitles.includes(jobTitle)) {
+      return "Your dashboard is optimized for portfolio oversight.";
+    } else if (juniorTitles.includes(jobTitle)) {
+      return "Your dashboard is focused on tasks and learning.";
+    } else if (midTitles.includes(jobTitle)) {
+      return "Your dashboard balances tasks and project work.";
+    }
+    return null;
   };
 
   const getPriorityColor = (priority: string) => {
@@ -923,6 +980,9 @@ export default function EmployeeHome() {
               </h1>
               <p className="text-muted-foreground mt-1">
                 Here's an overview of your work today. You have {pendingTasks.length + inProgressTasks.length} active tasks.
+                {getJobTitleMessage() && (
+                  <span className="block text-xs text-primary/70 mt-1">{getJobTitleMessage()}</span>
+                )}
               </p>
             </div>
             <Popover open={showCustomizePopover} onOpenChange={setShowCustomizePopover}>
