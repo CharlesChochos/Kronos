@@ -101,7 +101,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
         },
       });
       prevCategoriesRef.current = currentJson;
-    }, 500);
+    }, 2000);
     
     return () => clearTimeout(timeout);
   }, [expandedCategories, categoriesInitialized, prefsLoading, userPrefs]);

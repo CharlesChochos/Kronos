@@ -10,7 +10,7 @@ import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSche
 import { fromError } from "zod-validation-error";
 import { sendMeetingInvite, sendPasswordResetEmail } from "./email";
 import { validateBody, loginSchema, signupSchema, forgotPasswordSchema, resetPasswordSchema } from "./validation";
-import { generalLimiter, authLimiter, strictLimiter, uploadLimiter, aiLimiter } from "./rateLimiter";
+import { generalLimiter, authLimiter, strictLimiter, uploadLimiter, aiLimiter, preferencesLimiter } from "./rateLimiter";
 import OpenAI from "openai";
 import * as fs from "fs";
 import * as path from "path";
@@ -3522,7 +3522,7 @@ Guidelines:
   });
   
   // Upsert user preferences
-  app.post("/api/user-preferences", generalLimiter, requireAuth, async (req, res) => {
+  app.post("/api/user-preferences", preferencesLimiter, requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
       const result = insertUserPreferencesSchema.safeParse({

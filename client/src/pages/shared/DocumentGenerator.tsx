@@ -100,7 +100,7 @@ export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorPro
         complianceDefaults: complianceOptions,
       });
       prevComplianceRef.current = currentJson;
-    }, 1000);
+    }, 2000);
     
     return () => clearTimeout(timeout);
   }, [complianceOptions, complianceInitialized, isLoadingPrefs, userPrefs]);

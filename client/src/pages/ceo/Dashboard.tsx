@@ -182,7 +182,7 @@ export default function Dashboard() {
           setWidgets(lastSavedWidgetsRef.current);
         }
       }
-    }, 1000);
+    }, 2000);
     return () => {
       if (saveWidgetsTimeoutRef.current) {
         clearTimeout(saveWidgetsTimeoutRef.current);

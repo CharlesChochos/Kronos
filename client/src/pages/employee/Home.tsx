@@ -143,7 +143,7 @@ export default function EmployeeHome() {
         },
       });
       prevSettingsRef.current = currentJson;
-    }, 1000);
+    }, 2000);
     
     return () => clearTimeout(timeout);
   }, [widgetOrder, widgetSettings, bgColor, settingsInitialized, prefsLoading, userPrefs]);

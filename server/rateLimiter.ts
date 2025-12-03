@@ -74,3 +74,17 @@ export const aiLimiter = rateLimit({
     });
   },
 });
+
+export const preferencesLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute window
+  max: 30, // Allow 30 preference saves per minute (plenty for UI interactions)
+  standardHeaders,
+  legacyHeaders,
+  message: { error: 'Too many preference saves, please slow down.' },
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({ 
+      error: 'Too many preference saves, please slow down.',
+      retryAfter: '1 minute',
+    });
+  },
+});

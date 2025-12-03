@@ -167,7 +167,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
           setSidebarCollapsed(lastSavedSidebarRef.current);
         }
       }
-    }, 500);
+    }, 2000);
     return () => {
       if (saveSidebarTimeoutRef.current) {
         clearTimeout(saveSidebarTimeoutRef.current);
@@ -199,7 +199,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
           setSettings(lastSavedSettingsRef.current);
         }
       }
-    }, 1000);
+    }, 2000);
     return () => {
       if (saveSettingsTimeoutRef.current) {
         clearTimeout(saveSettingsTimeoutRef.current);

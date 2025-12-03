@@ -82,7 +82,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         },
       });
       prevCountRef.current = unreadMessageCount;
-    }, 1000);
+    }, 2000);
     
     return () => clearTimeout(timeout);
   }, [unreadMessageCount, countInitialized, prefsLoading, userPrefs]);
