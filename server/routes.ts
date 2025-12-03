@@ -6,7 +6,7 @@ import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import bcrypt from "bcryptjs";
-import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema, insertAssistantConversationSchema, insertAssistantMessageSchema, insertTimeEntrySchema, insertTimeOffRequestSchema, insertAuditLogSchema, insertInvestorSchema, insertInvestorInteractionSchema } from "@shared/schema";
+import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema, insertAssistantConversationSchema, insertAssistantMessageSchema, insertTimeEntrySchema, insertTimeOffRequestSchema, insertAuditLogSchema, insertInvestorSchema, insertInvestorInteractionSchema, insertOkrSchema, insertStakeholderSchema, insertAnnouncementSchema, insertPollSchema, insertMentorshipPairingSchema, insertClientPortalAccessSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import { sendMeetingInvite, sendPasswordResetEmail } from "./email";
 import { validateBody, loginSchema, signupSchema, forgotPasswordSchema, resetPasswordSchema } from "./validation";
@@ -2508,6 +2508,445 @@ Guidelines:
       res.json({ message: "Interaction deleted" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete interaction" });
+    }
+  });
+
+  // ===== OKR ROUTES =====
+  
+  // Get all OKRs
+  app.get("/api/okrs", requireAuth, async (req, res) => {
+    try {
+      const okrs = await storage.getAllOkrs();
+      res.json(okrs);
+    } catch (error) {
+      console.error('Get OKRs error:', error);
+      res.status(500).json({ error: "Failed to fetch OKRs" });
+    }
+  });
+  
+  // Get single OKR
+  app.get("/api/okrs/:id", requireAuth, async (req, res) => {
+    try {
+      const okr = await storage.getOkr(req.params.id);
+      if (!okr) {
+        return res.status(404).json({ error: "OKR not found" });
+      }
+      res.json(okr);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch OKR" });
+    }
+  });
+  
+  // Create OKR
+  app.post("/api/okrs", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const result = insertOkrSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const okr = await storage.createOkr(result.data);
+      res.status(201).json(okr);
+    } catch (error) {
+      console.error('Create OKR error:', error);
+      res.status(500).json({ error: "Failed to create OKR" });
+    }
+  });
+  
+  // Update OKR
+  app.patch("/api/okrs/:id", requireAuth, async (req, res) => {
+    try {
+      const okr = await storage.getOkr(req.params.id);
+      if (!okr) {
+        return res.status(404).json({ error: "OKR not found" });
+      }
+      const updated = await storage.updateOkr(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update OKR" });
+    }
+  });
+  
+  // Delete OKR
+  app.delete("/api/okrs/:id", requireAuth, async (req, res) => {
+    try {
+      const okr = await storage.getOkr(req.params.id);
+      if (!okr) {
+        return res.status(404).json({ error: "OKR not found" });
+      }
+      await storage.deleteOkr(req.params.id);
+      res.json({ message: "OKR deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete OKR" });
+    }
+  });
+
+  // ===== STAKEHOLDER ROUTES =====
+  
+  // Get all stakeholders
+  app.get("/api/stakeholders", requireAuth, async (req, res) => {
+    try {
+      const stakeholders = await storage.getAllStakeholders();
+      res.json(stakeholders);
+    } catch (error) {
+      console.error('Get stakeholders error:', error);
+      res.status(500).json({ error: "Failed to fetch stakeholders" });
+    }
+  });
+  
+  // Get single stakeholder
+  app.get("/api/stakeholders/:id", requireAuth, async (req, res) => {
+    try {
+      const stakeholder = await storage.getStakeholder(req.params.id);
+      if (!stakeholder) {
+        return res.status(404).json({ error: "Stakeholder not found" });
+      }
+      res.json(stakeholder);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch stakeholder" });
+    }
+  });
+  
+  // Create stakeholder
+  app.post("/api/stakeholders", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const result = insertStakeholderSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const stakeholder = await storage.createStakeholder(result.data);
+      res.status(201).json(stakeholder);
+    } catch (error) {
+      console.error('Create stakeholder error:', error);
+      res.status(500).json({ error: "Failed to create stakeholder" });
+    }
+  });
+  
+  // Update stakeholder
+  app.patch("/api/stakeholders/:id", requireAuth, async (req, res) => {
+    try {
+      const stakeholder = await storage.getStakeholder(req.params.id);
+      if (!stakeholder) {
+        return res.status(404).json({ error: "Stakeholder not found" });
+      }
+      const updated = await storage.updateStakeholder(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update stakeholder" });
+    }
+  });
+  
+  // Delete stakeholder
+  app.delete("/api/stakeholders/:id", requireAuth, async (req, res) => {
+    try {
+      const stakeholder = await storage.getStakeholder(req.params.id);
+      if (!stakeholder) {
+        return res.status(404).json({ error: "Stakeholder not found" });
+      }
+      await storage.deleteStakeholder(req.params.id);
+      res.json({ message: "Stakeholder deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete stakeholder" });
+    }
+  });
+
+  // ===== ANNOUNCEMENT ROUTES =====
+  
+  // Get all announcements
+  app.get("/api/announcements", requireAuth, async (req, res) => {
+    try {
+      const announcements = await storage.getAllAnnouncements();
+      res.json(announcements);
+    } catch (error) {
+      console.error('Get announcements error:', error);
+      res.status(500).json({ error: "Failed to fetch announcements" });
+    }
+  });
+  
+  // Get single announcement
+  app.get("/api/announcements/:id", requireAuth, async (req, res) => {
+    try {
+      const announcement = await storage.getAnnouncement(req.params.id);
+      if (!announcement) {
+        return res.status(404).json({ error: "Announcement not found" });
+      }
+      res.json(announcement);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch announcement" });
+    }
+  });
+  
+  // Create announcement
+  app.post("/api/announcements", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const result = insertAnnouncementSchema.safeParse({
+        ...req.body,
+        authorId: user.id,
+        authorName: user.name,
+      });
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const announcement = await storage.createAnnouncement(result.data);
+      res.status(201).json(announcement);
+    } catch (error) {
+      console.error('Create announcement error:', error);
+      res.status(500).json({ error: "Failed to create announcement" });
+    }
+  });
+  
+  // Update announcement
+  app.patch("/api/announcements/:id", requireAuth, async (req, res) => {
+    try {
+      const announcement = await storage.getAnnouncement(req.params.id);
+      if (!announcement) {
+        return res.status(404).json({ error: "Announcement not found" });
+      }
+      const updated = await storage.updateAnnouncement(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update announcement" });
+    }
+  });
+  
+  // Delete announcement
+  app.delete("/api/announcements/:id", requireAuth, async (req, res) => {
+    try {
+      const announcement = await storage.getAnnouncement(req.params.id);
+      if (!announcement) {
+        return res.status(404).json({ error: "Announcement not found" });
+      }
+      await storage.deleteAnnouncement(req.params.id);
+      res.json({ message: "Announcement deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete announcement" });
+    }
+  });
+
+  // ===== POLL ROUTES =====
+  
+  // Get all polls
+  app.get("/api/polls", requireAuth, async (req, res) => {
+    try {
+      const polls = await storage.getAllPolls();
+      res.json(polls);
+    } catch (error) {
+      console.error('Get polls error:', error);
+      res.status(500).json({ error: "Failed to fetch polls" });
+    }
+  });
+  
+  // Get single poll
+  app.get("/api/polls/:id", requireAuth, async (req, res) => {
+    try {
+      const poll = await storage.getPoll(req.params.id);
+      if (!poll) {
+        return res.status(404).json({ error: "Poll not found" });
+      }
+      res.json(poll);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch poll" });
+    }
+  });
+  
+  // Create poll
+  app.post("/api/polls", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const result = insertPollSchema.safeParse({
+        ...req.body,
+        creatorId: user.id,
+        creatorName: user.name,
+      });
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const poll = await storage.createPoll(result.data);
+      res.status(201).json(poll);
+    } catch (error) {
+      console.error('Create poll error:', error);
+      res.status(500).json({ error: "Failed to create poll" });
+    }
+  });
+  
+  // Update poll (for voting)
+  app.patch("/api/polls/:id", requireAuth, async (req, res) => {
+    try {
+      const poll = await storage.getPoll(req.params.id);
+      if (!poll) {
+        return res.status(404).json({ error: "Poll not found" });
+      }
+      const updated = await storage.updatePoll(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update poll" });
+    }
+  });
+  
+  // Delete poll
+  app.delete("/api/polls/:id", requireAuth, async (req, res) => {
+    try {
+      const poll = await storage.getPoll(req.params.id);
+      if (!poll) {
+        return res.status(404).json({ error: "Poll not found" });
+      }
+      await storage.deletePoll(req.params.id);
+      res.json({ message: "Poll deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete poll" });
+    }
+  });
+
+  // ===== MENTORSHIP PAIRING ROUTES =====
+  
+  // Get all mentorship pairings
+  app.get("/api/mentorship-pairings", requireAuth, async (req, res) => {
+    try {
+      const pairings = await storage.getAllMentorshipPairings();
+      res.json(pairings);
+    } catch (error) {
+      console.error('Get mentorship pairings error:', error);
+      res.status(500).json({ error: "Failed to fetch mentorship pairings" });
+    }
+  });
+  
+  // Get single mentorship pairing
+  app.get("/api/mentorship-pairings/:id", requireAuth, async (req, res) => {
+    try {
+      const pairing = await storage.getMentorshipPairing(req.params.id);
+      if (!pairing) {
+        return res.status(404).json({ error: "Mentorship pairing not found" });
+      }
+      res.json(pairing);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch mentorship pairing" });
+    }
+  });
+  
+  // Create mentorship pairing (CEO only)
+  app.post("/api/mentorship-pairings", generalLimiter, requireCEO, async (req, res) => {
+    try {
+      const result = insertMentorshipPairingSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const pairing = await storage.createMentorshipPairing(result.data);
+      res.status(201).json(pairing);
+    } catch (error) {
+      console.error('Create mentorship pairing error:', error);
+      res.status(500).json({ error: "Failed to create mentorship pairing" });
+    }
+  });
+  
+  // Update mentorship pairing
+  app.patch("/api/mentorship-pairings/:id", requireAuth, async (req, res) => {
+    try {
+      const pairing = await storage.getMentorshipPairing(req.params.id);
+      if (!pairing) {
+        return res.status(404).json({ error: "Mentorship pairing not found" });
+      }
+      const updated = await storage.updateMentorshipPairing(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update mentorship pairing" });
+    }
+  });
+  
+  // Delete mentorship pairing (CEO only)
+  app.delete("/api/mentorship-pairings/:id", requireCEO, async (req, res) => {
+    try {
+      const pairing = await storage.getMentorshipPairing(req.params.id);
+      if (!pairing) {
+        return res.status(404).json({ error: "Mentorship pairing not found" });
+      }
+      await storage.deleteMentorshipPairing(req.params.id);
+      res.json({ message: "Mentorship pairing deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete mentorship pairing" });
+    }
+  });
+
+  // ===== CLIENT PORTAL ACCESS ROUTES =====
+  
+  // Get all client portal access entries
+  app.get("/api/client-portal-access", requireAuth, async (req, res) => {
+    try {
+      const access = await storage.getAllClientPortalAccess();
+      res.json(access);
+    } catch (error) {
+      console.error('Get client portal access error:', error);
+      res.status(500).json({ error: "Failed to fetch client portal access" });
+    }
+  });
+  
+  // Get client portal access by deal
+  app.get("/api/client-portal-access/deal/:dealId", requireAuth, async (req, res) => {
+    try {
+      const access = await storage.getClientPortalAccessByDeal(req.params.dealId);
+      res.json(access);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch client portal access for deal" });
+    }
+  });
+  
+  // Get single client portal access
+  app.get("/api/client-portal-access/:id", requireAuth, async (req, res) => {
+    try {
+      const access = await storage.getClientPortalAccess(req.params.id);
+      if (!access) {
+        return res.status(404).json({ error: "Client portal access not found" });
+      }
+      res.json(access);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch client portal access" });
+    }
+  });
+  
+  // Create client portal access
+  app.post("/api/client-portal-access", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const result = insertClientPortalAccessSchema.safeParse({
+        ...req.body,
+        invitedBy: user.id,
+      });
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const access = await storage.createClientPortalAccess(result.data);
+      res.status(201).json(access);
+    } catch (error) {
+      console.error('Create client portal access error:', error);
+      res.status(500).json({ error: "Failed to create client portal access" });
+    }
+  });
+  
+  // Update client portal access
+  app.patch("/api/client-portal-access/:id", requireAuth, async (req, res) => {
+    try {
+      const access = await storage.getClientPortalAccess(req.params.id);
+      if (!access) {
+        return res.status(404).json({ error: "Client portal access not found" });
+      }
+      const updated = await storage.updateClientPortalAccess(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update client portal access" });
+    }
+  });
+  
+  // Delete client portal access
+  app.delete("/api/client-portal-access/:id", requireAuth, async (req, res) => {
+    try {
+      const access = await storage.getClientPortalAccess(req.params.id);
+      if (!access) {
+        return res.status(404).json({ error: "Client portal access not found" });
+      }
+      await storage.deleteClientPortalAccess(req.params.id);
+      res.json({ message: "Client portal access deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete client portal access" });
     }
   });
 
