@@ -68,7 +68,7 @@ Preferred communication style: Simple, everyday language.
 - Drizzle Kit for schema migrations (output to `/migrations` folder)
 
 **Schema Design**
-- **Users table**: Authentication, roles (CEO/Associate/Director/Managing Director/Analyst), performance metrics (score, active deals, completed tasks)
+- **Users table**: Authentication, roles (CEO/Associate/Director/Managing Director/Analyst), performance metrics (score, active deals, completed tasks), status (active/pending/suspended), 2FA fields (twoFactorEnabled, twoFactorSecret)
 - **Deals table**: Deal information including stage, value, client, sector, lead, progress percentage, status, and description
 - **Tasks table**: Task assignments with references to users and deals, priority levels, due dates, and status tracking
 - **Meetings table**: Meeting scheduling with title, date/time, attendees, location, deal association, and description
@@ -78,6 +78,7 @@ Preferred communication style: Simple, everyday language.
 - **deal_templates table**: Document templates with category, description, sections, and sector-specific tags
 - **calendar_events table**: Capital raising events with investor, deal, status, location, and notes
 - **task_attachments table**: File metadata for task attachments (filename, URL, size, type)
+- **documents table**: Document storage with file data (base64), filename, category, deal association, tags, uploadedBy, isArchived
 
 **Type Safety**
 - Zod schemas generated from Drizzle table definitions
@@ -172,3 +173,45 @@ Preferred communication style: Simple, everyday language.
 - `ReaperAssistant.tsx` - Slide-out panel with conversation management
 - Integrated globally via Layout component
 - Auto-selects most recent conversation when opened
+
+## Two-Factor Authentication (2FA)
+
+**Overview**
+- TOTP-based two-factor authentication using otplib and qrcode libraries
+- Optional 2FA that can be enabled/disabled from user account settings
+- QR code generation for authenticator app setup (Google Authenticator, Authy, etc.)
+
+**Implementation Details**
+- Backend routes: `/api/auth/2fa/setup` (generate secret + QR), `/api/auth/2fa/verify` (confirm setup), `/api/auth/2fa/disable` (turn off), `/api/auth/2fa/status` (check status)
+- Login flow: After password verification, if 2FA enabled, user is prompted for TOTP code via `/api/auth/2fa/login-verify`
+- Secrets stored securely in users table (twoFactorSecret column)
+- Frontend UI integrated into Layout.tsx account settings Security tab
+
+**Security Features**
+- Invite-only registration: New users assigned 'pending' status, require CEO approval
+- User suspension: Suspended users have sessions invalidated and cannot authenticate
+- Role management: CEOs can modify user roles and status via User Management page
+
+## Document Management
+
+**Overview**
+- Centralized document library for storing, organizing, and sharing deal-related documents
+- Accessible via Document Library navigation in both CEO and Employee sidebars
+- Full CRUD operations with file upload, search, filtering, and download
+
+**Features**
+- File upload with base64 encoding for database storage
+- Category-based organization (Contracts, Financial Documents, Legal, Presentations, Reports, Other)
+- Deal association for linking documents to specific deals
+- Tag support for enhanced searchability
+- Search and filter by filename, category, deal, or tags
+- Archive/unarchive functionality
+- Download capability for retrieving stored documents
+
+**API Endpoints**
+- `GET /api/documents` - List all accessible documents
+- `GET /api/documents/:id` - Get single document details
+- `GET /api/documents/deal/:dealId` - Get documents by deal
+- `POST /api/documents` - Upload new document
+- `PATCH /api/documents/:id` - Update document metadata
+- `DELETE /api/documents/:id` - Delete document
