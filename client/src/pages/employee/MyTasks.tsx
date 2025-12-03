@@ -66,13 +66,12 @@ export default function MyTasks() {
   const [aiSuggestion, setAiSuggestion] = useState<{action: string, reasoning: string, tools: string[]} | null>(null);
   const [deferredTasks, setDeferredTasks] = useState<string[]>([]);
   
-  // Flagged tasks - persisted in localStorage and synced with war room
+  // Flagged tasks - persisted in localStorage for pod team notifications
   const [flaggedTasks, setFlaggedTasks] = useState<Record<string, string>>(() => {
     try {
-      const saved = localStorage.getItem('warRoomFlags');
+      const saved = localStorage.getItem('flaggedTaskNotes');
       if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.taskFlags || {};
+        return JSON.parse(saved);
       }
     } catch {}
     return {};
@@ -99,13 +98,7 @@ export default function MyTasks() {
     setFlaggedTasks(newFlaggedTasks);
     
     try {
-      const saved = localStorage.getItem('warRoomFlags');
-      const current = saved ? JSON.parse(saved) : { dealIds: [], taskIds: [], taskFlags: {} };
-      localStorage.setItem('warRoomFlags', JSON.stringify({
-        ...current,
-        taskFlags: newFlaggedTasks,
-        taskIds: Object.keys(newFlaggedTasks),
-      }));
+      localStorage.setItem('flaggedTaskNotes', JSON.stringify(newFlaggedTasks));
     } catch {}
     
     toast.info("Task unflagged");
@@ -118,13 +111,7 @@ export default function MyTasks() {
     setFlaggedTasks(newFlaggedTasks);
     
     try {
-      const saved = localStorage.getItem('warRoomFlags');
-      const current = saved ? JSON.parse(saved) : { dealIds: [], taskIds: [], taskFlags: {} };
-      localStorage.setItem('warRoomFlags', JSON.stringify({
-        ...current,
-        taskFlags: newFlaggedTasks,
-        taskIds: Object.keys(newFlaggedTasks),
-      }));
+      localStorage.setItem('flaggedTaskNotes', JSON.stringify(newFlaggedTasks));
     } catch {}
     
     const task = myTasks.find(t => t.id === flagNoteTaskId);
@@ -142,18 +129,18 @@ export default function MyTasks() {
           });
           const data = await result.json();
           if (data.notifiedCount > 0) {
-            toast.success(`Task flagged! ${data.notifiedCount} team member(s) notified.`);
+            toast.success(`Task flagged! ${data.notifiedCount} pod team member(s) notified.`);
           } else {
-            toast.success("Task flagged for War Room!");
+            toast.success("Task flagged!");
           }
         } catch (error) {
           toast.error("Task flagged but failed to notify team. Please try again.");
         }
       } else {
-        toast.success("Task flagged for War Room!");
+        toast.success("Task flagged!");
       }
     } else {
-      toast.success("Task flagged for War Room!");
+      toast.success("Task flagged!");
     }
     
     setShowFlagNoteDialog(false);
@@ -880,7 +867,7 @@ export default function MyTasks() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Flag className="w-5 h-5 text-orange-500" />
-              Flag Task for War Room
+              Flag Task
             </DialogTitle>
             <DialogDescription>
               Add a note to explain why this task is being flagged
@@ -899,7 +886,7 @@ export default function MyTasks() {
               />
             </div>
             <div className="text-xs text-muted-foreground">
-              This note will be visible to pod team members in the War Room.
+              This note will be visible to pod team members working on this project.
             </div>
           </div>
           <DialogFooter>
