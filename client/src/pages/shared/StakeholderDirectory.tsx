@@ -33,6 +33,7 @@ import { useDeals } from "@/lib/api";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { SHARED_INVESTORS } from "@/lib/investors";
 
 type Stakeholder = {
   id: string;
@@ -60,23 +61,24 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
 
+  const investorStakeholders: Stakeholder[] = SHARED_INVESTORS.map((inv) => ({
+    id: `inv-${inv.id}`,
+    name: inv.name,
+    title: inv.type,
+    company: inv.name,
+    type: 'investor' as const,
+    email: inv.email,
+    phone: inv.phone,
+    website: inv.website,
+    location: inv.focus,
+    notes: `${inv.type} | Check size: ${inv.checkSize} | Focus: ${inv.focus} | Tags: ${inv.tags.join(', ')}`,
+    deals: [],
+    isFavorite: inv.matchScore >= 90,
+    createdAt: "2024-01-01T00:00:00Z"
+  }));
+
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([
-    {
-      id: "1",
-      name: "Robert Mitchell",
-      title: "Managing Partner",
-      company: "Sequoia Capital",
-      type: "investor",
-      email: "r.mitchell@sequoia.com",
-      phone: "+1 650-555-0123",
-      linkedin: "https://linkedin.com/in/robertmitchell",
-      location: "Menlo Park, CA",
-      notes: "Interested in Series B+ technology deals. Strong network in enterprise SaaS.",
-      deals: ["deal-1", "deal-2"],
-      isFavorite: true,
-      lastContact: "2024-11-28T10:00:00Z",
-      createdAt: "2024-06-15T00:00:00Z"
-    },
+    ...investorStakeholders,
     {
       id: "2",
       name: "Jennifer Wu",
