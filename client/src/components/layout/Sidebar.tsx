@@ -20,11 +20,13 @@ import {
   ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useLogout } from "@/lib/api";
+import { useLogout, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
 import { toast } from "sonner";
 import { useDashboardContext } from "@/contexts/DashboardContext";
 import logo from "@assets/generated_images/abstract_minimalist_layer_icon_for_fintech_logo.png";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import type { UserPreferences } from "@shared/schema";
 
 type SidebarProps = {
   role: 'CEO' | 'Employee';
@@ -46,19 +48,58 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
   const [location, setLocation] = useLocation();
   const logoutMutation = useLogout();
   const { unreadMessageCount, clearUnreadMessages } = useDashboardContext();
+  const queryClient = useQueryClient();
+  const { data: userPrefs, isLoading: prefsLoading } = useUserPreferences();
+  const saveUserPrefs = useSaveUserPreferences();
   
-  // Expanded categories state - persist to localStorage
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>(() => {
-    const saved = localStorage.getItem('sidebarCategories');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-    return {};
-  });
+  // Expanded categories state - persist to user_preferences.settings.sidebarCategories
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const [categoriesInitialized, setCategoriesInitialized] = useState(false);
+  const prevCategoriesRef = useRef<string | null>(null);
   
+  // Load categories from user preferences
   useEffect(() => {
-    localStorage.setItem('sidebarCategories', JSON.stringify(expandedCategories));
-  }, [expandedCategories]);
+    if (!prefsLoading && !categoriesInitialized) {
+      const savedCategories = (userPrefs?.settings as any)?.sidebarCategories;
+      if (savedCategories && typeof savedCategories === 'object') {
+        setExpandedCategories(savedCategories);
+      }
+      setCategoriesInitialized(true);
+    }
+  }, [prefsLoading, userPrefs, categoriesInitialized]);
+  
+  // Save categories to database (debounced)
+  useEffect(() => {
+    if (!categoriesInitialized || prefsLoading) return;
+    
+    const currentJson = JSON.stringify(expandedCategories);
+    if (prevCategoriesRef.current === currentJson) return;
+    
+    // Skip initial save if values match server state
+    if (prevCategoriesRef.current === null) {
+      const serverCategories = (userPrefs?.settings as any)?.sidebarCategories;
+      if (serverCategories && JSON.stringify(serverCategories) === currentJson) {
+        prevCategoriesRef.current = currentJson;
+        return;
+      }
+    }
+    
+    const timeout = setTimeout(() => {
+      const freshPrefs = queryClient.getQueryData<UserPreferences>(['userPreferences']) || userPrefs;
+      const { id, userId, updatedAt, ...mutablePrefs } = (freshPrefs || {}) as any;
+      const existingSettings = (freshPrefs?.settings as any) || {};
+      saveUserPrefs.mutate({
+        ...mutablePrefs,
+        settings: {
+          ...existingSettings,
+          sidebarCategories: expandedCategories,
+        },
+      });
+      prevCategoriesRef.current = currentJson;
+    }, 500);
+    
+    return () => clearTimeout(timeout);
+  }, [expandedCategories, categoriesInitialized, prefsLoading, userPrefs]);
   
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => ({

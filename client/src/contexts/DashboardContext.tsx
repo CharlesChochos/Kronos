@@ -1,5 +1,8 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import { useUserPreferences, useSaveUserPreferences } from '@/lib/api';
+import type { UserPreferences } from '@shared/schema';
 
 interface MessageNotification {
   id: string;
@@ -34,14 +37,55 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [showResourcesSheet, setShowResourcesSheet] = useState(false);
   const [showNotificationsSheet, setShowNotificationsSheet] = useState(false);
   const [showCustomizeSheet, setShowCustomizeSheet] = useState(false);
-  const [unreadMessageCount, setUnreadMessageCount] = useState(() => {
-    const saved = localStorage.getItem('unreadMessageCount');
-    return saved ? parseInt(saved, 10) : 2;
-  });
-
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [countInitialized, setCountInitialized] = useState(false);
+  const prevCountRef = useRef<number | null>(null);
+  
+  const queryClient = useQueryClient();
+  const { data: userPrefs, isLoading: prefsLoading } = useUserPreferences();
+  const saveUserPrefs = useSaveUserPreferences();
+  
+  // Load unread count from user preferences
   useEffect(() => {
-    localStorage.setItem('unreadMessageCount', unreadMessageCount.toString());
-  }, [unreadMessageCount]);
+    if (!prefsLoading && !countInitialized) {
+      const savedCount = (userPrefs?.settings as any)?.unreadMessageCount;
+      if (typeof savedCount === 'number') {
+        setUnreadMessageCount(savedCount);
+      }
+      setCountInitialized(true);
+    }
+  }, [prefsLoading, userPrefs, countInitialized]);
+  
+  // Save unread count to database (debounced)
+  useEffect(() => {
+    if (!countInitialized || prefsLoading) return;
+    if (prevCountRef.current === unreadMessageCount) return;
+    
+    // Skip initial save if values match server state
+    if (prevCountRef.current === null) {
+      const serverCount = (userPrefs?.settings as any)?.unreadMessageCount;
+      if (serverCount === unreadMessageCount) {
+        prevCountRef.current = unreadMessageCount;
+        return;
+      }
+    }
+    
+    const timeout = setTimeout(() => {
+      const freshPrefs = queryClient.getQueryData<UserPreferences>(['userPreferences']) || userPrefs;
+      const { id, userId, updatedAt, ...mutablePrefs } = (freshPrefs || {}) as any;
+      const existingSettings = (freshPrefs?.settings as any) || {};
+      saveUserPrefs.mutate({
+        ...mutablePrefs,
+        settings: {
+          ...existingSettings,
+          unreadMessageCount: unreadMessageCount,
+        },
+      });
+      prevCountRef.current = unreadMessageCount;
+    }, 1000);
+    
+    return () => clearTimeout(timeout);
+  }, [unreadMessageCount, countInitialized, prefsLoading, userPrefs]);
 
   const addMessageNotification = useCallback((notification: MessageNotification) => {
     setUnreadMessageCount(prev => prev + 1);

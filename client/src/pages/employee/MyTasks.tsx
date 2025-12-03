@@ -36,7 +36,9 @@ import {
   Brain,
   Flag
 } from "lucide-react";
-import { useCurrentUser, useTasks, useDeals, useUpdateTask, useUsers, apiRequest } from "@/lib/api";
+import { useCurrentUser, useTasks, useDeals, useUpdateTask, useUsers, apiRequest, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import type { UserPreferences } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, parseISO, isToday, isBefore, addDays, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
@@ -52,6 +54,9 @@ export default function MyTasks() {
   const { data: deals = [] } = useDeals();
   const { data: users = [] } = useUsers();
   const updateTask = useUpdateTask();
+  const queryClient = useQueryClient();
+  const { data: userPrefs, isLoading: prefsLoading } = useUserPreferences();
+  const saveUserPrefs = useSaveUserPreferences();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -66,16 +71,21 @@ export default function MyTasks() {
   const [aiSuggestion, setAiSuggestion] = useState<{action: string, reasoning: string, tools: string[]} | null>(null);
   const [deferredTasks, setDeferredTasks] = useState<string[]>([]);
   
-  // Flagged tasks - persisted in localStorage for pod team notifications
-  const [flaggedTasks, setFlaggedTasks] = useState<Record<string, string>>(() => {
-    try {
-      const saved = localStorage.getItem('flaggedTaskNotes');
-      if (saved) {
-        return JSON.parse(saved);
+  // Flagged tasks - persisted to user_preferences.settings.flaggedTasks
+  const [flaggedTasks, setFlaggedTasks] = useState<Record<string, string>>({});
+  const [flaggedTasksInitialized, setFlaggedTasksInitialized] = useState(false);
+  const prevFlaggedRef = useRef<string | null>(null);
+  
+  // Load flagged tasks from user preferences
+  useEffect(() => {
+    if (!prefsLoading && !flaggedTasksInitialized) {
+      const savedFlagged = (userPrefs?.settings as any)?.flaggedTasks;
+      if (savedFlagged && typeof savedFlagged === 'object') {
+        setFlaggedTasks(savedFlagged);
       }
-    } catch {}
-    return {};
-  });
+      setFlaggedTasksInitialized(true);
+    }
+  }, [prefsLoading, userPrefs, flaggedTasksInitialized]);
   
   // Flag note dialog state
   const [showFlagNoteDialog, setShowFlagNoteDialog] = useState(false);
@@ -92,15 +102,24 @@ export default function MyTasks() {
     }
   };
   
+  const saveFlaggedTasksToDb = (newFlaggedTasks: Record<string, string>) => {
+    const freshPrefs = queryClient.getQueryData<UserPreferences>(['userPreferences']) || userPrefs;
+    const { id, userId, updatedAt, ...mutablePrefs } = (freshPrefs || {}) as any;
+    const existingSettings = (freshPrefs?.settings as any) || {};
+    saveUserPrefs.mutate({
+      ...mutablePrefs,
+      settings: {
+        ...existingSettings,
+        flaggedTasks: newFlaggedTasks,
+      },
+    });
+  };
+  
   const unflagTask = (taskId: string) => {
     const newFlaggedTasks = { ...flaggedTasks };
     delete newFlaggedTasks[taskId];
     setFlaggedTasks(newFlaggedTasks);
-    
-    try {
-      localStorage.setItem('flaggedTaskNotes', JSON.stringify(newFlaggedTasks));
-    } catch {}
-    
+    saveFlaggedTasksToDb(newFlaggedTasks);
     toast.info("Task unflagged");
   };
   
@@ -109,10 +128,7 @@ export default function MyTasks() {
     
     const newFlaggedTasks = { ...flaggedTasks, [flagNoteTaskId]: flagNote };
     setFlaggedTasks(newFlaggedTasks);
-    
-    try {
-      localStorage.setItem('flaggedTaskNotes', JSON.stringify(newFlaggedTasks));
-    } catch {}
+    saveFlaggedTasksToDb(newFlaggedTasks);
     
     const task = myTasks.find(t => t.id === flagNoteTaskId);
     if (task && task.dealId) {

@@ -56,7 +56,9 @@ import {
   PieChartIcon,
   Activity
 } from "lucide-react";
-import { useCurrentUser, useTasks, useDeals, useMeetings, useNotifications, useUsers, useUpdateTask } from "@/lib/api";
+import { useCurrentUser, useTasks, useDeals, useMeetings, useNotifications, useUsers, useUpdateTask, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import type { UserPreferences } from "@shared/schema";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { format, isToday, isTomorrow, parseISO, subDays } from "date-fns";
@@ -71,6 +73,9 @@ export default function EmployeeHome() {
   const { data: notifications = [] } = useNotifications();
   const { data: users = [] } = useUsers();
   const updateTask = useUpdateTask();
+  const queryClient = useQueryClient();
+  const { data: userPrefs, isLoading: prefsLoading } = useUserPreferences();
+  const saveUserPrefs = useSaveUserPreferences();
   
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
@@ -80,40 +85,68 @@ export default function EmployeeHome() {
   // Widget definitions for drag and drop
   type WidgetId = 'quickStats' | 'myTasks' | 'myProjects' | 'schedule' | 'quickActions';
   const defaultWidgetOrder: WidgetId[] = ['quickStats', 'myTasks', 'myProjects', 'schedule', 'quickActions'];
+  const defaultWidgetSettings = {
+    showQuickStats: true,
+    showMyTasks: true,
+    showMyProjects: true,
+    showSchedule: true,
+    showQuickActions: true,
+  };
   
-  // Load widget order from localStorage
-  const [widgetOrder, setWidgetOrder] = useState<WidgetId[]>(() => {
-    const saved = localStorage.getItem('employeeHomeWidgetOrder');
-    return saved ? JSON.parse(saved) : defaultWidgetOrder;
-  });
+  // State for employee home settings
+  const [widgetOrder, setWidgetOrder] = useState<WidgetId[]>(defaultWidgetOrder);
+  const [widgetSettings, setWidgetSettings] = useState(defaultWidgetSettings);
+  const [bgColor, setBgColor] = useState<string>('default');
+  const [settingsInitialized, setSettingsInitialized] = useState(false);
+  const prevSettingsRef = useRef<string | null>(null);
   
-  // Customization state
-  const [widgetSettings, setWidgetSettings] = useState(() => {
-    const saved = localStorage.getItem('employeeHomeWidgetSettings');
-    return saved ? JSON.parse(saved) : {
-      showQuickStats: true,
-      showMyTasks: true,
-      showMyProjects: true,
-      showSchedule: true,
-      showQuickActions: true,
-    };
-  });
-  const [bgColor, setBgColor] = useState<string>(() => {
-    return localStorage.getItem('employeeHomeBgColor') || 'default';
-  });
-  
-  // Save settings to localStorage when they change
+  // Load settings from user preferences
   useEffect(() => {
-    localStorage.setItem('employeeHomeWidgetOrder', JSON.stringify(widgetOrder));
-  }, [widgetOrder]);
+    if (!prefsLoading && !settingsInitialized) {
+      const employeeSettings = (userPrefs?.settings as any)?.employeeHome;
+      if (employeeSettings) {
+        if (employeeSettings.widgetOrder) setWidgetOrder(employeeSettings.widgetOrder);
+        if (employeeSettings.widgetSettings) setWidgetSettings(employeeSettings.widgetSettings);
+        if (employeeSettings.bgColor) setBgColor(employeeSettings.bgColor);
+      }
+      setSettingsInitialized(true);
+    }
+  }, [prefsLoading, userPrefs, settingsInitialized]);
   
+  // Save settings to database (debounced)
   useEffect(() => {
-    localStorage.setItem('employeeHomeWidgetSettings', JSON.stringify(widgetSettings));
-  }, [widgetSettings]);
-  
-  useEffect(() => {
-    localStorage.setItem('employeeHomeBgColor', bgColor);
-  }, [bgColor]);
+    if (!settingsInitialized || prefsLoading) return;
+    
+    const currentSettings = { widgetOrder, widgetSettings, bgColor };
+    const currentJson = JSON.stringify(currentSettings);
+    
+    if (prevSettingsRef.current === currentJson) return;
+    
+    // Skip initial save if values match server state
+    if (prevSettingsRef.current === null) {
+      const serverSettings = (userPrefs?.settings as any)?.employeeHome;
+      if (serverSettings && JSON.stringify(serverSettings) === currentJson) {
+        prevSettingsRef.current = currentJson;
+        return;
+      }
+    }
+    
+    const timeout = setTimeout(() => {
+      const freshPrefs = queryClient.getQueryData<UserPreferences>(['userPreferences']) || userPrefs;
+      const { id, userId, updatedAt, ...mutablePrefs } = (freshPrefs || {}) as any;
+      const existingSettings = (freshPrefs?.settings as any) || {};
+      saveUserPrefs.mutate({
+        ...mutablePrefs,
+        settings: {
+          ...existingSettings,
+          employeeHome: currentSettings,
+        },
+      });
+      prevSettingsRef.current = currentJson;
+    }, 1000);
+    
+    return () => clearTimeout(timeout);
+  }, [widgetOrder, widgetSettings, bgColor, settingsInitialized, prefsLoading, userPrefs]);
 
   const openTaskDetail = (task: Task) => {
     setSelectedTask(task);
