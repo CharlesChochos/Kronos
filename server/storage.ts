@@ -2,7 +2,7 @@ import { eq, and, desc, gt } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@shared/schema";
-import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction } from "@shared/schema";
+import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -117,6 +117,49 @@ export interface IStorage {
   getInvestorInteractions(investorId: string): Promise<InvestorInteraction[]>;
   createInvestorInteraction(interaction: InsertInvestorInteraction): Promise<InvestorInteraction>;
   deleteInvestorInteraction(id: string): Promise<void>;
+  
+  // OKR operations
+  getOkr(id: string): Promise<Okr | undefined>;
+  getAllOkrs(): Promise<Okr[]>;
+  createOkr(okr: InsertOkr): Promise<Okr>;
+  updateOkr(id: string, updates: Partial<InsertOkr>): Promise<Okr | undefined>;
+  deleteOkr(id: string): Promise<void>;
+  
+  // Stakeholder operations
+  getStakeholder(id: string): Promise<Stakeholder | undefined>;
+  getAllStakeholders(): Promise<Stakeholder[]>;
+  createStakeholder(stakeholder: InsertStakeholder): Promise<Stakeholder>;
+  updateStakeholder(id: string, updates: Partial<InsertStakeholder>): Promise<Stakeholder | undefined>;
+  deleteStakeholder(id: string): Promise<void>;
+  
+  // Announcement operations
+  getAnnouncement(id: string): Promise<Announcement | undefined>;
+  getAllAnnouncements(): Promise<Announcement[]>;
+  createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
+  updateAnnouncement(id: string, updates: Partial<InsertAnnouncement>): Promise<Announcement | undefined>;
+  deleteAnnouncement(id: string): Promise<void>;
+  
+  // Poll operations
+  getPoll(id: string): Promise<Poll | undefined>;
+  getAllPolls(): Promise<Poll[]>;
+  createPoll(poll: InsertPoll): Promise<Poll>;
+  updatePoll(id: string, updates: Partial<InsertPoll>): Promise<Poll | undefined>;
+  deletePoll(id: string): Promise<void>;
+  
+  // Mentorship Pairing operations
+  getMentorshipPairing(id: string): Promise<MentorshipPairing | undefined>;
+  getAllMentorshipPairings(): Promise<MentorshipPairing[]>;
+  createMentorshipPairing(pairing: InsertMentorshipPairing): Promise<MentorshipPairing>;
+  updateMentorshipPairing(id: string, updates: Partial<InsertMentorshipPairing>): Promise<MentorshipPairing | undefined>;
+  deleteMentorshipPairing(id: string): Promise<void>;
+  
+  // Client Portal Access operations
+  getClientPortalAccess(id: string): Promise<ClientPortalAccess | undefined>;
+  getAllClientPortalAccess(): Promise<ClientPortalAccess[]>;
+  getClientPortalAccessByDeal(dealId: string): Promise<ClientPortalAccess[]>;
+  createClientPortalAccess(access: InsertClientPortalAccess): Promise<ClientPortalAccess>;
+  updateClientPortalAccess(id: string, updates: Partial<InsertClientPortalAccess>): Promise<ClientPortalAccess | undefined>;
+  deleteClientPortalAccess(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -634,6 +677,174 @@ export class DatabaseStorage implements IStorage {
   
   async deleteInvestorInteraction(id: string): Promise<void> {
     await db.delete(schema.investorInteractions).where(eq(schema.investorInteractions.id, id));
+  }
+  
+  // OKR operations
+  async getOkr(id: string): Promise<Okr | undefined> {
+    const [okr] = await db.select().from(schema.okrs).where(eq(schema.okrs.id, id));
+    return okr;
+  }
+  
+  async getAllOkrs(): Promise<Okr[]> {
+    return await db.select().from(schema.okrs).orderBy(desc(schema.okrs.createdAt));
+  }
+  
+  async createOkr(okr: InsertOkr): Promise<Okr> {
+    const [created] = await db.insert(schema.okrs).values(okr).returning();
+    return created;
+  }
+  
+  async updateOkr(id: string, updates: Partial<InsertOkr>): Promise<Okr | undefined> {
+    const [updated] = await db.update(schema.okrs)
+      .set(updates)
+      .where(eq(schema.okrs.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteOkr(id: string): Promise<void> {
+    await db.delete(schema.okrs).where(eq(schema.okrs.id, id));
+  }
+  
+  // Stakeholder operations
+  async getStakeholder(id: string): Promise<Stakeholder | undefined> {
+    const [stakeholder] = await db.select().from(schema.stakeholders).where(eq(schema.stakeholders.id, id));
+    return stakeholder;
+  }
+  
+  async getAllStakeholders(): Promise<Stakeholder[]> {
+    return await db.select().from(schema.stakeholders).orderBy(schema.stakeholders.name);
+  }
+  
+  async createStakeholder(stakeholder: InsertStakeholder): Promise<Stakeholder> {
+    const [created] = await db.insert(schema.stakeholders).values(stakeholder).returning();
+    return created;
+  }
+  
+  async updateStakeholder(id: string, updates: Partial<InsertStakeholder>): Promise<Stakeholder | undefined> {
+    const [updated] = await db.update(schema.stakeholders)
+      .set(updates)
+      .where(eq(schema.stakeholders.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteStakeholder(id: string): Promise<void> {
+    await db.delete(schema.stakeholders).where(eq(schema.stakeholders.id, id));
+  }
+  
+  // Announcement operations
+  async getAnnouncement(id: string): Promise<Announcement | undefined> {
+    const [announcement] = await db.select().from(schema.announcements).where(eq(schema.announcements.id, id));
+    return announcement;
+  }
+  
+  async getAllAnnouncements(): Promise<Announcement[]> {
+    return await db.select().from(schema.announcements).orderBy(desc(schema.announcements.createdAt));
+  }
+  
+  async createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement> {
+    const [created] = await db.insert(schema.announcements).values(announcement).returning();
+    return created;
+  }
+  
+  async updateAnnouncement(id: string, updates: Partial<InsertAnnouncement>): Promise<Announcement | undefined> {
+    const [updated] = await db.update(schema.announcements)
+      .set(updates)
+      .where(eq(schema.announcements.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteAnnouncement(id: string): Promise<void> {
+    await db.delete(schema.announcements).where(eq(schema.announcements.id, id));
+  }
+  
+  // Poll operations
+  async getPoll(id: string): Promise<Poll | undefined> {
+    const [poll] = await db.select().from(schema.polls).where(eq(schema.polls.id, id));
+    return poll;
+  }
+  
+  async getAllPolls(): Promise<Poll[]> {
+    return await db.select().from(schema.polls).orderBy(desc(schema.polls.createdAt));
+  }
+  
+  async createPoll(poll: InsertPoll): Promise<Poll> {
+    const [created] = await db.insert(schema.polls).values(poll).returning();
+    return created;
+  }
+  
+  async updatePoll(id: string, updates: Partial<InsertPoll>): Promise<Poll | undefined> {
+    const [updated] = await db.update(schema.polls)
+      .set(updates)
+      .where(eq(schema.polls.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deletePoll(id: string): Promise<void> {
+    await db.delete(schema.polls).where(eq(schema.polls.id, id));
+  }
+  
+  // Mentorship Pairing operations
+  async getMentorshipPairing(id: string): Promise<MentorshipPairing | undefined> {
+    const [pairing] = await db.select().from(schema.mentorshipPairings).where(eq(schema.mentorshipPairings.id, id));
+    return pairing;
+  }
+  
+  async getAllMentorshipPairings(): Promise<MentorshipPairing[]> {
+    return await db.select().from(schema.mentorshipPairings).orderBy(desc(schema.mentorshipPairings.createdAt));
+  }
+  
+  async createMentorshipPairing(pairing: InsertMentorshipPairing): Promise<MentorshipPairing> {
+    const [created] = await db.insert(schema.mentorshipPairings).values(pairing).returning();
+    return created;
+  }
+  
+  async updateMentorshipPairing(id: string, updates: Partial<InsertMentorshipPairing>): Promise<MentorshipPairing | undefined> {
+    const [updated] = await db.update(schema.mentorshipPairings)
+      .set(updates)
+      .where(eq(schema.mentorshipPairings.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteMentorshipPairing(id: string): Promise<void> {
+    await db.delete(schema.mentorshipPairings).where(eq(schema.mentorshipPairings.id, id));
+  }
+  
+  // Client Portal Access operations
+  async getClientPortalAccess(id: string): Promise<ClientPortalAccess | undefined> {
+    const [access] = await db.select().from(schema.clientPortalAccess).where(eq(schema.clientPortalAccess.id, id));
+    return access;
+  }
+  
+  async getAllClientPortalAccess(): Promise<ClientPortalAccess[]> {
+    return await db.select().from(schema.clientPortalAccess).orderBy(desc(schema.clientPortalAccess.createdAt));
+  }
+  
+  async getClientPortalAccessByDeal(dealId: string): Promise<ClientPortalAccess[]> {
+    return await db.select().from(schema.clientPortalAccess)
+      .where(eq(schema.clientPortalAccess.dealId, dealId))
+      .orderBy(desc(schema.clientPortalAccess.createdAt));
+  }
+  
+  async createClientPortalAccess(access: InsertClientPortalAccess): Promise<ClientPortalAccess> {
+    const [created] = await db.insert(schema.clientPortalAccess).values(access).returning();
+    return created;
+  }
+  
+  async updateClientPortalAccess(id: string, updates: Partial<InsertClientPortalAccess>): Promise<ClientPortalAccess | undefined> {
+    const [updated] = await db.update(schema.clientPortalAccess)
+      .set(updates)
+      .where(eq(schema.clientPortalAccess.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteClientPortalAccess(id: string): Promise<void> {
+    await db.delete(schema.clientPortalAccess).where(eq(schema.clientPortalAccess.id, id));
   }
 }
 

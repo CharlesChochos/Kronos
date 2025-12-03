@@ -408,3 +408,182 @@ export const sessions = pgTable("sessions", {
   sess: jsonb("sess").notNull(),
   expire: timestamp("expire", { precision: 6 }).notNull(),
 });
+
+// Key Result type for OKRs
+export type KeyResult = {
+  id: string;
+  title: string;
+  targetValue: number;
+  currentValue: number;
+  unit: string;
+  progress: number;
+};
+
+// OKRs table (Objectives and Key Results)
+export const okrs = pgTable("okrs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  objective: text("objective").notNull(),
+  description: text("description"),
+  ownerId: varchar("owner_id").references(() => users.id),
+  ownerName: text("owner_name").notNull(),
+  quarter: text("quarter").notNull(), // Q1, Q2, Q3, Q4
+  year: integer("year").notNull(),
+  keyResults: jsonb("key_results").default([]).$type<KeyResult[]>(),
+  status: text("status").notNull().default('on-track'), // on-track, at-risk, behind, completed
+  overallProgress: integer("overall_progress").default(0),
+  type: text("type").notNull().default('individual'), // individual, team
+  teamName: text("team_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertOkrSchema = createInsertSchema(okrs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertOkr = z.infer<typeof insertOkrSchema>;
+export type Okr = typeof okrs.$inferSelect;
+
+// Stakeholders table
+export const stakeholders = pgTable("stakeholders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  title: text("title").notNull(),
+  company: text("company").notNull(),
+  type: text("type").notNull().default('other'), // investor, advisor, legal, banker, consultant, client, other
+  email: text("email"),
+  phone: text("phone"),
+  linkedin: text("linkedin"),
+  website: text("website"),
+  location: text("location"),
+  notes: text("notes"),
+  deals: jsonb("deals").default([]).$type<string[]>(),
+  isFavorite: boolean("is_favorite").default(false),
+  lastContact: text("last_contact"), // ISO date string
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStakeholderSchema = createInsertSchema(stakeholders).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertStakeholder = z.infer<typeof insertStakeholderSchema>;
+export type Stakeholder = typeof stakeholders.$inferSelect;
+
+// Announcement Reaction type
+export type AnnouncementReaction = {
+  emoji: string;
+  count: number;
+  userIds: string[];
+};
+
+// Announcement Comment type
+export type AnnouncementComment = {
+  id: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+};
+
+// Announcements table
+export const announcements = pgTable("announcements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  type: text("type").notNull().default('general'), // deal-closed, milestone, team-update, celebration, general
+  dealId: varchar("deal_id").references(() => deals.id),
+  dealName: text("deal_name"),
+  authorId: varchar("author_id").references(() => users.id).notNull(),
+  authorName: text("author_name").notNull(),
+  isPinned: boolean("is_pinned").default(false),
+  reactions: jsonb("reactions").default([]).$type<AnnouncementReaction[]>(),
+  comments: jsonb("comments").default([]).$type<AnnouncementComment[]>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAnnouncementSchema = createInsertSchema(announcements).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
+export type Announcement = typeof announcements.$inferSelect;
+
+// Poll Option type
+export type PollOption = {
+  id: string;
+  text: string;
+  votes: string[]; // array of user IDs who voted
+};
+
+// Polls table
+export const polls = pgTable("polls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  question: text("question").notNull(),
+  options: jsonb("options").default([]).$type<PollOption[]>(),
+  creatorId: varchar("creator_id").references(() => users.id).notNull(),
+  creatorName: text("creator_name").notNull(),
+  expiresAt: text("expires_at").notNull(), // ISO date string
+  isAnonymous: boolean("is_anonymous").default(false),
+  allowMultiple: boolean("allow_multiple").default(false),
+  status: text("status").notNull().default('active'), // active, closed
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPollSchema = createInsertSchema(polls).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPoll = z.infer<typeof insertPollSchema>;
+export type Poll = typeof polls.$inferSelect;
+
+// Mentorship Pairings table
+export const mentorshipPairings = pgTable("mentorship_pairings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  mentorId: varchar("mentor_id").references(() => users.id).notNull(),
+  mentorName: text("mentor_name").notNull(),
+  menteeId: varchar("mentee_id").references(() => users.id).notNull(),
+  menteeName: text("mentee_name").notNull(),
+  focusAreas: jsonb("focus_areas").default([]).$type<string[]>(),
+  goals: jsonb("goals").default([]).$type<string[]>(),
+  status: text("status").notNull().default('active'), // active, completed, paused
+  startDate: text("start_date").notNull(), // ISO date string
+  endDate: text("end_date"),
+  meetingFrequency: text("meeting_frequency").default('Weekly'), // Weekly, Bi-weekly, Monthly
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMentorshipPairingSchema = createInsertSchema(mentorshipPairings).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMentorshipPairing = z.infer<typeof insertMentorshipPairingSchema>;
+export type MentorshipPairing = typeof mentorshipPairings.$inferSelect;
+
+// Client Portal Access table
+export const clientPortalAccess = pgTable("client_portal_access", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientName: text("client_name").notNull(),
+  clientEmail: text("client_email").notNull(),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  accessLevel: text("access_level").notNull().default('view'), // view, comment, edit
+  isActive: boolean("is_active").default(true),
+  lastAccess: text("last_access"), // ISO date string
+  invitedBy: varchar("invited_by").references(() => users.id),
+  accessToken: text("access_token"),
+  expiresAt: text("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertClientPortalAccessSchema = createInsertSchema(clientPortalAccess).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertClientPortalAccess = z.infer<typeof insertClientPortalAccessSchema>;
+export type ClientPortalAccess = typeof clientPortalAccess.$inferSelect;
