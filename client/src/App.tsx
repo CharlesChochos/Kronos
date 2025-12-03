@@ -14,10 +14,8 @@ import InvestorMatching from "@/pages/ceo/InvestorMatching";
 import EmployeeInvestorMatching from "@/pages/employee/InvestorMatching";
 import TeamAssignment from "@/pages/ceo/TeamAssignment";
 import TeamPerformance from "@/pages/ceo/TeamPerformance";
-import WarRoom from "@/pages/shared/WarRoom";
 import DealComparison from "@/pages/shared/DealComparison";
 import InvestorCRM from "@/pages/ceo/InvestorCRM";
-import VacationCalendar from "@/pages/shared/VacationCalendar";
 import ClientPortal from "@/pages/shared/ClientPortal";
 import MentorshipPairing from "@/pages/shared/MentorshipPairing";
 import GoalSettingOKRs from "@/pages/shared/GoalSettingOKRs";
@@ -38,11 +36,7 @@ const CeoDealManagement = () => <DealManagement role="CEO" />;
 const EmployeeDealManagement = () => <DealManagement role="Employee" />;
 const CeoChat = () => <Chat role="CEO" />;
 const EmployeeChat = () => <Chat role="Employee" />;
-const CeoWarRoom = () => <WarRoom role="CEO" />;
-const EmployeeWarRoom = () => <WarRoom role="Employee" />;
 const CeoDealComparison = () => <DealComparison role="CEO" />;
-const CeoVacationCalendar = () => <VacationCalendar role="CEO" />;
-const EmployeeVacationCalendar = () => <VacationCalendar role="Employee" />;
 const CeoClientPortal = () => <ClientPortal role="CEO" />;
 const CeoMentorshipPairing = () => <MentorshipPairing role="CEO" />;
 const CeoGoalSettingOKRs = () => <GoalSettingOKRs role="CEO" />;
@@ -129,17 +123,11 @@ function Router() {
       <Route path="/ceo/team-performance">
         {() => <ProtectedRoute component={TeamPerformance} />}
       </Route>
-      <Route path="/ceo/war-room">
-        {() => <ProtectedRoute component={CeoWarRoom} />}
-      </Route>
       <Route path="/ceo/deal-comparison">
         {() => <ProtectedRoute component={CeoDealComparison} />}
       </Route>
       <Route path="/ceo/investor-crm">
         {() => <ProtectedRoute component={InvestorCRM} />}
-      </Route>
-      <Route path="/ceo/vacation-calendar">
-        {() => <ProtectedRoute component={CeoVacationCalendar} />}
       </Route>
       <Route path="/ceo/client-portal">
         {() => <ProtectedRoute component={CeoClientPortal} />}
@@ -182,14 +170,8 @@ function Router() {
       <Route path="/employee/chat">
         {() => <ProtectedRoute component={EmployeeChat} />}
       </Route>
-      <Route path="/employee/war-room">
-        {() => <ProtectedRoute component={EmployeeWarRoom} />}
-      </Route>
       <Route path="/employee/calendar">
         {() => <ProtectedRoute component={EmployeeEventCalendar} />}
-      </Route>
-      <Route path="/employee/vacation-calendar">
-        {() => <ProtectedRoute component={EmployeeVacationCalendar} />}
       </Route>
       <Route path="/employee/okrs">
         {() => <ProtectedRoute component={EmployeeGoalSettingOKRs} />}

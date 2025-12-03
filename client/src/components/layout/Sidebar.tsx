@@ -13,16 +13,13 @@ import {
   TrendingUp,
   Calendar,
   BarChart3,
-  Shield,
   GitCompare,
-  Clock,
   Target,
   UserCheck,
   FileStack,
   GraduationCap,
   Megaphone,
   Vote,
-  Mic,
   Building
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -58,11 +55,9 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
     { icon: LayoutDashboard, label: "Dashboard", path: "/ceo/dashboard" },
     { icon: Briefcase, label: "Deal Management", path: "/ceo/deals" },
     { icon: BarChart3, label: "Team Performance", path: "/ceo/team-performance" },
-    { icon: Shield, label: "War Room", path: "/ceo/war-room" },
     { icon: GitCompare, label: "Deal Comparison", path: "/ceo/deal-comparison" },
     { icon: Users, label: "Investor CRM", path: "/ceo/investor-crm" },
     { icon: Calendar, label: "Calendar", path: "/ceo/calendar" },
-    { icon: Clock, label: "Vacation Calendar", path: "/ceo/vacation-calendar" },
     { icon: UserCheck, label: "Client Portal", path: "/ceo/client-portal" },
     { icon: GraduationCap, label: "Mentorship", path: "/ceo/mentorship" },
     { icon: Target, label: "Goals & OKRs", path: "/ceo/okrs" },
@@ -78,9 +73,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
   const employeeLinks = [
     { icon: Home, label: "Home", path: "/employee/home" },
     { icon: CheckSquare, label: "My Tasks", path: "/employee/tasks" },
-    { icon: Shield, label: "War Room", path: "/employee/war-room" },
     { icon: Calendar, label: "Calendar", path: "/employee/calendar" },
-    { icon: Clock, label: "Vacation Calendar", path: "/employee/vacation-calendar" },
     { icon: Target, label: "Goals & OKRs", path: "/employee/okrs" },
     { icon: Megaphone, label: "Announcements", path: "/employee/announcements" },
     { icon: Building, label: "Stakeholders", path: "/employee/stakeholders" },

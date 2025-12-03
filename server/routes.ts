@@ -2230,6 +2230,16 @@ Guidelines:
           details: `${req.body.status} time off request`,
         });
         
+        // Send notification to the employee
+        const isApproved = req.body.status === 'Approved';
+        await storage.createNotification({
+          userId: request.userId,
+          type: isApproved ? 'success' : 'alert',
+          title: `Time Off ${req.body.status}`,
+          message: `Your ${request.type} request from ${request.startDate} to ${request.endDate} has been ${req.body.status.toLowerCase()}.`,
+          link: '/employee/calendar',
+        });
+        
         return res.json(updated);
       }
       
