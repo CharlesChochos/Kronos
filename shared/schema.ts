@@ -13,10 +13,13 @@ export const users = pgTable("users", {
   avatar: text("avatar"),
   role: text("role").notNull().default('Associate'),
   jobTitle: text("job_title"),
+  status: text("status").notNull().default('pending'), // pending, active, suspended
   score: integer("score").default(0),
   activeDeals: integer("active_deals").default(0),
   completedTasks: integer("completed_tasks").default(0),
   preferences: jsonb("preferences").default({}),
+  twoFactorEnabled: boolean("two_factor_enabled").default(false),
+  twoFactorSecret: text("two_factor_secret"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -732,3 +735,88 @@ export const insertTaskAttachmentRecordSchema = createInsertSchema(taskAttachmen
 
 export type InsertTaskAttachmentRecord = z.infer<typeof insertTaskAttachmentRecordSchema>;
 export type TaskAttachmentRecord = typeof taskAttachmentsTable.$inferSelect;
+
+// Audit Logs table - tracks important actions for compliance
+export const auditLogsTable = pgTable("audit_logs_table", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  userName: text("user_name"),
+  action: text("action").notNull(), // user_approved, user_suspended, role_changed, deal_created, deal_updated, etc.
+  entityType: text("entity_type").notNull(), // user, deal, task, meeting, etc.
+  entityId: varchar("entity_id"),
+  entityName: text("entity_name"),
+  details: jsonb("details").default({}), // Additional context like old/new values
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAuditLogTableSchema = createInsertSchema(auditLogsTable).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAuditLogTable = z.infer<typeof insertAuditLogTableSchema>;
+export type AuditLogTable = typeof auditLogsTable.$inferSelect;
+
+// Database-backed Investors table (replacing static investors.ts)
+export const investorsTable = pgTable("investors_table", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  firm: text("firm").notNull(),
+  type: text("type").notNull(), // PE, VC, Strategic, Family Office, Hedge Fund, etc.
+  focus: text("focus").default('Multi-sector'), // Technology, Healthcare, Consumer, etc.
+  aum: text("aum"), // Assets Under Management
+  checkSize: text("check_size"), // Typical investment size range
+  preferredStage: text("preferred_stage"), // Growth, Late Stage, Buyout, etc.
+  location: text("location"),
+  website: text("website"),
+  email: text("email"),
+  phone: text("phone"),
+  linkedIn: text("linkedin"),
+  notes: text("notes"),
+  tags: jsonb("tags").default([]).$type<string[]>(),
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertInvestorTableSchema = createInsertSchema(investorsTable).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertInvestorTable = z.infer<typeof insertInvestorTableSchema>;
+export type InvestorTable = typeof investorsTable.$inferSelect;
+
+// Documents table - persistent storage for generated and uploaded documents
+export const documentsTable = pgTable("documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  type: text("type").notNull(), // teaser, cim, nda, loi, term_sheet, sba, sba_addendum, uploaded, etc.
+  category: text("category").default('general'), // deal_document, compliance, template, etc.
+  filename: text("filename").notNull(),
+  originalName: text("original_name"),
+  mimeType: text("mime_type"),
+  size: integer("size"), // in bytes
+  content: text("content"), // For generated documents, store the content
+  dealId: varchar("deal_id").references(() => deals.id),
+  dealName: text("deal_name"),
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  uploaderName: text("uploader_name"),
+  tags: jsonb("tags").default([]).$type<string[]>(),
+  isArchived: boolean("is_archived").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDocumentTableSchema = createInsertSchema(documentsTable).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDocumentTable = z.infer<typeof insertDocumentTableSchema>;
+export type DocumentTable = typeof documentsTable.$inferSelect;

@@ -198,6 +198,31 @@ export interface IStorage {
   getTaskAttachmentRecords(taskId: string): Promise<TaskAttachmentRecord[]>;
   createTaskAttachmentRecord(attachment: InsertTaskAttachmentRecord): Promise<TaskAttachmentRecord>;
   deleteTaskAttachmentRecord(id: string): Promise<void>;
+  
+  // User Status Management operations
+  updateUserStatus(id: string, status: string): Promise<User | undefined>;
+  getUsersByStatus(status: string): Promise<User[]>;
+  updateUserTwoFactor(id: string, enabled: boolean, secret?: string): Promise<User | undefined>;
+  
+  // Audit Log Table operations (new compliance logs)
+  getAuditLogTableEntries(limit?: number): Promise<schema.AuditLogTable[]>;
+  createAuditLogTableEntry(log: schema.InsertAuditLogTable): Promise<schema.AuditLogTable>;
+  
+  // Database-backed Investors operations
+  getInvestorFromTable(id: string): Promise<schema.InvestorTable | undefined>;
+  getAllInvestorsFromTable(): Promise<schema.InvestorTable[]>;
+  createInvestorInTable(investor: schema.InsertInvestorTable): Promise<schema.InvestorTable>;
+  updateInvestorInTable(id: string, updates: Partial<schema.InsertInvestorTable>): Promise<schema.InvestorTable | undefined>;
+  deleteInvestorFromTable(id: string): Promise<void>;
+  
+  // Document Table operations
+  getDocument(id: string): Promise<schema.DocumentTable | undefined>;
+  getAllDocuments(): Promise<schema.DocumentTable[]>;
+  getDocumentsByDeal(dealId: string): Promise<schema.DocumentTable[]>;
+  getDocumentsByUser(userId: string): Promise<schema.DocumentTable[]>;
+  createDocument(doc: schema.InsertDocumentTable): Promise<schema.DocumentTable>;
+  updateDocument(id: string, updates: Partial<schema.InsertDocumentTable>): Promise<schema.DocumentTable | undefined>;
+  deleteDocument(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1038,6 +1063,115 @@ export class DatabaseStorage implements IStorage {
   
   async deleteTaskAttachmentRecord(id: string): Promise<void> {
     await db.delete(schema.taskAttachmentsTable).where(eq(schema.taskAttachmentsTable.id, id));
+  }
+  
+  // User Status Management operations
+  async updateUserStatus(id: string, status: string): Promise<User | undefined> {
+    const [user] = await db.update(schema.users)
+      .set({ status })
+      .where(eq(schema.users.id, id))
+      .returning();
+    return user;
+  }
+  
+  async getUsersByStatus(status: string): Promise<User[]> {
+    return await db.select().from(schema.users)
+      .where(eq(schema.users.status, status))
+      .orderBy(desc(schema.users.createdAt));
+  }
+  
+  async updateUserTwoFactor(id: string, enabled: boolean, secret?: string): Promise<User | undefined> {
+    const [user] = await db.update(schema.users)
+      .set({ twoFactorEnabled: enabled, twoFactorSecret: secret || null })
+      .where(eq(schema.users.id, id))
+      .returning();
+    return user;
+  }
+  
+  // Audit Log Table operations
+  async getAuditLogTableEntries(limit: number = 100): Promise<schema.AuditLogTable[]> {
+    return await db.select().from(schema.auditLogsTable)
+      .orderBy(desc(schema.auditLogsTable.createdAt))
+      .limit(limit);
+  }
+  
+  async createAuditLogTableEntry(log: schema.InsertAuditLogTable): Promise<schema.AuditLogTable> {
+    const [created] = await db.insert(schema.auditLogsTable).values(log).returning();
+    return created;
+  }
+  
+  // Database-backed Investors operations
+  async getInvestorFromTable(id: string): Promise<schema.InvestorTable | undefined> {
+    const [investor] = await db.select().from(schema.investorsTable).where(eq(schema.investorsTable.id, id));
+    return investor;
+  }
+  
+  async getAllInvestorsFromTable(): Promise<schema.InvestorTable[]> {
+    return await db.select().from(schema.investorsTable)
+      .where(eq(schema.investorsTable.isActive, true))
+      .orderBy(schema.investorsTable.name);
+  }
+  
+  async createInvestorInTable(investor: schema.InsertInvestorTable): Promise<schema.InvestorTable> {
+    const [created] = await db.insert(schema.investorsTable).values(investor).returning();
+    return created;
+  }
+  
+  async updateInvestorInTable(id: string, updates: Partial<schema.InsertInvestorTable>): Promise<schema.InvestorTable | undefined> {
+    const [updated] = await db.update(schema.investorsTable)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.investorsTable.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteInvestorFromTable(id: string): Promise<void> {
+    await db.update(schema.investorsTable)
+      .set({ isActive: false })
+      .where(eq(schema.investorsTable.id, id));
+  }
+  
+  // Document Table operations
+  async getDocument(id: string): Promise<schema.DocumentTable | undefined> {
+    const [doc] = await db.select().from(schema.documentsTable).where(eq(schema.documentsTable.id, id));
+    return doc;
+  }
+  
+  async getAllDocuments(): Promise<schema.DocumentTable[]> {
+    return await db.select().from(schema.documentsTable)
+      .where(eq(schema.documentsTable.isArchived, false))
+      .orderBy(desc(schema.documentsTable.createdAt));
+  }
+  
+  async getDocumentsByDeal(dealId: string): Promise<schema.DocumentTable[]> {
+    return await db.select().from(schema.documentsTable)
+      .where(and(eq(schema.documentsTable.dealId, dealId), eq(schema.documentsTable.isArchived, false)))
+      .orderBy(desc(schema.documentsTable.createdAt));
+  }
+  
+  async getDocumentsByUser(userId: string): Promise<schema.DocumentTable[]> {
+    return await db.select().from(schema.documentsTable)
+      .where(and(eq(schema.documentsTable.uploadedBy, userId), eq(schema.documentsTable.isArchived, false)))
+      .orderBy(desc(schema.documentsTable.createdAt));
+  }
+  
+  async createDocument(doc: schema.InsertDocumentTable): Promise<schema.DocumentTable> {
+    const [created] = await db.insert(schema.documentsTable).values(doc).returning();
+    return created;
+  }
+  
+  async updateDocument(id: string, updates: Partial<schema.InsertDocumentTable>): Promise<schema.DocumentTable | undefined> {
+    const [updated] = await db.update(schema.documentsTable)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.documentsTable.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteDocument(id: string): Promise<void> {
+    await db.update(schema.documentsTable)
+      .set({ isArchived: true })
+      .where(eq(schema.documentsTable.id, id));
   }
 }
 

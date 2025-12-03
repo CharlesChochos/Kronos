@@ -31,6 +31,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Trust proxy for rate limiting behind reverse proxy (Replit)
+  app.set('trust proxy', 1);
+  
   // Session configuration with PostgreSQL store
   app.use(
     session({
@@ -68,6 +71,20 @@ export async function registerRoutes(
           const isValidPassword = await bcrypt.compare(password, user.password);
           if (!isValidPassword) {
             return done(null, false, { message: "Invalid email or password" });
+          }
+
+          // Check user status - only active users can log in
+          if (user.status === 'pending') {
+            return done(null, false, { message: "Your account is pending approval. Please wait for an administrator to approve your access." });
+          }
+          if (user.status === 'suspended') {
+            return done(null, false, { message: "Your account has been suspended. Please contact an administrator." });
+          }
+          if (user.status === 'rejected') {
+            return done(null, false, { message: "Your registration request was not approved. Please contact an administrator for more information." });
+          }
+          if (user.status !== 'active') {
+            return done(null, false, { message: "Your account is not active. Please contact an administrator." });
           }
 
           return done(null, user);
@@ -116,6 +133,25 @@ export async function registerRoutes(
 
   // ===== AUTH ROUTES =====
   
+  // Helper to create audit log
+  const createAuditLog = async (req: any, action: string, entityType: string, entityId?: string, entityName?: string, details?: any) => {
+    try {
+      await storage.createAuditLogTableEntry({
+        userId: req.user?.id || null,
+        userName: req.user?.name || 'System',
+        action,
+        entityType,
+        entityId: entityId || null,
+        entityName: entityName || null,
+        details: details || {},
+        ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
+        userAgent: req.headers['user-agent'] || null,
+      });
+    } catch (err) {
+      console.error('Failed to create audit log:', err);
+    }
+  };
+
   // Sign up
   app.post("/api/auth/signup", authLimiter, async (req, res) => {
     try {
@@ -129,15 +165,39 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Email already registered. Please sign in instead." });
       }
 
-      const user = await storage.createUser(result.data);
+      // Check if this is the first user (make them CEO and active)
+      const allUsers = await storage.getAllUsers();
+      const isFirstUser = allUsers.length === 0;
       
-      // Auto-login after signup
-      req.login(user, (err) => {
-        if (err) {
-          return res.status(500).json({ error: "Error logging in after signup" });
-        }
-        res.json(sanitizeUser(user));
-      });
+      // SECURITY: Non-first users are always assigned 'Associate' role
+      // Only CEOs can grant elevated roles after approval via admin routes
+      const userData = {
+        ...result.data,
+        status: isFirstUser ? 'active' : 'pending',
+        role: isFirstUser ? 'CEO' : 'Associate', // Always Associate for non-first users
+      };
+
+      const user = await storage.createUser(userData);
+      
+      // Create audit log for signup
+      await createAuditLog(req, 'user_signup', 'user', user.id, user.name, { email: user.email, role: user.role, status: user.status });
+      
+      // If first user (CEO), auto-login
+      if (isFirstUser) {
+        req.login(user, (err) => {
+          if (err) {
+            return res.status(500).json({ error: "Error logging in after signup" });
+          }
+          res.json(sanitizeUser(user));
+        });
+      } else {
+        // For other users, return success but don't login
+        res.json({ 
+          success: true, 
+          pending: true,
+          message: "Your account has been created and is pending approval. You'll be notified when an administrator approves your access."
+        });
+      }
     } catch (error) {
       res.status(500).json({ error: "Failed to create user" });
     }
@@ -419,6 +479,154 @@ export async function registerRoutes(
       res.json(sanitizeUser(user));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+  
+  // ===== ADMIN ROUTES (CEO ONLY) =====
+  
+  // Get pending users (CEO only)
+  app.get("/api/admin/pending-users", requireCEO, async (req, res) => {
+    try {
+      const pendingUsers = await storage.getUsersByStatus('pending');
+      res.json(pendingUsers.map(u => sanitizeUser(u)));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch pending users" });
+    }
+  });
+  
+  // Approve user (CEO only)
+  app.post("/api/admin/users/:id/approve", requireCEO, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      if (user.status !== 'pending') {
+        return res.status(400).json({ error: "User is not in pending status" });
+      }
+      
+      const updatedUser = await storage.updateUserStatus(req.params.id, 'active');
+      await createAuditLog(req, 'user_approved', 'user', user.id, user.name, { previousStatus: user.status, newStatus: 'active', approvedBy: (req.user as any).name });
+      
+      res.json(sanitizeUser(updatedUser));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to approve user" });
+    }
+  });
+  
+  // Reject user (CEO only) - deletes the pending user
+  app.post("/api/admin/users/:id/reject", requireCEO, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      if (user.status !== 'pending') {
+        return res.status(400).json({ error: "User is not in pending status" });
+      }
+      
+      await createAuditLog(req, 'user_rejected', 'user', user.id, user.name, { rejectedBy: (req.user as any).name });
+      await storage.updateUserStatus(req.params.id, 'rejected');
+      
+      res.json({ success: true, message: "User registration rejected" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to reject user" });
+    }
+  });
+  
+  // Suspend user (CEO only)
+  app.post("/api/admin/users/:id/suspend", requireCEO, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      if (user.id === currentUser.id) {
+        return res.status(400).json({ error: "You cannot suspend yourself" });
+      }
+      
+      const updatedUser = await storage.updateUserStatus(req.params.id, 'suspended');
+      await createAuditLog(req, 'user_suspended', 'user', user.id, user.name, { previousStatus: user.status, newStatus: 'suspended', suspendedBy: currentUser.name });
+      
+      // Invalidate suspended user's session by destroying all sessions for that user
+      // Note: With PostgreSQL session store, we can delete sessions directly
+      try {
+        const { db } = await import("./db");
+        const { sql } = await import("drizzle-orm");
+        await db.execute(sql`DELETE FROM sessions WHERE sess::jsonb->'passport'->>'user' = ${req.params.id}`);
+      } catch (sessionErr) {
+        console.error('Failed to invalidate suspended user sessions:', sessionErr);
+        // Continue even if session cleanup fails
+      }
+      
+      res.json(sanitizeUser(updatedUser));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to suspend user" });
+    }
+  });
+  
+  // Reactivate user (CEO only)
+  app.post("/api/admin/users/:id/reactivate", requireCEO, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      if (user.status !== 'suspended') {
+        return res.status(400).json({ error: "User is not suspended" });
+      }
+      
+      const updatedUser = await storage.updateUserStatus(req.params.id, 'active');
+      await createAuditLog(req, 'user_reactivated', 'user', user.id, user.name, { previousStatus: user.status, newStatus: 'active', reactivatedBy: (req.user as any).name });
+      
+      res.json(sanitizeUser(updatedUser));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to reactivate user" });
+    }
+  });
+  
+  // Change user role (CEO only)
+  app.patch("/api/admin/users/:id/role", requireCEO, async (req, res) => {
+    try {
+      const { role } = req.body;
+      const validRoles = ['CEO', 'Associate', 'Director', 'Managing Director', 'Analyst'];
+      if (!role || !validRoles.includes(role)) {
+        return res.status(400).json({ error: "Invalid role" });
+      }
+      
+      const currentUser = req.user as any;
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Prevent demoting the last CEO
+      if (user.role === 'CEO' && role !== 'CEO') {
+        const allUsers = await storage.getAllUsers();
+        const ceoCount = allUsers.filter(u => u.role === 'CEO' && u.status === 'active').length;
+        if (ceoCount <= 1) {
+          return res.status(400).json({ error: "Cannot demote the only CEO. Promote another user to CEO first." });
+        }
+      }
+      
+      const updatedUser = await storage.updateUserProfile(req.params.id, { role });
+      await createAuditLog(req, 'role_changed', 'user', user.id, user.name, { previousRole: user.role, newRole: role, changedBy: currentUser.name });
+      
+      res.json(sanitizeUser(updatedUser));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user role" });
+    }
+  });
+  
+  // Get audit logs (CEO only)
+  app.get("/api/admin/audit-logs", requireCEO, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 100;
+      const logs = await storage.getAuditLogTableEntries(limit);
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch audit logs" });
     }
   });
 
@@ -3331,6 +3539,156 @@ Guidelines:
       res.json({ message: "Task attachment deleted" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete task attachment" });
+    }
+  });
+  
+  // ===== DOCUMENT STORAGE ROUTES =====
+  
+  // Get all documents
+  app.get("/api/documents", requireAuth, async (req, res) => {
+    try {
+      const documents = await storage.getAllDocuments();
+      res.json(documents);
+    } catch (error) {
+      console.error('Get documents error:', error);
+      res.status(500).json({ error: "Failed to fetch documents" });
+    }
+  });
+  
+  // Get documents by deal
+  app.get("/api/documents/deal/:dealId", requireAuth, async (req, res) => {
+    try {
+      const documents = await storage.getDocumentsByDeal(req.params.dealId);
+      res.json(documents);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch documents" });
+    }
+  });
+  
+  // Get single document
+  app.get("/api/documents/:id", requireAuth, async (req, res) => {
+    try {
+      const doc = await storage.getDocument(req.params.id);
+      if (!doc) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      res.json(doc);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch document" });
+    }
+  });
+  
+  // Create document (metadata - file storage handled separately)
+  app.post("/api/documents", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const doc = await storage.createDocument({
+        ...req.body,
+        uploadedBy: user.id,
+      });
+      await createAuditLog(req, 'document_created', 'document', doc.id, doc.name, { category: doc.category, dealId: doc.dealId });
+      res.status(201).json(doc);
+    } catch (error) {
+      console.error('Create document error:', error);
+      res.status(500).json({ error: "Failed to create document" });
+    }
+  });
+  
+  // Update document
+  app.patch("/api/documents/:id", requireAuth, async (req, res) => {
+    try {
+      const doc = await storage.getDocument(req.params.id);
+      if (!doc) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      const updated = await storage.updateDocument(req.params.id, req.body);
+      await createAuditLog(req, 'document_updated', 'document', req.params.id, doc.name, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update document" });
+    }
+  });
+  
+  // Archive/delete document (soft delete)
+  app.delete("/api/documents/:id", requireAuth, async (req, res) => {
+    try {
+      const doc = await storage.getDocument(req.params.id);
+      if (!doc) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      await storage.deleteDocument(req.params.id);
+      await createAuditLog(req, 'document_archived', 'document', req.params.id, doc.name);
+      res.json({ message: "Document archived" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to archive document" });
+    }
+  });
+  
+  // ===== DATABASE INVESTORS ROUTES =====
+  
+  // Get all investors from database
+  app.get("/api/db-investors", requireAuth, async (req, res) => {
+    try {
+      const investors = await storage.getAllInvestorsFromTable();
+      res.json(investors);
+    } catch (error) {
+      console.error('Get investors error:', error);
+      res.status(500).json({ error: "Failed to fetch investors" });
+    }
+  });
+  
+  // Get single investor
+  app.get("/api/db-investors/:id", requireAuth, async (req, res) => {
+    try {
+      const investor = await storage.getInvestorFromTable(req.params.id);
+      if (!investor) {
+        return res.status(404).json({ error: "Investor not found" });
+      }
+      res.json(investor);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch investor" });
+    }
+  });
+  
+  // Create investor (CEO only)
+  app.post("/api/db-investors", generalLimiter, requireCEO, async (req, res) => {
+    try {
+      const investor = await storage.createInvestorInTable(req.body);
+      await createAuditLog(req, 'investor_created', 'investor', investor.id, investor.name, { firm: investor.firm, type: investor.investorType });
+      res.status(201).json(investor);
+    } catch (error) {
+      console.error('Create investor error:', error);
+      res.status(500).json({ error: "Failed to create investor" });
+    }
+  });
+  
+  // Update investor
+  app.patch("/api/db-investors/:id", requireAuth, async (req, res) => {
+    try {
+      const investor = await storage.getInvestorFromTable(req.params.id);
+      if (!investor) {
+        return res.status(404).json({ error: "Investor not found" });
+      }
+      const updated = await storage.updateInvestorInTable(req.params.id, req.body);
+      await createAuditLog(req, 'investor_updated', 'investor', req.params.id, investor.name, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update investor" });
+    }
+  });
+  
+  // Delete investor (soft delete - deactivate)
+  app.delete("/api/db-investors/:id", requireCEO, async (req, res) => {
+    try {
+      const investor = await storage.getInvestorFromTable(req.params.id);
+      if (!investor) {
+        return res.status(404).json({ error: "Investor not found" });
+      }
+      await storage.deleteInvestorFromTable(req.params.id);
+      await createAuditLog(req, 'investor_deactivated', 'investor', req.params.id, investor.name);
+      res.json({ message: "Investor deactivated" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to deactivate investor" });
     }
   });
 
