@@ -33,6 +33,7 @@ type User = {
   name: string;
   email: string;
   role: string;
+  jobTitle?: string;
   status: string;
   createdAt: string;
   avatar?: string;
@@ -351,6 +352,7 @@ export default function UserManagement() {
                     <TableRow className="border-border hover:bg-transparent">
                       <TableHead>User</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Job Title</TableHead>
                       <TableHead>Requested On</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -370,6 +372,15 @@ export default function UserManagement() {
                           </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                        <TableCell>
+                          {user.jobTitle ? (
+                            <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                              {user.jobTitle}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">Not specified</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-muted-foreground">
                           {format(new Date(user.createdAt), "MMM d, yyyy")}
                         </TableCell>
@@ -431,6 +442,7 @@ export default function UserManagement() {
                     <TableRow className="border-border hover:bg-transparent">
                       <TableHead>User</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Job Title</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>2FA</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -451,6 +463,15 @@ export default function UserManagement() {
                           </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                        <TableCell>
+                          {user.jobTitle ? (
+                            <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                              {user.jobTitle}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={roleColors[user.role] || ""}>
                             {user.role}
@@ -531,6 +552,7 @@ export default function UserManagement() {
                     <TableRow className="border-border hover:bg-transparent">
                       <TableHead>User</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Job Title</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -550,6 +572,15 @@ export default function UserManagement() {
                           </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                        <TableCell>
+                          {user.jobTitle ? (
+                            <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30 opacity-50">
+                              {user.jobTitle}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={roleColors[user.role] || ""}>
                             {user.role}
