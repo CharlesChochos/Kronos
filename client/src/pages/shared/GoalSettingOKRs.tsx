@@ -54,6 +54,8 @@ type OKR = {
   status: 'on-track' | 'at-risk' | 'behind' | 'completed';
   overallProgress: number;
   createdAt: string;
+  type: 'individual' | 'team';
+  teamName?: string;
 };
 
 export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) {
@@ -80,7 +82,9 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
       ],
       status: "on-track",
       overallProgress: 77,
-      createdAt: "2024-10-01T00:00:00Z"
+      createdAt: "2024-10-01T00:00:00Z",
+      type: "team",
+      teamName: "Deal Team Alpha"
     },
     {
       id: "2",
@@ -97,7 +101,8 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
       ],
       status: "at-risk",
       overallProgress: 77,
-      createdAt: "2024-10-01T00:00:00Z"
+      createdAt: "2024-10-01T00:00:00Z",
+      type: "individual"
     },
     {
       id: "3",
@@ -114,7 +119,8 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
       ],
       status: "on-track",
       overallProgress: 91,
-      createdAt: "2024-10-01T00:00:00Z"
+      createdAt: "2024-10-01T00:00:00Z",
+      type: "individual"
     }
   ]);
 
@@ -124,7 +130,9 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
     ownerId: currentUser?.id || "",
     quarter: "Q1",
     year: 2025,
-    keyResults: [{ title: "", targetValue: 0, unit: "" }]
+    keyResults: [{ title: "", targetValue: 0, unit: "" }],
+    type: "individual" as 'individual' | 'team',
+    teamName: ""
   });
 
   const toggleExpand = (id: string) => {
@@ -139,16 +147,23 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
 
   const filteredOKRs = okrs.filter(okr => {
     const matchesSearch = okr.objective.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      okr.ownerName.toLowerCase().includes(searchQuery.toLowerCase());
+      okr.ownerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (okr.teamName && okr.teamName.toLowerCase().includes(searchQuery.toLowerCase()));
     
     if (activeTab === "my-okrs") return matchesSearch && okr.ownerId === currentUser?.id;
-    if (activeTab === "team") return matchesSearch && okr.ownerId !== currentUser?.id;
+    if (activeTab === "team-okrs") return matchesSearch && okr.type === 'team';
+    if (activeTab === "individual") return matchesSearch && okr.type === 'individual';
     return matchesSearch;
   });
 
   const handleCreateOKR = () => {
     if (!newOKR.objective || newOKR.keyResults.filter(kr => kr.title).length === 0) {
       toast.error("Please add an objective and at least one key result");
+      return;
+    }
+
+    if (newOKR.type === 'team' && !newOKR.teamName) {
+      toast.error("Please enter a team name for team OKRs");
       return;
     }
 
@@ -171,7 +186,9 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
       })),
       status: "on-track",
       overallProgress: 0,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      type: newOKR.type,
+      teamName: newOKR.type === 'team' ? newOKR.teamName : undefined
     };
 
     setOKRs([okr, ...okrs]);
@@ -182,7 +199,9 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
       ownerId: currentUser?.id || "",
       quarter: "Q1",
       year: 2025,
-      keyResults: [{ title: "", targetValue: 0, unit: "" }]
+      keyResults: [{ title: "", targetValue: 0, unit: "" }],
+      type: "individual",
+      teamName: ""
     });
     toast.success("OKR created successfully");
   };
@@ -323,7 +342,8 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
               <TabsList>
                 <TabsTrigger value="all">All OKRs</TabsTrigger>
                 <TabsTrigger value="my-okrs">My OKRs</TabsTrigger>
-                <TabsTrigger value="team">Team OKRs</TabsTrigger>
+                <TabsTrigger value="team-okrs">Team Goals</TabsTrigger>
+                <TabsTrigger value="individual">Individual Goals</TabsTrigger>
               </TabsList>
               <TabsContent value={activeTab} className="mt-4">
                 <ScrollArea className="h-[500px]">
@@ -349,11 +369,14 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
                                   <Badge className={cn("text-white", getStatusColor(okr.status))}>
                                     {okr.status.replace('-', ' ')}
                                   </Badge>
+                                  <Badge variant="outline" className={okr.type === 'team' ? 'border-blue-500 text-blue-500' : 'border-purple-500 text-purple-500'}>
+                                    {okr.type === 'team' ? 'Team' : 'Individual'}
+                                  </Badge>
                                 </div>
                                 <p className="text-sm text-muted-foreground">{okr.description}</p>
                                 <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                                   <span className="flex items-center gap-1">
-                                    <Users className="w-3 h-3" /> {okr.ownerName}
+                                    <Users className="w-3 h-3" /> {okr.type === 'team' && okr.teamName ? okr.teamName : okr.ownerName}
                                   </span>
                                   <span className="flex items-center gap-1">
                                     <Calendar className="w-3 h-3" /> {okr.quarter} {okr.year}
@@ -444,20 +467,48 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
                   data-testid="input-okr-description"
                 />
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Owner</Label>
-                  <Select value={newOKR.ownerId} onValueChange={(v) => setNewOKR({ ...newOKR, ownerId: v })}>
+                  <Label>Goal Type *</Label>
+                  <Select value={newOKR.type} onValueChange={(v) => setNewOKR({ ...newOKR, type: v as 'individual' | 'team' })}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select owner" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {users.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
-                      ))}
+                      <SelectItem value="individual">Individual Goal</SelectItem>
+                      <SelectItem value="team">Team Goal</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+                {newOKR.type === 'team' && (
+                  <div>
+                    <Label>Team Name *</Label>
+                    <Input
+                      value={newOKR.teamName}
+                      onChange={(e) => setNewOKR({ ...newOKR, teamName: e.target.value })}
+                      placeholder="Enter team name"
+                      data-testid="input-team-name"
+                    />
+                  </div>
+                )}
+                {newOKR.type === 'individual' && (
+                  <div>
+                    <Label>Owner</Label>
+                    <Select value={newOKR.ownerId} onValueChange={(v) => setNewOKR({ ...newOKR, ownerId: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select owner" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Quarter</Label>
                   <Select value={newOKR.quarter} onValueChange={(v) => setNewOKR({ ...newOKR, quarter: v })}>

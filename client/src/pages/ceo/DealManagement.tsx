@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useSearch } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -18,7 +18,8 @@ import {
   Search, Filter, MoreVertical, ArrowRight, Calendar, DollarSign, Briefcase, 
   Pencil, Trash2, Eye, Users, Phone, Mail, MessageSquare, Plus, X, 
   Building2, TrendingUp, FileText, Clock, CheckCircle2, ChevronRight,
-  UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload, GitCompare, ArrowUpDown, BarChart3
+  UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload, GitCompare, ArrowUpDown, BarChart3,
+  Mic, MicOff, Play, Pause, Square, Volume2
 } from "lucide-react";
 import { useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -100,6 +101,42 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
     setSelectedCalendarTask({ ...task, deal });
     setShowTaskDetailModal(true);
   };
+
+  // Voice Notes State
+  type DealVoiceNote = {
+    id: string;
+    title: string;
+    duration: number;
+    authorName: string;
+    createdAt: string;
+  };
+  const [dealVoiceNotes, setDealVoiceNotes] = useState<Record<string, DealVoiceNote[]>>({});
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [voiceRecordingTime, setVoiceRecordingTime] = useState(0);
+  const [voiceNoteTitle, setVoiceNoteTitle] = useState("");
+  const voiceRecordingInterval = useRef<NodeJS.Timeout | null>(null);
+  const voicePlaybackInterval = useRef<NodeJS.Timeout | null>(null);
+  const [playingVoiceNoteId, setPlayingVoiceNoteId] = useState<string | null>(null);
+  const [voicePlayProgress, setVoicePlayProgress] = useState(0);
+
+  // Reset voice recording state when deal changes or component unmounts
+  useEffect(() => {
+    if (isRecordingVoice) {
+      if (voiceRecordingInterval.current) {
+        clearInterval(voiceRecordingInterval.current);
+      }
+      setIsRecordingVoice(false);
+      setVoiceRecordingTime(0);
+      setVoiceNoteTitle("");
+    }
+    if (playingVoiceNoteId) {
+      if (voicePlaybackInterval.current) {
+        clearInterval(voicePlaybackInterval.current);
+      }
+      setPlayingVoiceNoteId(null);
+      setVoicePlayProgress(0);
+    }
+  }, [selectedDeal?.id]);
   
   const [newDeal, setNewDeal] = useState({
     name: '',
@@ -155,6 +192,96 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
 
   const getStageIndex = (stage: string) => DEAL_STAGES.indexOf(stage);
   const getStageProgress = (stage: string) => Math.round(((getStageIndex(stage) + 1) / DEAL_STAGES.length) * 100);
+
+  // Voice Note Functions
+  const formatVoiceDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const startVoiceRecording = () => {
+    setIsRecordingVoice(true);
+    setVoiceRecordingTime(0);
+    voiceRecordingInterval.current = setInterval(() => {
+      setVoiceRecordingTime(prev => prev + 1);
+    }, 1000);
+    toast.info("Recording started");
+  };
+
+  const stopVoiceRecording = () => {
+    setIsRecordingVoice(false);
+    if (voiceRecordingInterval.current) {
+      clearInterval(voiceRecordingInterval.current);
+    }
+
+    if (selectedDeal && voiceRecordingTime > 0) {
+      const newNote = {
+        id: Date.now().toString(),
+        title: voiceNoteTitle || `Note ${format(new Date(), 'MMM d, h:mm a')}`,
+        duration: voiceRecordingTime,
+        authorName: currentUser?.name || "Unknown",
+        createdAt: new Date().toISOString()
+      };
+
+      setDealVoiceNotes(prev => ({
+        ...prev,
+        [selectedDeal.id]: [...(prev[selectedDeal.id] || []), newNote]
+      }));
+      
+      setVoiceNoteTitle("");
+      setVoiceRecordingTime(0);
+      toast.success("Voice note saved!");
+    }
+  };
+
+  const cancelVoiceRecording = () => {
+    setIsRecordingVoice(false);
+    if (voiceRecordingInterval.current) {
+      clearInterval(voiceRecordingInterval.current);
+    }
+    setVoiceRecordingTime(0);
+    setVoiceNoteTitle("");
+  };
+
+  const toggleVoiceNotePlay = (noteId: string, duration: number) => {
+    // Always clear any existing playback interval first
+    if (voicePlaybackInterval.current) {
+      clearInterval(voicePlaybackInterval.current);
+      voicePlaybackInterval.current = null;
+    }
+
+    if (playingVoiceNoteId === noteId) {
+      // Stop playing current note
+      setPlayingVoiceNoteId(null);
+      setVoicePlayProgress(0);
+    } else {
+      // Start playing new note
+      setPlayingVoiceNoteId(noteId);
+      setVoicePlayProgress(0);
+      voicePlaybackInterval.current = setInterval(() => {
+        setVoicePlayProgress(prev => {
+          if (prev >= 100) {
+            if (voicePlaybackInterval.current) {
+              clearInterval(voicePlaybackInterval.current);
+              voicePlaybackInterval.current = null;
+            }
+            setPlayingVoiceNoteId(null);
+            return 0;
+          }
+          return prev + (100 / duration);
+        });
+      }, 1000);
+    }
+  };
+
+  const deleteVoiceNote = (dealId: string, noteId: string) => {
+    setDealVoiceNotes(prev => ({
+      ...prev,
+      [dealId]: (prev[dealId] || []).filter(n => n.id !== noteId)
+    }));
+    toast.success("Voice note deleted");
+  };
 
   const handleCreateDeal = async () => {
     if (!newDeal.name || !newDeal.client || !newDeal.value) {
@@ -1393,11 +1520,12 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
 
               {/* Tabs */}
               <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
-                <TabsList className="grid grid-cols-5 bg-secondary/50">
+                <TabsList className="grid grid-cols-6 bg-secondary/50">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="team">Pod Team</TabsTrigger>
                   <TabsTrigger value="investors">Investors</TabsTrigger>
                   <TabsTrigger value="documents">Documents</TabsTrigger>
+                  <TabsTrigger value="voice">Voice Notes</TabsTrigger>
                   <TabsTrigger value="audit">Audit</TabsTrigger>
                 </TabsList>
 
@@ -1783,6 +1911,100 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       {((selectedDeal.attachments as any[] || [])).length === 0 && (
                         <div className="text-center py-8 text-muted-foreground text-sm">
                           No documents uploaded yet
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+
+                {/* Voice Notes Tab */}
+                <TabsContent value="voice" className="mt-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Voice Notes</h4>
+                    <Badge variant="secondary">{(dealVoiceNotes[selectedDeal.id] || []).length} notes</Badge>
+                  </div>
+
+                  {/* Recording Section */}
+                  <div className="p-4 border border-dashed border-border rounded-lg space-y-3">
+                    {isRecordingVoice ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-center gap-4">
+                          <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center animate-pulse">
+                            <Mic className="w-6 h-6 text-red-500" />
+                          </div>
+                          <div className="text-2xl font-bold text-red-500">{formatVoiceDuration(voiceRecordingTime)}</div>
+                        </div>
+                        <Input
+                          placeholder="Add a title for this recording..."
+                          value={voiceNoteTitle}
+                          onChange={(e) => setVoiceNoteTitle(e.target.value)}
+                          className="text-center"
+                        />
+                        <div className="flex items-center justify-center gap-2">
+                          <Button variant="outline" onClick={cancelVoiceRecording}>
+                            <X className="w-4 h-4 mr-2" /> Cancel
+                          </Button>
+                          <Button variant="destructive" onClick={stopVoiceRecording}>
+                            <Square className="w-4 h-4 mr-2" /> Stop & Save
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center space-y-3">
+                        <Button onClick={startVoiceRecording} className="gap-2">
+                          <Mic className="w-4 h-4" /> Start Recording
+                        </Button>
+                        <p className="text-xs text-muted-foreground">Record quick audio updates for this deal</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Voice Notes List */}
+                  <ScrollArea className="h-[200px]">
+                    <div className="space-y-2">
+                      {(dealVoiceNotes[selectedDeal.id] || []).map((note) => (
+                        <div key={note.id} className="p-3 bg-secondary/30 rounded-lg flex items-center justify-between group">
+                          <div className="flex items-center gap-3 flex-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-10 w-10 rounded-full bg-primary/20"
+                              onClick={() => toggleVoiceNotePlay(note.id, note.duration)}
+                            >
+                              {playingVoiceNoteId === note.id ? (
+                                <Pause className="w-4 h-4 text-primary" />
+                              ) : (
+                                <Play className="w-4 h-4 text-primary" />
+                              )}
+                            </Button>
+                            <div className="flex-1">
+                              <div className="font-medium text-sm">{note.title}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {note.authorName} • {formatVoiceDuration(note.duration)} • {format(parseISO(note.createdAt), 'MMM d, h:mm a')}
+                              </div>
+                              {playingVoiceNoteId === note.id && (
+                                <div className="h-1 bg-secondary rounded-full mt-2 overflow-hidden">
+                                  <div 
+                                    className="h-full bg-primary transition-all" 
+                                    style={{ width: `${voicePlayProgress}%` }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => deleteVoiceNote(selectedDeal.id, note.id)}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </div>
+                      ))}
+                      {(dealVoiceNotes[selectedDeal.id] || []).length === 0 && (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                          No voice notes recorded yet
                         </div>
                       )}
                     </div>
