@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,160 +35,41 @@ import {
   Eye,
   EyeOff
 } from "lucide-react";
-import { useCurrentUser, useDeals, useUsers } from "@/lib/api";
+import { 
+  useCurrentUser, 
+  useDeals, 
+  useUsers,
+  useAnnouncements,
+  useCreateAnnouncement,
+  useUpdateAnnouncement,
+  useDeleteAnnouncement,
+  usePolls,
+  useCreatePoll,
+  useUpdatePoll,
+  useDeletePoll
+} from "@/lib/api";
 import { toast } from "sonner";
 import { format, formatDistanceToNow, addDays } from "date-fns";
 import { cn } from "@/lib/utils";
+import type { Announcement, Poll, PollOption } from "@shared/schema";
 
-type Announcement = {
-  id: string;
-  title: string;
-  content: string;
-  type: 'deal-closed' | 'milestone' | 'team-update' | 'celebration' | 'general';
-  dealId?: string;
-  dealName?: string;
-  authorId: string;
-  authorName: string;
-  isPinned: boolean;
-  reactions: { emoji: string; count: number; userIds: string[] }[];
-  comments: { id: string; authorName: string; content: string; createdAt: string }[];
-  createdAt: string;
-};
-
-type PollOption = {
-  id: string;
-  text: string;
-  votes: string[];
-};
-
-type Poll = {
-  id: string;
-  question: string;
-  options: PollOption[];
-  creatorId: string;
-  creatorName: string;
-  expiresAt: string;
-  isAnonymous: boolean;
-  allowMultiple: boolean;
-  status: 'active' | 'closed';
-  createdAt: string;
-};
-
-const DEFAULT_ANNOUNCEMENTS: Announcement[] = [
-  {
-    id: "1",
-    title: "TechCorp Acquisition Successfully Closed!",
-    content: "Thrilled to announce the successful closing of the TechCorp acquisition deal worth $150M. This marks our largest technology sector deal this year. Congratulations to the entire deal team for their outstanding work!",
-    type: "deal-closed",
-    dealId: "deal-1",
-    dealName: "TechCorp Acquisition",
-    authorId: "user-1",
-    authorName: "Josh Anderson",
-    isPinned: true,
-    reactions: [
-      { emoji: "🎉", count: 12, userIds: ["u1", "u2", "u3"] },
-      { emoji: "👏", count: 8, userIds: ["u4", "u5"] },
-      { emoji: "🚀", count: 5, userIds: ["u6", "u7"] }
-    ],
-    comments: [
-      { id: "c1", authorName: "Sarah Chen", content: "Amazing work team! This was a challenging deal.", createdAt: "2024-12-01T10:30:00Z" },
-      { id: "c2", authorName: "Michael Brown", content: "Proud to be part of this team!", createdAt: "2024-12-01T11:15:00Z" }
-    ],
-    createdAt: "2024-12-01T09:00:00Z"
-  },
-  {
-    id: "2",
-    title: "FinServ Deal Reaches Due Diligence Phase",
-    content: "The FinServ merger has officially entered the due diligence phase. The deal team should prepare for intensive document review over the next 6 weeks. DD room access has been configured.",
-    type: "milestone",
-    dealId: "deal-2",
-    dealName: "FinServ Merger",
-    authorId: "user-2",
-    authorName: "Sarah Chen",
-    isPinned: false,
-    reactions: [
-      { emoji: "💪", count: 6, userIds: ["u1", "u2"] },
-      { emoji: "📊", count: 4, userIds: ["u3"] }
-    ],
-    comments: [],
-    createdAt: "2024-11-28T14:00:00Z"
-  },
-  {
-    id: "3",
-    title: "Welcome New Team Members!",
-    content: "Please join me in welcoming Emily Johnson and David Park to our investment banking team. Emily joins as an Analyst from Goldman Sachs, and David as an Associate from Morgan Stanley. Looking forward to great work together!",
-    type: "team-update",
-    authorId: "user-1",
-    authorName: "Josh Anderson",
-    isPinned: false,
-    reactions: [
-      { emoji: "👋", count: 15, userIds: ["u1", "u2", "u3", "u4", "u5"] },
-      { emoji: "🎊", count: 8, userIds: ["u6", "u7"] }
-    ],
-    comments: [
-      { id: "c1", authorName: "Lisa Wang", content: "Welcome to the team! Excited to work with you both.", createdAt: "2024-11-25T10:00:00Z" }
-    ],
-    createdAt: "2024-11-25T09:00:00Z"
-  },
-  {
-    id: "4",
-    title: "Q4 Deal Pipeline Record!",
-    content: "We've hit a new record for Q4 deal pipeline value - $2.3B in active deals! This is 40% higher than last year. Thank you all for your dedication and hard work. Let's keep the momentum going!",
-    type: "celebration",
-    authorId: "user-1",
-    authorName: "Josh Anderson",
-    isPinned: false,
-    reactions: [
-      { emoji: "🎉", count: 20, userIds: ["u1", "u2", "u3", "u4", "u5", "u6"] },
-      { emoji: "🏆", count: 12, userIds: ["u7", "u8", "u9"] },
-      { emoji: "💰", count: 8, userIds: ["u10"] }
-    ],
-    comments: [],
-    createdAt: "2024-11-20T16:00:00Z"
-  }
-];
-
-const getDefaultPolls = (): Poll[] => [
-  {
-    id: "1",
-    question: "Which day works best for the weekly team standup?",
-    options: [
-      { id: "o1", text: "Monday morning", votes: ["u1", "u2", "u3", "u4"] },
-      { id: "o2", text: "Tuesday morning", votes: ["u5", "u6"] },
-      { id: "o3", text: "Wednesday morning", votes: ["u7", "u8", "u9"] },
-      { id: "o4", text: "Friday afternoon", votes: ["u10"] }
-    ],
-    creatorId: "user-1",
-    creatorName: "Josh Anderson",
-    expiresAt: addDays(new Date(), 2).toISOString(),
-    isAnonymous: false,
-    allowMultiple: false,
-    status: "active",
-    createdAt: "2024-12-01T09:00:00Z"
-  },
-  {
-    id: "2",
-    question: "What type of team building activity would you prefer?",
-    options: [
-      { id: "o1", text: "Escape room", votes: ["u1", "u2", "u3", "u4", "u5"] },
-      { id: "o2", text: "Cooking class", votes: ["u6", "u7"] },
-      { id: "o3", text: "Sports event", votes: ["u8", "u9", "u10", "u11"] },
-      { id: "o4", text: "Happy hour", votes: ["u12", "u13", "u14"] }
-    ],
-    creatorId: "user-2",
-    creatorName: "Sarah Chen",
-    expiresAt: addDays(new Date(), 5).toISOString(),
-    isAnonymous: true,
-    allowMultiple: false,
-    status: "active",
-    createdAt: "2024-11-28T14:00:00Z"
-  }
-];
+type AnnouncementType = 'deal-closed' | 'milestone' | 'team-update' | 'celebration' | 'general';
+type LocalReaction = { emoji: string; count: number; userIds: string[] };
+type LocalComment = { id: string; authorId: string; authorName: string; content: string; createdAt: string };
 
 export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }) {
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [] } = useDeals();
   const { data: users = [] } = useUsers();
+  const { data: announcements = [], isLoading: announcementsLoading } = useAnnouncements();
+  const { data: polls = [], isLoading: pollsLoading } = usePolls();
+  const createAnnouncementMutation = useCreateAnnouncement();
+  const updateAnnouncementMutation = useUpdateAnnouncement();
+  const deleteAnnouncementMutation = useDeleteAnnouncement();
+  const createPollMutation = useCreatePoll();
+  const updatePollMutation = useUpdatePoll();
+  const deletePollMutation = useDeletePoll();
+  
   const [activeTab, setActiveTab] = useState<'announcements' | 'polls'>('announcements');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreatePollModal, setShowCreatePollModal] = useState(false);
@@ -198,46 +79,14 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
   const [commentingOn, setCommentingOn] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
 
-  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
-    const saved = localStorage.getItem('osreaper_announcements');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return DEFAULT_ANNOUNCEMENTS;
-      }
-    }
-    return DEFAULT_ANNOUNCEMENTS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('osreaper_announcements', JSON.stringify(announcements));
-  }, [announcements]);
-
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: "",
     content: "",
-    type: "general" as Announcement['type'],
+    type: "general" as AnnouncementType,
     dealId: "",
     isPinned: false,
     notifyTeam: true
   });
-
-  const [polls, setPolls] = useState<Poll[]>(() => {
-    const saved = localStorage.getItem('osreaper_polls');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return getDefaultPolls();
-      }
-    }
-    return getDefaultPolls();
-  });
-
-  useEffect(() => {
-    localStorage.setItem('osreaper_polls', JSON.stringify(polls));
-  }, [polls]);
 
   const [newPoll, setNewPoll] = useState({
     question: "",
@@ -261,183 +110,197 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
     .sort((a, b) => {
       if (a.isPinned && !b.isPinned) return -1;
       if (!a.isPinned && b.isPinned) return 1;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime;
     });
 
-  const handleCreateAnnouncement = () => {
+  const handleCreateAnnouncement = async () => {
     if (!newAnnouncement.title || !newAnnouncement.content) {
       toast.error("Please fill in all required fields");
       return;
     }
 
     const deal = deals.find(d => d.id === newAnnouncement.dealId);
-    const announcement: Announcement = {
-      id: Date.now().toString(),
-      title: newAnnouncement.title,
-      content: newAnnouncement.content,
-      type: newAnnouncement.type,
-      dealId: newAnnouncement.dealId || undefined,
-      dealName: deal?.name,
-      authorId: currentUser?.id || "",
-      authorName: currentUser?.name || "Unknown",
-      isPinned: newAnnouncement.isPinned,
-      reactions: [],
-      comments: [],
-      createdAt: new Date().toISOString()
-    };
-
-    setAnnouncements([announcement, ...announcements]);
-    setShowCreateModal(false);
-    setNewAnnouncement({ title: "", content: "", type: "general", dealId: "", isPinned: false, notifyTeam: true });
     
-    if (newAnnouncement.notifyTeam) {
-      toast.success("Announcement posted and team notified!");
-    } else {
-      toast.success("Announcement posted successfully");
+    try {
+      await createAnnouncementMutation.mutateAsync({
+        title: newAnnouncement.title,
+        content: newAnnouncement.content,
+        type: newAnnouncement.type,
+        dealId: newAnnouncement.dealId || undefined,
+        dealName: deal?.name,
+        isPinned: newAnnouncement.isPinned,
+        reactions: [],
+        comments: []
+      });
+
+      setShowCreateModal(false);
+      setNewAnnouncement({ title: "", content: "", type: "general", dealId: "", isPinned: false, notifyTeam: true });
+    
+      if (newAnnouncement.notifyTeam) {
+        toast.success("Announcement posted and team notified!");
+      } else {
+        toast.success("Announcement posted successfully");
+      }
+    } catch (error) {
+      toast.error("Failed to create announcement");
     }
   };
 
-  const addReaction = (announcementId: string, emoji: string) => {
-    setAnnouncements(announcements.map(a => {
-      if (a.id === announcementId) {
-        const existingReaction = a.reactions.find(r => r.emoji === emoji);
-        if (existingReaction) {
-          if (existingReaction.userIds.includes(currentUser?.id || "")) {
-            return {
-              ...a,
-              reactions: a.reactions.map(r =>
-                r.emoji === emoji
-                  ? { ...r, count: r.count - 1, userIds: r.userIds.filter(id => id !== currentUser?.id) }
-                  : r
-              ).filter(r => r.count > 0)
-            };
-          } else {
-            return {
-              ...a,
-              reactions: a.reactions.map(r =>
-                r.emoji === emoji
-                  ? { ...r, count: r.count + 1, userIds: [...r.userIds, currentUser?.id || ""] }
-                  : r
-              )
-            };
-          }
-        } else {
-          return {
-            ...a,
-            reactions: [...a.reactions, { emoji, count: 1, userIds: [currentUser?.id || ""] }]
-          };
-        }
+  const addReaction = async (announcementId: string, emoji: string) => {
+    const announcement = announcements.find(a => a.id === announcementId);
+    if (!announcement) return;
+    
+    const reactions = announcement.reactions || [];
+    const existingReaction = reactions.find(r => r.emoji === emoji);
+    let newReactions: LocalReaction[];
+    
+    if (existingReaction) {
+      if (existingReaction.userIds.includes(currentUser?.id || "")) {
+        newReactions = reactions
+          .map(r => r.emoji === emoji 
+            ? { ...r, count: r.count - 1, userIds: r.userIds.filter(id => id !== currentUser?.id) }
+            : r)
+          .filter(r => r.count > 0);
+      } else {
+        newReactions = reactions.map(r =>
+          r.emoji === emoji
+            ? { ...r, count: r.count + 1, userIds: [...r.userIds, currentUser?.id || ""] }
+            : r
+        );
       }
-      return a;
-    }));
+    } else {
+      newReactions = [...reactions, { emoji, count: 1, userIds: [currentUser?.id || ""] }];
+    }
+    
+    try {
+      await updateAnnouncementMutation.mutateAsync({ id: announcementId, updates: { reactions: newReactions } });
+    } catch (error) {
+      toast.error("Failed to add reaction");
+    }
   };
 
-  const addComment = (announcementId: string) => {
+  const addComment = async (announcementId: string) => {
     if (!newComment.trim()) return;
-
-    setAnnouncements(announcements.map(a => {
-      if (a.id === announcementId) {
-        return {
-          ...a,
-          comments: [...a.comments, {
-            id: Date.now().toString(),
-            authorName: currentUser?.name || "Unknown",
-            content: newComment,
-            createdAt: new Date().toISOString()
-          }]
-        };
-      }
-      return a;
-    }));
-
-    setNewComment("");
-    setCommentingOn(null);
-    toast.success("Comment added");
+    
+    const announcement = announcements.find(a => a.id === announcementId);
+    if (!announcement) return;
+    
+    const newCommentObj: LocalComment = {
+      id: Date.now().toString(),
+      authorId: currentUser?.id || "",
+      authorName: currentUser?.name || "Unknown",
+      content: newComment,
+      createdAt: new Date().toISOString()
+    };
+    
+    try {
+      await updateAnnouncementMutation.mutateAsync({
+        id: announcementId,
+        updates: { comments: [...(announcement.comments || []), newCommentObj] }
+      });
+      setNewComment("");
+      setCommentingOn(null);
+      toast.success("Comment added");
+    } catch (error) {
+      toast.error("Failed to add comment");
+    }
   };
 
-  const togglePin = (id: string) => {
-    setAnnouncements(announcements.map(a =>
-      a.id === id ? { ...a, isPinned: !a.isPinned } : a
-    ));
+  const togglePin = async (id: string) => {
+    const announcement = announcements.find(a => a.id === id);
+    if (!announcement) return;
+    
+    try {
+      await updateAnnouncementMutation.mutateAsync({ id, updates: { isPinned: !announcement.isPinned } });
+    } catch (error) {
+      toast.error("Failed to toggle pin");
+    }
   };
 
-  const handleCreatePoll = () => {
+  const handleCreatePoll = async () => {
     const validOptions = newPoll.options.filter(o => o.trim());
     if (!newPoll.question || validOptions.length < 2) {
       toast.error("Please add a question and at least 2 options");
       return;
     }
 
-    const poll: Poll = {
-      id: Date.now().toString(),
-      question: newPoll.question,
-      options: validOptions.map((text, i) => ({
-        id: `o${i}`,
-        text,
-        votes: []
-      })),
-      creatorId: currentUser?.id || "",
-      creatorName: currentUser?.name || "Unknown",
-      expiresAt: addDays(new Date(), newPoll.expiresInDays).toISOString(),
-      isAnonymous: newPoll.isAnonymous,
-      allowMultiple: newPoll.allowMultiple,
-      status: "active",
-      createdAt: new Date().toISOString()
-    };
-
-    setPolls([poll, ...polls]);
-    setShowCreatePollModal(false);
-    setNewPoll({ question: "", options: ["", "", ""], expiresInDays: 3, isAnonymous: false, allowMultiple: false });
-    toast.success("Poll created successfully");
+    try {
+      await createPollMutation.mutateAsync({
+        question: newPoll.question,
+        options: validOptions.map((text, i) => ({
+          id: `o${i}`,
+          text,
+          votes: []
+        })),
+        expiresAt: addDays(new Date(), newPoll.expiresInDays).toISOString(),
+        isAnonymous: newPoll.isAnonymous,
+        allowMultiple: newPoll.allowMultiple,
+        status: "active"
+      });
+      
+      setShowCreatePollModal(false);
+      setNewPoll({ question: "", options: ["", "", ""], expiresInDays: 3, isAnonymous: false, allowMultiple: false });
+      toast.success("Poll created successfully");
+    } catch (error) {
+      toast.error("Failed to create poll");
+    }
   };
 
-  const votePoll = (pollId: string, optionId: string) => {
-    setPolls(polls.map(poll => {
-      if (poll.id === pollId) {
-        const hasVoted = poll.options.some(o => o.votes.includes(currentUser?.id || ""));
-        if (hasVoted && !poll.allowMultiple) {
-          return {
-            ...poll,
-            options: poll.options.map(o => ({
-              ...o,
-              votes: o.id === optionId
-                ? [...o.votes.filter(v => v !== currentUser?.id), currentUser?.id || ""]
-                : o.votes.filter(v => v !== currentUser?.id)
-            }))
-          };
-        } else {
-          return {
-            ...poll,
-            options: poll.options.map(o => ({
-              ...o,
-              votes: o.id === optionId
-                ? o.votes.includes(currentUser?.id || "")
-                  ? o.votes.filter(v => v !== currentUser?.id)
-                  : [...o.votes, currentUser?.id || ""]
-                : o.votes
-            }))
-          };
-        }
-      }
-      return poll;
-    }));
-    toast.success("Vote recorded");
+  const votePoll = async (pollId: string, optionId: string) => {
+    const poll = polls.find(p => p.id === pollId);
+    if (!poll || !poll.options) return;
+    
+    const hasVoted = poll.options.some(o => o.votes.includes(currentUser?.id || ""));
+    let newOptions: PollOption[];
+    
+    if (hasVoted && !poll.allowMultiple) {
+      newOptions = poll.options.map(o => ({
+        ...o,
+        votes: o.id === optionId
+          ? [...o.votes.filter(v => v !== currentUser?.id), currentUser?.id || ""]
+          : o.votes.filter(v => v !== currentUser?.id)
+      }));
+    } else {
+      newOptions = poll.options.map(o => ({
+        ...o,
+        votes: o.id === optionId
+          ? o.votes.includes(currentUser?.id || "")
+            ? o.votes.filter(v => v !== currentUser?.id)
+            : [...o.votes, currentUser?.id || ""]
+          : o.votes
+      }));
+    }
+    
+    try {
+      await updatePollMutation.mutateAsync({ id: pollId, updates: { options: newOptions } });
+      toast.success("Vote recorded");
+    } catch (error) {
+      toast.error("Failed to record vote");
+    }
   };
 
-  const closePoll = (pollId: string) => {
-    setPolls(polls.map(p =>
-      p.id === pollId ? { ...p, status: 'closed' as const } : p
-    ));
-    toast.success("Poll closed");
+  const closePoll = async (pollId: string) => {
+    try {
+      await updatePollMutation.mutateAsync({ id: pollId, updates: { status: 'closed' } });
+      toast.success("Poll closed");
+    } catch (error) {
+      toast.error("Failed to close poll");
+    }
   };
 
-  const deletePoll = (pollId: string) => {
-    setPolls(polls.filter(p => p.id !== pollId));
-    toast.success("Poll deleted");
+  const deletePoll = async (pollId: string) => {
+    try {
+      await deletePollMutation.mutateAsync(pollId);
+      toast.success("Poll deleted");
+    } catch (error) {
+      toast.error("Failed to delete poll");
+    }
   };
 
   const getTotalVotes = (poll: Poll) => {
-    return poll.options.reduce((sum, o) => sum + o.votes.length, 0);
+    return (poll.options || []).reduce((sum, o) => sum + o.votes.length, 0);
   };
 
   const getVotePercentage = (poll: Poll, option: PollOption) => {
@@ -561,7 +424,7 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
                       <MessageSquare className="w-5 h-5 text-blue-500" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{announcements.reduce((sum, a) => sum + a.comments.length, 0)}</p>
+                      <p className="text-2xl font-bold">{announcements.reduce((sum, a) => sum + (a.comments?.length || 0), 0)}</p>
                       <p className="text-xs text-muted-foreground">Comments</p>
                     </div>
                   </div>
@@ -574,7 +437,7 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
                       <ThumbsUp className="w-5 h-5 text-red-500" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{announcements.reduce((sum, a) => sum + a.reactions.reduce((s, r) => s + r.count, 0), 0)}</p>
+                      <p className="text-2xl font-bold">{announcements.reduce((sum, a) => sum + (a.reactions || []).reduce((s, r) => s + r.count, 0), 0)}</p>
                       <p className="text-xs text-muted-foreground">Reactions</p>
                     </div>
                   </div>
@@ -624,13 +487,13 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
                       {announcement.authorName}
                     </span>
                     <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> {formatDistanceToNow(new Date(announcement.createdAt), { addSuffix: true })}
+                      <Clock className="w-3 h-3" /> {announcement.createdAt ? formatDistanceToNow(new Date(announcement.createdAt), { addSuffix: true }) : 'Just now'}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2 mb-4">
                     {reactionEmojis.map((emoji) => {
-                      const reaction = announcement.reactions.find(r => r.emoji === emoji);
+                      const reaction = (announcement.reactions || []).find(r => r.emoji === emoji);
                       const hasReacted = reaction?.userIds.includes(currentUser?.id || "");
                       return (
                         <button
@@ -648,9 +511,9 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
                     })}
                   </div>
 
-                  {announcement.comments.length > 0 && (
+                  {(announcement.comments?.length || 0) > 0 && (
                     <div className="border-t pt-4 space-y-3">
-                      {announcement.comments.map((comment) => (
+                      {(announcement.comments || []).map((comment) => (
                         <div key={comment.id} className="flex gap-2">
                           <Avatar className="h-6 w-6">
                             <AvatarFallback className="text-[10px]">
@@ -791,7 +654,7 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
                           </div>
 
                           <div className="space-y-2">
-                            {poll.options.map((option) => {
+                            {(poll.options || []).map((option) => {
                               const percentage = getVotePercentage(poll, option);
                               const isSelected = option.votes.includes(currentUser?.id || "");
                               return (
@@ -844,7 +707,7 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
                 <ScrollArea className="h-[400px]">
                   <div className="space-y-4 pr-4">
                     {closedPolls.map((poll) => {
-                      const winner = [...poll.options].sort((a, b) => b.votes.length - a.votes.length)[0];
+                      const winner = [...(poll.options || [])].sort((a, b) => b.votes.length - a.votes.length)[0];
                       return (
                         <Card key={poll.id} className="opacity-80" data-testid={`poll-closed-${poll.id}`}>
                           <CardContent className="p-4">
@@ -1053,7 +916,7 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
             <div className="space-y-4">
               <h3 className="font-medium">{selectedPoll.question}</h3>
               <div className="space-y-3">
-                {[...selectedPoll.options]
+                {[...(selectedPoll.options || [])]
                   .sort((a, b) => b.votes.length - a.votes.length)
                   .map((option, index) => (
                     <div key={option.id}>

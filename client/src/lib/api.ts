@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { User, Deal, Task, InsertUser, Meeting, Notification, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction } from "@shared/schema";
+import type { User, Deal, Task, InsertUser, Meeting, Notification, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess } from "@shared/schema";
 
 // Generic API request helper
 export async function apiRequest(method: string, url: string, body?: any): Promise<Response> {
@@ -740,6 +740,414 @@ export function useCreateInvestorInteraction() {
     onSuccess: (_, { investorId }) => {
       queryClient.invalidateQueries({ queryKey: ["investors", investorId] });
       queryClient.invalidateQueries({ queryKey: ["investors"] });
+    },
+  });
+}
+
+// ===== OKR API =====
+export function useOkrs() {
+  return useQuery({
+    queryKey: ["okrs"],
+    queryFn: async () => {
+      const res = await fetch("/api/okrs");
+      if (!res.ok) throw new Error("Failed to fetch OKRs");
+      return res.json() as Promise<Okr[]>;
+    },
+  });
+}
+
+export function useCreateOkr() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (okr: InsertOkr) => {
+      const res = await fetch("/api/okrs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(okr),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create OKR");
+      }
+      return res.json() as Promise<Okr>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["okrs"] });
+    },
+  });
+}
+
+export function useUpdateOkr() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<InsertOkr> }) => {
+      const res = await fetch(`/api/okrs/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update OKR");
+      }
+      return res.json() as Promise<Okr>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["okrs"] });
+    },
+  });
+}
+
+export function useDeleteOkr() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/okrs/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete OKR");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["okrs"] });
+    },
+  });
+}
+
+// ===== STAKEHOLDER API =====
+export function useStakeholders() {
+  return useQuery({
+    queryKey: ["stakeholders"],
+    queryFn: async () => {
+      const res = await fetch("/api/stakeholders");
+      if (!res.ok) throw new Error("Failed to fetch stakeholders");
+      return res.json() as Promise<Stakeholder[]>;
+    },
+  });
+}
+
+export function useCreateStakeholder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (stakeholder: InsertStakeholder) => {
+      const res = await fetch("/api/stakeholders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(stakeholder),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create stakeholder");
+      }
+      return res.json() as Promise<Stakeholder>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stakeholders"] });
+    },
+  });
+}
+
+export function useUpdateStakeholder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<InsertStakeholder> }) => {
+      const res = await fetch(`/api/stakeholders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update stakeholder");
+      }
+      return res.json() as Promise<Stakeholder>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stakeholders"] });
+    },
+  });
+}
+
+export function useDeleteStakeholder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/stakeholders/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete stakeholder");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stakeholders"] });
+    },
+  });
+}
+
+// ===== ANNOUNCEMENT API =====
+export function useAnnouncements() {
+  return useQuery({
+    queryKey: ["announcements"],
+    queryFn: async () => {
+      const res = await fetch("/api/announcements");
+      if (!res.ok) throw new Error("Failed to fetch announcements");
+      return res.json() as Promise<Announcement[]>;
+    },
+  });
+}
+
+export function useCreateAnnouncement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (announcement: Omit<InsertAnnouncement, 'authorId' | 'authorName'>) => {
+      const res = await fetch("/api/announcements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(announcement),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create announcement");
+      }
+      return res.json() as Promise<Announcement>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["announcements"] });
+    },
+  });
+}
+
+export function useUpdateAnnouncement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<InsertAnnouncement> }) => {
+      const res = await fetch(`/api/announcements/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update announcement");
+      }
+      return res.json() as Promise<Announcement>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["announcements"] });
+    },
+  });
+}
+
+export function useDeleteAnnouncement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/announcements/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete announcement");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["announcements"] });
+    },
+  });
+}
+
+// ===== POLL API =====
+export function usePolls() {
+  return useQuery({
+    queryKey: ["polls"],
+    queryFn: async () => {
+      const res = await fetch("/api/polls");
+      if (!res.ok) throw new Error("Failed to fetch polls");
+      return res.json() as Promise<Poll[]>;
+    },
+  });
+}
+
+export function useCreatePoll() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (poll: Omit<InsertPoll, 'creatorId' | 'creatorName'>) => {
+      const res = await fetch("/api/polls", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(poll),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create poll");
+      }
+      return res.json() as Promise<Poll>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["polls"] });
+    },
+  });
+}
+
+export function useUpdatePoll() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<InsertPoll> }) => {
+      const res = await fetch(`/api/polls/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update poll");
+      }
+      return res.json() as Promise<Poll>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["polls"] });
+    },
+  });
+}
+
+export function useDeletePoll() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/polls/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete poll");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["polls"] });
+    },
+  });
+}
+
+// ===== MENTORSHIP PAIRING API =====
+export function useMentorshipPairings() {
+  return useQuery({
+    queryKey: ["mentorship-pairings"],
+    queryFn: async () => {
+      const res = await fetch("/api/mentorship-pairings");
+      if (!res.ok) throw new Error("Failed to fetch mentorship pairings");
+      return res.json() as Promise<MentorshipPairing[]>;
+    },
+  });
+}
+
+export function useCreateMentorshipPairing() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (pairing: InsertMentorshipPairing) => {
+      const res = await fetch("/api/mentorship-pairings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pairing),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create mentorship pairing");
+      }
+      return res.json() as Promise<MentorshipPairing>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mentorship-pairings"] });
+    },
+  });
+}
+
+export function useUpdateMentorshipPairing() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<InsertMentorshipPairing> }) => {
+      const res = await fetch(`/api/mentorship-pairings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update mentorship pairing");
+      }
+      return res.json() as Promise<MentorshipPairing>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mentorship-pairings"] });
+    },
+  });
+}
+
+export function useDeleteMentorshipPairing() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/mentorship-pairings/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete mentorship pairing");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mentorship-pairings"] });
+    },
+  });
+}
+
+// ===== CLIENT PORTAL ACCESS API =====
+export function useClientPortalAccess() {
+  return useQuery({
+    queryKey: ["client-portal-access"],
+    queryFn: async () => {
+      const res = await fetch("/api/client-portal-access");
+      if (!res.ok) throw new Error("Failed to fetch client portal access");
+      return res.json() as Promise<ClientPortalAccess[]>;
+    },
+  });
+}
+
+export function useCreateClientPortalAccess() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (access: Omit<InsertClientPortalAccess, 'invitedBy'>) => {
+      const res = await fetch("/api/client-portal-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(access),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create client portal access");
+      }
+      return res.json() as Promise<ClientPortalAccess>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-portal-access"] });
+    },
+  });
+}
+
+export function useUpdateClientPortalAccess() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<InsertClientPortalAccess> }) => {
+      const res = await fetch(`/api/client-portal-access/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update client portal access");
+      }
+      return res.json() as Promise<ClientPortalAccess>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-portal-access"] });
+    },
+  });
+}
+
+export function useDeleteClientPortalAccess() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/client-portal-access/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete client portal access");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-portal-access"] });
     },
   });
 }

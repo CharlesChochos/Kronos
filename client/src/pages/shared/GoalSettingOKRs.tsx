@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,117 +28,23 @@ import {
   Trash2,
   Award
 } from "lucide-react";
-import { useCurrentUser, useUsers } from "@/lib/api";
+import { useCurrentUser, useUsers, useOkrs, useCreateOkr, useUpdateOkr } from "@/lib/api";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-
-type KeyResult = {
-  id: string;
-  title: string;
-  targetValue: number;
-  currentValue: number;
-  unit: string;
-  progress: number;
-};
-
-type OKR = {
-  id: string;
-  objective: string;
-  description: string;
-  ownerId: string;
-  ownerName: string;
-  quarter: string;
-  year: number;
-  keyResults: KeyResult[];
-  status: 'on-track' | 'at-risk' | 'behind' | 'completed';
-  overallProgress: number;
-  createdAt: string;
-  type: 'individual' | 'team';
-  teamName?: string;
-};
-
-const DEFAULT_OKRS: OKR[] = [
-  {
-    id: "1",
-    objective: "Increase deal pipeline value by 50%",
-    description: "Grow our active deal pipeline to drive revenue growth",
-    ownerId: "user-1",
-    ownerName: "Josh Anderson",
-    quarter: "Q4",
-    year: 2024,
-    keyResults: [
-      { id: "kr1", title: "Close 5 new deals worth $10M+", targetValue: 5, currentValue: 3, unit: "deals", progress: 60 },
-      { id: "kr2", title: "Add 20 qualified prospects to pipeline", targetValue: 20, currentValue: 15, unit: "prospects", progress: 75 },
-      { id: "kr3", title: "Achieve 90% client satisfaction score", targetValue: 90, currentValue: 87, unit: "%", progress: 97 }
-    ],
-    status: "on-track",
-    overallProgress: 77,
-    createdAt: "2024-10-01T00:00:00Z",
-    type: "team",
-    teamName: "Deal Team Alpha"
-  },
-  {
-    id: "2",
-    objective: "Build world-class investment banking team",
-    description: "Attract and develop top talent for sustainable growth",
-    ownerId: "user-1",
-    ownerName: "Josh Anderson",
-    quarter: "Q4",
-    year: 2024,
-    keyResults: [
-      { id: "kr1", title: "Hire 3 senior associates", targetValue: 3, currentValue: 2, unit: "hires", progress: 67 },
-      { id: "kr2", title: "Complete training program for all analysts", targetValue: 100, currentValue: 80, unit: "%", progress: 80 },
-      { id: "kr3", title: "Reduce turnover rate to under 10%", targetValue: 10, currentValue: 12, unit: "%", progress: 83 }
-    ],
-    status: "at-risk",
-    overallProgress: 77,
-    createdAt: "2024-10-01T00:00:00Z",
-    type: "individual"
-  },
-  {
-    id: "3",
-    objective: "Improve operational efficiency",
-    description: "Streamline processes and reduce time-to-close",
-    ownerId: "user-2",
-    ownerName: "Sarah Chen",
-    quarter: "Q4",
-    year: 2024,
-    keyResults: [
-      { id: "kr1", title: "Reduce deal cycle time by 20%", targetValue: 20, currentValue: 15, unit: "% reduction", progress: 75 },
-      { id: "kr2", title: "Automate 5 manual processes", targetValue: 5, currentValue: 5, unit: "processes", progress: 100 },
-      { id: "kr3", title: "Achieve 95% on-time task completion", targetValue: 95, currentValue: 92, unit: "%", progress: 97 }
-    ],
-    status: "on-track",
-    overallProgress: 91,
-    createdAt: "2024-10-01T00:00:00Z",
-    type: "individual"
-  }
-];
+import type { Okr, KeyResult } from "@shared/schema";
 
 export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) {
   const { data: currentUser } = useCurrentUser();
   const { data: users = [] } = useUsers();
+  const { data: okrs = [], isLoading } = useOkrs();
+  const createOkrMutation = useCreateOkr();
+  const updateOkrMutation = useUpdateOkr();
+  
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedOKRs, setExpandedOKRs] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState("all");
-
-  const [okrs, setOKRs] = useState<OKR[]>(() => {
-    const saved = localStorage.getItem('osreaper_okrs');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return DEFAULT_OKRS;
-      }
-    }
-    return DEFAULT_OKRS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('osreaper_okrs', JSON.stringify(okrs));
-  }, [okrs]);
 
   const [newOKR, setNewOKR] = useState({
     objective: "",
@@ -172,7 +78,7 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
     return matchesSearch;
   });
 
-  const handleCreateOKR = () => {
+  const handleCreateOKR = async () => {
     if (!newOKR.objective || newOKR.keyResults.filter(kr => kr.title).length === 0) {
       toast.error("Please add an objective and at least one key result");
       return;
@@ -184,64 +90,72 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
     }
 
     const owner = users.find(u => u.id === newOKR.ownerId) || currentUser;
-    const okr: OKR = {
-      id: Date.now().toString(),
-      objective: newOKR.objective,
-      description: newOKR.description,
-      ownerId: newOKR.ownerId || currentUser?.id || "",
-      ownerName: owner?.name || "Unknown",
-      quarter: newOKR.quarter,
-      year: newOKR.year,
-      keyResults: newOKR.keyResults.filter(kr => kr.title).map((kr, i) => ({
-        id: `kr${i}`,
-        title: kr.title,
-        targetValue: kr.targetValue,
-        currentValue: 0,
-        unit: kr.unit,
-        progress: 0
-      })),
-      status: "on-track",
-      overallProgress: 0,
-      createdAt: new Date().toISOString(),
-      type: newOKR.type,
-      teamName: newOKR.type === 'team' ? newOKR.teamName : undefined
-    };
-
-    setOKRs([okr, ...okrs]);
-    setShowCreateModal(false);
-    setNewOKR({
-      objective: "",
-      description: "",
-      ownerId: currentUser?.id || "",
-      quarter: "Q1",
-      year: 2025,
-      keyResults: [{ title: "", targetValue: 0, unit: "" }],
-      type: "individual",
-      teamName: ""
-    });
-    toast.success("OKR created successfully");
+    
+    try {
+      await createOkrMutation.mutateAsync({
+        objective: newOKR.objective,
+        description: newOKR.description,
+        ownerId: newOKR.ownerId || currentUser?.id || undefined,
+        ownerName: owner?.name || "Unknown",
+        quarter: newOKR.quarter,
+        year: newOKR.year,
+        keyResults: newOKR.keyResults.filter(kr => kr.title).map((kr, i) => ({
+          id: `kr${i}`,
+          title: kr.title,
+          targetValue: kr.targetValue,
+          currentValue: 0,
+          unit: kr.unit,
+          progress: 0
+        })),
+        status: "on-track",
+        overallProgress: 0,
+        type: newOKR.type,
+        teamName: newOKR.type === 'team' ? newOKR.teamName : undefined
+      });
+      
+      setShowCreateModal(false);
+      setNewOKR({
+        objective: "",
+        description: "",
+        ownerId: currentUser?.id || "",
+        quarter: "Q1",
+        year: 2025,
+        keyResults: [{ title: "", targetValue: 0, unit: "" }],
+        type: "individual",
+        teamName: ""
+      });
+      toast.success("OKR created successfully");
+    } catch (error) {
+      toast.error("Failed to create OKR");
+    }
   };
 
-  const updateKeyResultProgress = (okrId: string, krId: string, newValue: number) => {
-    setOKRs(okrs.map(okr => {
-      if (okr.id === okrId) {
-        const updatedKRs = okr.keyResults.map(kr => {
-          if (kr.id === krId) {
-            const progress = Math.min(Math.round((newValue / kr.targetValue) * 100), 100);
-            return { ...kr, currentValue: newValue, progress };
-          }
-          return kr;
-        });
-        const overallProgress = Math.round(updatedKRs.reduce((sum, kr) => sum + kr.progress, 0) / updatedKRs.length);
-        let status: OKR['status'] = 'on-track';
-        if (overallProgress >= 100) status = 'completed';
-        else if (overallProgress < 50) status = 'behind';
-        else if (overallProgress < 70) status = 'at-risk';
-        
-        return { ...okr, keyResults: updatedKRs, overallProgress, status };
+  const updateKeyResultProgress = async (okrId: string, krId: string, newValue: number) => {
+    const okr = okrs.find(o => o.id === okrId);
+    if (!okr || !okr.keyResults) return;
+    
+    const updatedKRs = okr.keyResults.map(kr => {
+      if (kr.id === krId) {
+        const progress = Math.min(Math.round((newValue / kr.targetValue) * 100), 100);
+        return { ...kr, currentValue: newValue, progress };
       }
-      return okr;
-    }));
+      return kr;
+    });
+    
+    const overallProgress = Math.round(updatedKRs.reduce((sum, kr) => sum + kr.progress, 0) / updatedKRs.length);
+    let status: 'on-track' | 'at-risk' | 'behind' | 'completed' = 'on-track';
+    if (overallProgress >= 100) status = 'completed';
+    else if (overallProgress < 50) status = 'behind';
+    else if (overallProgress < 70) status = 'at-risk';
+    
+    try {
+      await updateOkrMutation.mutateAsync({
+        id: okrId,
+        updates: { keyResults: updatedKRs, overallProgress, status }
+      });
+    } catch (error) {
+      toast.error("Failed to update progress");
+    }
   };
 
   const addKeyResultField = () => {

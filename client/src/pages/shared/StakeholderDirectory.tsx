@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,18 +29,21 @@ import {
   ExternalLink,
   Calendar
 } from "lucide-react";
-import { useDeals } from "@/lib/api";
+import { useDeals, useStakeholders, useCreateStakeholder, useUpdateStakeholder, useDeleteStakeholder } from "@/lib/api";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { SHARED_INVESTORS } from "@/lib/investors";
+import type { Stakeholder } from "@shared/schema";
 
-type Stakeholder = {
+type StakeholderType = 'investor' | 'advisor' | 'legal' | 'banker' | 'consultant' | 'client' | 'other';
+
+type LocalStakeholder = {
   id: string;
   name: string;
   title: string;
   company: string;
-  type: 'investor' | 'advisor' | 'legal' | 'banker' | 'consultant' | 'client' | 'other';
+  type: StakeholderType;
   email?: string;
   phone?: string;
   linkedin?: string;
@@ -50,99 +53,23 @@ type Stakeholder = {
   deals: string[];
   isFavorite: boolean;
   lastContact?: string;
-  createdAt: string;
+  createdAt?: string;
 };
-
-const DEFAULT_CUSTOM_STAKEHOLDERS: Stakeholder[] = [
-  {
-    id: "2",
-    name: "Jennifer Wu",
-    title: "Partner",
-    company: "Kirkland & Ellis",
-    type: "legal",
-    email: "jwu@kirkland.com",
-    phone: "+1 212-555-0456",
-    linkedin: "https://linkedin.com/in/jenniferwu",
-    location: "New York, NY",
-    notes: "Specializes in M&A transactions. Excellent track record on cross-border deals.",
-    deals: ["deal-1"],
-    isFavorite: true,
-    lastContact: "2024-12-01T14:30:00Z",
-    createdAt: "2024-03-20T00:00:00Z"
-  },
-  {
-    id: "3",
-    name: "David Thompson",
-    title: "Senior Advisor",
-    company: "McKinsey & Company",
-    type: "consultant",
-    email: "david_thompson@mckinsey.com",
-    phone: "+1 415-555-0789",
-    location: "San Francisco, CA",
-    notes: "Healthcare sector specialist. Previously led operational DD for multiple portfolio companies.",
-    deals: ["deal-3"],
-    isFavorite: false,
-    lastContact: "2024-11-15T09:00:00Z",
-    createdAt: "2024-08-10T00:00:00Z"
-  },
-  {
-    id: "4",
-    name: "Sarah Goldstein",
-    title: "Managing Director",
-    company: "Goldman Sachs",
-    type: "banker",
-    email: "sarah.goldstein@gs.com",
-    phone: "+1 212-555-0321",
-    linkedin: "https://linkedin.com/in/sarahgoldstein",
-    website: "https://goldmansachs.com",
-    location: "New York, NY",
-    notes: "Technology M&A coverage. Has done multiple deals in our sector.",
-    deals: ["deal-2", "deal-3"],
-    isFavorite: false,
-    lastContact: "2024-11-20T16:00:00Z",
-    createdAt: "2024-05-01T00:00:00Z"
-  },
-  {
-    id: "5",
-    name: "Michael Chen",
-    title: "CEO",
-    company: "TechCorp Industries",
-    type: "client",
-    email: "mchen@techcorp.com",
-    phone: "+1 408-555-0654",
-    linkedin: "https://linkedin.com/in/michaelchen",
-    location: "San Jose, CA",
-    notes: "Primary contact for TechCorp acquisition. Very hands-on and detail-oriented.",
-    deals: ["deal-1"],
-    isFavorite: true,
-    lastContact: "2024-12-02T11:00:00Z",
-    createdAt: "2024-09-01T00:00:00Z"
-  },
-  {
-    id: "6",
-    name: "Lisa Park",
-    title: "Board Advisor",
-    company: "Independent",
-    type: "advisor",
-    email: "lisa@lisapark.com",
-    linkedin: "https://linkedin.com/in/lisapark",
-    location: "Boston, MA",
-    notes: "Former CFO of multiple tech companies. Great for financial diligence guidance.",
-    deals: [],
-    isFavorite: false,
-    createdAt: "2024-07-15T00:00:00Z"
-  }
-];
 
 export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee' }) {
   const { data: deals = [] } = useDeals();
+  const { data: dbStakeholders = [], isLoading } = useStakeholders();
+  const createStakeholderMutation = useCreateStakeholder();
+  const updateStakeholderMutation = useUpdateStakeholder();
+  const deleteStakeholderMutation = useDeleteStakeholder();
+  
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedStakeholder, setSelectedStakeholder] = useState<Stakeholder | null>(null);
+  const [selectedStakeholder, setSelectedStakeholder] = useState<LocalStakeholder | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
 
-  const investorStakeholders: Stakeholder[] = useMemo(() => SHARED_INVESTORS.map((inv) => ({
+  const investorStakeholders: LocalStakeholder[] = useMemo(() => SHARED_INVESTORS.map((inv) => ({
     id: `inv-${inv.id}`,
     name: inv.name,
     title: inv.type,
@@ -158,41 +85,31 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     createdAt: "2024-01-01T00:00:00Z"
   })), []);
 
-  const [customStakeholders, setCustomStakeholders] = useState<Stakeholder[]>(() => {
-    const saved = localStorage.getItem('osreaper_stakeholders');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return DEFAULT_CUSTOM_STAKEHOLDERS;
-      }
-    }
-    return DEFAULT_CUSTOM_STAKEHOLDERS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('osreaper_stakeholders', JSON.stringify(customStakeholders));
-  }, [customStakeholders]);
+  const customStakeholders: LocalStakeholder[] = useMemo(() => dbStakeholders.map(s => ({
+    id: s.id,
+    name: s.name,
+    title: s.title,
+    company: s.company,
+    type: s.type as StakeholderType,
+    email: s.email || undefined,
+    phone: s.phone || undefined,
+    linkedin: s.linkedin || undefined,
+    website: s.website || undefined,
+    location: s.location || undefined,
+    notes: s.notes || undefined,
+    deals: s.deals || [],
+    isFavorite: s.isFavorite || false,
+    lastContact: s.lastContact || undefined,
+    createdAt: s.createdAt?.toString()
+  })), [dbStakeholders]);
 
   const stakeholders = useMemo(() => [...investorStakeholders, ...customStakeholders], [investorStakeholders, customStakeholders]);
-  
-  const setStakeholders = (newStakeholders: Stakeholder[] | ((prev: Stakeholder[]) => Stakeholder[])) => {
-    if (typeof newStakeholders === 'function') {
-      setCustomStakeholders((prev) => {
-        const allStakeholders = [...investorStakeholders, ...prev];
-        const updated = newStakeholders(allStakeholders);
-        return updated.filter(s => !s.id.startsWith('inv-'));
-      });
-    } else {
-      setCustomStakeholders(newStakeholders.filter(s => !s.id.startsWith('inv-')));
-    }
-  };
 
   const [newStakeholder, setNewStakeholder] = useState({
     name: "",
     title: "",
     company: "",
-    type: "investor" as Stakeholder['type'],
+    type: "investor" as StakeholderType,
     email: "",
     phone: "",
     linkedin: "",
@@ -221,38 +138,64 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     return matchesSearch && s.type === activeTab;
   });
 
-  const handleCreateStakeholder = () => {
+  const handleCreateStakeholder = async () => {
     if (!newStakeholder.name || !newStakeholder.company) {
       toast.error("Please fill in required fields");
       return;
     }
 
-    const stakeholder: Stakeholder = {
-      id: Date.now().toString(),
-      ...newStakeholder,
-      deals: [],
-      isFavorite: false,
-      createdAt: new Date().toISOString()
-    };
+    try {
+      await createStakeholderMutation.mutateAsync({
+        name: newStakeholder.name,
+        title: newStakeholder.title,
+        company: newStakeholder.company,
+        type: newStakeholder.type,
+        email: newStakeholder.email || undefined,
+        phone: newStakeholder.phone || undefined,
+        linkedin: newStakeholder.linkedin || undefined,
+        website: newStakeholder.website || undefined,
+        location: newStakeholder.location || undefined,
+        notes: newStakeholder.notes || undefined,
+        deals: [],
+        isFavorite: false
+      });
 
-    setStakeholders([stakeholder, ...stakeholders]);
-    setShowCreateModal(false);
-    setNewStakeholder({
-      name: "", title: "", company: "", type: "investor",
-      email: "", phone: "", linkedin: "", website: "", location: "", notes: ""
-    });
-    toast.success("Stakeholder added to directory");
+      setShowCreateModal(false);
+      setNewStakeholder({
+        name: "", title: "", company: "", type: "investor",
+        email: "", phone: "", linkedin: "", website: "", location: "", notes: ""
+      });
+      toast.success("Stakeholder added to directory");
+    } catch (error) {
+      toast.error("Failed to add stakeholder");
+    }
   };
 
-  const toggleFavorite = (id: string) => {
-    setStakeholders(stakeholders.map(s =>
-      s.id === id ? { ...s, isFavorite: !s.isFavorite } : s
-    ));
+  const toggleFavorite = async (id: string) => {
+    if (id.startsWith('inv-')) return;
+    
+    const stakeholder = stakeholders.find(s => s.id === id);
+    if (!stakeholder) return;
+    
+    try {
+      await updateStakeholderMutation.mutateAsync({
+        id,
+        updates: { isFavorite: !stakeholder.isFavorite }
+      });
+    } catch (error) {
+      toast.error("Failed to update favorite");
+    }
   };
 
-  const deleteStakeholder = (id: string) => {
-    setStakeholders(stakeholders.filter(s => s.id !== id));
-    toast.success("Stakeholder removed");
+  const deleteStakeholder = async (id: string) => {
+    if (id.startsWith('inv-')) return;
+    
+    try {
+      await deleteStakeholderMutation.mutateAsync(id);
+      toast.success("Stakeholder removed");
+    } catch (error) {
+      toast.error("Failed to remove stakeholder");
+    }
   };
 
   const getTypeCounts = () => {
