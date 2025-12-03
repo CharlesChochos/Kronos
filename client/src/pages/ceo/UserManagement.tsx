@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Layout } from "@/components/layout/Layout";
+import { useCurrentUser } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -85,6 +87,7 @@ const actionLabels: Record<string, string> = {
 };
 
 export default function UserManagement() {
+  const { data: currentUser } = useCurrentUser();
   const queryClient = useQueryClient();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
@@ -235,11 +238,12 @@ export default function UserManagement() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-display font-bold tracking-tight">User Management</h1>
-          <p className="text-muted-foreground mt-1">
+    <Layout role="CEO" pageTitle="User Management" userName={currentUser?.name || ""}>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-display font-bold tracking-tight">User Management</h1>
+            <p className="text-muted-foreground mt-1">
             Manage user access, roles, and review audit logs
           </p>
         </div>
@@ -706,6 +710,7 @@ export default function UserManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </Layout>
   );
 }

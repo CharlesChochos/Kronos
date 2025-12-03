@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Layout } from "@/components/layout/Layout";
+import { useCurrentUser } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -138,6 +140,7 @@ const categoryColors: Record<string, string> = {
 };
 
 export default function AuditLogs() {
+  const { data: currentUser } = useCurrentUser();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterEntityType, setFilterEntityType] = useState<string>("all");
   const [filterUser, setFilterUser] = useState<string>("all");
@@ -241,14 +244,15 @@ export default function AuditLogs() {
   };
 
   return (
-    <div className="space-y-6" data-testid="audit-logs-page">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-display font-bold">Audit Logs</h1>
-          <p className="text-muted-foreground mt-1">
-            Track all user activities and system events for compliance
-          </p>
-        </div>
+    <Layout role="CEO" pageTitle="Audit Logs" userName={currentUser?.name || ""}>
+      <div className="space-y-6" data-testid="audit-logs-page">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-display font-bold">Audit Logs</h1>
+            <p className="text-muted-foreground mt-1">
+              Track all user activities and system events for compliance
+            </p>
+          </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -567,6 +571,7 @@ export default function AuditLogs() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </Layout>
   );
 }

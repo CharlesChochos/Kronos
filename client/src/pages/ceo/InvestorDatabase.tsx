@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Layout } from "@/components/layout/Layout";
+import { useCurrentUser } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,6 +99,7 @@ const emptyInvestor = {
 };
 
 export default function InvestorDatabase() {
+  const { data: currentUser } = useCurrentUser();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -390,14 +393,15 @@ export default function InvestorDatabase() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-display font-bold tracking-tight">Investor Database</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your investor contacts and relationships
-          </p>
-        </div>
+    <Layout role="CEO" pageTitle="Investor Database" userName={currentUser?.name || ""}>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-display font-bold tracking-tight">Investor Database</h1>
+            <p className="text-muted-foreground mt-1">
+              Manage your investor contacts and relationships
+            </p>
+          </div>
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogTrigger asChild>
             <Button className="gap-2" data-testid="button-add-investor">
@@ -682,6 +686,7 @@ export default function InvestorDatabase() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </Layout>
   );
 }
