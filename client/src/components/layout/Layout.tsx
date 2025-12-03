@@ -680,260 +680,8 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
         </main>
       </div>
 
-      {/* Profile Sheet */}
-      <Sheet open={showProfileSheet} onOpenChange={(open) => {
-        setShowProfileSheet(open);
-        if (open) {
-          setProfileForm({
-            name: currentUser?.name || '',
-            email: currentUser?.email || '',
-            phone: (currentUser as any)?.phone || '',
-            role: currentUser?.role || '',
-            jobTitle: (currentUser as any)?.jobTitle || '',
-          });
-        } else {
-          setIsEditingProfile(false);
-          setIsChangingPassword(false);
-          setProfileForm({ name: '', email: '', phone: '', role: '', jobTitle: '' });
-          setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        }
-      }}>
-        <SheetContent className="bg-card border-border">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <User className="w-5 h-5 text-primary" />
-              My Profile
-            </SheetTitle>
-            <SheetDescription>View and manage your profile information.</SheetDescription>
-          </SheetHeader>
-          
-          <ScrollArea className="h-[calc(100vh-120px)] mt-4">
-            <div className="space-y-6 pr-4">
-              {/* Profile Header */}
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-white text-xl font-bold">
-                  {currentUser?.name?.split(' ').map(n => n[0]).join('') || 'U'}
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold">{currentUser?.name}</h3>
-                  <p className="text-muted-foreground">
-                    {currentUser?.role === 'Custom' && (currentUser as any)?.jobTitle 
-                      ? (currentUser as any).jobTitle 
-                      : currentUser?.role}
-                  </p>
-                </div>
-                {!isEditingProfile && !isChangingPassword && (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={handleStartEditProfile}
-                    data-testid="button-edit-profile"
-                  >
-                    <Pencil className="w-4 h-4 mr-1" />
-                    Edit
-                  </Button>
-                )}
-              </div>
-              
-              <Separator />
-              
-              {/* Edit Profile Form */}
-              {isEditingProfile ? (
-                <div className="space-y-4">
-                  <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Edit Contact Information</h4>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-name">Full Name</Label>
-                    <Input
-                      id="edit-name"
-                      value={profileForm.name}
-                      onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                      placeholder="Your full name"
-                      data-testid="input-edit-name"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-email">Email Address</Label>
-                    <Input
-                      id="edit-email"
-                      type="email"
-                      value={profileForm.email}
-                      onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                      placeholder="Your email address"
-                      data-testid="input-edit-email"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-phone">Phone Number</Label>
-                    <Input
-                      id="edit-phone"
-                      type="tel"
-                      value={profileForm.phone}
-                      onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                      placeholder="Your phone number (optional)"
-                      data-testid="input-edit-phone"
-                    />
-                  </div>
-                  
-                  <div className="flex gap-2 pt-2">
-                    <Button 
-                      variant="outline" 
-                      onClick={handleCancelEditProfile}
-                      className="flex-1"
-                      data-testid="button-cancel-edit-profile"
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      onClick={handleSaveProfile}
-                      disabled={updateUserProfile.isPending}
-                      className="flex-1"
-                      data-testid="button-save-profile"
-                    >
-                      {updateUserProfile.isPending ? "Saving..." : "Save Changes"}
-                    </Button>
-                  </div>
-                </div>
-              ) : isChangingPassword ? (
-                <div className="space-y-4">
-                  <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Change Password</h4>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="current-password">Current Password</Label>
-                    <Input
-                      id="current-password"
-                      type="password"
-                      value={passwordForm.currentPassword}
-                      onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                      placeholder="Enter current password"
-                      data-testid="input-current-password"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="new-password">New Password</Label>
-                    <Input
-                      id="new-password"
-                      type="password"
-                      value={passwordForm.newPassword}
-                      onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                      placeholder="Enter new password (min 6 characters)"
-                      data-testid="input-new-password"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm-password">Confirm New Password</Label>
-                    <Input
-                      id="confirm-password"
-                      type="password"
-                      value={passwordForm.confirmPassword}
-                      onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                      placeholder="Confirm new password"
-                      data-testid="input-confirm-password"
-                    />
-                  </div>
-                  
-                  <div className="flex gap-2 pt-2">
-                    <Button 
-                      variant="outline" 
-                      onClick={handleCancelChangePassword}
-                      className="flex-1"
-                      data-testid="button-cancel-password"
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      onClick={handleChangePassword}
-                      disabled={changePassword.isPending}
-                      className="flex-1"
-                      data-testid="button-save-password"
-                    >
-                      {changePassword.isPending ? "Changing..." : "Change Password"}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* Contact Information */}
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Contact Information</h4>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <Mail className="w-4 h-4 text-muted-foreground" />
-                        <div>
-                          <Label className="text-muted-foreground text-xs">Email</Label>
-                          <p className="text-sm">{currentUser?.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Phone className="w-4 h-4 text-muted-foreground" />
-                        <div>
-                          <Label className="text-muted-foreground text-xs">Phone</Label>
-                          <p className="text-sm">{(currentUser as any)?.phone || 'Not set'}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <Separator />
-                  
-                  {/* Performance Stats */}
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Performance</h4>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="text-center p-3 bg-secondary/30 rounded-lg">
-                        <p className="text-2xl font-bold text-primary">{currentUser?.score || 0}</p>
-                        <p className="text-xs text-muted-foreground">Score</p>
-                      </div>
-                      <div className="text-center p-3 bg-secondary/30 rounded-lg">
-                        <p className="text-2xl font-bold">{currentUser?.activeDeals || 0}</p>
-                        <p className="text-xs text-muted-foreground">Active Deals</p>
-                      </div>
-                      <div className="text-center p-3 bg-secondary/30 rounded-lg">
-                        <p className="text-2xl font-bold text-green-500">{currentUser?.completedTasks || 0}</p>
-                        <p className="text-xs text-muted-foreground">Tasks Done</p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <Separator />
-                  
-                  {/* Security */}
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Security</h4>
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start"
-                      onClick={() => setIsChangingPassword(true)}
-                      data-testid="button-change-password"
-                    >
-                      <Lock className="w-4 h-4 mr-2" />
-                      Change Password
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          </ScrollArea>
-        </SheetContent>
-      </Sheet>
-
       {/* Settings Sheet */}
-      <Sheet open={showSettingsSheet} onOpenChange={(open) => {
-        setShowSettingsSheet(open);
-        if (open && currentUser) {
-          setProfileForm({
-            name: currentUser.name || '',
-            email: currentUser.email || '',
-            phone: (currentUser as any)?.phone || '',
-            role: currentUser.role || '',
-            jobTitle: (currentUser as any)?.jobTitle || '',
-          });
-        }
-      }}>
+      <Sheet open={showSettingsSheet} onOpenChange={setShowSettingsSheet}>
         <SheetContent className="bg-card border-border w-[450px] sm:max-w-[450px]">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
@@ -943,141 +691,12 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
             <SheetDescription>Manage your account and preferences</SheetDescription>
           </SheetHeader>
           
-          <Tabs defaultValue="profile" className="mt-6">
-            <TabsList className="grid w-full grid-cols-4 bg-secondary/50">
-              <TabsTrigger value="profile" className="text-xs">Profile</TabsTrigger>
+          <Tabs defaultValue="notifications" className="mt-6">
+            <TabsList className="grid w-full grid-cols-3 bg-secondary/50">
               <TabsTrigger value="notifications" className="text-xs">Alerts</TabsTrigger>
               <TabsTrigger value="display" className="text-xs">Display</TabsTrigger>
               <TabsTrigger value="account" className="text-xs">Account</TabsTrigger>
             </TabsList>
-            
-            {/* Profile Tab */}
-            <TabsContent value="profile" className="mt-4 space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="relative group">
-                  {(currentUser as any)?.avatar ? (
-                    <img 
-                      src={(currentUser as any).avatar} 
-                      alt="Profile" 
-                      className="w-16 h-16 rounded-full object-cover border-2 border-primary/30"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-xl font-bold text-primary">
-                      {currentUser?.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'U'}
-                    </div>
-                  )}
-                  <button 
-                    onClick={() => photoInputRef.current?.click()}
-                    className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Camera className="w-5 h-5 text-white" />
-                  </button>
-                </div>
-                <div>
-                  <input
-                    ref={photoInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoUpload}
-                    className="hidden"
-                    data-testid="input-photo-upload"
-                  />
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => photoInputRef.current?.click()}
-                      disabled={isUploadingPhoto}
-                      data-testid="button-upload-photo"
-                    >
-                      {isUploadingPhoto ? "Uploading..." : "Upload Photo"}
-                    </Button>
-                    {(currentUser as any)?.avatar && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={handleRemovePhoto}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                        data-testid="button-remove-photo"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">JPG, PNG. Max 2MB</p>
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Full Name</Label>
-                  <Input 
-                    value={profileForm.name} 
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Your full name" 
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Email</Label>
-                  <Input 
-                    type="email" 
-                    value={profileForm.email} 
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Role</Label>
-                  {currentUser?.role === 'CEO' ? (
-                    <Input value="CEO" disabled className="bg-muted/50" />
-                  ) : (
-                    <Select 
-                      value={profileForm.role} 
-                      onValueChange={(value) => setProfileForm(prev => ({ ...prev, role: value }))}
-                    >
-                      <SelectTrigger data-testid="select-role">
-                        <SelectValue placeholder="Select role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Junior Analyst">Junior Analyst</SelectItem>
-                        <SelectItem value="Analyst">Analyst</SelectItem>
-                        <SelectItem value="Associate">Associate</SelectItem>
-                        <SelectItem value="Senior Associate">Senior Associate</SelectItem>
-                        <SelectItem value="VP">VP</SelectItem>
-                        <SelectItem value="Director">Director</SelectItem>
-                        <SelectItem value="Managing Director">Managing Director</SelectItem>
-                        <SelectItem value="Custom">Custom Title</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {currentUser?.role === 'CEO' ? 'CEO role cannot be changed' : 'Select your role in the organization'}
-                  </p>
-                </div>
-                {profileForm.role === 'Custom' && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Job Title</Label>
-                    <Input 
-                      value={profileForm.jobTitle || ''} 
-                      onChange={(e) => setProfileForm(prev => ({ ...prev, jobTitle: e.target.value }))}
-                      placeholder="Enter your job title (e.g., AI Engineer, HR Manager)"
-                      data-testid="input-job-title"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      This title will be displayed instead of a standard role
-                    </p>
-                  </div>
-                )}
-              </div>
-              
-              <Button 
-                className="w-full" 
-                size="sm" 
-                onClick={handleSaveProfile}
-                disabled={updateUserProfile.isPending}
-              >
-                {updateUserProfile.isPending ? "Saving..." : "Save Profile"}
-              </Button>
-            </TabsContent>
             
             {/* Notifications Tab */}
             <TabsContent value="notifications" className="mt-4 space-y-4">
@@ -1201,37 +820,100 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
             
             {/* Account Tab */}
             <TabsContent value="account" className="mt-4 space-y-4">
-              <div className="space-y-4">
-                <h4 className="text-sm font-medium">Security</h4>
-                <Button variant="outline" className="w-full justify-start" onClick={() => setIsChangingPassword(true)}>
-                  <Lock className="w-4 h-4 mr-2" /> Change Password
-                </Button>
-                <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
-                  <div>
-                    <Label className="text-sm">Two-Factor Authentication</Label>
-                    <p className="text-xs text-muted-foreground">Add an extra layer of security</p>
+              {isChangingPassword ? (
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium">Change Password</h4>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="current-password">Current Password</Label>
+                    <Input
+                      id="current-password"
+                      type="password"
+                      value={passwordForm.currentPassword}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                      placeholder="Enter current password"
+                      data-testid="input-current-password"
+                    />
                   </div>
-                  <Switch 
-                    checked={settings.twoFactorAuth} 
-                    onCheckedChange={(checked) => updateSetting('twoFactorAuth', checked)} 
-                  />
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">New Password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                      placeholder="Enter new password (min 6 characters)"
+                      data-testid="input-new-password"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">Confirm New Password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                      placeholder="Confirm new password"
+                      data-testid="input-confirm-password"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={handleCancelChangePassword}
+                      className="flex-1"
+                      data-testid="button-cancel-password"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleChangePassword}
+                      disabled={changePassword.isPending}
+                      className="flex-1"
+                      data-testid="button-save-password"
+                    >
+                      {changePassword.isPending ? "Changing..." : "Change Password"}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              
-              <Separator />
-              
-              <div className="space-y-4">
-                <h4 className="text-sm font-medium text-red-400">Danger Zone</h4>
-                <Button variant="outline" className="w-full justify-start text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/10">
-                  Deactivate Account
-                </Button>
-                <Button variant="outline" className="w-full justify-start text-red-500 border-red-500/30 hover:bg-red-500/10">
-                  Delete Account
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  Deleting your account is permanent and cannot be undone. Contact support if you need assistance.
-                </p>
-              </div>
+              ) : (
+                <>
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium">Security</h4>
+                    <Button variant="outline" className="w-full justify-start" onClick={() => setIsChangingPassword(true)}>
+                      <Lock className="w-4 h-4 mr-2" /> Change Password
+                    </Button>
+                    <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                      <div>
+                        <Label className="text-sm">Two-Factor Authentication</Label>
+                        <p className="text-xs text-muted-foreground">Add an extra layer of security</p>
+                      </div>
+                      <Switch 
+                        checked={settings.twoFactorAuth} 
+                        onCheckedChange={(checked) => updateSetting('twoFactorAuth', checked)} 
+                      />
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium text-red-400">Danger Zone</h4>
+                    <Button variant="outline" className="w-full justify-start text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/10">
+                      Deactivate Account
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start text-red-500 border-red-500/30 hover:bg-red-500/10">
+                      Delete Account
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Deleting your account is permanent and cannot be undone. Contact support if you need assistance.
+                    </p>
+                  </div>
+                </>
+              )}
             </TabsContent>
           </Tabs>
         </SheetContent>
