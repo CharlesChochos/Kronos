@@ -215,3 +215,32 @@ Preferred communication style: Simple, everyday language.
 - `POST /api/documents` - Upload new document
 - `PATCH /api/documents/:id` - Update document metadata
 - `DELETE /api/documents/:id` - Delete document
+
+## Audit Logging
+
+**Overview**
+- Platform-wide audit logging system for tracking all important user actions and system events
+- Accessible via Audit Logs page in CEO sidebar under Administration section
+- Logs authentication events, deal/task CRUD, document operations, and user management actions
+
+**Database Schema**
+- **audit_logs_table**: Stores audit entries with userId, userName, action, entityType, entityId, entityName, details (jsonb), ipAddress, userAgent, and createdAt timestamp
+
+**Tracked Events**
+- Authentication: login, login_2fa, 2fa_enabled, 2fa_disabled, user_signup
+- User Management: user_approved, user_rejected, user_suspended, user_reactivated, role_changed
+- Deals: deal_created, deal_updated, deal_deleted
+- Tasks: task_created, task_updated, task_completed, task_deleted
+- Documents: document_created, document_updated, document_archived
+- Investors: investor_created, investor_updated, investor_deactivated
+
+**Features**
+- Filterable by user, entity type, and search query
+- Summary statistics (total events, active users, auth events, today's events)
+- Detailed view for individual log entries showing all captured data
+- CSV export with proper escaping for compliance reporting
+- CEO-only access for security
+
+**API Endpoints**
+- `GET /api/audit-logs` - List all audit logs (CEO only)
+- `GET /api/audit-logs/:entityType/:entityId` - Get audit logs for specific entity

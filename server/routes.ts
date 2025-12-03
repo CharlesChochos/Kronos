@@ -673,6 +673,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: fromError(result.error).toString() });
       }
       const deal = await storage.createDeal(result.data);
+      await createAuditLog(req, 'deal_created', 'deal', deal.id, deal.name, { value: deal.value, client: deal.client, sector: deal.sector, stage: deal.stage });
       res.json(deal);
     } catch (error) {
       res.status(500).json({ error: "Failed to create deal" });
@@ -712,6 +713,16 @@ export async function registerRoutes(
       if (!updatedDeal) {
         return res.status(404).json({ error: "Deal not found" });
       }
+      const changes: Record<string, any> = {};
+      if (result.data.stage && result.data.stage !== deal.stage) changes.stage = { from: deal.stage, to: result.data.stage };
+      if (result.data.status && result.data.status !== deal.status) changes.status = { from: deal.status, to: result.data.status };
+      if (result.data.progress !== undefined && result.data.progress !== deal.progress) changes.progress = { from: deal.progress, to: result.data.progress };
+      if (result.data.value !== undefined && result.data.value !== deal.value) changes.value = { from: deal.value, to: result.data.value };
+      if (result.data.client && result.data.client !== deal.client) changes.client = { from: deal.client, to: result.data.client };
+      if (result.data.lead && result.data.lead !== deal.lead) changes.lead = { from: deal.lead, to: result.data.lead };
+      if (Object.keys(changes).length > 0) {
+        await createAuditLog(req, 'deal_updated', 'deal', deal.id, deal.name, changes);
+      }
       res.json(updatedDeal);
     } catch (error) {
       res.status(500).json({ error: "Failed to update deal" });
@@ -721,7 +732,11 @@ export async function registerRoutes(
   // Delete deal (CEO only)
   app.delete("/api/deals/:id", requireCEO, async (req, res) => {
     try {
+      const deal = await storage.getDeal(req.params.id);
       await storage.deleteDeal(req.params.id);
+      if (deal) {
+        await createAuditLog(req, 'deal_deleted', 'deal', req.params.id, deal.name, { client: deal.client, value: deal.value });
+      }
       res.json({ message: "Deal deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete deal" });
@@ -767,6 +782,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: fromError(result.error).toString() });
       }
       const task = await storage.createTask(result.data);
+      await createAuditLog(req, 'task_created', 'task', task.id, task.title, { priority: task.priority, assignedTo: task.assignedTo, dueDate: task.dueDate });
       res.json(task);
     } catch (error) {
       res.status(500).json({ error: "Failed to create task" });
@@ -803,6 +819,23 @@ export async function registerRoutes(
       }
       
       const task = await storage.updateTask(req.params.id, result.data);
+      const changes: Record<string, any> = {};
+      if (result.data.status && result.data.status !== existingTask.status) {
+        changes.status = { from: existingTask.status, to: result.data.status };
+      }
+      if (result.data.priority && result.data.priority !== existingTask.priority) {
+        changes.priority = { from: existingTask.priority, to: result.data.priority };
+      }
+      if (result.data.assignedTo && result.data.assignedTo !== existingTask.assignedTo) {
+        changes.assignedTo = { from: existingTask.assignedTo, to: result.data.assignedTo };
+      }
+      if (Object.keys(changes).length > 0) {
+        if (changes.status?.to === 'Completed') {
+          await createAuditLog(req, 'task_completed', 'task', existingTask.id, existingTask.title, changes);
+        } else {
+          await createAuditLog(req, 'task_updated', 'task', existingTask.id, existingTask.title, changes);
+        }
+      }
       res.json(task);
     } catch (error) {
       res.status(500).json({ error: "Failed to update task" });
@@ -812,7 +845,11 @@ export async function registerRoutes(
   // Delete task (CEO only)
   app.delete("/api/tasks/:id", requireCEO, async (req, res) => {
     try {
+      const task = await storage.getTask(req.params.id);
       await storage.deleteTask(req.params.id);
+      if (task) {
+        await createAuditLog(req, 'task_deleted', 'task', req.params.id, task.title, { assignedTo: task.assignedTo });
+      }
       res.json({ message: "Task deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete task" });
@@ -3766,7 +3803,7 @@ Guidelines:
         ...req.body,
         uploadedBy: user.id,
       });
-      await createAuditLog(req, 'document_created', 'document', doc.id, doc.name, { category: doc.category, dealId: doc.dealId });
+      await createAuditLog(req, 'document_created', 'document', doc.id, doc.title, { category: doc.category, dealId: doc.dealId });
       res.status(201).json(doc);
     } catch (error) {
       console.error('Create document error:', error);
@@ -3782,7 +3819,7 @@ Guidelines:
         return res.status(404).json({ error: "Document not found" });
       }
       const updated = await storage.updateDocument(req.params.id, req.body);
-      await createAuditLog(req, 'document_updated', 'document', req.params.id, doc.name, req.body);
+      await createAuditLog(req, 'document_updated', 'document', req.params.id, doc.title, req.body);
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update document" });
@@ -3797,7 +3834,7 @@ Guidelines:
         return res.status(404).json({ error: "Document not found" });
       }
       await storage.deleteDocument(req.params.id);
-      await createAuditLog(req, 'document_archived', 'document', req.params.id, doc.name);
+      await createAuditLog(req, 'document_archived', 'document', req.params.id, doc.title);
       res.json({ message: "Document archived" });
     } catch (error) {
       res.status(500).json({ error: "Failed to archive document" });
@@ -3834,7 +3871,7 @@ Guidelines:
   app.post("/api/db-investors", generalLimiter, requireCEO, async (req, res) => {
     try {
       const investor = await storage.createInvestorInTable(req.body);
-      await createAuditLog(req, 'investor_created', 'investor', investor.id, investor.name, { firm: investor.firm, type: investor.investorType });
+      await createAuditLog(req, 'investor_created', 'investor', investor.id, investor.name, { firm: investor.firm, type: investor.type });
       res.status(201).json(investor);
     } catch (error) {
       console.error('Create investor error:', error);

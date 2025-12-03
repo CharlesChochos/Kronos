@@ -21,7 +21,8 @@ import {
   Shield,
   Database,
   FileStack,
-  FolderOpen
+  FolderOpen,
+  ClipboardList
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLogout, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
@@ -175,6 +176,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
       category: "Administration",
       links: [
         { icon: Shield, label: "User Management", path: "/ceo/admin" },
+        { icon: ClipboardList, label: "Audit Logs", path: "/ceo/audit-logs" },
         { icon: FileStack, label: "Deal Templates", path: "/ceo/deal-templates" },
         { icon: FolderOpen, label: "Document Library", path: "/ceo/document-library" },
       ]

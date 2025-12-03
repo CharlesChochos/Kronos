@@ -29,6 +29,7 @@ import UserManagement from "@/pages/ceo/UserManagement";
 import InvestorDatabase from "@/pages/ceo/InvestorDatabase";
 import DealTemplates from "@/pages/shared/DealTemplates";
 import DocumentManagement from "@/pages/shared/DocumentManagement";
+import AuditLogs from "@/pages/ceo/AuditLogs";
 import { useEffect } from "react";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 
@@ -153,6 +154,9 @@ function Router() {
       </Route>
       <Route path="/ceo/investor-database">
         {() => <ProtectedRoute component={InvestorDatabase} />}
+      </Route>
+      <Route path="/ceo/audit-logs">
+        {() => <ProtectedRoute component={AuditLogs} />}
       </Route>
       <Route path="/ceo/deal-templates">
         {() => <ProtectedRoute component={CeoDealTemplates} />}
