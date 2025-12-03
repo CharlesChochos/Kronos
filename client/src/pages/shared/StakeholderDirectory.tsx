@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,87 @@ type Stakeholder = {
   createdAt: string;
 };
 
+const DEFAULT_CUSTOM_STAKEHOLDERS: Stakeholder[] = [
+  {
+    id: "2",
+    name: "Jennifer Wu",
+    title: "Partner",
+    company: "Kirkland & Ellis",
+    type: "legal",
+    email: "jwu@kirkland.com",
+    phone: "+1 212-555-0456",
+    linkedin: "https://linkedin.com/in/jenniferwu",
+    location: "New York, NY",
+    notes: "Specializes in M&A transactions. Excellent track record on cross-border deals.",
+    deals: ["deal-1"],
+    isFavorite: true,
+    lastContact: "2024-12-01T14:30:00Z",
+    createdAt: "2024-03-20T00:00:00Z"
+  },
+  {
+    id: "3",
+    name: "David Thompson",
+    title: "Senior Advisor",
+    company: "McKinsey & Company",
+    type: "consultant",
+    email: "david_thompson@mckinsey.com",
+    phone: "+1 415-555-0789",
+    location: "San Francisco, CA",
+    notes: "Healthcare sector specialist. Previously led operational DD for multiple portfolio companies.",
+    deals: ["deal-3"],
+    isFavorite: false,
+    lastContact: "2024-11-15T09:00:00Z",
+    createdAt: "2024-08-10T00:00:00Z"
+  },
+  {
+    id: "4",
+    name: "Sarah Goldstein",
+    title: "Managing Director",
+    company: "Goldman Sachs",
+    type: "banker",
+    email: "sarah.goldstein@gs.com",
+    phone: "+1 212-555-0321",
+    linkedin: "https://linkedin.com/in/sarahgoldstein",
+    website: "https://goldmansachs.com",
+    location: "New York, NY",
+    notes: "Technology M&A coverage. Has done multiple deals in our sector.",
+    deals: ["deal-2", "deal-3"],
+    isFavorite: false,
+    lastContact: "2024-11-20T16:00:00Z",
+    createdAt: "2024-05-01T00:00:00Z"
+  },
+  {
+    id: "5",
+    name: "Michael Chen",
+    title: "CEO",
+    company: "TechCorp Industries",
+    type: "client",
+    email: "mchen@techcorp.com",
+    phone: "+1 408-555-0654",
+    linkedin: "https://linkedin.com/in/michaelchen",
+    location: "San Jose, CA",
+    notes: "Primary contact for TechCorp acquisition. Very hands-on and detail-oriented.",
+    deals: ["deal-1"],
+    isFavorite: true,
+    lastContact: "2024-12-02T11:00:00Z",
+    createdAt: "2024-09-01T00:00:00Z"
+  },
+  {
+    id: "6",
+    name: "Lisa Park",
+    title: "Board Advisor",
+    company: "Independent",
+    type: "advisor",
+    email: "lisa@lisapark.com",
+    linkedin: "https://linkedin.com/in/lisapark",
+    location: "Boston, MA",
+    notes: "Former CFO of multiple tech companies. Great for financial diligence guidance.",
+    deals: [],
+    isFavorite: false,
+    createdAt: "2024-07-15T00:00:00Z"
+  }
+];
+
 export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee' }) {
   const { data: deals = [] } = useDeals();
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -61,7 +142,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
 
-  const investorStakeholders: Stakeholder[] = SHARED_INVESTORS.map((inv) => ({
+  const investorStakeholders: Stakeholder[] = useMemo(() => SHARED_INVESTORS.map((inv) => ({
     id: `inv-${inv.id}`,
     name: inv.name,
     title: inv.type,
@@ -75,89 +156,37 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     deals: [],
     isFavorite: inv.matchScore >= 90,
     createdAt: "2024-01-01T00:00:00Z"
-  }));
+  })), []);
 
-  const [stakeholders, setStakeholders] = useState<Stakeholder[]>([
-    ...investorStakeholders,
-    {
-      id: "2",
-      name: "Jennifer Wu",
-      title: "Partner",
-      company: "Kirkland & Ellis",
-      type: "legal",
-      email: "jwu@kirkland.com",
-      phone: "+1 212-555-0456",
-      linkedin: "https://linkedin.com/in/jenniferwu",
-      location: "New York, NY",
-      notes: "Specializes in M&A transactions. Excellent track record on cross-border deals.",
-      deals: ["deal-1"],
-      isFavorite: true,
-      lastContact: "2024-12-01T14:30:00Z",
-      createdAt: "2024-03-20T00:00:00Z"
-    },
-    {
-      id: "3",
-      name: "David Thompson",
-      title: "Senior Advisor",
-      company: "McKinsey & Company",
-      type: "consultant",
-      email: "david_thompson@mckinsey.com",
-      phone: "+1 415-555-0789",
-      location: "San Francisco, CA",
-      notes: "Healthcare sector specialist. Previously led operational DD for multiple portfolio companies.",
-      deals: ["deal-3"],
-      isFavorite: false,
-      lastContact: "2024-11-15T09:00:00Z",
-      createdAt: "2024-08-10T00:00:00Z"
-    },
-    {
-      id: "4",
-      name: "Sarah Goldstein",
-      title: "Managing Director",
-      company: "Goldman Sachs",
-      type: "banker",
-      email: "sarah.goldstein@gs.com",
-      phone: "+1 212-555-0321",
-      linkedin: "https://linkedin.com/in/sarahgoldstein",
-      website: "https://goldmansachs.com",
-      location: "New York, NY",
-      notes: "Technology M&A coverage. Has done multiple deals in our sector.",
-      deals: ["deal-2", "deal-3"],
-      isFavorite: false,
-      lastContact: "2024-11-20T16:00:00Z",
-      createdAt: "2024-05-01T00:00:00Z"
-    },
-    {
-      id: "5",
-      name: "Michael Chen",
-      title: "CEO",
-      company: "TechCorp Industries",
-      type: "client",
-      email: "mchen@techcorp.com",
-      phone: "+1 408-555-0654",
-      linkedin: "https://linkedin.com/in/michaelchen",
-      location: "San Jose, CA",
-      notes: "Primary contact for TechCorp acquisition. Very hands-on and detail-oriented.",
-      deals: ["deal-1"],
-      isFavorite: true,
-      lastContact: "2024-12-02T11:00:00Z",
-      createdAt: "2024-09-01T00:00:00Z"
-    },
-    {
-      id: "6",
-      name: "Lisa Park",
-      title: "Board Advisor",
-      company: "Independent",
-      type: "advisor",
-      email: "lisa@lisapark.com",
-      linkedin: "https://linkedin.com/in/lisapark",
-      location: "Boston, MA",
-      notes: "Former CFO of multiple tech companies. Great for financial diligence guidance.",
-      deals: [],
-      isFavorite: false,
-      createdAt: "2024-07-15T00:00:00Z"
+  const [customStakeholders, setCustomStakeholders] = useState<Stakeholder[]>(() => {
+    const saved = localStorage.getItem('osreaper_stakeholders');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return DEFAULT_CUSTOM_STAKEHOLDERS;
+      }
     }
-  ]);
+    return DEFAULT_CUSTOM_STAKEHOLDERS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('osreaper_stakeholders', JSON.stringify(customStakeholders));
+  }, [customStakeholders]);
+
+  const stakeholders = useMemo(() => [...investorStakeholders, ...customStakeholders], [investorStakeholders, customStakeholders]);
+  
+  const setStakeholders = (newStakeholders: Stakeholder[] | ((prev: Stakeholder[]) => Stakeholder[])) => {
+    if (typeof newStakeholders === 'function') {
+      setCustomStakeholders((prev) => {
+        const allStakeholders = [...investorStakeholders, ...prev];
+        const updated = newStakeholders(allStakeholders);
+        return updated.filter(s => !s.id.startsWith('inv-'));
+      });
+    } else {
+      setCustomStakeholders(newStakeholders.filter(s => !s.id.startsWith('inv-')));
+    }
+  };
 
   const [newStakeholder, setNewStakeholder] = useState({
     name: "",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,6 +74,117 @@ type Poll = {
   createdAt: string;
 };
 
+const DEFAULT_ANNOUNCEMENTS: Announcement[] = [
+  {
+    id: "1",
+    title: "TechCorp Acquisition Successfully Closed!",
+    content: "Thrilled to announce the successful closing of the TechCorp acquisition deal worth $150M. This marks our largest technology sector deal this year. Congratulations to the entire deal team for their outstanding work!",
+    type: "deal-closed",
+    dealId: "deal-1",
+    dealName: "TechCorp Acquisition",
+    authorId: "user-1",
+    authorName: "Josh Anderson",
+    isPinned: true,
+    reactions: [
+      { emoji: "🎉", count: 12, userIds: ["u1", "u2", "u3"] },
+      { emoji: "👏", count: 8, userIds: ["u4", "u5"] },
+      { emoji: "🚀", count: 5, userIds: ["u6", "u7"] }
+    ],
+    comments: [
+      { id: "c1", authorName: "Sarah Chen", content: "Amazing work team! This was a challenging deal.", createdAt: "2024-12-01T10:30:00Z" },
+      { id: "c2", authorName: "Michael Brown", content: "Proud to be part of this team!", createdAt: "2024-12-01T11:15:00Z" }
+    ],
+    createdAt: "2024-12-01T09:00:00Z"
+  },
+  {
+    id: "2",
+    title: "FinServ Deal Reaches Due Diligence Phase",
+    content: "The FinServ merger has officially entered the due diligence phase. The deal team should prepare for intensive document review over the next 6 weeks. DD room access has been configured.",
+    type: "milestone",
+    dealId: "deal-2",
+    dealName: "FinServ Merger",
+    authorId: "user-2",
+    authorName: "Sarah Chen",
+    isPinned: false,
+    reactions: [
+      { emoji: "💪", count: 6, userIds: ["u1", "u2"] },
+      { emoji: "📊", count: 4, userIds: ["u3"] }
+    ],
+    comments: [],
+    createdAt: "2024-11-28T14:00:00Z"
+  },
+  {
+    id: "3",
+    title: "Welcome New Team Members!",
+    content: "Please join me in welcoming Emily Johnson and David Park to our investment banking team. Emily joins as an Analyst from Goldman Sachs, and David as an Associate from Morgan Stanley. Looking forward to great work together!",
+    type: "team-update",
+    authorId: "user-1",
+    authorName: "Josh Anderson",
+    isPinned: false,
+    reactions: [
+      { emoji: "👋", count: 15, userIds: ["u1", "u2", "u3", "u4", "u5"] },
+      { emoji: "🎊", count: 8, userIds: ["u6", "u7"] }
+    ],
+    comments: [
+      { id: "c1", authorName: "Lisa Wang", content: "Welcome to the team! Excited to work with you both.", createdAt: "2024-11-25T10:00:00Z" }
+    ],
+    createdAt: "2024-11-25T09:00:00Z"
+  },
+  {
+    id: "4",
+    title: "Q4 Deal Pipeline Record!",
+    content: "We've hit a new record for Q4 deal pipeline value - $2.3B in active deals! This is 40% higher than last year. Thank you all for your dedication and hard work. Let's keep the momentum going!",
+    type: "celebration",
+    authorId: "user-1",
+    authorName: "Josh Anderson",
+    isPinned: false,
+    reactions: [
+      { emoji: "🎉", count: 20, userIds: ["u1", "u2", "u3", "u4", "u5", "u6"] },
+      { emoji: "🏆", count: 12, userIds: ["u7", "u8", "u9"] },
+      { emoji: "💰", count: 8, userIds: ["u10"] }
+    ],
+    comments: [],
+    createdAt: "2024-11-20T16:00:00Z"
+  }
+];
+
+const getDefaultPolls = (): Poll[] => [
+  {
+    id: "1",
+    question: "Which day works best for the weekly team standup?",
+    options: [
+      { id: "o1", text: "Monday morning", votes: ["u1", "u2", "u3", "u4"] },
+      { id: "o2", text: "Tuesday morning", votes: ["u5", "u6"] },
+      { id: "o3", text: "Wednesday morning", votes: ["u7", "u8", "u9"] },
+      { id: "o4", text: "Friday afternoon", votes: ["u10"] }
+    ],
+    creatorId: "user-1",
+    creatorName: "Josh Anderson",
+    expiresAt: addDays(new Date(), 2).toISOString(),
+    isAnonymous: false,
+    allowMultiple: false,
+    status: "active",
+    createdAt: "2024-12-01T09:00:00Z"
+  },
+  {
+    id: "2",
+    question: "What type of team building activity would you prefer?",
+    options: [
+      { id: "o1", text: "Escape room", votes: ["u1", "u2", "u3", "u4", "u5"] },
+      { id: "o2", text: "Cooking class", votes: ["u6", "u7"] },
+      { id: "o3", text: "Sports event", votes: ["u8", "u9", "u10", "u11"] },
+      { id: "o4", text: "Happy hour", votes: ["u12", "u13", "u14"] }
+    ],
+    creatorId: "user-2",
+    creatorName: "Sarah Chen",
+    expiresAt: addDays(new Date(), 5).toISOString(),
+    isAnonymous: true,
+    allowMultiple: false,
+    status: "active",
+    createdAt: "2024-11-28T14:00:00Z"
+  }
+];
+
 export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }) {
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [] } = useDeals();
@@ -87,79 +198,21 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
   const [commentingOn, setCommentingOn] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
 
-  const [announcements, setAnnouncements] = useState<Announcement[]>([
-    {
-      id: "1",
-      title: "TechCorp Acquisition Successfully Closed!",
-      content: "Thrilled to announce the successful closing of the TechCorp acquisition deal worth $150M. This marks our largest technology sector deal this year. Congratulations to the entire deal team for their outstanding work!",
-      type: "deal-closed",
-      dealId: "deal-1",
-      dealName: "TechCorp Acquisition",
-      authorId: "user-1",
-      authorName: "Josh Anderson",
-      isPinned: true,
-      reactions: [
-        { emoji: "🎉", count: 12, userIds: ["u1", "u2", "u3"] },
-        { emoji: "👏", count: 8, userIds: ["u4", "u5"] },
-        { emoji: "🚀", count: 5, userIds: ["u6", "u7"] }
-      ],
-      comments: [
-        { id: "c1", authorName: "Sarah Chen", content: "Amazing work team! This was a challenging deal.", createdAt: "2024-12-01T10:30:00Z" },
-        { id: "c2", authorName: "Michael Brown", content: "Proud to be part of this team!", createdAt: "2024-12-01T11:15:00Z" }
-      ],
-      createdAt: "2024-12-01T09:00:00Z"
-    },
-    {
-      id: "2",
-      title: "FinServ Deal Reaches Due Diligence Phase",
-      content: "The FinServ merger has officially entered the due diligence phase. The deal team should prepare for intensive document review over the next 6 weeks. DD room access has been configured.",
-      type: "milestone",
-      dealId: "deal-2",
-      dealName: "FinServ Merger",
-      authorId: "user-2",
-      authorName: "Sarah Chen",
-      isPinned: false,
-      reactions: [
-        { emoji: "💪", count: 6, userIds: ["u1", "u2"] },
-        { emoji: "📊", count: 4, userIds: ["u3"] }
-      ],
-      comments: [],
-      createdAt: "2024-11-28T14:00:00Z"
-    },
-    {
-      id: "3",
-      title: "Welcome New Team Members!",
-      content: "Please join me in welcoming Emily Johnson and David Park to our investment banking team. Emily joins as an Analyst from Goldman Sachs, and David as an Associate from Morgan Stanley. Looking forward to great work together!",
-      type: "team-update",
-      authorId: "user-1",
-      authorName: "Josh Anderson",
-      isPinned: false,
-      reactions: [
-        { emoji: "👋", count: 15, userIds: ["u1", "u2", "u3", "u4", "u5"] },
-        { emoji: "🎊", count: 8, userIds: ["u6", "u7"] }
-      ],
-      comments: [
-        { id: "c1", authorName: "Lisa Wang", content: "Welcome to the team! Excited to work with you both.", createdAt: "2024-11-25T10:00:00Z" }
-      ],
-      createdAt: "2024-11-25T09:00:00Z"
-    },
-    {
-      id: "4",
-      title: "Q4 Deal Pipeline Record!",
-      content: "We've hit a new record for Q4 deal pipeline value - $2.3B in active deals! This is 40% higher than last year. Thank you all for your dedication and hard work. Let's keep the momentum going!",
-      type: "celebration",
-      authorId: "user-1",
-      authorName: "Josh Anderson",
-      isPinned: false,
-      reactions: [
-        { emoji: "🎉", count: 20, userIds: ["u1", "u2", "u3", "u4", "u5", "u6"] },
-        { emoji: "🏆", count: 12, userIds: ["u7", "u8", "u9"] },
-        { emoji: "💰", count: 8, userIds: ["u10"] }
-      ],
-      comments: [],
-      createdAt: "2024-11-20T16:00:00Z"
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
+    const saved = localStorage.getItem('osreaper_announcements');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return DEFAULT_ANNOUNCEMENTS;
+      }
     }
-  ]);
+    return DEFAULT_ANNOUNCEMENTS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('osreaper_announcements', JSON.stringify(announcements));
+  }, [announcements]);
 
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: "",
@@ -170,42 +223,21 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
     notifyTeam: true
   });
 
-  const [polls, setPolls] = useState<Poll[]>([
-    {
-      id: "1",
-      question: "Which day works best for the weekly team standup?",
-      options: [
-        { id: "o1", text: "Monday morning", votes: ["u1", "u2", "u3", "u4"] },
-        { id: "o2", text: "Tuesday morning", votes: ["u5", "u6"] },
-        { id: "o3", text: "Wednesday morning", votes: ["u7", "u8", "u9"] },
-        { id: "o4", text: "Friday afternoon", votes: ["u10"] }
-      ],
-      creatorId: "user-1",
-      creatorName: "Josh Anderson",
-      expiresAt: addDays(new Date(), 2).toISOString(),
-      isAnonymous: false,
-      allowMultiple: false,
-      status: "active",
-      createdAt: "2024-12-01T09:00:00Z"
-    },
-    {
-      id: "2",
-      question: "What type of team building activity would you prefer?",
-      options: [
-        { id: "o1", text: "Escape room", votes: ["u1", "u2", "u3", "u4", "u5"] },
-        { id: "o2", text: "Cooking class", votes: ["u6", "u7"] },
-        { id: "o3", text: "Sports event", votes: ["u8", "u9", "u10", "u11"] },
-        { id: "o4", text: "Happy hour", votes: ["u12", "u13", "u14"] }
-      ],
-      creatorId: "user-2",
-      creatorName: "Sarah Chen",
-      expiresAt: addDays(new Date(), 5).toISOString(),
-      isAnonymous: true,
-      allowMultiple: false,
-      status: "active",
-      createdAt: "2024-11-28T14:00:00Z"
+  const [polls, setPolls] = useState<Poll[]>(() => {
+    const saved = localStorage.getItem('osreaper_polls');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return getDefaultPolls();
+      }
     }
-  ]);
+    return getDefaultPolls();
+  });
+
+  useEffect(() => {
+    localStorage.setItem('osreaper_polls', JSON.stringify(polls));
+  }, [polls]);
 
   const [newPoll, setNewPoll] = useState({
     question: "",

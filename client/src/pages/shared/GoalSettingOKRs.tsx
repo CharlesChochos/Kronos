@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,64 @@ type OKR = {
   teamName?: string;
 };
 
+const DEFAULT_OKRS: OKR[] = [
+  {
+    id: "1",
+    objective: "Increase deal pipeline value by 50%",
+    description: "Grow our active deal pipeline to drive revenue growth",
+    ownerId: "user-1",
+    ownerName: "Josh Anderson",
+    quarter: "Q4",
+    year: 2024,
+    keyResults: [
+      { id: "kr1", title: "Close 5 new deals worth $10M+", targetValue: 5, currentValue: 3, unit: "deals", progress: 60 },
+      { id: "kr2", title: "Add 20 qualified prospects to pipeline", targetValue: 20, currentValue: 15, unit: "prospects", progress: 75 },
+      { id: "kr3", title: "Achieve 90% client satisfaction score", targetValue: 90, currentValue: 87, unit: "%", progress: 97 }
+    ],
+    status: "on-track",
+    overallProgress: 77,
+    createdAt: "2024-10-01T00:00:00Z",
+    type: "team",
+    teamName: "Deal Team Alpha"
+  },
+  {
+    id: "2",
+    objective: "Build world-class investment banking team",
+    description: "Attract and develop top talent for sustainable growth",
+    ownerId: "user-1",
+    ownerName: "Josh Anderson",
+    quarter: "Q4",
+    year: 2024,
+    keyResults: [
+      { id: "kr1", title: "Hire 3 senior associates", targetValue: 3, currentValue: 2, unit: "hires", progress: 67 },
+      { id: "kr2", title: "Complete training program for all analysts", targetValue: 100, currentValue: 80, unit: "%", progress: 80 },
+      { id: "kr3", title: "Reduce turnover rate to under 10%", targetValue: 10, currentValue: 12, unit: "%", progress: 83 }
+    ],
+    status: "at-risk",
+    overallProgress: 77,
+    createdAt: "2024-10-01T00:00:00Z",
+    type: "individual"
+  },
+  {
+    id: "3",
+    objective: "Improve operational efficiency",
+    description: "Streamline processes and reduce time-to-close",
+    ownerId: "user-2",
+    ownerName: "Sarah Chen",
+    quarter: "Q4",
+    year: 2024,
+    keyResults: [
+      { id: "kr1", title: "Reduce deal cycle time by 20%", targetValue: 20, currentValue: 15, unit: "% reduction", progress: 75 },
+      { id: "kr2", title: "Automate 5 manual processes", targetValue: 5, currentValue: 5, unit: "processes", progress: 100 },
+      { id: "kr3", title: "Achieve 95% on-time task completion", targetValue: 95, currentValue: 92, unit: "%", progress: 97 }
+    ],
+    status: "on-track",
+    overallProgress: 91,
+    createdAt: "2024-10-01T00:00:00Z",
+    type: "individual"
+  }
+];
+
 export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) {
   const { data: currentUser } = useCurrentUser();
   const { data: users = [] } = useUsers();
@@ -66,63 +124,21 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
   const [expandedOKRs, setExpandedOKRs] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState("all");
 
-  const [okrs, setOKRs] = useState<OKR[]>([
-    {
-      id: "1",
-      objective: "Increase deal pipeline value by 50%",
-      description: "Grow our active deal pipeline to drive revenue growth",
-      ownerId: "user-1",
-      ownerName: "Josh Anderson",
-      quarter: "Q4",
-      year: 2024,
-      keyResults: [
-        { id: "kr1", title: "Close 5 new deals worth $10M+", targetValue: 5, currentValue: 3, unit: "deals", progress: 60 },
-        { id: "kr2", title: "Add 20 qualified prospects to pipeline", targetValue: 20, currentValue: 15, unit: "prospects", progress: 75 },
-        { id: "kr3", title: "Achieve 90% client satisfaction score", targetValue: 90, currentValue: 87, unit: "%", progress: 97 }
-      ],
-      status: "on-track",
-      overallProgress: 77,
-      createdAt: "2024-10-01T00:00:00Z",
-      type: "team",
-      teamName: "Deal Team Alpha"
-    },
-    {
-      id: "2",
-      objective: "Build world-class investment banking team",
-      description: "Attract and develop top talent for sustainable growth",
-      ownerId: "user-1",
-      ownerName: "Josh Anderson",
-      quarter: "Q4",
-      year: 2024,
-      keyResults: [
-        { id: "kr1", title: "Hire 3 senior associates", targetValue: 3, currentValue: 2, unit: "hires", progress: 67 },
-        { id: "kr2", title: "Complete training program for all analysts", targetValue: 100, currentValue: 80, unit: "%", progress: 80 },
-        { id: "kr3", title: "Reduce turnover rate to under 10%", targetValue: 10, currentValue: 12, unit: "%", progress: 83 }
-      ],
-      status: "at-risk",
-      overallProgress: 77,
-      createdAt: "2024-10-01T00:00:00Z",
-      type: "individual"
-    },
-    {
-      id: "3",
-      objective: "Improve operational efficiency",
-      description: "Streamline processes and reduce time-to-close",
-      ownerId: "user-2",
-      ownerName: "Sarah Chen",
-      quarter: "Q4",
-      year: 2024,
-      keyResults: [
-        { id: "kr1", title: "Reduce deal cycle time by 20%", targetValue: 20, currentValue: 15, unit: "% reduction", progress: 75 },
-        { id: "kr2", title: "Automate 5 manual processes", targetValue: 5, currentValue: 5, unit: "processes", progress: 100 },
-        { id: "kr3", title: "Achieve 95% on-time task completion", targetValue: 95, currentValue: 92, unit: "%", progress: 97 }
-      ],
-      status: "on-track",
-      overallProgress: 91,
-      createdAt: "2024-10-01T00:00:00Z",
-      type: "individual"
+  const [okrs, setOKRs] = useState<OKR[]>(() => {
+    const saved = localStorage.getItem('osreaper_okrs');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return DEFAULT_OKRS;
+      }
     }
-  ]);
+    return DEFAULT_OKRS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('osreaper_okrs', JSON.stringify(okrs));
+  }, [okrs]);
 
   const [newOKR, setNewOKR] = useState({
     objective: "",

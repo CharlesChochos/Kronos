@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,56 +49,72 @@ type ClientPortalAccess = {
   createdAt: string;
 };
 
+const DEFAULT_CLIENT_ACCESS: ClientPortalAccess[] = [
+  {
+    id: "1",
+    clientName: "TechVentures LLC",
+    clientEmail: "john@techventures.com",
+    dealId: "deal-1",
+    dealName: "TechCorp Acquisition",
+    accessLevel: "view",
+    portalUrl: "https://portal.osreaper.com/c/abc123",
+    expiresAt: "2025-01-15",
+    isActive: true,
+    lastAccessed: "2024-12-01T14:30:00Z",
+    documentsShared: 12,
+    createdAt: "2024-11-15T10:00:00Z"
+  },
+  {
+    id: "2",
+    clientName: "Growth Partners",
+    clientEmail: "sarah@growthpartners.co",
+    dealId: "deal-2",
+    dealName: "FinServ Merger",
+    accessLevel: "upload",
+    portalUrl: "https://portal.osreaper.com/c/def456",
+    expiresAt: "2025-02-01",
+    isActive: true,
+    lastAccessed: "2024-12-02T09:15:00Z",
+    documentsShared: 8,
+    createdAt: "2024-11-20T14:00:00Z"
+  },
+  {
+    id: "3",
+    clientName: "Alpha Holdings",
+    clientEmail: "mike@alphaholdings.com",
+    dealId: "deal-3",
+    dealName: "Healthcare Divestiture",
+    accessLevel: "full",
+    portalUrl: "https://portal.osreaper.com/c/ghi789",
+    expiresAt: "2024-11-30",
+    isActive: false,
+    lastAccessed: "2024-11-28T16:45:00Z",
+    documentsShared: 24,
+    createdAt: "2024-10-01T08:00:00Z"
+  }
+];
+
 export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
   const { data: deals = [] } = useDeals();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("active");
 
-  const [clientAccess, setClientAccess] = useState<ClientPortalAccess[]>([
-    {
-      id: "1",
-      clientName: "TechVentures LLC",
-      clientEmail: "john@techventures.com",
-      dealId: "deal-1",
-      dealName: "TechCorp Acquisition",
-      accessLevel: "view",
-      portalUrl: "https://portal.osreaper.com/c/abc123",
-      expiresAt: "2025-01-15",
-      isActive: true,
-      lastAccessed: "2024-12-01T14:30:00Z",
-      documentsShared: 12,
-      createdAt: "2024-11-15T10:00:00Z"
-    },
-    {
-      id: "2",
-      clientName: "Growth Partners",
-      clientEmail: "sarah@growthpartners.co",
-      dealId: "deal-2",
-      dealName: "FinServ Merger",
-      accessLevel: "upload",
-      portalUrl: "https://portal.osreaper.com/c/def456",
-      expiresAt: "2025-02-01",
-      isActive: true,
-      lastAccessed: "2024-12-02T09:15:00Z",
-      documentsShared: 8,
-      createdAt: "2024-11-20T14:00:00Z"
-    },
-    {
-      id: "3",
-      clientName: "Alpha Holdings",
-      clientEmail: "mike@alphaholdings.com",
-      dealId: "deal-3",
-      dealName: "Healthcare Divestiture",
-      accessLevel: "full",
-      portalUrl: "https://portal.osreaper.com/c/ghi789",
-      expiresAt: "2024-11-30",
-      isActive: false,
-      lastAccessed: "2024-11-28T16:45:00Z",
-      documentsShared: 24,
-      createdAt: "2024-10-01T08:00:00Z"
+  const [clientAccess, setClientAccess] = useState<ClientPortalAccess[]>(() => {
+    const saved = localStorage.getItem('osreaper_client_access');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return DEFAULT_CLIENT_ACCESS;
+      }
     }
-  ]);
+    return DEFAULT_CLIENT_ACCESS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('osreaper_client_access', JSON.stringify(clientAccess));
+  }, [clientAccess]);
 
   const [newAccess, setNewAccess] = useState({
     clientName: "",

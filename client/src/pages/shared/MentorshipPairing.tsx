@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,76 +49,92 @@ type MentorshipPair = {
   sessionsCompleted: number;
 };
 
+const DEFAULT_PAIRINGS: MentorshipPair[] = [
+  {
+    id: "1",
+    mentorId: "user-1",
+    mentorName: "Sarah Chen",
+    mentorRole: "Managing Director",
+    menteeId: "user-2",
+    menteeName: "Michael Brown",
+    menteeRole: "Associate",
+    focusAreas: ["Financial Modeling", "Client Relationships", "Deal Structuring"],
+    goals: [
+      { id: "g1", text: "Complete advanced LBO modeling course", completed: true },
+      { id: "g2", text: "Lead a client presentation independently", completed: false },
+      { id: "g3", text: "Develop sector expertise in Technology", completed: false }
+    ],
+    meetingFrequency: "Weekly",
+    nextMeeting: "2024-12-05T14:00:00Z",
+    startDate: "2024-09-01T00:00:00Z",
+    status: "active",
+    progressScore: 65,
+    sessionsCompleted: 12
+  },
+  {
+    id: "2",
+    mentorId: "user-3",
+    mentorName: "David Park",
+    mentorRole: "Director",
+    menteeId: "user-4",
+    menteeName: "Emily Johnson",
+    menteeRole: "Analyst",
+    focusAreas: ["Due Diligence", "Research Methods", "Presentation Skills"],
+    goals: [
+      { id: "g1", text: "Improve DD checklist efficiency", completed: true },
+      { id: "g2", text: "Present at team meeting", completed: true },
+      { id: "g3", text: "Build investor contact network", completed: false }
+    ],
+    meetingFrequency: "Bi-weekly",
+    nextMeeting: "2024-12-10T10:00:00Z",
+    startDate: "2024-10-15T00:00:00Z",
+    status: "active",
+    progressScore: 78,
+    sessionsCompleted: 6
+  },
+  {
+    id: "3",
+    mentorId: "user-5",
+    mentorName: "Lisa Wang",
+    mentorRole: "Managing Director",
+    menteeId: "user-6",
+    menteeName: "James Wilson",
+    menteeRole: "Associate",
+    focusAreas: ["Leadership", "Team Management", "Strategic Thinking"],
+    goals: [
+      { id: "g1", text: "Lead small deal team", completed: true },
+      { id: "g2", text: "Complete leadership training", completed: true },
+      { id: "g3", text: "Mentor an analyst", completed: true }
+    ],
+    meetingFrequency: "Monthly",
+    nextMeeting: null,
+    startDate: "2024-03-01T00:00:00Z",
+    status: "completed",
+    progressScore: 100,
+    sessionsCompleted: 9
+  }
+];
+
 export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }) {
   const { data: users = [] } = useUsers();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [pairings, setPairings] = useState<MentorshipPair[]>([
-    {
-      id: "1",
-      mentorId: "user-1",
-      mentorName: "Sarah Chen",
-      mentorRole: "Managing Director",
-      menteeId: "user-2",
-      menteeName: "Michael Brown",
-      menteeRole: "Associate",
-      focusAreas: ["Financial Modeling", "Client Relationships", "Deal Structuring"],
-      goals: [
-        { id: "g1", text: "Complete advanced LBO modeling course", completed: true },
-        { id: "g2", text: "Lead a client presentation independently", completed: false },
-        { id: "g3", text: "Develop sector expertise in Technology", completed: false }
-      ],
-      meetingFrequency: "Weekly",
-      nextMeeting: "2024-12-05T14:00:00Z",
-      startDate: "2024-09-01T00:00:00Z",
-      status: "active",
-      progressScore: 65,
-      sessionsCompleted: 12
-    },
-    {
-      id: "2",
-      mentorId: "user-3",
-      mentorName: "David Park",
-      mentorRole: "Director",
-      menteeId: "user-4",
-      menteeName: "Emily Johnson",
-      menteeRole: "Analyst",
-      focusAreas: ["Due Diligence", "Research Methods", "Presentation Skills"],
-      goals: [
-        { id: "g1", text: "Improve DD checklist efficiency", completed: true },
-        { id: "g2", text: "Present at team meeting", completed: true },
-        { id: "g3", text: "Build investor contact network", completed: false }
-      ],
-      meetingFrequency: "Bi-weekly",
-      nextMeeting: "2024-12-10T10:00:00Z",
-      startDate: "2024-10-15T00:00:00Z",
-      status: "active",
-      progressScore: 78,
-      sessionsCompleted: 6
-    },
-    {
-      id: "3",
-      mentorId: "user-5",
-      mentorName: "Lisa Wang",
-      mentorRole: "Managing Director",
-      menteeId: "user-6",
-      menteeName: "James Wilson",
-      menteeRole: "Associate",
-      focusAreas: ["Leadership", "Team Management", "Strategic Thinking"],
-      goals: [
-        { id: "g1", text: "Lead small deal team", completed: true },
-        { id: "g2", text: "Complete leadership training", completed: true },
-        { id: "g3", text: "Mentor an analyst", completed: true }
-      ],
-      meetingFrequency: "Monthly",
-      nextMeeting: null,
-      startDate: "2024-03-01T00:00:00Z",
-      status: "completed",
-      progressScore: 100,
-      sessionsCompleted: 9
+  const [pairings, setPairings] = useState<MentorshipPair[]>(() => {
+    const saved = localStorage.getItem('osreaper_mentorship_pairings');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return DEFAULT_PAIRINGS;
+      }
     }
-  ]);
+    return DEFAULT_PAIRINGS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('osreaper_mentorship_pairings', JSON.stringify(pairings));
+  }, [pairings]);
 
   const [newPairing, setNewPairing] = useState({
     mentorId: "",
