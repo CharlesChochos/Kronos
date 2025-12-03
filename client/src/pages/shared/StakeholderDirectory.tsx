@@ -429,6 +429,136 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
         </Card>
       </div>
 
+      {/* Edit Modal */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Stakeholder</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-4 pr-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Name *</Label>
+                  <Input
+                    value={selectedStakeholder?.name || ''}
+                    onChange={(e) => setSelectedStakeholder(prev => prev ? { ...prev, name: e.target.value } : null)}
+                    placeholder="Full name"
+                    data-testid="input-edit-stakeholder-name"
+                  />
+                </div>
+                <div>
+                  <Label>Title</Label>
+                  <Input
+                    value={selectedStakeholder?.title || ''}
+                    onChange={(e) => setSelectedStakeholder(prev => prev ? { ...prev, title: e.target.value } : null)}
+                    placeholder="Job title"
+                    data-testid="input-edit-stakeholder-title"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Company *</Label>
+                  <Input
+                    value={selectedStakeholder?.company || ''}
+                    onChange={(e) => setSelectedStakeholder(prev => prev ? { ...prev, company: e.target.value } : null)}
+                    placeholder="Company name"
+                    data-testid="input-edit-stakeholder-company"
+                  />
+                </div>
+                <div>
+                  <Label>Type</Label>
+                  <Select value={selectedStakeholder?.type || 'investor'} onValueChange={(v: any) => setSelectedStakeholder(prev => prev ? { ...prev, type: v } : null)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="investor">Investor</SelectItem>
+                      <SelectItem value="advisor">Advisor</SelectItem>
+                      <SelectItem value="legal">Legal Counsel</SelectItem>
+                      <SelectItem value="banker">Banker</SelectItem>
+                      <SelectItem value="consultant">Consultant</SelectItem>
+                      <SelectItem value="client">Client</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    value={selectedStakeholder?.email || ''}
+                    onChange={(e) => setSelectedStakeholder(prev => prev ? { ...prev, email: e.target.value } : null)}
+                    placeholder="email@example.com"
+                    data-testid="input-edit-stakeholder-email"
+                  />
+                </div>
+                <div>
+                  <Label>Phone</Label>
+                  <Input
+                    value={selectedStakeholder?.phone || ''}
+                    onChange={(e) => setSelectedStakeholder(prev => prev ? { ...prev, phone: e.target.value } : null)}
+                    placeholder="+1 555-000-0000"
+                    data-testid="input-edit-stakeholder-phone"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Location</Label>
+                <Input
+                  value={selectedStakeholder?.location || ''}
+                  onChange={(e) => setSelectedStakeholder(prev => prev ? { ...prev, location: e.target.value } : null)}
+                  placeholder="City, State"
+                  data-testid="input-edit-stakeholder-location"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>LinkedIn URL</Label>
+                  <Input
+                    value={selectedStakeholder?.linkedin || ''}
+                    onChange={(e) => setSelectedStakeholder(prev => prev ? { ...prev, linkedin: e.target.value } : null)}
+                    placeholder="https://linkedin.com/in/..."
+                  />
+                </div>
+                <div>
+                  <Label>Website</Label>
+                  <Input
+                    value={selectedStakeholder?.website || ''}
+                    onChange={(e) => setSelectedStakeholder(prev => prev ? { ...prev, website: e.target.value } : null)}
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Notes</Label>
+                <Textarea
+                  value={selectedStakeholder?.notes || ''}
+                  onChange={(e) => setSelectedStakeholder(prev => prev ? { ...prev, notes: e.target.value } : null)}
+                  placeholder="Additional notes about this contact..."
+                  rows={3}
+                  data-testid="input-edit-stakeholder-notes"
+                />
+              </div>
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
+            <Button onClick={() => {
+              if (selectedStakeholder) {
+                setStakeholders(stakeholders.map(s => s.id === selectedStakeholder.id ? selectedStakeholder : s));
+                toast.success("Stakeholder updated");
+                setShowEditModal(false);
+              }
+            }} data-testid="button-save-stakeholder">Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Modal */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
