@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import { Sidebar } from "./Sidebar";
 import { ReaperAssistant } from "../assistant/ReaperAssistant";
-import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check, Rocket, TrendingUp, UserCheck, ChevronRight, PanelLeftClose, PanelLeft, Camera, Trash2, Calendar, Paperclip, ExternalLink, Loader2 } from "lucide-react";
+import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check, Rocket, TrendingUp, UserCheck, ChevronRight, PanelLeftClose, PanelLeft, Camera, Trash2, Calendar, Paperclip, ExternalLink, Loader2, Shield, ShieldCheck, ShieldOff, Copy, Smartphone, QrCode } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -26,7 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDashboardContext } from "@/contexts/DashboardContext";
-import { useNotifications, useDeals, useTasks, useUsers, useLogout, useCurrentUser, useMarkNotificationRead, useUpdateUserProfile, useChangePassword, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
+import { useNotifications, useDeals, useTasks, useUsers, useLogout, useCurrentUser, useMarkNotificationRead, useUpdateUserProfile, useChangePassword, useUserPreferences, useSaveUserPreferences, use2FAStatus, useSetup2FA, useVerify2FA, useDisable2FA } from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -65,6 +65,16 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     newPassword: '',
     confirmPassword: '',
   });
+  
+  // 2FA state
+  const [isSettingUp2FA, setIsSettingUp2FA] = useState(false);
+  const [isDisabling2FA, setIsDisabling2FA] = useState(false);
+  const [twoFACode, setTwoFACode] = useState('');
+  const [qrCodeData, setQrCodeData] = useState<{ secret: string; qrCode: string } | null>(null);
+  const { data: twoFAStatus, isLoading: twoFALoading } = use2FAStatus();
+  const setup2FA = useSetup2FA();
+  const verify2FA = useVerify2FA();
+  const disable2FA = useDisable2FA();
   
   // User preferences from database
   const { data: userPrefs, isLoading: prefsLoading } = useUserPreferences();
@@ -343,6 +353,67 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (error: any) {
       toast.error(error.message || "Failed to change password");
+    }
+  };
+  
+  // 2FA handlers
+  const handleStart2FASetup = async () => {
+    try {
+      const result = await setup2FA.mutateAsync();
+      setQrCodeData({ secret: result.secret, qrCode: result.qrCode });
+      setIsSettingUp2FA(true);
+      setTwoFACode('');
+    } catch (error: any) {
+      toast.error(error.message || "Failed to setup 2FA");
+    }
+  };
+  
+  const handleVerify2FA = async () => {
+    if (twoFACode.length !== 6) {
+      toast.error("Please enter a valid 6-digit code");
+      return;
+    }
+    try {
+      await verify2FA.mutateAsync(twoFACode);
+      toast.success("Two-factor authentication enabled successfully!");
+      setIsSettingUp2FA(false);
+      setQrCodeData(null);
+      setTwoFACode('');
+    } catch (error: any) {
+      toast.error(error.message || "Invalid verification code");
+    }
+  };
+  
+  const handleCancel2FASetup = () => {
+    setIsSettingUp2FA(false);
+    setQrCodeData(null);
+    setTwoFACode('');
+  };
+  
+  const handleDisable2FA = async () => {
+    if (twoFACode.length !== 6) {
+      toast.error("Please enter a valid 6-digit code");
+      return;
+    }
+    try {
+      await disable2FA.mutateAsync(twoFACode);
+      toast.success("Two-factor authentication disabled");
+      setIsDisabling2FA(false);
+      setTwoFACode('');
+    } catch (error: any) {
+      toast.error(error.message || "Invalid verification code");
+    }
+  };
+  
+  const handleCancelDisable2FA = () => {
+    setIsDisabling2FA(false);
+    setTwoFACode('');
+  };
+  
+  const copySecretToClipboard = () => {
+    if (qrCodeData?.secret) {
+      navigator.clipboard.writeText(qrCodeData.secret);
+      toast.success("Secret key copied to clipboard");
     }
   };
   
@@ -1181,6 +1252,134 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                     </Button>
                   </div>
                 </div>
+              ) : isSettingUp2FA ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Shield className="w-5 h-5 text-primary" />
+                    <h4 className="text-sm font-medium">Setup Two-Factor Authentication</h4>
+                  </div>
+                  
+                  <div className="p-4 bg-secondary/30 rounded-lg space-y-4">
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
+                      </p>
+                      {qrCodeData?.qrCode && (
+                        <div className="flex justify-center mb-4">
+                          <img 
+                            src={qrCodeData.qrCode} 
+                            alt="2FA QR Code" 
+                            className="w-48 h-48 bg-white p-2 rounded-lg"
+                            data-testid="img-2fa-qr-code"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Or enter this secret key manually:</Label>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 p-2 bg-background rounded text-xs font-mono break-all">
+                          {qrCodeData?.secret}
+                        </code>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={copySecretToClipboard}
+                          data-testid="button-copy-2fa-secret"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="2fa-code">Enter verification code from your app:</Label>
+                      <Input
+                        id="2fa-code"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={6}
+                        value={twoFACode}
+                        onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, ''))}
+                        placeholder="Enter 6-digit code"
+                        className="text-center text-lg tracking-widest font-mono"
+                        data-testid="input-2fa-verify-code"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={handleCancel2FASetup}
+                      className="flex-1"
+                      data-testid="button-cancel-2fa-setup"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleVerify2FA}
+                      disabled={verify2FA.isPending || twoFACode.length !== 6}
+                      className="flex-1"
+                      data-testid="button-verify-2fa"
+                    >
+                      {verify2FA.isPending ? "Verifying..." : "Enable 2FA"}
+                    </Button>
+                  </div>
+                </div>
+              ) : isDisabling2FA ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <ShieldOff className="w-5 h-5 text-red-400" />
+                    <h4 className="text-sm font-medium">Disable Two-Factor Authentication</h4>
+                  </div>
+                  
+                  <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      To disable two-factor authentication, enter the current code from your authenticator app.
+                    </p>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="2fa-disable-code">Verification Code:</Label>
+                      <Input
+                        id="2fa-disable-code"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={6}
+                        value={twoFACode}
+                        onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, ''))}
+                        placeholder="Enter 6-digit code"
+                        className="text-center text-lg tracking-widest font-mono"
+                        data-testid="input-2fa-disable-code"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={handleCancelDisable2FA}
+                      className="flex-1"
+                      data-testid="button-cancel-disable-2fa"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      variant="destructive"
+                      onClick={handleDisable2FA}
+                      disabled={disable2FA.isPending || twoFACode.length !== 6}
+                      className="flex-1"
+                      data-testid="button-confirm-disable-2fa"
+                    >
+                      {disable2FA.isPending ? "Disabling..." : "Disable 2FA"}
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <>
                   <div className="space-y-4">
@@ -1188,16 +1387,57 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                     <Button variant="outline" className="w-full justify-start" onClick={() => setIsChangingPassword(true)}>
                       <Lock className="w-4 h-4 mr-2" /> Change Password
                     </Button>
-                    <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
-                      <div>
-                        <Label className="text-sm">Two-Factor Authentication</Label>
-                        <p className="text-xs text-muted-foreground">Add an extra layer of security</p>
+                    
+                    {twoFALoading ? (
+                      <div className="flex items-center justify-center p-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                       </div>
-                      <Switch 
-                        checked={settings.twoFactorAuth} 
-                        onCheckedChange={(checked) => updateSetting('twoFactorAuth', checked)} 
-                      />
-                    </div>
+                    ) : twoFAStatus?.enabled ? (
+                      <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg space-y-3">
+                        <div className="flex items-center gap-3">
+                          <ShieldCheck className="w-5 h-5 text-green-500" />
+                          <div>
+                            <Label className="text-sm text-green-400">Two-Factor Authentication Enabled</Label>
+                            <p className="text-xs text-muted-foreground">Your account is protected with 2FA</p>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          className="w-full text-red-400 border-red-400/30 hover:bg-red-500/10"
+                          onClick={() => setIsDisabling2FA(true)}
+                          data-testid="button-start-disable-2fa"
+                        >
+                          <ShieldOff className="w-4 h-4 mr-2" /> Disable 2FA
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-secondary/30 rounded-lg space-y-3">
+                        <div className="flex items-center gap-3">
+                          <Shield className="w-5 h-5 text-muted-foreground" />
+                          <div>
+                            <Label className="text-sm">Two-Factor Authentication</Label>
+                            <p className="text-xs text-muted-foreground">Add an extra layer of security</p>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          className="w-full"
+                          onClick={handleStart2FASetup}
+                          disabled={setup2FA.isPending}
+                          data-testid="button-setup-2fa"
+                        >
+                          {setup2FA.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Setting up...
+                            </>
+                          ) : (
+                            <>
+                              <Smartphone className="w-4 h-4 mr-2" /> Setup 2FA
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   
                   <Separator />

@@ -20,7 +20,8 @@ import {
   ChevronRight,
   Shield,
   Database,
-  FileStack
+  FileStack,
+  FolderOpen
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLogout, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
@@ -175,6 +176,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
       links: [
         { icon: Shield, label: "User Management", path: "/ceo/admin" },
         { icon: FileStack, label: "Deal Templates", path: "/ceo/deal-templates" },
+        { icon: FolderOpen, label: "Document Library", path: "/ceo/document-library" },
       ]
     }
   ];
@@ -189,6 +191,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
         { icon: Briefcase, label: "Deal Management", path: "/employee/deals" },
         { icon: PieChart, label: "Investor Match", path: "/employee/investors" },
         { icon: FileText, label: "Documents", path: "/employee/documents" },
+        { icon: FolderOpen, label: "Document Library", path: "/employee/document-library" },
       ]
     },
     {

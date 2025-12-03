@@ -28,6 +28,7 @@ import Chat from "@/pages/shared/Chat";
 import UserManagement from "@/pages/ceo/UserManagement";
 import InvestorDatabase from "@/pages/ceo/InvestorDatabase";
 import DealTemplates from "@/pages/shared/DealTemplates";
+import DocumentManagement from "@/pages/shared/DocumentManagement";
 import { useEffect } from "react";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 
@@ -49,6 +50,8 @@ const EmployeeStakeholderDirectory = () => <StakeholderDirectory role="Employee"
 const CeoEventCalendar = () => <EventCalendar role="CEO" />;
 const EmployeeEventCalendar = () => <EventCalendar role="Employee" />;
 const CeoDealTemplates = () => <DealTemplates role="CEO" />;
+const CeoDocumentManagement = () => <DocumentManagement role="CEO" />;
+const EmployeeDocumentManagement = () => <DocumentManagement role="Employee" />;
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { data: user, isLoading } = useCurrentUser();
@@ -154,6 +157,9 @@ function Router() {
       <Route path="/ceo/deal-templates">
         {() => <ProtectedRoute component={CeoDealTemplates} />}
       </Route>
+      <Route path="/ceo/document-library">
+        {() => <ProtectedRoute component={CeoDocumentManagement} />}
+      </Route>
       
       {/* Employee Routes */}
       <Route path="/employee/home">
@@ -185,6 +191,9 @@ function Router() {
       </Route>
       <Route path="/employee/stakeholders">
         {() => <ProtectedRoute component={EmployeeStakeholderDirectory} />}
+      </Route>
+      <Route path="/employee/document-library">
+        {() => <ProtectedRoute component={EmployeeDocumentManagement} />}
       </Route>
 
       <Route component={NotFound} />

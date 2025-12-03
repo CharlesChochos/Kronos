@@ -1201,6 +1201,121 @@ export function useDeleteDocumentTemplate() {
   });
 }
 
+// ===== DOCUMENT STORAGE API =====
+export type DocumentRecord = {
+  id: string;
+  title: string;
+  type: string;
+  category: string;
+  filename: string;
+  originalName?: string;
+  mimeType?: string;
+  size?: number;
+  content?: string;
+  dealId?: string;
+  dealName?: string;
+  uploadedBy?: string;
+  uploaderName?: string;
+  tags?: string[];
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function useDocuments() {
+  return useQuery({
+    queryKey: ["documents"],
+    queryFn: async () => {
+      const res = await fetch("/api/documents", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch documents");
+      return res.json() as Promise<DocumentRecord[]>;
+    },
+  });
+}
+
+export function useDocumentsByDeal(dealId: string | null) {
+  return useQuery({
+    queryKey: ["documents", "deal", dealId],
+    queryFn: async () => {
+      if (!dealId) return [];
+      const res = await fetch(`/api/documents/deal/${dealId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch deal documents");
+      return res.json() as Promise<DocumentRecord[]>;
+    },
+    enabled: !!dealId,
+  });
+}
+
+export function useCreateDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (doc: {
+      title: string;
+      type: string;
+      category?: string;
+      filename: string;
+      originalName?: string;
+      mimeType?: string;
+      size?: number;
+      content?: string;
+      dealId?: string;
+      dealName?: string;
+      tags?: string[];
+    }) => {
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(doc),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create document");
+      }
+      return res.json() as Promise<DocumentRecord>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+  });
+}
+
+export function useUpdateDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<DocumentRecord> }) => {
+      const res = await fetch(`/api/documents/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update document");
+      }
+      return res.json() as Promise<DocumentRecord>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+  });
+}
+
+export function useDeleteDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/documents/${id}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to delete document");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+  });
+}
+
 // ===== INVESTOR MATCH HOOKS =====
 
 export type InvestorMatch = {
@@ -1560,6 +1675,84 @@ export function useDeleteTaskAttachment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["task-attachments"] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+}
+
+// 2FA API
+export function use2FAStatus() {
+  return useQuery({
+    queryKey: ["2fa-status"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/2fa/status", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch 2FA status");
+      return res.json() as Promise<{ enabled: boolean; hasSecret: boolean }>;
+    },
+  });
+}
+
+export function useSetup2FA() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/auth/2fa/setup", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to setup 2FA");
+      }
+      return res.json() as Promise<{ secret: string; qrCode: string; otpauthUrl: string }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["2fa-status"] });
+    },
+  });
+}
+
+export function useVerify2FA() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (code: string) => {
+      const res = await fetch("/api/auth/2fa/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ code }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Invalid verification code");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["2fa-status"] });
+      queryClient.invalidateQueries({ queryKey: ["auth"] });
+    },
+  });
+}
+
+export function useDisable2FA() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (code: string) => {
+      const res = await fetch("/api/auth/2fa/disable", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ code }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to disable 2FA");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["2fa-status"] });
+      queryClient.invalidateQueries({ queryKey: ["auth"] });
     },
   });
 }
