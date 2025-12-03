@@ -755,32 +755,32 @@ export async function registerRoutes(
 
       // Get all users who might be part of the pod team for this deal
       // This includes the deal lead and anyone with tasks assigned to this deal
-      const allTasks = await storage.getTasks();
+      const allTasks = await storage.getAllTasks();
       const dealTasks = allTasks.filter(t => t.dealId === dealId);
-      const assignedUserIds = new Set<string>();
+      const assignedUserIds: string[] = [];
       
       // Add deal lead if exists
       if (deal.lead) {
-        const users = await storage.getUsers();
+        const users = await storage.getAllUsers();
         const leadUser = users.find(u => u.name === deal.lead);
-        if (leadUser) {
-          assignedUserIds.add(leadUser.id);
+        if (leadUser && !assignedUserIds.includes(leadUser.id)) {
+          assignedUserIds.push(leadUser.id);
         }
       }
       
       // Add all users assigned to tasks on this deal
       dealTasks.forEach(task => {
-        if (task.assignedTo) {
-          assignedUserIds.add(task.assignedTo);
+        if (task.assignedTo && !assignedUserIds.includes(task.assignedTo)) {
+          assignedUserIds.push(task.assignedTo);
         }
       });
 
       // Remove the current user from notifications (don't notify yourself)
-      assignedUserIds.delete(currentUser.id);
+      const filteredUserIds = assignedUserIds.filter((id: string) => id !== currentUser.id);
 
       // Create notifications for all pod team members
       const notifications = [];
-      for (const userId of assignedUserIds) {
+      for (const userId of filteredUserIds) {
         const notification = await storage.createNotification({
           userId,
           title: 'Task Flagged for War Room',
