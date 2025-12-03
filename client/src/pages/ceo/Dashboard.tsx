@@ -79,7 +79,7 @@ import {
   Video,
   Link as LinkIcon
 } from "lucide-react";
-import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews } from "@/lib/api";
+import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, subDays } from "date-fns";
@@ -116,6 +116,8 @@ export default function Dashboard() {
   const createDeal = useCreateDeal();
   const createMeeting = useCreateMeeting();
   const updateUserPreferences = useUpdateUserPreferences();
+  const { data: userPrefs, isLoading: prefsLoading } = useUserPreferences();
+  const saveUserPrefs = useSaveUserPreferences();
 
   // Use context for shared sheet states (only Customize is rendered here, others moved to Layout)
   const {
@@ -130,19 +132,77 @@ export default function Dashboard() {
   const [selectedEmployee, setSelectedEmployee] = useState<UserType | null>(null);
   const [viewTab, setViewTab] = useState<'dashboard' | 'analytics'>('dashboard');
   
-  // Widget configuration - load from localStorage
-  const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
-    const saved = localStorage.getItem('ceoDashboardWidgets');
-    return saved ? JSON.parse(saved) : DEFAULT_WIDGETS;
-  });
+  // Widget configuration - load from user preferences (database)
+  const [widgets, setWidgets] = useState<WidgetConfig[]>(DEFAULT_WIDGETS);
+  const [widgetsInitialized, setWidgetsInitialized] = useState(false);
   
-  // Save widget order to localStorage when it changes
+  // Load widget config from user preferences when available
   useEffect(() => {
-    localStorage.setItem('ceoDashboardWidgets', JSON.stringify(widgets));
-  }, [widgets]);
+    if (!prefsLoading && userPrefs?.dashboardWidgets && userPrefs.dashboardWidgets.length > 0 && !widgetsInitialized) {
+      setWidgets(userPrefs.dashboardWidgets as WidgetConfig[]);
+      setWidgetsInitialized(true);
+    } else if (!prefsLoading && !widgetsInitialized) {
+      setWidgetsInitialized(true);
+    }
+  }, [prefsLoading, userPrefs, widgetsInitialized]);
   
-  // Market symbols state
+  // Save widget order to database when it changes (debounced with error handling and rollback)
+  const saveWidgetsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+  const lastSavedWidgetsRef = useRef<WidgetConfig[]>(DEFAULT_WIDGETS);
+  
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+  
+  // Store the last successfully saved widgets for rollback
+  useEffect(() => {
+    if (userPrefs?.dashboardWidgets && userPrefs.dashboardWidgets.length > 0) {
+      lastSavedWidgetsRef.current = userPrefs.dashboardWidgets as WidgetConfig[];
+    }
+  }, [userPrefs]);
+  
+  useEffect(() => {
+    if (!widgetsInitialized) return;
+    if (saveWidgetsTimeoutRef.current) {
+      clearTimeout(saveWidgetsTimeoutRef.current);
+    }
+    saveWidgetsTimeoutRef.current = setTimeout(async () => {
+      if (!isMountedRef.current) return;
+      try {
+        await saveUserPrefs.mutateAsync({ dashboardWidgets: widgets });
+        lastSavedWidgetsRef.current = widgets;
+      } catch (error) {
+        console.error('Failed to save widget preferences:', error);
+        toast.error('Failed to save dashboard preferences - reverting changes');
+        if (isMountedRef.current) {
+          setWidgets(lastSavedWidgetsRef.current);
+        }
+      }
+    }, 1000);
+    return () => {
+      if (saveWidgetsTimeoutRef.current) {
+        clearTimeout(saveWidgetsTimeoutRef.current);
+      }
+    };
+  }, [widgets, widgetsInitialized]);
+  
+  // Market symbols - load from preferences with effect for hydration
   const [marketSymbols, setMarketSymbols] = useState<string[]>(['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY']);
+  const [symbolsInitialized, setSymbolsInitialized] = useState(false);
+  
+  // Hydrate market symbols from user preferences when loaded
+  useEffect(() => {
+    if (!prefsLoading && userPrefs?.marketSymbols && userPrefs.marketSymbols.length > 0 && !symbolsInitialized) {
+      setMarketSymbols(userPrefs.marketSymbols);
+      setSymbolsInitialized(true);
+    } else if (!prefsLoading && !symbolsInitialized) {
+      setSymbolsInitialized(true);
+    }
+  }, [prefsLoading, userPrefs, symbolsInitialized]);
   const [marketSearchQuery, setMarketSearchQuery] = useState('');
   const [showMarketSearch, setShowMarketSearch] = useState(false);
   
@@ -1753,21 +1813,21 @@ export default function Dashboard() {
                     { name: 'Forest', value: 'forest', color: 'bg-[#14532d]' },
                     { name: 'Wine', value: 'wine', color: 'bg-[#450a0a]' },
                     { name: 'Purple', value: 'purple', color: 'bg-[#3b0764]' },
-                  ].map((theme) => (
+                  ].map((themeOption) => (
                     <button
-                      key={theme.value}
+                      key={themeOption.value}
                       onClick={() => {
-                        localStorage.setItem('dashboardTheme', theme.value);
-                        toast.success(`Theme set to ${theme.name}`);
+                        saveUserPrefs.mutate({ theme: themeOption.value });
+                        toast.success(`Theme set to ${themeOption.name}`);
                       }}
                       className={cn(
                         "w-full aspect-square rounded-lg border-2 transition-all",
-                        theme.color,
-                        localStorage.getItem('dashboardTheme') === theme.value 
+                        themeOption.color,
+                        userPrefs?.theme === themeOption.value 
                           ? "border-primary ring-2 ring-primary/30" 
                           : "border-border hover:border-primary/50"
                       )}
-                      title={theme.name}
+                      title={themeOption.name}
                     />
                   ))}
                 </div>
@@ -1780,8 +1840,11 @@ export default function Dashboard() {
                 className="w-full"
                 onClick={() => {
                   setWidgets(DEFAULT_WIDGETS);
-                  localStorage.removeItem('ceoDashboardWidgets');
-                  localStorage.removeItem('dashboardTheme');
+                  saveUserPrefs.mutate({ 
+                    dashboardWidgets: DEFAULT_WIDGETS,
+                    theme: 'system',
+                    marketSymbols: ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY'],
+                  });
                   toast.success("Dashboard reset to defaults");
                 }}
               >

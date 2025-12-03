@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,26 +24,14 @@ import {
   Users,
   FileText,
   Star,
-  StarOff
+  StarOff,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { useDealTemplates, useCreateDealTemplate, useUpdateDealTemplate, useDeleteDealTemplate, DealTemplateType } from "@/lib/api";
 
-type DealTemplate = {
-  id: string;
-  name: string;
-  description: string;
-  sector: string;
-  dealType: string;
-  stages: string[];
-  defaultTasks: { title: string; type: string; priority: string }[];
-  estimatedDuration: number;
-  checklistItems: string[];
-  isFavorite: boolean;
-  usageCount: number;
-  createdAt: string;
-  updatedAt: string;
-};
+type DealTemplate = DealTemplateType;
 
 export default function DealTemplates({ role }: { role: 'CEO' | 'Employee' }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -51,84 +39,10 @@ export default function DealTemplates({ role }: { role: 'CEO' | 'Employee' }) {
   const [selectedTemplate, setSelectedTemplate] = useState<DealTemplate | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [templates, setTemplates] = useState<DealTemplate[]>([
-    {
-      id: "1",
-      name: "Standard M&A Acquisition",
-      description: "Complete template for mergers and acquisitions including due diligence, valuation, and integration planning",
-      sector: "Technology",
-      dealType: "M&A",
-      stages: ["Origination", "Due Diligence", "Valuation", "Negotiation", "Closing", "Integration"],
-      defaultTasks: [
-        { title: "Initial screening and target identification", type: "Research", priority: "High" },
-        { title: "Financial due diligence", type: "Analysis", priority: "High" },
-        { title: "Legal review and documentation", type: "Document", priority: "High" },
-        { title: "Valuation model preparation", type: "Analysis", priority: "High" },
-        { title: "Management presentations", type: "Meeting", priority: "Medium" }
-      ],
-      estimatedDuration: 120,
-      checklistItems: [
-        "NDA signed by all parties",
-        "Data room access configured",
-        "Financial statements collected (3 years)",
-        "Management team interviews scheduled",
-        "Third-party advisors engaged"
-      ],
-      isFavorite: true,
-      usageCount: 24,
-      createdAt: "2024-06-15T10:00:00Z",
-      updatedAt: "2024-11-20T14:30:00Z"
-    },
-    {
-      id: "2",
-      name: "Series A/B Fundraising",
-      description: "Template for venture capital fundraising rounds including investor outreach and term sheet negotiation",
-      sector: "All",
-      dealType: "Capital Raising",
-      stages: ["Preparation", "Investor Outreach", "Due Diligence", "Term Sheet", "Closing"],
-      defaultTasks: [
-        { title: "Pitch deck preparation", type: "Document", priority: "High" },
-        { title: "Financial model update", type: "Analysis", priority: "High" },
-        { title: "Investor list curation", type: "Research", priority: "Medium" },
-        { title: "Data room setup", type: "Admin", priority: "Medium" }
-      ],
-      estimatedDuration: 90,
-      checklistItems: [
-        "Pitch deck finalized",
-        "Cap table updated",
-        "Financial projections complete",
-        "Legal counsel engaged",
-        "Reference customers identified"
-      ],
-      isFavorite: true,
-      usageCount: 18,
-      createdAt: "2024-07-01T09:00:00Z",
-      updatedAt: "2024-10-15T11:00:00Z"
-    },
-    {
-      id: "3",
-      name: "Asset Divestiture",
-      description: "Template for selling business units or asset portfolios",
-      sector: "Healthcare",
-      dealType: "Divestiture",
-      stages: ["Preparation", "Marketing", "Buyer Selection", "Due Diligence", "Closing"],
-      defaultTasks: [
-        { title: "Carve-out analysis", type: "Analysis", priority: "High" },
-        { title: "Information memorandum", type: "Document", priority: "High" },
-        { title: "Buyer identification", type: "Research", priority: "Medium" }
-      ],
-      estimatedDuration: 180,
-      checklistItems: [
-        "Standalone financials prepared",
-        "Transition services agreement drafted",
-        "Employee communication plan ready"
-      ],
-      isFavorite: false,
-      usageCount: 8,
-      createdAt: "2024-08-10T14:00:00Z",
-      updatedAt: "2024-09-25T16:00:00Z"
-    }
-  ]);
+  const { data: templates = [], isLoading } = useDealTemplates();
+  const createTemplate = useCreateDealTemplate();
+  const updateTemplate = useUpdateDealTemplate();
+  const deleteTemplateMutation = useDeleteDealTemplate();
 
   const [newTemplate, setNewTemplate] = useState({
     name: "",
@@ -142,68 +56,101 @@ export default function DealTemplates({ role }: { role: 'CEO' | 'Employee' }) {
 
   const filteredTemplates = templates.filter(t =>
     t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (t.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     t.sector.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleCreateTemplate = () => {
+  const handleCreateTemplate = async () => {
     if (!newTemplate.name || !newTemplate.description) {
       toast.error("Please fill in required fields");
       return;
     }
 
-    const template: DealTemplate = {
-      id: Date.now().toString(),
-      name: newTemplate.name,
-      description: newTemplate.description,
-      sector: newTemplate.sector,
-      dealType: newTemplate.dealType,
-      stages: newTemplate.stages.split(",").map(s => s.trim()).filter(Boolean),
-      defaultTasks: [],
-      estimatedDuration: newTemplate.estimatedDuration,
-      checklistItems: newTemplate.checklistItems.split("\n").map(s => s.trim()).filter(Boolean),
-      isFavorite: false,
-      usageCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    setTemplates([template, ...templates]);
-    setShowCreateModal(false);
-    setNewTemplate({ name: "", description: "", sector: "Technology", dealType: "M&A", estimatedDuration: 90, stages: "", checklistItems: "" });
-    toast.success("Template created successfully");
+    try {
+      await createTemplate.mutateAsync({
+        name: newTemplate.name,
+        description: newTemplate.description,
+        sector: newTemplate.sector,
+        dealType: newTemplate.dealType,
+        stages: newTemplate.stages.split(",").map(s => s.trim()).filter(Boolean),
+        defaultTasks: [],
+        estimatedDuration: newTemplate.estimatedDuration,
+        checklistItems: newTemplate.checklistItems.split("\n").map(s => s.trim()).filter(Boolean),
+        isFavorite: false,
+        usageCount: 0,
+      });
+      setShowCreateModal(false);
+      setNewTemplate({ name: "", description: "", sector: "Technology", dealType: "M&A", estimatedDuration: 90, stages: "", checklistItems: "" });
+      toast.success("Template created successfully");
+    } catch (error) {
+      toast.error("Failed to create template");
+    }
   };
 
-  const toggleFavorite = (id: string) => {
-    setTemplates(templates.map(t => 
-      t.id === id ? { ...t, isFavorite: !t.isFavorite } : t
-    ));
+  const toggleFavorite = async (id: string) => {
+    const template = templates.find(t => t.id === id);
+    if (!template) return;
+    try {
+      await updateTemplate.mutateAsync({
+        id,
+        updates: { isFavorite: !template.isFavorite }
+      });
+    } catch (error) {
+      toast.error("Failed to update favorite");
+    }
   };
 
-  const duplicateTemplate = (template: DealTemplate) => {
-    const newT: DealTemplate = {
-      ...template,
-      id: Date.now().toString(),
-      name: `${template.name} (Copy)`,
-      usageCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    setTemplates([newT, ...templates]);
-    toast.success("Template duplicated");
+  const duplicateTemplate = async (template: DealTemplate) => {
+    try {
+      await createTemplate.mutateAsync({
+        name: `${template.name} (Copy)`,
+        description: template.description,
+        sector: template.sector,
+        dealType: template.dealType,
+        stages: template.stages,
+        defaultTasks: template.defaultTasks,
+        estimatedDuration: template.estimatedDuration,
+        checklistItems: template.checklistItems,
+        isFavorite: false,
+        usageCount: 0,
+      });
+      toast.success("Template duplicated");
+    } catch (error) {
+      toast.error("Failed to duplicate template");
+    }
   };
 
-  const deleteTemplate = (id: string) => {
-    setTemplates(templates.filter(t => t.id !== id));
-    toast.success("Template deleted");
+  const deleteTemplate = async (id: string) => {
+    try {
+      await deleteTemplateMutation.mutateAsync(id);
+      toast.success("Template deleted");
+    } catch (error) {
+      toast.error("Failed to delete template");
+    }
   };
 
-  const useTemplate = (template: DealTemplate) => {
-    setTemplates(templates.map(t =>
-      t.id === template.id ? { ...t, usageCount: t.usageCount + 1 } : t
-    ));
-    toast.success(`Creating new deal from "${template.name}" template`);
+  const useTemplate = async (template: DealTemplate) => {
+    try {
+      await updateTemplate.mutateAsync({
+        id: template.id,
+        updates: { usageCount: (template.usageCount || 0) + 1 }
+      });
+      toast.success(`Creating new deal from "${template.name}" template`);
+    } catch (error) {
+      console.error("Failed to update usage count:", error);
+      toast.success(`Creating new deal from "${template.name}" template`);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <Layout role={role}>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout role={role}>
