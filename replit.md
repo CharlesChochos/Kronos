@@ -74,7 +74,7 @@ Preferred communication style: Simple, everyday language.
 - **Meetings table**: Meeting scheduling with title, date/time, attendees, location, deal association, and description
 - **Notifications table**: User notifications with type (info/success/warning/alert), title, message, read status, and link reference
 - **investor_matches table**: Stores investor match/reject decisions per user with status (matched/rejected/pending)
-- **user_preferences table**: Dashboard widgets, sidebar collapsed state, theme, market symbols, compliance defaults, and settings
+- **user_preferences table**: Dashboard widgets, sidebar collapsed state, theme, market symbols, compliance defaults, and settings (employeeHome, flaggedTasks, sidebarCategories, unreadMessageCount)
 - **deal_templates table**: Document templates with category, description, sections, and sector-specific tags
 - **calendar_events table**: Capital raising events with investor, deal, status, location, and notes
 - **task_attachments table**: File metadata for task attachments (filename, URL, size, type)
@@ -126,6 +126,13 @@ Preferred communication style: Simple, everyday language.
 - Custom Vite plugin (`vite-plugin-meta-images`) updates OpenGraph meta tags with deployment URLs
 - Session storage is in-memory by default but includes `connect-pg-simple` for PostgreSQL session store option
 - The build process separates client (Vite) and server (esbuild) builds with selective dependency bundling for server cold-start optimization
+
+**User Preferences Persistence Pattern**
+- All user-specific UI state is persisted to the `user_preferences` table (no localStorage)
+- Components use `useUserPreferences` hook to load and `useSaveUserPreferences` to save
+- Debounced saves prevent excessive database writes
+- To avoid race conditions with concurrent saves, components fetch fresh preferences via `queryClient.getQueryData<UserPreferences>(['userPreferences'])` immediately before mutation
+- Settings are merged with existing settings to preserve other components' data
 
 ## Email Integration
 
