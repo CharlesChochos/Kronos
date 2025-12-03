@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from "framer-motion";
 import { 
   Calendar, 
@@ -66,65 +67,102 @@ export default function MyTasks() {
   const [deferredTasks, setDeferredTasks] = useState<string[]>([]);
   
   // Flagged tasks - persisted in localStorage and synced with war room
-  const [flaggedTasks, setFlaggedTasks] = useState<string[]>(() => {
+  const [flaggedTasks, setFlaggedTasks] = useState<Record<string, string>>(() => {
     try {
       const saved = localStorage.getItem('warRoomFlags');
       if (saved) {
         const parsed = JSON.parse(saved);
-        return parsed.taskIds || [];
+        return parsed.taskFlags || {};
       }
     } catch {}
-    return [];
+    return {};
   });
   
-  const toggleTaskFlag = async (taskId: string) => {
-    const isCurrentlyFlagged = flaggedTasks.includes(taskId);
-    const newFlaggedTasks = isCurrentlyFlagged
-      ? flaggedTasks.filter(id => id !== taskId)
-      : [...flaggedTasks, taskId];
-    
+  // Flag note dialog state
+  const [showFlagNoteDialog, setShowFlagNoteDialog] = useState(false);
+  const [flagNoteTaskId, setFlagNoteTaskId] = useState<string | null>(null);
+  const [flagNote, setFlagNote] = useState("");
+  
+  const openFlagDialog = (taskId: string) => {
+    if (flaggedTasks[taskId]) {
+      unflagTask(taskId);
+    } else {
+      setFlagNoteTaskId(taskId);
+      setFlagNote("");
+      setShowFlagNoteDialog(true);
+    }
+  };
+  
+  const unflagTask = (taskId: string) => {
+    const newFlaggedTasks = { ...flaggedTasks };
+    delete newFlaggedTasks[taskId];
     setFlaggedTasks(newFlaggedTasks);
     
-    // Update war room flags in localStorage
     try {
       const saved = localStorage.getItem('warRoomFlags');
-      const current = saved ? JSON.parse(saved) : { dealIds: [], taskIds: [] };
-      current.taskIds = newFlaggedTasks;
-      localStorage.setItem('warRoomFlags', JSON.stringify(current));
+      const current = saved ? JSON.parse(saved) : { dealIds: [], taskIds: [], taskFlags: {} };
+      localStorage.setItem('warRoomFlags', JSON.stringify({
+        ...current,
+        taskFlags: newFlaggedTasks,
+        taskIds: Object.keys(newFlaggedTasks),
+      }));
     } catch {}
     
-    // Send notification to pod team if flagging (not unflagging)
-    if (!isCurrentlyFlagged) {
-      const task = myTasks.find(t => t.id === taskId);
-      if (task && task.dealId) {
-        const deal = getDeal(task.dealId);
-        if (deal) {
-          try {
-            const result = await apiRequest('POST', '/api/notifications/flag', {
-              taskId,
-              taskTitle: task.title,
-              dealId: deal.id,
-              dealName: deal.name,
-              flaggedBy: currentUser?.name || 'Team member',
-            });
-            const data = await result.json();
-            if (data.notifiedCount > 0) {
-              toast.success(`Task flagged! ${data.notifiedCount} team member(s) notified.`);
-            } else {
-              toast.success("Task flagged for War Room!");
-            }
-          } catch (error) {
-            toast.error("Task flagged but failed to notify team. Please try again.");
+    toast.info("Task unflagged");
+  };
+  
+  const confirmFlag = async () => {
+    if (!flagNoteTaskId) return;
+    
+    const newFlaggedTasks = { ...flaggedTasks, [flagNoteTaskId]: flagNote };
+    setFlaggedTasks(newFlaggedTasks);
+    
+    try {
+      const saved = localStorage.getItem('warRoomFlags');
+      const current = saved ? JSON.parse(saved) : { dealIds: [], taskIds: [], taskFlags: {} };
+      localStorage.setItem('warRoomFlags', JSON.stringify({
+        ...current,
+        taskFlags: newFlaggedTasks,
+        taskIds: Object.keys(newFlaggedTasks),
+      }));
+    } catch {}
+    
+    const task = myTasks.find(t => t.id === flagNoteTaskId);
+    if (task && task.dealId) {
+      const deal = getDeal(task.dealId);
+      if (deal) {
+        try {
+          const result = await apiRequest('POST', '/api/notifications/flag', {
+            taskId: flagNoteTaskId,
+            taskTitle: task.title,
+            dealId: deal.id,
+            dealName: deal.name,
+            flaggedBy: currentUser?.name || 'Team member',
+            flagNote: flagNote || undefined,
+          });
+          const data = await result.json();
+          if (data.notifiedCount > 0) {
+            toast.success(`Task flagged! ${data.notifiedCount} team member(s) notified.`);
+          } else {
+            toast.success("Task flagged for War Room!");
           }
-        } else {
-          toast.success("Task flagged for War Room!");
+        } catch (error) {
+          toast.error("Task flagged but failed to notify team. Please try again.");
         }
       } else {
         toast.success("Task flagged for War Room!");
       }
     } else {
-      toast.info("Task unflagged");
+      toast.success("Task flagged for War Room!");
     }
+    
+    setShowFlagNoteDialog(false);
+    setFlagNoteTaskId(null);
+    setFlagNote("");
+  };
+  
+  const toggleTaskFlag = (taskId: string) => {
+    openFlagDialog(taskId);
   };
   
   const taskRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -534,7 +572,7 @@ export default function MyTasks() {
                       dealName={getDealName(task.dealId)}
                       onClick={() => handleTaskClick(task)}
                       highlighted={highlightedTaskId === task.id}
-                      isFlagged={flaggedTasks.includes(task.id)}
+                      isFlagged={!!flaggedTasks[task.id]}
                       onFlag={(e) => { e.stopPropagation(); toggleTaskFlag(task.id); }}
                       ref={(el) => { taskRefs.current[task.id] = el; }}
                     />
@@ -569,7 +607,7 @@ export default function MyTasks() {
                       dealName={getDealName(task.dealId)}
                       onClick={() => handleTaskClick(task)}
                       highlighted={highlightedTaskId === task.id}
-                      isFlagged={flaggedTasks.includes(task.id)}
+                      isFlagged={!!flaggedTasks[task.id]}
                       onFlag={(e) => { e.stopPropagation(); toggleTaskFlag(task.id); }}
                       ref={(el) => { taskRefs.current[task.id] = el; }}
                     />
@@ -604,7 +642,7 @@ export default function MyTasks() {
                       dealName={getDealName(task.dealId)}
                       onClick={() => handleTaskClick(task)}
                       highlighted={highlightedTaskId === task.id}
-                      isFlagged={flaggedTasks.includes(task.id)}
+                      isFlagged={!!flaggedTasks[task.id]}
                       onFlag={(e) => { e.stopPropagation(); toggleTaskFlag(task.id); }}
                       ref={(el) => { taskRefs.current[task.id] = el; }}
                     />
@@ -826,6 +864,55 @@ export default function MyTasks() {
                 Start Working
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Flag Note Dialog */}
+      <Dialog open={showFlagNoteDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowFlagNoteDialog(false);
+          setFlagNoteTaskId(null);
+          setFlagNote("");
+        }
+      }}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Flag className="w-5 h-5 text-orange-500" />
+              Flag Task for War Room
+            </DialogTitle>
+            <DialogDescription>
+              Add a note to explain why this task is being flagged
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Flag Note (Optional)</Label>
+              <Textarea
+                placeholder="Describe the issue or reason for flagging this task..."
+                value={flagNote}
+                onChange={(e) => setFlagNote(e.target.value)}
+                rows={4}
+                className="resize-none"
+                data-testid="textarea-flag-note"
+              />
+            </div>
+            <div className="text-xs text-muted-foreground">
+              This note will be visible to pod team members in the War Room.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowFlagNoteDialog(false);
+              setFlagNoteTaskId(null);
+              setFlagNote("");
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={confirmFlag} className="bg-orange-500 hover:bg-orange-600">
+              <Flag className="w-4 h-4 mr-2" /> Flag Task
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

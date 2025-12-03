@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import { Sidebar } from "./Sidebar";
 import { ReaperAssistant } from "../assistant/ReaperAssistant";
-import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check, Rocket, TrendingUp, UserCheck, ChevronRight, PanelLeftClose, PanelLeft, Camera, Trash2, Calendar, Paperclip, ExternalLink } from "lucide-react";
+import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check, Rocket, TrendingUp, UserCheck, ChevronRight, PanelLeftClose, PanelLeft, Camera, Trash2, Calendar, Paperclip, ExternalLink, Loader2 } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -691,12 +691,219 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
             <SheetDescription>Manage your account and preferences</SheetDescription>
           </SheetHeader>
           
-          <Tabs defaultValue="notifications" className="mt-6">
-            <TabsList className="grid w-full grid-cols-3 bg-secondary/50">
+          <Tabs defaultValue="profile" className="mt-6">
+            <TabsList className="grid w-full grid-cols-4 bg-secondary/50">
+              <TabsTrigger value="profile" className="text-xs">Profile</TabsTrigger>
               <TabsTrigger value="notifications" className="text-xs">Alerts</TabsTrigger>
               <TabsTrigger value="display" className="text-xs">Display</TabsTrigger>
               <TabsTrigger value="account" className="text-xs">Account</TabsTrigger>
             </TabsList>
+            
+            {/* Profile Tab */}
+            <TabsContent value="profile" className="mt-4">
+              <ScrollArea className="h-[calc(100vh-220px)]">
+                <div className="space-y-6 pr-4">
+                  {/* Profile Header */}
+                  <div className="flex flex-col items-center text-center space-y-3 p-4 bg-secondary/30 rounded-lg">
+                    <div className="relative">
+                      <Avatar className="w-20 h-20 border-2 border-primary/30">
+                        <AvatarImage src={currentUser?.avatar || undefined} />
+                        <AvatarFallback className="bg-primary/20 text-primary text-xl font-bold">
+                          {(currentUser?.name || userName || 'U').split(' ').map(n => n[0]).join('').toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <input
+                        type="file"
+                        ref={photoInputRef}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setIsUploadingPhoto(true);
+                            setTimeout(() => {
+                              setIsUploadingPhoto(false);
+                              toast.success("Photo updated!");
+                            }, 1500);
+                          }
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="absolute -bottom-1 -right-1 rounded-full w-7 h-7 p-0"
+                        onClick={() => photoInputRef.current?.click()}
+                        disabled={isUploadingPhoto}
+                        data-testid="button-change-photo"
+                      >
+                        {isUploadingPhoto ? <Loader2 className="w-3 h-3 animate-spin" /> : <Camera className="w-3 h-3" />}
+                      </Button>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg">{currentUser?.name || userName}</h3>
+                      <Badge variant="outline" className="mt-1 text-primary border-primary/30">
+                        {currentUser?.role || role}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Profile Details */}
+                  {isEditingProfile ? (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="profile-name">Full Name</Label>
+                        <Input
+                          id="profile-name"
+                          value={profileForm.name}
+                          onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                          placeholder="Enter your name"
+                          data-testid="input-profile-name"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="profile-email">Email Address</Label>
+                        <Input
+                          id="profile-email"
+                          type="email"
+                          value={profileForm.email}
+                          onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                          placeholder="Enter your email"
+                          data-testid="input-profile-email"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="profile-phone">Phone Number</Label>
+                        <Input
+                          id="profile-phone"
+                          type="tel"
+                          value={profileForm.phone}
+                          onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                          placeholder="Enter phone number"
+                          data-testid="input-profile-phone"
+                        />
+                      </div>
+                      
+                      {currentUser?.role !== 'CEO' && (
+                        <div className="space-y-2">
+                          <Label htmlFor="profile-role">Role</Label>
+                          <Select
+                            value={profileForm.role}
+                            onValueChange={(value) => setProfileForm({ ...profileForm, role: value })}
+                          >
+                            <SelectTrigger data-testid="select-profile-role">
+                              <SelectValue placeholder="Select role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Analyst">Analyst</SelectItem>
+                              <SelectItem value="Associate">Associate</SelectItem>
+                              <SelectItem value="Director">Director</SelectItem>
+                              <SelectItem value="Managing Director">Managing Director</SelectItem>
+                              <SelectItem value="Custom">Custom Title</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      
+                      {profileForm.role === 'Custom' && (
+                        <div className="space-y-2">
+                          <Label htmlFor="profile-job-title">Custom Job Title</Label>
+                          <Input
+                            id="profile-job-title"
+                            value={profileForm.jobTitle}
+                            onChange={(e) => setProfileForm({ ...profileForm, jobTitle: e.target.value })}
+                            placeholder="Enter your job title"
+                            data-testid="input-profile-job-title"
+                          />
+                        </div>
+                      )}
+                      
+                      <div className="flex gap-2 pt-2">
+                        <Button 
+                          variant="outline" 
+                          onClick={handleCancelEditProfile}
+                          className="flex-1"
+                          data-testid="button-cancel-profile"
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          onClick={handleSaveProfile}
+                          disabled={updateUserProfile.isPending}
+                          className="flex-1"
+                          data-testid="button-save-profile"
+                        >
+                          {updateUserProfile.isPending ? "Saving..." : "Save Changes"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-lg">
+                          <Mail className="w-4 h-4 text-muted-foreground" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-muted-foreground">Email</p>
+                            <p className="text-sm font-medium truncate">{currentUser?.email || 'Not set'}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-lg">
+                          <Phone className="w-4 h-4 text-muted-foreground" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-muted-foreground">Phone</p>
+                            <p className="text-sm font-medium">{(currentUser as any)?.phone || 'Not set'}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-lg">
+                          <Briefcase className="w-4 h-4 text-muted-foreground" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-muted-foreground">Department</p>
+                            <p className="text-sm font-medium">Investment Banking</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-lg">
+                          <Target className="w-4 h-4 text-muted-foreground" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-muted-foreground">Performance Score</p>
+                            <p className="text-sm font-medium">{currentUser?.score || 0}%</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-lg">
+                          <CheckSquare className="w-4 h-4 text-muted-foreground" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-muted-foreground">Tasks Completed</p>
+                            <p className="text-sm font-medium">{currentUser?.completedTasks || 0}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-lg">
+                          <Briefcase className="w-4 h-4 text-muted-foreground" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-muted-foreground">Active Deals</p>
+                            <p className="text-sm font-medium">{currentUser?.activeDeals || 0}</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={handleStartEditProfile}
+                        data-testid="button-edit-profile"
+                      >
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Edit Profile
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
             
             {/* Notifications Tab */}
             <TabsContent value="notifications" className="mt-4 space-y-4">
