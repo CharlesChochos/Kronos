@@ -616,7 +616,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                     </AvatarFallback>
                   </Avatar>
                   <div className="text-left hidden md:block">
-                    <p className="text-sm font-medium leading-none">{userName}</p>
+                    <p className="text-sm font-medium leading-none">{currentUser?.name || userName}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {currentUser?.role === 'Custom' && (currentUser as any)?.jobTitle 
                         ? (currentUser as any).jobTitle 
