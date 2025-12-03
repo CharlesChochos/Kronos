@@ -19,13 +19,23 @@ import {
   Clock,
   Paperclip,
   X,
-  FileText
+  FileText,
+  Loader2
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import { useCurrentUser, useUsers, useDeals, useTasks, useCreateTask } from "@/lib/api";
+import { useCurrentUser, useUsers, useDeals, useTasks, useCreateTask, useCreateTaskAttachment } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Deal, User } from "@shared/schema";
+
+type UploadedFile = {
+  id: string;
+  filename: string;
+  url: string;
+  size: number;
+  type: string;
+  uploadedAt: string;
+};
 
 export default function TeamAssignment() {
   const searchString = useSearch();
@@ -34,6 +44,7 @@ export default function TeamAssignment() {
   const { data: deals = [], isLoading: dealsLoading } = useDeals();
   const { data: tasks = [] } = useTasks();
   const createTask = useCreateTask();
+  const createAttachment = useCreateTaskAttachment();
   const [highlightedUserId, setHighlightedUserId] = useState<string | null>(null);
   const userRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
@@ -66,7 +77,8 @@ export default function TeamAssignment() {
     type: 'Analysis',
     dueDate: new Date().toISOString().split('T')[0],
   });
-  const [taskAttachments, setTaskAttachments] = useState<File[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getUserTaskCount = (userId: string) => tasks.filter(t => t.assignedTo === userId && t.status !== 'Completed').length;
@@ -82,15 +94,52 @@ export default function TeamAssignment() {
     return getUserAvailability(user.id) === filterAvailability;
   });
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files) {
-      setTaskAttachments(prev => [...prev, ...Array.from(files)]);
+    if (!files || files.length === 0) return;
+    
+    setIsUploading(true);
+    
+    try {
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to upload file');
+        }
+        
+        const uploadedFile: UploadedFile = await response.json();
+        setUploadedFiles(prev => [...prev, uploadedFile]);
+      }
+      toast.success(`${files.length} file(s) uploaded successfully`);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to upload file');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
-  const removeAttachment = (index: number) => {
-    setTaskAttachments(prev => prev.filter((_, i) => i !== index));
+  const removeAttachment = async (index: number) => {
+    const file = uploadedFiles[index];
+    if (file) {
+      try {
+        const filename = file.url.replace('/uploads/', '');
+        await fetch(`/api/upload/${filename}`, { method: 'DELETE' });
+      } catch (error) {
+        console.error('Failed to delete file:', error);
+      }
+    }
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleAssignTask = async () => {
@@ -99,16 +148,15 @@ export default function TeamAssignment() {
       return;
     }
     try {
-      // Convert files to attachment objects (in a real app, you'd upload these to storage first)
-      const attachmentObjects = taskAttachments.map(file => ({
-        id: crypto.randomUUID(),
-        filename: file.name,
-        url: URL.createObjectURL(file), // In production, this would be a real upload URL
+      const attachmentObjects = uploadedFiles.map(file => ({
+        id: file.id,
+        filename: file.filename,
+        url: file.url,
         size: file.size,
-        uploadedAt: new Date().toISOString(),
+        uploadedAt: file.uploadedAt,
       }));
 
-      await createTask.mutateAsync({
+      const createdTask = await createTask.mutateAsync({
         title: newTask.title,
         description: newTask.description || null,
         dealId: selectedDeal,
@@ -120,10 +168,21 @@ export default function TeamAssignment() {
         status: 'Pending',
         attachments: attachmentObjects.length > 0 ? attachmentObjects : [],
       });
+      
+      for (const file of uploadedFiles) {
+        await createAttachment.mutateAsync({
+          taskId: createdTask.id,
+          filename: file.url.split('/').pop() || file.filename,
+          originalName: file.filename,
+          mimeType: file.type || null,
+          size: file.size,
+        });
+      }
+      
       toast.success(`Task assigned to ${selectedUser.name}!`);
       setShowAssignModal(false);
       setNewTask({ title: '', description: '', priority: 'Medium', type: 'Analysis', dueDate: new Date().toISOString().split('T')[0] });
-      setTaskAttachments([]);
+      setUploadedFiles([]);
       setSelectedUser(null);
     } catch (error: any) {
       toast.error(error.message || "Failed to assign task");
@@ -388,22 +447,28 @@ export default function TeamAssignment() {
                 onChange={handleFileSelect}
                 multiple
                 className="hidden"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
               />
               <Button 
                 type="button" 
                 variant="outline" 
                 className="w-full"
                 onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
               >
-                <Paperclip className="w-4 h-4 mr-2" /> Add Files
+                {isUploading ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading...</>
+                ) : (
+                  <><Paperclip className="w-4 h-4 mr-2" /> Add Files</>
+                )}
               </Button>
-              {taskAttachments.length > 0 && (
+              {uploadedFiles.length > 0 && (
                 <div className="space-y-2 mt-2">
-                  {taskAttachments.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-secondary/30 rounded-lg">
+                  {uploadedFiles.map((file, index) => (
+                    <div key={file.id} className="flex items-center justify-between p-2 bg-secondary/30 rounded-lg">
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-primary" />
-                        <span className="text-sm truncate max-w-48">{file.name}</span>
+                        <span className="text-sm truncate max-w-48">{file.filename}</span>
                         <span className="text-xs text-muted-foreground">
                           ({(file.size / 1024).toFixed(1)} KB)
                         </span>

@@ -1501,3 +1501,65 @@ export function useDeleteCalendarEvent() {
     },
   });
 }
+
+// ===== TASK ATTACHMENT HOOKS =====
+
+export type TaskAttachmentType = {
+  id: string;
+  taskId: string;
+  filename: string;
+  originalName: string;
+  mimeType: string | null;
+  size: number | null;
+  uploadedBy: string | null;
+  uploadedAt: string;
+};
+
+export function useTaskAttachments(taskId: string) {
+  return useQuery({
+    queryKey: ["task-attachments", taskId],
+    queryFn: async () => {
+      const res = await fetch(`/api/task-attachments/${taskId}`);
+      if (!res.ok) throw new Error("Failed to fetch task attachments");
+      return res.json() as Promise<TaskAttachmentType[]>;
+    },
+    enabled: !!taskId,
+  });
+}
+
+export function useCreateTaskAttachment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (attachment: Omit<TaskAttachmentType, 'id' | 'uploadedBy' | 'uploadedAt'>) => {
+      const res = await fetch("/api/task-attachments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(attachment),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create task attachment");
+      }
+      return res.json() as Promise<TaskAttachmentType>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["task-attachments", data.taskId] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+}
+
+export function useDeleteTaskAttachment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/task-attachments/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete task attachment");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task-attachments"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+}

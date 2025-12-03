@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import {
   ChevronRight,
   Loader2
 } from "lucide-react";
-import { useCurrentUser, useDeals, useGenerateDocument, useDocumentTemplates, useUpdateDocumentTemplate } from "@/lib/api";
+import { useCurrentUser, useDeals, useGenerateDocument, useDocumentTemplates, useUpdateDocumentTemplate, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
@@ -36,6 +36,8 @@ export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorPro
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [], isLoading: isLoadingDeals } = useDeals();
   const { data: templates = [], isLoading: isLoadingTemplates } = useDocumentTemplates();
+  const { data: userPrefs, isLoading: isLoadingPrefs } = useUserPreferences();
+  const saveUserPrefs = useSaveUserPreferences();
   const generateDocument = useGenerateDocument();
   const updateTemplate = useUpdateDocumentTemplate();
   
@@ -48,6 +50,60 @@ export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorPro
     finra: false,
     legal: true,
   });
+  const [complianceInitialized, setComplianceInitialized] = useState(false);
+
+  // Load compliance options from user preferences
+  useEffect(() => {
+    if (!isLoadingPrefs && !complianceInitialized) {
+      if (userPrefs?.complianceDefaults) {
+        const defaults = userPrefs.complianceDefaults as { sec?: boolean; finra?: boolean; legal?: boolean };
+        setComplianceOptions({
+          sec: defaults.sec ?? false,
+          finra: defaults.finra ?? false,
+          legal: defaults.legal ?? true,
+        });
+      }
+      setComplianceInitialized(true);
+    }
+  }, [isLoadingPrefs, userPrefs, complianceInitialized]);
+
+  // Track previous compliance options to avoid unnecessary saves
+  const prevComplianceRef = useRef<string | null>(null);
+  
+  // Save compliance options to database (debounced)
+  useEffect(() => {
+    if (!complianceInitialized || isLoadingPrefs) return;
+    
+    const currentJson = JSON.stringify(complianceOptions);
+    
+    // Skip save if values haven't changed from last save
+    if (prevComplianceRef.current === currentJson) return;
+    
+    // Skip initial save if values match server state
+    if (prevComplianceRef.current === null && userPrefs?.complianceDefaults) {
+      const serverJson = JSON.stringify({
+        sec: (userPrefs.complianceDefaults as any).sec ?? false,
+        finra: (userPrefs.complianceDefaults as any).finra ?? false,
+        legal: (userPrefs.complianceDefaults as any).legal ?? true,
+      });
+      if (currentJson === serverJson) {
+        prevComplianceRef.current = currentJson;
+        return;
+      }
+    }
+    
+    const timeout = setTimeout(() => {
+      // Extract only mutable fields from userPrefs
+      const { id, userId, updatedAt, ...mutablePrefs } = (userPrefs || {}) as any;
+      saveUserPrefs.mutate({
+        ...mutablePrefs,
+        complianceDefaults: complianceOptions,
+      });
+      prevComplianceRef.current = currentJson;
+    }, 1000);
+    
+    return () => clearTimeout(timeout);
+  }, [complianceOptions, complianceInitialized, isLoadingPrefs, userPrefs]);
 
   // Set initial deal once data loads or when deals change
   useEffect(() => {
@@ -208,7 +264,7 @@ export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorPro
     }
   };
 
-  const isDataLoading = isLoadingDeals || isLoadingTemplates;
+  const isDataLoading = isLoadingDeals || isLoadingTemplates || isLoadingPrefs;
 
   if (isDataLoading) {
     return (
