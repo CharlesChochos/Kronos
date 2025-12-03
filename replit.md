@@ -73,6 +73,11 @@ Preferred communication style: Simple, everyday language.
 - **Tasks table**: Task assignments with references to users and deals, priority levels, due dates, and status tracking
 - **Meetings table**: Meeting scheduling with title, date/time, attendees, location, deal association, and description
 - **Notifications table**: User notifications with type (info/success/warning/alert), title, message, read status, and link reference
+- **investor_matches table**: Stores investor match/reject decisions per user with status (matched/rejected/pending)
+- **user_preferences table**: Dashboard widgets, sidebar collapsed state, theme, market symbols, compliance defaults, and settings
+- **deal_templates table**: Document templates with category, description, sections, and sector-specific tags
+- **calendar_events table**: Capital raising events with investor, deal, status, location, and notes
+- **task_attachments table**: File metadata for task attachments (filename, URL, size, type)
 
 **Type Safety**
 - Zod schemas generated from Drizzle table definitions
