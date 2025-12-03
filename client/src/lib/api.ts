@@ -164,7 +164,10 @@ export function useUpdateDeal() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),
       });
-      if (!res.ok) throw new Error("Failed to update deal");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Failed to update deal" }));
+        throw new Error(errorData.error || "Failed to update deal");
+      }
       return res.json();
     },
     onSuccess: () => {

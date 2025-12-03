@@ -40,10 +40,65 @@ export default function InvestorMatching() {
   });
   
   const [selectedDeal, setSelectedDeal] = useState<string>('');
-  const [matchedInvestors, setMatchedInvestors] = useState<typeof INVESTORS>([]);
-  const [rejectedInvestors, setRejectedInvestors] = useState<number[]>([]);
   const [showContactModal, setShowContactModal] = useState<typeof INVESTORS[0] | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
+  
+  // Persist matched/rejected investors per deal in localStorage
+  const getStorageKey = (dealId: string, type: 'matched' | 'rejected') => 
+    `investor_${type}_${dealId}`;
+  
+  const [matchedInvestors, setMatchedInvestors] = useState<typeof INVESTORS>(() => {
+    if (!selectedDeal) return [];
+    const saved = localStorage.getItem(getStorageKey(selectedDeal, 'matched'));
+    if (saved) {
+      const savedIds = JSON.parse(saved) as number[];
+      return INVESTORS.filter(inv => savedIds.includes(inv.id));
+    }
+    return [];
+  });
+  
+  const [rejectedInvestors, setRejectedInvestors] = useState<number[]>(() => {
+    if (!selectedDeal) return [];
+    const saved = localStorage.getItem(getStorageKey(selectedDeal, 'rejected'));
+    return saved ? JSON.parse(saved) : [];
+  });
+  
+  // Load matched/rejected state when deal changes
+  useEffect(() => {
+    if (selectedDeal) {
+      const savedMatched = localStorage.getItem(getStorageKey(selectedDeal, 'matched'));
+      const savedRejected = localStorage.getItem(getStorageKey(selectedDeal, 'rejected'));
+      
+      if (savedMatched) {
+        const savedIds = JSON.parse(savedMatched) as number[];
+        setMatchedInvestors(INVESTORS.filter(inv => savedIds.includes(inv.id)));
+      } else {
+        setMatchedInvestors([]);
+      }
+      
+      setRejectedInvestors(savedRejected ? JSON.parse(savedRejected) : []);
+    }
+  }, [selectedDeal]);
+  
+  // Save matched investors to localStorage when changed (including empty arrays)
+  useEffect(() => {
+    if (selectedDeal) {
+      localStorage.setItem(
+        getStorageKey(selectedDeal, 'matched'), 
+        JSON.stringify(matchedInvestors.map(inv => inv.id))
+      );
+    }
+  }, [matchedInvestors, selectedDeal]);
+  
+  // Save rejected investors to localStorage when changed (including empty arrays)
+  useEffect(() => {
+    if (selectedDeal) {
+      localStorage.setItem(
+        getStorageKey(selectedDeal, 'rejected'), 
+        JSON.stringify(rejectedInvestors)
+      );
+    }
+  }, [rejectedInvestors, selectedDeal]);
   
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);

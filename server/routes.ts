@@ -458,18 +458,40 @@ export async function registerRoutes(
     }
   });
 
-  // Update deal (CEO only)
-  app.patch("/api/deals/:id", requireCEO, async (req, res) => {
+  // Update deal (CEO can update any deal, employees can only update deals they're assigned to)
+  app.patch("/api/deals/:id", requireAuth, async (req, res) => {
     try {
+      const user = req.user as any;
+      const deal = await storage.getDeal(req.params.id);
+      
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+      
+      // CEOs can update any deal
+      if (user.role !== 'CEO') {
+        // Employees can only update deals they're assigned to (in pod team)
+        const podTeam = (deal as any).podTeam || [];
+        const isAssigned = podTeam.some((member: any) => 
+          (user.id && (member.userId === user.id || member.id === user.id)) ||
+          (user.email && member.email === user.email) ||
+          (user.name && member.name === user.name)
+        );
+        
+        if (!isAssigned) {
+          return res.status(403).json({ error: "You can only update deals you're assigned to" });
+        }
+      }
+      
       const result = insertDealSchema.partial().safeParse(req.body);
       if (!result.success) {
         return res.status(400).json({ error: fromError(result.error).toString() });
       }
-      const deal = await storage.updateDeal(req.params.id, result.data);
-      if (!deal) {
+      const updatedDeal = await storage.updateDeal(req.params.id, result.data);
+      if (!updatedDeal) {
         return res.status(404).json({ error: "Deal not found" });
       }
-      res.json(deal);
+      res.json(updatedDeal);
     } catch (error) {
       res.status(500).json({ error: "Failed to update deal" });
     }
