@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
   Globe,
   Heart
 } from "lucide-react";
-import { useCurrentUser, useDeals, useUpdateDeal } from "@/lib/api";
+import { useCurrentUser, useDeals, useUpdateDeal, useInvestorMatches, useCreateInvestorMatch, useDeleteInvestorMatch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion";
@@ -32,62 +32,29 @@ export default function InvestorMatching() {
   const [showContactModal, setShowContactModal] = useState<typeof INVESTORS[0] | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   
-  // Persist matched/rejected investors per deal in localStorage
-  const getStorageKey = (dealId: string, type: 'matched' | 'rejected') => 
-    `investor_${type}_${dealId}`;
+  const { data: investorMatches = [] } = useInvestorMatches(selectedDeal || null);
+  const createMatch = useCreateInvestorMatch();
+  const deleteMatch = useDeleteInvestorMatch();
   
-  const [matchedInvestors, setMatchedInvestors] = useState<typeof INVESTORS>(() => {
-    if (!selectedDeal) return [];
-    const saved = localStorage.getItem(getStorageKey(selectedDeal, 'matched'));
-    if (saved) {
-      const savedIds = JSON.parse(saved) as number[];
-      return INVESTORS.filter(inv => savedIds.includes(inv.id));
-    }
-    return [];
-  });
+  const [rejectedInvestors, setRejectedInvestors] = useState<number[]>([]);
   
-  const [rejectedInvestors, setRejectedInvestors] = useState<number[]>(() => {
-    if (!selectedDeal) return [];
-    const saved = localStorage.getItem(getStorageKey(selectedDeal, 'rejected'));
-    return saved ? JSON.parse(saved) : [];
-  });
+  const matchedInvestors = useMemo(() => {
+    const matchedIds = investorMatches
+      .filter(m => m.status === 'matched')
+      .map(m => m.investorId);
+    return INVESTORS.filter(inv => matchedIds.includes(inv.id));
+  }, [investorMatches]);
   
-  // Load matched/rejected state when deal changes
   useEffect(() => {
     if (selectedDeal) {
-      const savedMatched = localStorage.getItem(getStorageKey(selectedDeal, 'matched'));
-      const savedRejected = localStorage.getItem(getStorageKey(selectedDeal, 'rejected'));
-      
-      if (savedMatched) {
-        const savedIds = JSON.parse(savedMatched) as number[];
-        setMatchedInvestors(INVESTORS.filter(inv => savedIds.includes(inv.id)));
-      } else {
-        setMatchedInvestors([]);
-      }
-      
-      setRejectedInvestors(savedRejected ? JSON.parse(savedRejected) : []);
+      const rejectedIds = investorMatches
+        .filter(m => m.status === 'rejected')
+        .map(m => m.investorId);
+      setRejectedInvestors(rejectedIds);
+    } else {
+      setRejectedInvestors([]);
     }
-  }, [selectedDeal]);
-  
-  // Save matched investors to localStorage when changed (including empty arrays)
-  useEffect(() => {
-    if (selectedDeal) {
-      localStorage.setItem(
-        getStorageKey(selectedDeal, 'matched'), 
-        JSON.stringify(matchedInvestors.map(inv => inv.id))
-      );
-    }
-  }, [matchedInvestors, selectedDeal]);
-  
-  // Save rejected investors to localStorage when changed (including empty arrays)
-  useEffect(() => {
-    if (selectedDeal) {
-      localStorage.setItem(
-        getStorageKey(selectedDeal, 'rejected'), 
-        JSON.stringify(rejectedInvestors)
-      );
-    }
-  }, [rejectedInvestors, selectedDeal]);
+  }, [selectedDeal, investorMatches]);
   
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);
@@ -150,22 +117,35 @@ export default function InvestorMatching() {
   };
 
   const handleSwipe = useCallback(async (direction: 'left' | 'right') => {
-    if (!currentInvestor || isAnimating) return;
+    if (!currentInvestor || isAnimating || !selectedDeal) return;
     
     setIsAnimating(true);
     
-    if (direction === 'right') {
-      setMatchedInvestors(prev => [...prev, currentInvestor]);
-      await addInvestorToTaggedList(currentInvestor);
-      toast.success(`Matched with ${currentInvestor.name}! Added to deal.`);
-    } else {
-      setRejectedInvestors(prev => [...prev, currentInvestor.id]);
-      toast.info(`Passed on ${currentInvestor.name}`);
+    try {
+      if (direction === 'right') {
+        await createMatch.mutateAsync({
+          dealId: selectedDeal,
+          investorId: currentInvestor.id,
+          status: 'matched',
+        });
+        await addInvestorToTaggedList(currentInvestor);
+        toast.success(`Matched with ${currentInvestor.name}! Added to deal.`);
+      } else {
+        await createMatch.mutateAsync({
+          dealId: selectedDeal,
+          investorId: currentInvestor.id,
+          status: 'rejected',
+        });
+        toast.info(`Passed on ${currentInvestor.name}`);
+      }
+    } catch (error) {
+      console.error('Failed to save match:', error);
+      toast.error('Failed to save decision');
     }
     
     x.set(0);
     setIsAnimating(false);
-  }, [currentInvestor, isAnimating, currentDeal, selectedDeal]);
+  }, [currentInvestor, isAnimating, selectedDeal, createMatch]);
 
   const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const threshold = 100;
@@ -203,10 +183,17 @@ export default function InvestorMatching() {
     }
   };
 
-  const resetMatches = () => {
-    setMatchedInvestors([]);
-    setRejectedInvestors([]);
-    toast.info("Matches reset");
+  const resetMatches = async () => {
+    if (!selectedDeal) return;
+    try {
+      const res = await fetch(`/api/investor-matches/${selectedDeal}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to reset matches');
+      setRejectedInvestors([]);
+      toast.info("Matches reset");
+    } catch (error) {
+      console.error('Failed to reset matches:', error);
+      toast.error("Failed to reset matches");
+    }
   };
 
   if (isLoading) {

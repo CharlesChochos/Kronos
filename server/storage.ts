@@ -2,7 +2,7 @@ import { eq, and, desc, gt } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@shared/schema";
-import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess, DocumentTemplate, InsertDocumentTemplate } from "@shared/schema";
+import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess, DocumentTemplate, InsertDocumentTemplate, InvestorMatch, InsertInvestorMatch, UserPreferences, InsertUserPreferences, DealTemplate, InsertDealTemplate, CalendarEvent, InsertCalendarEvent, TaskAttachmentRecord, InsertTaskAttachmentRecord } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -167,6 +167,37 @@ export interface IStorage {
   createDocumentTemplate(template: InsertDocumentTemplate): Promise<DocumentTemplate>;
   updateDocumentTemplate(id: string, updates: Partial<InsertDocumentTemplate>): Promise<DocumentTemplate | undefined>;
   deleteDocumentTemplate(id: string): Promise<void>;
+  
+  // Investor Match operations
+  getInvestorMatchesByDeal(dealId: string): Promise<InvestorMatch[]>;
+  createInvestorMatch(match: InsertInvestorMatch): Promise<InvestorMatch>;
+  deleteInvestorMatch(dealId: string, investorId: number): Promise<void>;
+  deleteInvestorMatchesByDeal(dealId: string): Promise<void>;
+  
+  // User Preferences operations
+  getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
+  upsertUserPreferences(prefs: InsertUserPreferences): Promise<UserPreferences>;
+  updateUserPreferencesRecord(userId: string, updates: Partial<InsertUserPreferences>): Promise<UserPreferences | undefined>;
+  
+  // Deal Template operations
+  getDealTemplate(id: string): Promise<DealTemplate | undefined>;
+  getAllDealTemplates(): Promise<DealTemplate[]>;
+  createDealTemplate(template: InsertDealTemplate): Promise<DealTemplate>;
+  updateDealTemplate(id: string, updates: Partial<InsertDealTemplate>): Promise<DealTemplate | undefined>;
+  deleteDealTemplate(id: string): Promise<void>;
+  
+  // Calendar Event operations
+  getCalendarEvent(id: string): Promise<CalendarEvent | undefined>;
+  getAllCalendarEvents(): Promise<CalendarEvent[]>;
+  getCalendarEventsByDeal(dealId: string): Promise<CalendarEvent[]>;
+  createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
+  updateCalendarEvent(id: string, updates: Partial<InsertCalendarEvent>): Promise<CalendarEvent | undefined>;
+  deleteCalendarEvent(id: string): Promise<void>;
+  
+  // Task Attachment Record operations
+  getTaskAttachmentRecords(taskId: string): Promise<TaskAttachmentRecord[]>;
+  createTaskAttachmentRecord(attachment: InsertTaskAttachmentRecord): Promise<TaskAttachmentRecord>;
+  deleteTaskAttachmentRecord(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -879,6 +910,134 @@ export class DatabaseStorage implements IStorage {
   
   async deleteDocumentTemplate(id: string): Promise<void> {
     await db.delete(schema.documentTemplates).where(eq(schema.documentTemplates.id, id));
+  }
+  
+  // Investor Match operations
+  async getInvestorMatchesByDeal(dealId: string): Promise<InvestorMatch[]> {
+    return await db.select().from(schema.investorMatches)
+      .where(eq(schema.investorMatches.dealId, dealId))
+      .orderBy(desc(schema.investorMatches.matchedAt));
+  }
+  
+  async createInvestorMatch(match: InsertInvestorMatch): Promise<InvestorMatch> {
+    const [created] = await db.insert(schema.investorMatches).values(match).returning();
+    return created;
+  }
+  
+  async deleteInvestorMatch(dealId: string, investorId: number): Promise<void> {
+    await db.delete(schema.investorMatches)
+      .where(and(
+        eq(schema.investorMatches.dealId, dealId),
+        eq(schema.investorMatches.investorId, investorId)
+      ));
+  }
+  
+  async deleteInvestorMatchesByDeal(dealId: string): Promise<void> {
+    await db.delete(schema.investorMatches).where(eq(schema.investorMatches.dealId, dealId));
+  }
+  
+  // User Preferences operations
+  async getUserPreferences(userId: string): Promise<UserPreferences | undefined> {
+    const [prefs] = await db.select().from(schema.userPreferences).where(eq(schema.userPreferences.userId, userId));
+    return prefs;
+  }
+  
+  async upsertUserPreferences(prefs: InsertUserPreferences): Promise<UserPreferences> {
+    const existing = await this.getUserPreferences(prefs.userId);
+    if (existing) {
+      const [updated] = await db.update(schema.userPreferences)
+        .set({ ...prefs, updatedAt: new Date() })
+        .where(eq(schema.userPreferences.userId, prefs.userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(schema.userPreferences).values(prefs).returning();
+      return created;
+    }
+  }
+  
+  async updateUserPreferencesRecord(userId: string, updates: Partial<InsertUserPreferences>): Promise<UserPreferences | undefined> {
+    const [updated] = await db.update(schema.userPreferences)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.userPreferences.userId, userId))
+      .returning();
+    return updated;
+  }
+  
+  // Deal Template operations
+  async getDealTemplate(id: string): Promise<DealTemplate | undefined> {
+    const [template] = await db.select().from(schema.dealTemplates).where(eq(schema.dealTemplates.id, id));
+    return template;
+  }
+  
+  async getAllDealTemplates(): Promise<DealTemplate[]> {
+    return await db.select().from(schema.dealTemplates).orderBy(desc(schema.dealTemplates.usageCount));
+  }
+  
+  async createDealTemplate(template: InsertDealTemplate): Promise<DealTemplate> {
+    const [created] = await db.insert(schema.dealTemplates).values(template).returning();
+    return created;
+  }
+  
+  async updateDealTemplate(id: string, updates: Partial<InsertDealTemplate>): Promise<DealTemplate | undefined> {
+    const [updated] = await db.update(schema.dealTemplates)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.dealTemplates.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteDealTemplate(id: string): Promise<void> {
+    await db.delete(schema.dealTemplates).where(eq(schema.dealTemplates.id, id));
+  }
+  
+  // Calendar Event operations
+  async getCalendarEvent(id: string): Promise<CalendarEvent | undefined> {
+    const [event] = await db.select().from(schema.calendarEvents).where(eq(schema.calendarEvents.id, id));
+    return event;
+  }
+  
+  async getAllCalendarEvents(): Promise<CalendarEvent[]> {
+    return await db.select().from(schema.calendarEvents).orderBy(schema.calendarEvents.date);
+  }
+  
+  async getCalendarEventsByDeal(dealId: string): Promise<CalendarEvent[]> {
+    return await db.select().from(schema.calendarEvents)
+      .where(eq(schema.calendarEvents.dealId, dealId))
+      .orderBy(schema.calendarEvents.date);
+  }
+  
+  async createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent> {
+    const [created] = await db.insert(schema.calendarEvents).values(event).returning();
+    return created;
+  }
+  
+  async updateCalendarEvent(id: string, updates: Partial<InsertCalendarEvent>): Promise<CalendarEvent | undefined> {
+    const [updated] = await db.update(schema.calendarEvents)
+      .set(updates)
+      .where(eq(schema.calendarEvents.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteCalendarEvent(id: string): Promise<void> {
+    await db.delete(schema.calendarEvents).where(eq(schema.calendarEvents.id, id));
+  }
+  
+  // Task Attachment Record operations
+  async getTaskAttachmentRecords(taskId: string): Promise<TaskAttachmentRecord[]> {
+    return await db.select().from(schema.taskAttachmentsTable)
+      .where(eq(schema.taskAttachmentsTable.taskId, taskId))
+      .orderBy(desc(schema.taskAttachmentsTable.uploadedAt));
+  }
+  
+  async createTaskAttachmentRecord(attachment: InsertTaskAttachmentRecord): Promise<TaskAttachmentRecord> {
+    const [created] = await db.insert(schema.taskAttachmentsTable).values(attachment).returning();
+    return created;
+  }
+  
+  async deleteTaskAttachmentRecord(id: string): Promise<void> {
+    await db.delete(schema.taskAttachmentsTable).where(eq(schema.taskAttachmentsTable.id, id));
   }
 }
 

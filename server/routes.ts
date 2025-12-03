@@ -6,7 +6,7 @@ import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import bcrypt from "bcryptjs";
-import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema, insertAssistantConversationSchema, insertAssistantMessageSchema, insertTimeEntrySchema, insertTimeOffRequestSchema, insertAuditLogSchema, insertInvestorSchema, insertInvestorInteractionSchema, insertOkrSchema, insertStakeholderSchema, insertAnnouncementSchema, insertPollSchema, insertMentorshipPairingSchema, insertClientPortalAccessSchema, insertDocumentTemplateSchema } from "@shared/schema";
+import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema, insertAssistantConversationSchema, insertAssistantMessageSchema, insertTimeEntrySchema, insertTimeOffRequestSchema, insertAuditLogSchema, insertInvestorSchema, insertInvestorInteractionSchema, insertOkrSchema, insertStakeholderSchema, insertAnnouncementSchema, insertPollSchema, insertMentorshipPairingSchema, insertClientPortalAccessSchema, insertDocumentTemplateSchema, insertInvestorMatchSchema, insertUserPreferencesSchema, insertDealTemplateSchema, insertCalendarEventSchema, insertTaskAttachmentRecordSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import { sendMeetingInvite, sendPasswordResetEmail } from "./email";
 import { validateBody, loginSchema, signupSchema, forgotPasswordSchema, resetPasswordSchema } from "./validation";
@@ -3020,6 +3020,317 @@ Guidelines:
       res.json({ message: "Document template deleted" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete document template" });
+    }
+  });
+
+  // ===== INVESTOR MATCH ROUTES =====
+  
+  // Get investor matches by deal
+  app.get("/api/investor-matches/:dealId", requireAuth, async (req, res) => {
+    try {
+      const matches = await storage.getInvestorMatchesByDeal(req.params.dealId);
+      res.json(matches);
+    } catch (error) {
+      console.error('Get investor matches error:', error);
+      res.status(500).json({ error: "Failed to fetch investor matches" });
+    }
+  });
+  
+  // Create investor match
+  app.post("/api/investor-matches", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const result = insertInvestorMatchSchema.safeParse({
+        ...req.body,
+        matchedBy: user.id,
+      });
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const match = await storage.createInvestorMatch(result.data);
+      res.status(201).json(match);
+    } catch (error) {
+      console.error('Create investor match error:', error);
+      res.status(500).json({ error: "Failed to create investor match" });
+    }
+  });
+  
+  // Delete investor match
+  app.delete("/api/investor-matches/:dealId/:investorId", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteInvestorMatch(req.params.dealId, parseInt(req.params.investorId));
+      res.json({ message: "Investor match deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete investor match" });
+    }
+  });
+  
+  // Delete all investor matches for a deal
+  app.delete("/api/investor-matches/:dealId", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteInvestorMatchesByDeal(req.params.dealId);
+      res.json({ message: "All investor matches deleted for deal" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete investor matches" });
+    }
+  });
+
+  // ===== USER PREFERENCES ROUTES =====
+  
+  // Get user preferences
+  app.get("/api/user-preferences", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const prefs = await storage.getUserPreferences(user.id);
+      res.json(prefs || {
+        userId: user.id,
+        dashboardWidgets: [],
+        sidebarCollapsed: false,
+        theme: 'system',
+        complianceDefaults: { sec: false, finra: false, legal: true },
+        marketSymbols: ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY'],
+      });
+    } catch (error) {
+      console.error('Get user preferences error:', error);
+      res.status(500).json({ error: "Failed to fetch user preferences" });
+    }
+  });
+  
+  // Upsert user preferences
+  app.post("/api/user-preferences", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const result = insertUserPreferencesSchema.safeParse({
+        ...req.body,
+        userId: user.id,
+      });
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const prefs = await storage.upsertUserPreferences(result.data);
+      res.json(prefs);
+    } catch (error) {
+      console.error('Upsert user preferences error:', error);
+      res.status(500).json({ error: "Failed to save user preferences" });
+    }
+  });
+  
+  // Update specific user preferences fields
+  app.patch("/api/user-preferences", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      // First ensure preferences exist
+      let prefs = await storage.getUserPreferences(user.id);
+      if (!prefs) {
+        prefs = await storage.upsertUserPreferences({
+          userId: user.id,
+          ...req.body,
+        });
+      } else {
+        prefs = await storage.updateUserPreferencesRecord(user.id, req.body);
+      }
+      res.json(prefs);
+    } catch (error) {
+      console.error('Update user preferences error:', error);
+      res.status(500).json({ error: "Failed to update user preferences" });
+    }
+  });
+
+  // ===== DEAL TEMPLATE ROUTES =====
+  
+  // Get all deal templates
+  app.get("/api/deal-templates", requireAuth, async (req, res) => {
+    try {
+      const templates = await storage.getAllDealTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error('Get deal templates error:', error);
+      res.status(500).json({ error: "Failed to fetch deal templates" });
+    }
+  });
+  
+  // Get single deal template
+  app.get("/api/deal-templates/:id", requireAuth, async (req, res) => {
+    try {
+      const template = await storage.getDealTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Deal template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch deal template" });
+    }
+  });
+  
+  // Create deal template
+  app.post("/api/deal-templates", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const result = insertDealTemplateSchema.safeParse({
+        ...req.body,
+        createdBy: user.id,
+      });
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const template = await storage.createDealTemplate(result.data);
+      res.status(201).json(template);
+    } catch (error) {
+      console.error('Create deal template error:', error);
+      res.status(500).json({ error: "Failed to create deal template" });
+    }
+  });
+  
+  // Update deal template
+  app.patch("/api/deal-templates/:id", requireAuth, async (req, res) => {
+    try {
+      const template = await storage.getDealTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Deal template not found" });
+      }
+      const updated = await storage.updateDealTemplate(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update deal template" });
+    }
+  });
+  
+  // Delete deal template (CEO only)
+  app.delete("/api/deal-templates/:id", requireCEO, async (req, res) => {
+    try {
+      const template = await storage.getDealTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Deal template not found" });
+      }
+      await storage.deleteDealTemplate(req.params.id);
+      res.json({ message: "Deal template deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete deal template" });
+    }
+  });
+
+  // ===== CALENDAR EVENT ROUTES =====
+  
+  // Get all calendar events
+  app.get("/api/calendar-events", requireAuth, async (req, res) => {
+    try {
+      const events = await storage.getAllCalendarEvents();
+      res.json(events);
+    } catch (error) {
+      console.error('Get calendar events error:', error);
+      res.status(500).json({ error: "Failed to fetch calendar events" });
+    }
+  });
+  
+  // Get calendar events by deal
+  app.get("/api/calendar-events/deal/:dealId", requireAuth, async (req, res) => {
+    try {
+      const events = await storage.getCalendarEventsByDeal(req.params.dealId);
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch calendar events" });
+    }
+  });
+  
+  // Get single calendar event
+  app.get("/api/calendar-events/:id", requireAuth, async (req, res) => {
+    try {
+      const event = await storage.getCalendarEvent(req.params.id);
+      if (!event) {
+        return res.status(404).json({ error: "Calendar event not found" });
+      }
+      res.json(event);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch calendar event" });
+    }
+  });
+  
+  // Create calendar event
+  app.post("/api/calendar-events", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const result = insertCalendarEventSchema.safeParse({
+        ...req.body,
+        createdBy: user.id,
+      });
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const event = await storage.createCalendarEvent(result.data);
+      res.status(201).json(event);
+    } catch (error) {
+      console.error('Create calendar event error:', error);
+      res.status(500).json({ error: "Failed to create calendar event" });
+    }
+  });
+  
+  // Update calendar event
+  app.patch("/api/calendar-events/:id", requireAuth, async (req, res) => {
+    try {
+      const event = await storage.getCalendarEvent(req.params.id);
+      if (!event) {
+        return res.status(404).json({ error: "Calendar event not found" });
+      }
+      const updated = await storage.updateCalendarEvent(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update calendar event" });
+    }
+  });
+  
+  // Delete calendar event
+  app.delete("/api/calendar-events/:id", requireAuth, async (req, res) => {
+    try {
+      const event = await storage.getCalendarEvent(req.params.id);
+      if (!event) {
+        return res.status(404).json({ error: "Calendar event not found" });
+      }
+      await storage.deleteCalendarEvent(req.params.id);
+      res.json({ message: "Calendar event deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete calendar event" });
+    }
+  });
+
+  // ===== TASK ATTACHMENT ROUTES =====
+  
+  // Get task attachments
+  app.get("/api/task-attachments/:taskId", requireAuth, async (req, res) => {
+    try {
+      const attachments = await storage.getTaskAttachmentRecords(req.params.taskId);
+      res.json(attachments);
+    } catch (error) {
+      console.error('Get task attachments error:', error);
+      res.status(500).json({ error: "Failed to fetch task attachments" });
+    }
+  });
+  
+  // Create task attachment record (metadata only - file upload would need separate handling)
+  app.post("/api/task-attachments", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const result = insertTaskAttachmentRecordSchema.safeParse({
+        ...req.body,
+        uploadedBy: user.id,
+      });
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const attachment = await storage.createTaskAttachmentRecord(result.data);
+      res.status(201).json(attachment);
+    } catch (error) {
+      console.error('Create task attachment error:', error);
+      res.status(500).json({ error: "Failed to create task attachment" });
+    }
+  });
+  
+  // Delete task attachment record
+  app.delete("/api/task-attachments/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteTaskAttachmentRecord(req.params.id);
+      res.json({ message: "Task attachment deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete task attachment" });
     }
   });
 

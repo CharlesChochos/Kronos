@@ -610,3 +610,121 @@ export const insertDocumentTemplateSchema = createInsertSchema(documentTemplates
 
 export type InsertDocumentTemplate = z.infer<typeof insertDocumentTemplateSchema>;
 export type DocumentTemplate = typeof documentTemplates.$inferSelect;
+
+// Investor Matches table - tracks matched/rejected investors per deal
+export const investorMatches = pgTable("investor_matches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  investorId: integer("investor_id").notNull(), // ID from shared investors list
+  status: text("status").notNull().default('matched'), // matched, rejected
+  matchedBy: varchar("matched_by").references(() => users.id),
+  matchedAt: timestamp("matched_at").defaultNow(),
+});
+
+export const insertInvestorMatchSchema = createInsertSchema(investorMatches).omit({
+  id: true,
+  matchedAt: true,
+});
+
+export type InsertInvestorMatch = z.infer<typeof insertInvestorMatchSchema>;
+export type InvestorMatch = typeof investorMatches.$inferSelect;
+
+// User Preferences table - stores dashboard widgets, sidebar state, theme, etc.
+export const userPreferences = pgTable("user_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  dashboardWidgets: jsonb("dashboard_widgets").default([]), // Widget configuration array
+  sidebarCollapsed: boolean("sidebar_collapsed").default(false),
+  theme: text("theme").default('system'), // light, dark, system
+  complianceDefaults: jsonb("compliance_defaults").default({ sec: false, finra: false, legal: true }),
+  marketSymbols: jsonb("market_symbols").default(['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY']),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserPreferencesSchema = createInsertSchema(userPreferences).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
+export type UserPreferences = typeof userPreferences.$inferSelect;
+
+// Deal Template Task type
+export type DealTemplateTask = {
+  title: string;
+  type: string;
+  priority: string;
+};
+
+// Deal Templates table - workflow templates for creating deals
+export const dealTemplates = pgTable("deal_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  sector: text("sector").notNull().default('All'),
+  dealType: text("deal_type").notNull().default('M&A'), // M&A, Capital Raising, Divestiture, etc.
+  stages: jsonb("stages").default([]).$type<string[]>(),
+  defaultTasks: jsonb("default_tasks").default([]).$type<DealTemplateTask[]>(),
+  estimatedDuration: integer("estimated_duration").default(90), // in days
+  checklistItems: jsonb("checklist_items").default([]).$type<string[]>(),
+  isFavorite: boolean("is_favorite").default(false),
+  usageCount: integer("usage_count").default(0),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDealTemplateSchema = createInsertSchema(dealTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDealTemplate = z.infer<typeof insertDealTemplateSchema>;
+export type DealTemplate = typeof dealTemplates.$inferSelect;
+
+// Calendar Events table - for capital raising calendar and other events
+export const calendarEvents = pgTable("calendar_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  type: text("type").notNull().default('deadline'), // deadline, meeting, milestone, filing
+  date: text("date").notNull(), // ISO date string
+  time: text("time"), // HH:MM format
+  description: text("description"),
+  dealId: varchar("deal_id").references(() => deals.id),
+  dealName: text("deal_name"),
+  location: text("location"),
+  participants: jsonb("participants").default([]).$type<string[]>(),
+  isAllDay: boolean("is_all_day").default(false),
+  color: text("color"), // Hex color for calendar display
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
+
+// Task Attachments table - metadata for uploaded files (DB table)
+export const taskAttachmentsTable = pgTable("task_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").references(() => tasks.id).notNull(),
+  filename: text("filename").notNull(),
+  originalName: text("original_name").notNull(),
+  mimeType: text("mime_type"),
+  size: integer("size"), // in bytes
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+export const insertTaskAttachmentRecordSchema = createInsertSchema(taskAttachmentsTable).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export type InsertTaskAttachmentRecord = z.infer<typeof insertTaskAttachmentRecordSchema>;
+export type TaskAttachmentRecord = typeof taskAttachmentsTable.$inferSelect;

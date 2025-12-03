@@ -382,25 +382,6 @@ export function useDeleteNotification() {
   });
 }
 
-// User Preferences API
-export function useUpdateUserPreferences() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ userId, preferences }: { userId: string; preferences: any }) => {
-      const res = await fetch(`/api/users/${userId}/preferences`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(preferences),
-      });
-      if (!res.ok) throw new Error("Failed to update preferences");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["auth"] });
-    },
-  });
-}
-
 // Market Data API
 export type MarketDataItem = {
   name: string;
@@ -1216,6 +1197,303 @@ export function useDeleteDocumentTemplate() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["document-templates"] });
+    },
+  });
+}
+
+// ===== INVESTOR MATCH HOOKS =====
+
+export type InvestorMatch = {
+  id: string;
+  dealId: string;
+  investorId: number;
+  status: string;
+  matchedBy: string | null;
+  matchedAt: string;
+};
+
+export function useInvestorMatches(dealId: string | null) {
+  return useQuery({
+    queryKey: ["investor-matches", dealId],
+    queryFn: async () => {
+      if (!dealId) return [];
+      const res = await fetch(`/api/investor-matches/${dealId}`);
+      if (!res.ok) throw new Error("Failed to fetch investor matches");
+      return res.json() as Promise<InvestorMatch[]>;
+    },
+    enabled: !!dealId,
+  });
+}
+
+export function useCreateInvestorMatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (match: { dealId: string; investorId: number; status: string }) => {
+      const res = await fetch("/api/investor-matches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(match),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create investor match");
+      }
+      return res.json() as Promise<InvestorMatch>;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["investor-matches", variables.dealId] });
+    },
+  });
+}
+
+export function useDeleteInvestorMatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ dealId, investorId }: { dealId: string; investorId: number }) => {
+      const res = await fetch(`/api/investor-matches/${dealId}/${investorId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete investor match");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["investor-matches", variables.dealId] });
+    },
+  });
+}
+
+// ===== USER PREFERENCES HOOKS =====
+
+export type UserPreferencesType = {
+  id?: string;
+  userId: string;
+  dashboardWidgets: any[];
+  sidebarCollapsed: boolean;
+  theme: string;
+  complianceDefaults: { sec: boolean; finra: boolean; legal: boolean };
+  marketSymbols: string[];
+  updatedAt?: string;
+};
+
+export function useUserPreferences() {
+  return useQuery({
+    queryKey: ["user-preferences"],
+    queryFn: async () => {
+      const res = await fetch("/api/user-preferences");
+      if (!res.ok) throw new Error("Failed to fetch user preferences");
+      return res.json() as Promise<UserPreferencesType>;
+    },
+  });
+}
+
+export function useSaveUserPreferences() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (prefs: Partial<UserPreferencesType>) => {
+      const res = await fetch("/api/user-preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(prefs),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to save user preferences");
+      }
+      return res.json() as Promise<UserPreferencesType>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
+    },
+  });
+}
+
+export function useUpdateUserPreferences() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (updates: Partial<UserPreferencesType>) => {
+      const res = await fetch("/api/user-preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update user preferences");
+      }
+      return res.json() as Promise<UserPreferencesType>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
+    },
+  });
+}
+
+// ===== DEAL TEMPLATE HOOKS =====
+
+export type DealTemplateType = {
+  id: string;
+  name: string;
+  description: string | null;
+  sector: string;
+  dealType: string;
+  stages: string[];
+  defaultTasks: { title: string; type: string; priority: string }[];
+  estimatedDuration: number | null;
+  checklistItems: string[];
+  isFavorite: boolean | null;
+  usageCount: number | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function useDealTemplates() {
+  return useQuery({
+    queryKey: ["deal-templates"],
+    queryFn: async () => {
+      const res = await fetch("/api/deal-templates");
+      if (!res.ok) throw new Error("Failed to fetch deal templates");
+      return res.json() as Promise<DealTemplateType[]>;
+    },
+  });
+}
+
+export function useCreateDealTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (template: Omit<DealTemplateType, 'id' | 'createdBy' | 'createdAt' | 'updatedAt'>) => {
+      const res = await fetch("/api/deal-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(template),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create deal template");
+      }
+      return res.json() as Promise<DealTemplateType>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deal-templates"] });
+    },
+  });
+}
+
+export function useUpdateDealTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<DealTemplateType> }) => {
+      const res = await fetch(`/api/deal-templates/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update deal template");
+      }
+      return res.json() as Promise<DealTemplateType>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deal-templates"] });
+    },
+  });
+}
+
+export function useDeleteDealTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/deal-templates/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete deal template");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deal-templates"] });
+    },
+  });
+}
+
+// ===== CALENDAR EVENT HOOKS =====
+
+export type CalendarEventType = {
+  id: string;
+  title: string;
+  type: string;
+  date: string;
+  time: string | null;
+  description: string | null;
+  dealId: string | null;
+  dealName: string | null;
+  location: string | null;
+  participants: string[];
+  isAllDay: boolean | null;
+  color: string | null;
+  createdBy: string | null;
+  createdAt: string;
+};
+
+export function useCalendarEvents() {
+  return useQuery({
+    queryKey: ["calendar-events"],
+    queryFn: async () => {
+      const res = await fetch("/api/calendar-events");
+      if (!res.ok) throw new Error("Failed to fetch calendar events");
+      return res.json() as Promise<CalendarEventType[]>;
+    },
+  });
+}
+
+export function useCreateCalendarEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (event: Omit<CalendarEventType, 'id' | 'createdBy' | 'createdAt'>) => {
+      const res = await fetch("/api/calendar-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(event),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create calendar event");
+      }
+      return res.json() as Promise<CalendarEventType>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
+    },
+  });
+}
+
+export function useUpdateCalendarEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<CalendarEventType> }) => {
+      const res = await fetch(`/api/calendar-events/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update calendar event");
+      }
+      return res.json() as Promise<CalendarEventType>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
+    },
+  });
+}
+
+export function useDeleteCalendarEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/calendar-events/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete calendar event");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
     },
   });
 }
