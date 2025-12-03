@@ -17,7 +17,10 @@ import {
   Megaphone,
   Building,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Shield,
+  Database,
+  FileStack
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLogout, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
@@ -164,6 +167,14 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
         { icon: UserCheck, label: "Client Portal", path: "/ceo/client-portal" },
         { icon: PieChart, label: "Investor Match", path: "/ceo/investors" },
         { icon: Users, label: "Investor CRM", path: "/ceo/investor-crm" },
+        { icon: Database, label: "Investor Database", path: "/ceo/investor-database" },
+      ]
+    },
+    {
+      category: "Administration",
+      links: [
+        { icon: Shield, label: "User Management", path: "/ceo/admin" },
+        { icon: FileStack, label: "Deal Templates", path: "/ceo/deal-templates" },
       ]
     }
   ];

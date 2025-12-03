@@ -205,17 +205,29 @@ export async function registerRoutes(
 
   // Login
   app.post("/api/auth/login", authLimiter, validateBody(loginSchema), (req, res, next) => {
-    passport.authenticate("local", (err: any, user: any, info: any) => {
+    passport.authenticate("local", async (err: any, user: any, info: any) => {
       if (err) {
         return res.status(500).json({ error: "Authentication error" });
       }
       if (!user) {
         return res.status(401).json({ error: info?.message || "Invalid credentials" });
       }
-      req.login(user, (loginErr) => {
+      
+      // Check if 2FA is enabled for this user
+      if (user.twoFactorEnabled) {
+        // Don't log in yet - return a flag indicating 2FA is required
+        return res.json({ 
+          requiresTwoFactor: true, 
+          email: user.email,
+          message: "Please enter your two-factor authentication code"
+        });
+      }
+      
+      req.login(user, async (loginErr) => {
         if (loginErr) {
           return res.status(500).json({ error: "Login error" });
         }
+        await createAuditLog(req, 'login', 'user', user.id, user.name, { method: 'password' });
         res.json(sanitizeUser(user));
       });
     })(req, res, next);
@@ -1132,6 +1144,174 @@ export async function registerRoutes(
       res.json({ message: "Password updated successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to update password" });
+    }
+  });
+
+  // ===== TWO-FACTOR AUTHENTICATION ROUTES =====
+  
+  // Generate 2FA secret and QR code for setup
+  app.post("/api/auth/2fa/setup", requireAuth, async (req, res) => {
+    try {
+      const { authenticator } = await import('otplib');
+      const QRCode = await import('qrcode');
+      
+      const user = req.user as any;
+      
+      if (user.twoFactorEnabled) {
+        return res.status(400).json({ error: "Two-factor authentication is already enabled" });
+      }
+      
+      // Generate a secret
+      const secret = authenticator.generateSecret();
+      
+      // Generate the otpauth URL
+      const otpauthUrl = authenticator.keyuri(user.email, 'OSReaper', secret);
+      
+      // Generate QR code as data URL
+      const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
+      
+      // Temporarily store the secret (not yet enabled)
+      await storage.updateUserTwoFactor(user.id, false, secret);
+      
+      res.json({ 
+        secret,
+        qrCodeUrl: qrCodeDataUrl,
+        message: "Scan this QR code with your authenticator app, then verify with a code to enable 2FA"
+      });
+    } catch (error) {
+      console.error('2FA setup error:', error);
+      res.status(500).json({ error: "Failed to setup two-factor authentication" });
+    }
+  });
+  
+  // Verify and enable 2FA
+  app.post("/api/auth/2fa/verify", requireAuth, async (req, res) => {
+    try {
+      const { authenticator } = await import('otplib');
+      const { code } = req.body;
+      const user = req.user as any;
+      
+      if (!code) {
+        return res.status(400).json({ error: "Verification code is required" });
+      }
+      
+      // Get the user with their secret
+      const fullUser = await storage.getUser(user.id);
+      if (!fullUser?.twoFactorSecret) {
+        return res.status(400).json({ error: "Please start 2FA setup first" });
+      }
+      
+      // Verify the code
+      const isValid = authenticator.verify({ token: code, secret: fullUser.twoFactorSecret });
+      
+      if (!isValid) {
+        return res.status(400).json({ error: "Invalid verification code. Please try again." });
+      }
+      
+      // Enable 2FA
+      await storage.updateUserTwoFactor(user.id, true, fullUser.twoFactorSecret);
+      await createAuditLog(req, '2fa_enabled', 'user', user.id, user.name, { method: 'totp' });
+      
+      res.json({ message: "Two-factor authentication enabled successfully" });
+    } catch (error) {
+      console.error('2FA verify error:', error);
+      res.status(500).json({ error: "Failed to verify two-factor authentication" });
+    }
+  });
+  
+  // Disable 2FA
+  app.post("/api/auth/2fa/disable", requireAuth, async (req, res) => {
+    try {
+      const { authenticator } = await import('otplib');
+      const { code, password } = req.body;
+      const user = req.user as any;
+      
+      if (!code || !password) {
+        return res.status(400).json({ error: "Verification code and password are required" });
+      }
+      
+      // Get the user with their secret and password
+      const fullUser = await storage.getUser(user.id);
+      if (!fullUser?.twoFactorEnabled) {
+        return res.status(400).json({ error: "Two-factor authentication is not enabled" });
+      }
+      
+      // Verify password
+      const isValidPassword = await bcrypt.compare(password, fullUser.password);
+      if (!isValidPassword) {
+        return res.status(400).json({ error: "Invalid password" });
+      }
+      
+      // Verify the code
+      const isValid = authenticator.verify({ token: code, secret: fullUser.twoFactorSecret! });
+      if (!isValid) {
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+      
+      // Disable 2FA
+      await storage.updateUserTwoFactor(user.id, false, undefined);
+      await createAuditLog(req, '2fa_disabled', 'user', user.id, user.name, {});
+      
+      res.json({ message: "Two-factor authentication disabled successfully" });
+    } catch (error) {
+      console.error('2FA disable error:', error);
+      res.status(500).json({ error: "Failed to disable two-factor authentication" });
+    }
+  });
+  
+  // Get 2FA status
+  app.get("/api/auth/2fa/status", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const fullUser = await storage.getUser(user.id);
+      
+      res.json({ 
+        enabled: fullUser?.twoFactorEnabled || false,
+        hasSecret: !!fullUser?.twoFactorSecret
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get 2FA status" });
+    }
+  });
+  
+  // Verify 2FA code during login (called after initial password auth)
+  app.post("/api/auth/2fa/login-verify", async (req, res) => {
+    try {
+      const { authenticator } = await import('otplib');
+      const { email, code } = req.body;
+      
+      if (!email || !code) {
+        return res.status(400).json({ error: "Email and verification code are required" });
+      }
+      
+      const user = await storage.getUserByEmail(email);
+      if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
+        return res.status(400).json({ error: "Invalid request" });
+      }
+      
+      // Check user status
+      if (user.status !== 'active') {
+        return res.status(401).json({ error: "Account is not active" });
+      }
+      
+      // Verify the code
+      const isValid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
+      
+      if (!isValid) {
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+      
+      // Log the user in
+      req.login(user, async (err) => {
+        if (err) {
+          return res.status(500).json({ error: "Failed to complete login" });
+        }
+        await createAuditLog(req, 'login_2fa', 'user', user.id, user.name, { method: 'totp' });
+        res.json(sanitizeUser(user));
+      });
+    } catch (error) {
+      console.error('2FA login verify error:', error);
+      res.status(500).json({ error: "Failed to verify two-factor authentication" });
     }
   });
 

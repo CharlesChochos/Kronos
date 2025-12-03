@@ -20,8 +20,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useLogin, useSignup } from "@/lib/api";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, CheckCircle } from "lucide-react";
+import { Mail, CheckCircle, Shield, Clock } from "lucide-react";
 import logo from "@assets/generated_images/abstract_minimalist_layer_icon_for_fintech_logo.png";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -50,6 +51,11 @@ export default function AuthPage() {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
+  const [showTwoFactor, setShowTwoFactor] = useState(false);
+  const [twoFactorEmail, setTwoFactorEmail] = useState("");
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+  const [showPendingApproval, setShowPendingApproval] = useState(false);
   const loginMutation = useLogin();
   const signupMutation = useSignup();
 
@@ -87,6 +93,47 @@ export default function AuthPage() {
     setForgotPasswordSent(false);
   };
 
+  const handleTwoFactorVerify = async () => {
+    if (twoFactorCode.length !== 6) {
+      toast.error("Please enter a 6-digit code");
+      return;
+    }
+    
+    setTwoFactorLoading(true);
+    try {
+      const response = await fetch('/api/auth/2fa/login-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: twoFactorEmail, code: twoFactorCode }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.id) {
+        const firstName = data.name?.split(' ')[0] || twoFactorEmail.split('@')[0];
+        setWelcomeName(firstName);
+        
+        if (data.role === 'CEO') {
+          setRedirectPath("/ceo/dashboard");
+        } else {
+          setRedirectPath("/employee/home");
+        }
+        
+        sessionStorage.setItem('welcomePending', 'true');
+        setShowTwoFactor(false);
+        setShowWelcome(true);
+      } else {
+        toast.error(data.error || "Invalid verification code");
+        setTwoFactorCode("");
+      }
+    } catch (error) {
+      toast.error("Failed to verify code. Please try again.");
+      setTwoFactorCode("");
+    } finally {
+      setTwoFactorLoading(false);
+    }
+  };
+
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -107,14 +154,12 @@ export default function AuthPage() {
     },
   });
 
-  // Handle redirect after welcome animation
   useEffect(() => {
     if (showWelcome && redirectPath) {
       const timer = setTimeout(() => {
-        // Clear the welcome pending flag before redirect
         sessionStorage.removeItem('welcomePending');
         setLocation(redirectPath);
-      }, 3500); // Extended to 3.5 seconds for better visibility
+      }, 3500);
       return () => clearTimeout(timer);
     }
   }, [showWelcome, redirectPath, setLocation]);
@@ -126,18 +171,21 @@ export default function AuthPage() {
         password: values.password,
       });
       
-      // Extract first name from email or user data
+      if (user?.requiresTwoFactor) {
+        setTwoFactorEmail(user.email);
+        setShowTwoFactor(true);
+        return;
+      }
+      
       const firstName = user?.name?.split(' ')[0] || values.email.split('@')[0];
       setWelcomeName(firstName);
       
-      // Route based on user's actual role from database
       if (user?.role === 'CEO') {
         setRedirectPath("/ceo/dashboard");
       } else {
         setRedirectPath("/employee/home");
       }
       
-      // Set flag to prevent router from redirecting during animation
       sessionStorage.setItem('welcomePending', 'true');
       setShowWelcome(true);
     } catch (error: any) {
@@ -148,20 +196,22 @@ export default function AuthPage() {
   async function onSignupSubmit(values: z.infer<typeof signupSchema>) {
     try {
       const { confirmPassword, ...signupData } = values;
-      const user = await signupMutation.mutateAsync(signupData);
+      const result = await signupMutation.mutateAsync(signupData);
       
-      // Extract first name
+      if (result?.pending) {
+        setShowPendingApproval(true);
+        return;
+      }
+      
       const firstName = values.name.split(' ')[0];
       setWelcomeName(firstName);
       
-      // Route based on selected role - CEOs go to CEO dashboard
-      if (values.role === 'CEO') {
+      if (result?.role === 'CEO') {
         setRedirectPath("/ceo/dashboard");
       } else {
         setRedirectPath("/employee/home");
       }
       
-      // Set flag to prevent router from redirecting during animation
       sessionStorage.setItem('welcomePending', 'true');
       setShowWelcome(true);
     } catch (error: any) {
@@ -171,11 +221,9 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
-      {/* Abstract Background */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-background to-background pointer-events-none"></div>
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none opacity-20"></div>
       
-      {/* Welcome Animation Overlay */}
       <AnimatePresence>
         {showWelcome && (
           <motion.div 
@@ -185,10 +233,8 @@ export default function AuthPage() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            {/* Animated Background */}
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/30 via-background to-background pointer-events-none"></div>
             
-            {/* Logo Animation */}
             <motion.div
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -225,7 +271,6 @@ export default function AuthPage() {
               </motion.div>
             </motion.div>
             
-            {/* Welcome Text */}
             <motion.div
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -250,7 +295,6 @@ export default function AuthPage() {
               </motion.p>
             </motion.div>
             
-            {/* Loading Indicator */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -486,7 +530,6 @@ export default function AuthPage() {
         </CardFooter>
       </Card>
 
-      {/* Forgot Password Dialog */}
       <Dialog open={showForgotPassword} onOpenChange={closeForgotPasswordDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -555,6 +598,94 @@ export default function AuthPage() {
               </Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showTwoFactor} onOpenChange={(open) => !open && setShowTwoFactor(false)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-primary" />
+              Two-Factor Authentication
+            </DialogTitle>
+            <DialogDescription>
+              Enter the 6-digit code from your authenticator app to continue.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            <div className="flex justify-center">
+              <InputOTP 
+                maxLength={6} 
+                value={twoFactorCode} 
+                onChange={setTwoFactorCode}
+                data-testid="input-2fa-code"
+              >
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                  <InputOTPSlot index={3} />
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+            
+            <div className="flex gap-2 justify-end">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowTwoFactor(false);
+                  setTwoFactorCode("");
+                }}
+                data-testid="button-cancel-2fa"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleTwoFactorVerify}
+                disabled={twoFactorLoading || twoFactorCode.length !== 6}
+                data-testid="button-verify-2fa"
+              >
+                {twoFactorLoading ? "Verifying..." : "Verify"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPendingApproval} onOpenChange={setShowPendingApproval}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-amber-500" />
+              Account Pending Approval
+            </DialogTitle>
+            <DialogDescription>
+              Your account has been created successfully!
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4 space-y-4">
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+              <p className="text-sm text-muted-foreground">
+                Your account is pending approval from an administrator. You'll be able to sign in once your access has been approved.
+              </p>
+            </div>
+            
+            <Button 
+              className="w-full" 
+              onClick={() => {
+                setShowPendingApproval(false);
+                setActiveTab("login");
+                signupForm.reset();
+              }}
+              data-testid="button-back-to-login"
+            >
+              Back to Login
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
