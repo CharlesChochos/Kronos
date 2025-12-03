@@ -170,6 +170,96 @@ async function seed() {
     ]);
 
     console.log(`Created ${tasks.length} tasks`);
+
+    // Create document templates
+    const documentTemplates = await Promise.all([
+      storage.createDocumentTemplate({
+        name: "Term Sheet",
+        description: "Standard term sheet template for initial deal terms",
+        category: "Legal",
+        complexity: "Medium",
+        isDefault: true,
+      }),
+      storage.createDocumentTemplate({
+        name: "Letter of Intent",
+        description: "LOI template for preliminary offers and expressions of interest",
+        category: "Legal",
+        complexity: "Medium",
+        isDefault: true,
+      }),
+      storage.createDocumentTemplate({
+        name: "Due Diligence Request",
+        description: "Comprehensive information request checklist",
+        category: "Analysis",
+        complexity: "Medium",
+        isDefault: true,
+      }),
+      storage.createDocumentTemplate({
+        name: "Purchase Agreement",
+        description: "Legal document for acquisition transactions",
+        category: "Legal",
+        complexity: "High",
+        isDefault: true,
+      }),
+      storage.createDocumentTemplate({
+        name: "NDA",
+        description: "Non-disclosure agreement for confidential information",
+        category: "Legal",
+        complexity: "Low",
+        isDefault: true,
+      }),
+      storage.createDocumentTemplate({
+        name: "Board Resolution",
+        description: "Corporate governance and approval template",
+        category: "Governance",
+        complexity: "Medium",
+        isDefault: true,
+      }),
+      storage.createDocumentTemplate({
+        name: "M&A Deal Template",
+        description: "Complete template for mergers and acquisitions including due diligence, valuation, and integration planning",
+        category: "Deal",
+        complexity: "High",
+        isDefault: true,
+      }),
+      storage.createDocumentTemplate({
+        name: "IPO Roadshow Template",
+        description: "Investor presentation and roadshow materials for initial public offerings",
+        category: "Deal",
+        complexity: "High",
+        isDefault: true,
+      }),
+      storage.createDocumentTemplate({
+        name: "Private Placement Memo",
+        description: "Confidential information memorandum for private capital raising",
+        category: "Deal",
+        complexity: "High",
+        isDefault: true,
+      }),
+      storage.createDocumentTemplate({
+        name: "Debt Financing Template",
+        description: "Credit facility and bond issuance documentation templates",
+        category: "Deal",
+        complexity: "High",
+        isDefault: true,
+      }),
+      storage.createDocumentTemplate({
+        name: "Valuation Report",
+        description: "Comprehensive business valuation report template with DCF and comps analysis",
+        category: "Analysis",
+        complexity: "Medium",
+        isDefault: true,
+      }),
+      storage.createDocumentTemplate({
+        name: "Investment Committee Memo",
+        description: "Presentation format for investment committee approval",
+        category: "Governance",
+        complexity: "Medium",
+        isDefault: true,
+      }),
+    ]);
+
+    console.log(`Created ${documentTemplates.length} document templates`);
     console.log("Database seeded successfully!");
     process.exit(0);
   } catch (error) {

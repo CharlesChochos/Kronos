@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { 
   Users, 
@@ -20,121 +19,24 @@ import {
   Target,
   Calendar,
   MessageSquare,
-  CheckCircle,
-  Clock,
   TrendingUp,
   Award,
   Heart,
-  Star
+  Loader2
 } from "lucide-react";
-import { useUsers } from "@/lib/api";
+import { useUsers, useMentorshipPairings, useCreateMentorshipPairing, useUpdateMentorshipPairing } from "@/lib/api";
 import { toast } from "sonner";
 import { format } from "date-fns";
-
-type MentorshipPair = {
-  id: string;
-  mentorId: string;
-  mentorName: string;
-  mentorRole: string;
-  menteeId: string;
-  menteeName: string;
-  menteeRole: string;
-  focusAreas: string[];
-  goals: { id: string; text: string; completed: boolean }[];
-  meetingFrequency: string;
-  nextMeeting: string | null;
-  startDate: string;
-  status: 'active' | 'completed' | 'paused';
-  progressScore: number;
-  sessionsCompleted: number;
-};
-
-const DEFAULT_PAIRINGS: MentorshipPair[] = [
-  {
-    id: "1",
-    mentorId: "user-1",
-    mentorName: "Sarah Chen",
-    mentorRole: "Managing Director",
-    menteeId: "user-2",
-    menteeName: "Michael Brown",
-    menteeRole: "Associate",
-    focusAreas: ["Financial Modeling", "Client Relationships", "Deal Structuring"],
-    goals: [
-      { id: "g1", text: "Complete advanced LBO modeling course", completed: true },
-      { id: "g2", text: "Lead a client presentation independently", completed: false },
-      { id: "g3", text: "Develop sector expertise in Technology", completed: false }
-    ],
-    meetingFrequency: "Weekly",
-    nextMeeting: "2024-12-05T14:00:00Z",
-    startDate: "2024-09-01T00:00:00Z",
-    status: "active",
-    progressScore: 65,
-    sessionsCompleted: 12
-  },
-  {
-    id: "2",
-    mentorId: "user-3",
-    mentorName: "David Park",
-    mentorRole: "Director",
-    menteeId: "user-4",
-    menteeName: "Emily Johnson",
-    menteeRole: "Analyst",
-    focusAreas: ["Due Diligence", "Research Methods", "Presentation Skills"],
-    goals: [
-      { id: "g1", text: "Improve DD checklist efficiency", completed: true },
-      { id: "g2", text: "Present at team meeting", completed: true },
-      { id: "g3", text: "Build investor contact network", completed: false }
-    ],
-    meetingFrequency: "Bi-weekly",
-    nextMeeting: "2024-12-10T10:00:00Z",
-    startDate: "2024-10-15T00:00:00Z",
-    status: "active",
-    progressScore: 78,
-    sessionsCompleted: 6
-  },
-  {
-    id: "3",
-    mentorId: "user-5",
-    mentorName: "Lisa Wang",
-    mentorRole: "Managing Director",
-    menteeId: "user-6",
-    menteeName: "James Wilson",
-    menteeRole: "Associate",
-    focusAreas: ["Leadership", "Team Management", "Strategic Thinking"],
-    goals: [
-      { id: "g1", text: "Lead small deal team", completed: true },
-      { id: "g2", text: "Complete leadership training", completed: true },
-      { id: "g3", text: "Mentor an analyst", completed: true }
-    ],
-    meetingFrequency: "Monthly",
-    nextMeeting: null,
-    startDate: "2024-03-01T00:00:00Z",
-    status: "completed",
-    progressScore: 100,
-    sessionsCompleted: 9
-  }
-];
+import type { MentorshipPairing } from "@shared/schema";
 
 export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }) {
   const { data: users = [] } = useUsers();
+  const { data: pairings = [], isLoading } = useMentorshipPairings();
+  const createPairing = useCreateMentorshipPairing();
+  const updatePairing = useUpdateMentorshipPairing();
+  
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-
-  const [pairings, setPairings] = useState<MentorshipPair[]>(() => {
-    const saved = localStorage.getItem('osreaper_mentorship_pairings');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return DEFAULT_PAIRINGS;
-      }
-    }
-    return DEFAULT_PAIRINGS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('osreaper_mentorship_pairings', JSON.stringify(pairings));
-  }, [pairings]);
 
   const [newPairing, setNewPairing] = useState({
     mentorId: "",
@@ -149,13 +51,19 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
   const mentors = users.filter(u => seniorRoles.includes(u.role));
   const mentees = users.filter(u => !seniorRoles.includes(u.role));
 
+  // Helper to get user info from ID
+  const getUserRole = (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    return user?.role || "Unknown";
+  };
+
   const filteredPairings = pairings.filter(p =>
     p.mentorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.menteeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.focusAreas.some(f => f.toLowerCase().includes(searchQuery.toLowerCase()))
+    (p.focusAreas || []).some((f: string) => f.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const handleCreatePairing = () => {
+  const handleCreatePairing = async () => {
     if (!newPairing.mentorId || !newPairing.menteeId) {
       toast.error("Please select both mentor and mentee");
       return;
@@ -164,46 +72,40 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
     const mentor = users.find(u => u.id === newPairing.mentorId);
     const mentee = users.find(u => u.id === newPairing.menteeId);
 
-    const pairing: MentorshipPair = {
-      id: Date.now().toString(),
-      mentorId: newPairing.mentorId,
-      mentorName: mentor?.name || "Unknown",
-      mentorRole: mentor?.role || "Unknown",
-      menteeId: newPairing.menteeId,
-      menteeName: mentee?.name || "Unknown",
-      menteeRole: mentee?.role || "Unknown",
-      focusAreas: newPairing.focusAreas.split(",").map(s => s.trim()).filter(Boolean),
-      goals: newPairing.goals.split("\n").map((text, i) => ({
-        id: `g${i}`,
-        text: text.trim(),
-        completed: false
-      })).filter(g => g.text),
-      meetingFrequency: newPairing.meetingFrequency,
-      nextMeeting: newPairing.firstMeeting || null,
-      startDate: new Date().toISOString(),
-      status: "active",
-      progressScore: 0,
-      sessionsCompleted: 0
-    };
+    try {
+      await createPairing.mutateAsync({
+        mentorId: newPairing.mentorId,
+        mentorName: mentor?.name || "Unknown",
+        menteeId: newPairing.menteeId,
+        menteeName: mentee?.name || "Unknown",
+        focusAreas: newPairing.focusAreas.split(",").map(s => s.trim()).filter(Boolean),
+        goals: newPairing.goals.split("\n").map(s => s.trim()).filter(Boolean),
+        meetingFrequency: newPairing.meetingFrequency,
+        startDate: new Date().toISOString(),
+        status: "active",
+      });
 
-    setPairings([pairing, ...pairings]);
-    setShowCreateModal(false);
-    setNewPairing({ mentorId: "", menteeId: "", focusAreas: "", goals: "", meetingFrequency: "Weekly", firstMeeting: "" });
-    toast.success("Mentorship pairing created successfully");
+      setShowCreateModal(false);
+      setNewPairing({ mentorId: "", menteeId: "", focusAreas: "", goals: "", meetingFrequency: "Weekly", firstMeeting: "" });
+      toast.success("Mentorship pairing created successfully");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create pairing");
+    }
   };
 
-  const toggleGoal = (pairingId: string, goalId: string) => {
-    setPairings(pairings.map(p => {
-      if (p.id === pairingId) {
-        const updatedGoals = p.goals.map(g =>
-          g.id === goalId ? { ...g, completed: !g.completed } : g
-        );
-        const completedCount = updatedGoals.filter(g => g.completed).length;
-        const progressScore = Math.round((completedCount / updatedGoals.length) * 100);
-        return { ...p, goals: updatedGoals, progressScore };
-      }
-      return p;
-    }));
+  const updatePairingStatus = async (id: string, status: string) => {
+    try {
+      await updatePairing.mutateAsync({
+        id,
+        updates: { 
+          status, 
+          endDate: status === 'completed' ? new Date().toISOString() : undefined 
+        },
+      });
+      toast.success("Pairing status updated");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update pairing");
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -218,6 +120,16 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
         return <Badge>{status}</Badge>;
     }
   };
+
+  if (isLoading) {
+    return (
+      <Layout role={role}>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout role={role}>
@@ -269,9 +181,9 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
-                    {Math.round(pairings.filter(p => p.status === 'active').reduce((sum, p) => sum + p.progressScore, 0) / Math.max(pairings.filter(p => p.status === 'active').length, 1))}%
+                    {pairings.reduce((sum, p) => sum + (p.goals || []).length, 0)}
                   </p>
-                  <p className="text-xs text-muted-foreground">Avg. Progress</p>
+                  <p className="text-xs text-muted-foreground">Total Goals</p>
                 </div>
               </div>
             </CardContent>
@@ -283,8 +195,8 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
                   <Calendar className="w-5 h-5 text-yellow-500" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{pairings.reduce((sum, p) => sum + p.sessionsCompleted, 0)}</p>
-                  <p className="text-xs text-muted-foreground">Sessions Held</p>
+                  <p className="text-2xl font-bold">{pairings.length}</p>
+                  <p className="text-xs text-muted-foreground">Total Pairs</p>
                 </div>
               </div>
             </CardContent>
@@ -323,7 +235,7 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
                             </Avatar>
                             <div>
                               <p className="font-medium">{pairing.mentorName}</p>
-                              <p className="text-xs text-muted-foreground">{pairing.mentorRole} (Mentor)</p>
+                              <p className="text-xs text-muted-foreground">{getUserRole(pairing.mentorId)} (Mentor)</p>
                             </div>
                           </div>
                           <Heart className="w-4 h-4 text-red-400" />
@@ -335,7 +247,7 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
                             </Avatar>
                             <div>
                               <p className="font-medium">{pairing.menteeName}</p>
-                              <p className="text-xs text-muted-foreground">{pairing.menteeRole} (Mentee)</p>
+                              <p className="text-xs text-muted-foreground">{getUserRole(pairing.menteeId)} (Mentee)</p>
                             </div>
                           </div>
                         </div>
@@ -348,16 +260,15 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
                         <div>
                           <p className="text-xs text-muted-foreground mb-2">Focus Areas</p>
                           <div className="flex flex-wrap gap-1">
-                            {pairing.focusAreas.map((area, i) => (
+                            {(pairing.focusAreas || []).map((area, i) => (
                               <Badge key={i} variant="outline" className="text-xs">{area}</Badge>
                             ))}
                           </div>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground mb-2">Progress</p>
-                          <div className="flex items-center gap-2">
-                            <Progress value={pairing.progressScore} className="flex-1" />
-                            <span className="text-sm font-medium">{pairing.progressScore}%</span>
+                          <p className="text-xs text-muted-foreground mb-2">Goals</p>
+                          <div className="text-sm">
+                            {(pairing.goals || []).length} development goals
                           </div>
                         </div>
                       </div>
@@ -365,14 +276,13 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
                       <div className="space-y-2">
                         <p className="text-xs text-muted-foreground">Development Goals</p>
                         <div className="space-y-1">
-                          {pairing.goals.map((goal) => (
+                          {(pairing.goals || []).map((goal, index) => (
                             <div
-                              key={goal.id}
-                              className="flex items-center gap-2 text-sm cursor-pointer hover:bg-secondary/30 p-1 rounded"
-                              onClick={() => toggleGoal(pairing.id, goal.id)}
+                              key={index}
+                              className="flex items-center gap-2 text-sm p-1 rounded"
                             >
-                              <CheckCircle className={`w-4 h-4 ${goal.completed ? 'text-green-500' : 'text-muted-foreground'}`} />
-                              <span className={goal.completed ? 'line-through text-muted-foreground' : ''}>{goal.text}</span>
+                              <Target className="w-4 h-4 text-muted-foreground" />
+                              <span>{goal}</span>
                             </div>
                           ))}
                         </div>
@@ -380,19 +290,16 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
 
                       <div className="flex items-center gap-4 mt-4 pt-4 border-t text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" /> {pairing.meetingFrequency}
+                          <Calendar className="w-3 h-3" /> {pairing.meetingFrequency || 'Weekly'}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <MessageSquare className="w-3 h-3" /> {pairing.sessionsCompleted} sessions
-                        </span>
-                        {pairing.nextMeeting && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> Next: {format(new Date(pairing.nextMeeting), 'MMM d')}
-                          </span>
-                        )}
                         <span className="flex items-center gap-1">
                           <TrendingUp className="w-3 h-3" /> Since {format(new Date(pairing.startDate), 'MMM yyyy')}
                         </span>
+                        {pairing.notes && (
+                          <span className="flex items-center gap-1">
+                            <MessageSquare className="w-3 h-3" /> Has notes
+                          </span>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

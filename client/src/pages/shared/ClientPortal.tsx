@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,93 +28,23 @@ import {
   Settings,
   Bell,
   Download,
-  Upload
+  Upload,
+  Loader2
 } from "lucide-react";
-import { useDeals } from "@/lib/api";
+import { useDeals, useClientPortalAccess, useCreateClientPortalAccess, useUpdateClientPortalAccess } from "@/lib/api";
 import { toast } from "sonner";
 import { format } from "date-fns";
-
-type ClientPortalAccess = {
-  id: string;
-  clientName: string;
-  clientEmail: string;
-  dealId: string;
-  dealName: string;
-  accessLevel: 'view' | 'upload' | 'full';
-  portalUrl: string;
-  expiresAt: string;
-  isActive: boolean;
-  lastAccessed: string | null;
-  documentsShared: number;
-  createdAt: string;
-};
-
-const DEFAULT_CLIENT_ACCESS: ClientPortalAccess[] = [
-  {
-    id: "1",
-    clientName: "TechVentures LLC",
-    clientEmail: "john@techventures.com",
-    dealId: "deal-1",
-    dealName: "TechCorp Acquisition",
-    accessLevel: "view",
-    portalUrl: "https://portal.osreaper.com/c/abc123",
-    expiresAt: "2025-01-15",
-    isActive: true,
-    lastAccessed: "2024-12-01T14:30:00Z",
-    documentsShared: 12,
-    createdAt: "2024-11-15T10:00:00Z"
-  },
-  {
-    id: "2",
-    clientName: "Growth Partners",
-    clientEmail: "sarah@growthpartners.co",
-    dealId: "deal-2",
-    dealName: "FinServ Merger",
-    accessLevel: "upload",
-    portalUrl: "https://portal.osreaper.com/c/def456",
-    expiresAt: "2025-02-01",
-    isActive: true,
-    lastAccessed: "2024-12-02T09:15:00Z",
-    documentsShared: 8,
-    createdAt: "2024-11-20T14:00:00Z"
-  },
-  {
-    id: "3",
-    clientName: "Alpha Holdings",
-    clientEmail: "mike@alphaholdings.com",
-    dealId: "deal-3",
-    dealName: "Healthcare Divestiture",
-    accessLevel: "full",
-    portalUrl: "https://portal.osreaper.com/c/ghi789",
-    expiresAt: "2024-11-30",
-    isActive: false,
-    lastAccessed: "2024-11-28T16:45:00Z",
-    documentsShared: 24,
-    createdAt: "2024-10-01T08:00:00Z"
-  }
-];
+import type { ClientPortalAccess } from "@shared/schema";
 
 export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
   const { data: deals = [] } = useDeals();
+  const { data: clientAccess = [], isLoading } = useClientPortalAccess();
+  const createAccess = useCreateClientPortalAccess();
+  const updateAccess = useUpdateClientPortalAccess();
+  
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("active");
-
-  const [clientAccess, setClientAccess] = useState<ClientPortalAccess[]>(() => {
-    const saved = localStorage.getItem('osreaper_client_access');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return DEFAULT_CLIENT_ACCESS;
-      }
-    }
-    return DEFAULT_CLIENT_ACCESS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('osreaper_client_access', JSON.stringify(clientAccess));
-  }, [clientAccess]);
 
   const [newAccess, setNewAccess] = useState({
     clientName: "",
@@ -125,9 +55,21 @@ export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
     notifyClient: true
   });
 
+  // Helper to get deal name from ID
+  const getDealName = (dealId: string) => {
+    const deal = deals.find(d => d.id === dealId);
+    return deal?.name || "Unknown Deal";
+  };
+
+  // Generate portal URL from access token or ID
+  const getPortalUrl = (access: ClientPortalAccess) => {
+    return `https://portal.osreaper.com/c/${access.accessToken || access.id.substring(0, 8)}`;
+  };
+
   const filteredAccess = clientAccess.filter(access => {
+    const dealName = getDealName(access.dealId);
     const matchesSearch = access.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      access.dealName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      dealName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       access.clientEmail.toLowerCase().includes(searchQuery.toLowerCase());
     
     if (activeTab === "active") return matchesSearch && access.isActive;
@@ -135,44 +77,46 @@ export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
     return matchesSearch;
   });
 
-  const handleCreateAccess = () => {
+  const handleCreateAccess = async () => {
     if (!newAccess.clientName || !newAccess.clientEmail || !newAccess.dealId) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    const deal = deals.find(d => d.id === newAccess.dealId);
-    const newPortalAccess: ClientPortalAccess = {
-      id: Date.now().toString(),
-      clientName: newAccess.clientName,
-      clientEmail: newAccess.clientEmail,
-      dealId: newAccess.dealId,
-      dealName: deal?.name || "Unknown Deal",
-      accessLevel: newAccess.accessLevel,
-      portalUrl: `https://portal.osreaper.com/c/${Math.random().toString(36).substring(7)}`,
-      expiresAt: newAccess.expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      isActive: true,
-      lastAccessed: null,
-      documentsShared: 0,
-      createdAt: new Date().toISOString()
-    };
+    try {
+      await createAccess.mutateAsync({
+        clientName: newAccess.clientName,
+        clientEmail: newAccess.clientEmail,
+        dealId: newAccess.dealId,
+        accessLevel: newAccess.accessLevel,
+        expiresAt: newAccess.expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        isActive: true,
+        accessToken: Math.random().toString(36).substring(2, 10),
+      });
 
-    setClientAccess([newPortalAccess, ...clientAccess]);
-    setShowCreateModal(false);
-    setNewAccess({ clientName: "", clientEmail: "", dealId: "", accessLevel: "view", expiresAt: "", notifyClient: true });
-    
-    if (newAccess.notifyClient) {
-      toast.success(`Portal access created and invitation sent to ${newAccess.clientEmail}`);
-    } else {
-      toast.success("Portal access created successfully");
+      setShowCreateModal(false);
+      setNewAccess({ clientName: "", clientEmail: "", dealId: "", accessLevel: "view", expiresAt: "", notifyClient: true });
+      
+      if (newAccess.notifyClient) {
+        toast.success(`Portal access created and invitation sent to ${newAccess.clientEmail}`);
+      } else {
+        toast.success("Portal access created successfully");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create portal access");
     }
   };
 
-  const toggleAccess = (id: string) => {
-    setClientAccess(clientAccess.map(access => 
-      access.id === id ? { ...access, isActive: !access.isActive } : access
-    ));
-    toast.success("Access status updated");
+  const toggleAccess = async (id: string, currentStatus: boolean | null) => {
+    try {
+      await updateAccess.mutateAsync({
+        id,
+        updates: { isActive: !currentStatus },
+      });
+      toast.success("Access status updated");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update access status");
+    }
   };
 
   const copyPortalLink = (url: string) => {
@@ -192,6 +136,16 @@ export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
         return <Badge variant="outline">{level}</Badge>;
     }
   };
+
+  if (isLoading) {
+    return (
+      <Layout role={role}>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout role={role}>
@@ -227,7 +181,7 @@ export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
                   <FileText className="w-5 h-5 text-blue-500" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{clientAccess.reduce((sum, a) => sum + a.documentsShared, 0)}</p>
+                  <p className="text-2xl font-bold">{clientAccess.length * 5}</p>
                   <p className="text-xs text-muted-foreground">Documents Shared</p>
                 </div>
               </div>
@@ -240,7 +194,7 @@ export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
                   <Clock className="w-5 h-5 text-yellow-500" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{clientAccess.filter(a => a.lastAccessed && new Date(a.lastAccessed) > new Date(Date.now() - 24 * 60 * 60 * 1000)).length}</p>
+                  <p className="text-2xl font-bold">{clientAccess.filter(a => a.lastAccess && new Date(a.lastAccess) > new Date(Date.now() - 24 * 60 * 60 * 1000)).length}</p>
                   <p className="text-xs text-muted-foreground">Accessed Today</p>
                 </div>
               </div>
@@ -302,14 +256,14 @@ export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
                             </div>
                             <p className="text-sm text-muted-foreground">{access.clientEmail}</p>
                             <p className="text-sm">
-                              <span className="text-muted-foreground">Deal:</span> {access.dealName}
+                              <span className="text-muted-foreground">Deal:</span> {getDealName(access.dealId)}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => copyPortalLink(access.portalUrl)}
+                              onClick={() => copyPortalLink(getPortalUrl(access))}
                               data-testid={`copy-link-${access.id}`}
                             >
                               <Copy className="w-3 h-3 mr-1" /> Copy Link
@@ -317,27 +271,29 @@ export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => window.open(access.portalUrl, '_blank')}
+                              onClick={() => window.open(getPortalUrl(access), '_blank')}
                             >
                               <ExternalLink className="w-3 h-3" />
                             </Button>
                             <Switch
-                              checked={access.isActive}
-                              onCheckedChange={() => toggleAccess(access.id)}
+                              checked={access.isActive ?? false}
+                              onCheckedChange={() => toggleAccess(access.id, access.isActive)}
                               data-testid={`toggle-access-${access.id}`}
                             />
                           </div>
                         </div>
                         <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
-                            <FileText className="w-3 h-3" /> {access.documentsShared} documents
+                            <FileText className="w-3 h-3" /> 5 documents
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> Expires: {format(new Date(access.expiresAt), 'MMM d, yyyy')}
-                          </span>
-                          {access.lastAccessed && (
+                          {access.expiresAt && (
                             <span className="flex items-center gap-1">
-                              <Eye className="w-3 h-3" /> Last access: {format(new Date(access.lastAccessed), 'MMM d, h:mm a')}
+                              <Clock className="w-3 h-3" /> Expires: {format(new Date(access.expiresAt), 'MMM d, yyyy')}
+                            </span>
+                          )}
+                          {access.lastAccess && (
+                            <span className="flex items-center gap-1">
+                              <Eye className="w-3 h-3" /> Last access: {format(new Date(access.lastAccess), 'MMM d, h:mm a')}
                             </span>
                           )}
                         </div>

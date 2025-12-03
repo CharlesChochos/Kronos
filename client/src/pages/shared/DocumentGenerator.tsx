@@ -22,25 +22,11 @@ import {
   ChevronRight,
   Loader2
 } from "lucide-react";
-import { useCurrentUser, useDeals, useGenerateDocument } from "@/lib/api";
+import { useCurrentUser, useDeals, useGenerateDocument, useDocumentTemplates, useUpdateDocumentTemplate } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
-
-const TEMPLATES = [
-  { id: 1, name: "Term Sheet", description: "Standard term sheet template for initial deal terms", lastUsed: "2025-12-01", complexity: "Medium", category: "Legal" },
-  { id: 2, name: "Letter of Intent", description: "LOI template for preliminary offers and expressions of interest", lastUsed: "2025-12-01", complexity: "Medium", category: "Legal" },
-  { id: 3, name: "Due Diligence Request", description: "Comprehensive information request checklist", lastUsed: "2025-11-28", complexity: "Medium", category: "Analysis" },
-  { id: 4, name: "Purchase Agreement", description: "Legal document for acquisition transactions", lastUsed: "2025-11-25", complexity: "High", category: "Legal" },
-  { id: 5, name: "NDA", description: "Non-disclosure agreement for confidential information", lastUsed: "2025-12-02", complexity: "Low", category: "Legal" },
-  { id: 6, name: "Board Resolution", description: "Corporate governance and approval template", lastUsed: "2025-11-20", complexity: "Medium", category: "Governance" },
-  { id: 7, name: "M&A Deal Template", description: "Complete template for mergers and acquisitions including due diligence, valuation, and integration planning", lastUsed: "2025-12-01", complexity: "High", category: "Deal" },
-  { id: 8, name: "IPO Roadshow Template", description: "Investor presentation and roadshow materials for initial public offerings", lastUsed: "2025-11-28", complexity: "High", category: "Deal" },
-  { id: 9, name: "Private Placement Memo", description: "Confidential information memorandum for private capital raising", lastUsed: "2025-11-25", complexity: "High", category: "Deal" },
-  { id: 10, name: "Debt Financing Template", description: "Credit facility and bond issuance documentation templates", lastUsed: "2025-11-22", complexity: "High", category: "Deal" },
-  { id: 11, name: "Valuation Report", description: "Comprehensive business valuation report template with DCF and comps analysis", lastUsed: "2025-12-02", complexity: "Medium", category: "Analysis" },
-  { id: 12, name: "Investment Committee Memo", description: "Presentation format for investment committee approval", lastUsed: "2025-11-30", complexity: "Medium", category: "Governance" },
-];
+import type { DocumentTemplate } from "@shared/schema";
 
 type DocumentGeneratorProps = {
   role?: 'CEO' | 'Employee';
@@ -48,10 +34,12 @@ type DocumentGeneratorProps = {
 
 export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorProps) {
   const { data: currentUser } = useCurrentUser();
-  const { data: deals = [], isLoading } = useDeals();
+  const { data: deals = [], isLoading: isLoadingDeals } = useDeals();
+  const { data: templates = [], isLoading: isLoadingTemplates } = useDocumentTemplates();
   const generateDocument = useGenerateDocument();
+  const updateTemplate = useUpdateDocumentTemplate();
   
-  const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [generatedContent, setGeneratedContent] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDeal, setSelectedDeal] = useState<string>("");
@@ -70,9 +58,10 @@ export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorPro
     }
   }, [deals]);
 
-  const filteredTemplates = TEMPLATES.filter(t => 
+  // Filter templates based on search query (only show default/active ones)
+  const filteredTemplates = templates.filter(t => 
     t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.description.toLowerCase().includes(searchQuery.toLowerCase())
+    (t.description || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleGenerate = async () => {
@@ -83,7 +72,7 @@ export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorPro
     
     setGeneratedContent(null);
     
-    const template = TEMPLATES.find(t => t.id === selectedTemplate);
+    const template = templates.find(t => t.id === selectedTemplate);
     const deal = deals.find(d => d.id === selectedDeal);
     
     try {
@@ -101,6 +90,18 @@ export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorPro
       });
       
       setGeneratedContent(result.content);
+      
+      // Update template usage stats in database
+      if (template) {
+        updateTemplate.mutate({
+          id: template.id,
+          updates: {
+            lastUsed: new Date().toISOString().split('T')[0],
+            usageCount: (template.usageCount || 0) + 1,
+          },
+        });
+      }
+      
       toast.success("Document generated with AI!");
     } catch (error: any) {
       toast.error(error.message || "Failed to generate document");
@@ -113,7 +114,7 @@ export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorPro
       return;
     }
     
-    const templateName = TEMPLATES.find(t => t.id === selectedTemplate)?.name || 'document';
+    const templateName = templates.find(t => t.id === selectedTemplate)?.name || 'document';
     const fileName = templateName.replace(/\s+/g, '_');
     
     if (format === 'pdf') {
@@ -207,6 +208,18 @@ export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorPro
     }
   };
 
+  const isDataLoading = isLoadingDeals || isLoadingTemplates;
+
+  if (isDataLoading) {
+    return (
+      <Layout role={role} pageTitle="Document Generator" userName={currentUser?.name || ""}>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout role={role} pageTitle="Document Generator" userName={currentUser?.name || ""}>
       <div className="grid grid-cols-12 gap-6 h-[calc(100vh-8rem)]">
@@ -277,7 +290,7 @@ export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorPro
                         <CardHeader className="border-b border-border/50 pb-4">
                             <div className="flex justify-between items-center">
                                 <div>
-                                    <CardTitle className="text-xl">{TEMPLATES.find(t => t.id === selectedTemplate)?.name}</CardTitle>
+                                    <CardTitle className="text-xl">{templates.find(t => t.id === selectedTemplate)?.name}</CardTitle>
                                     <CardDescription>
                                       {generatedContent ? 'Document generated - ready for review' : 'AI-assisted generation ready'}
                                     </CardDescription>
@@ -312,7 +325,7 @@ export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorPro
                              {/* Document View */}
                              <div className="bg-white text-black p-10 shadow-lg min-h-[600px] w-full max-w-2xl mx-auto rounded-sm">
                                 <div className="mb-8">
-                                    <h1 className="text-2xl font-bold text-center mb-2">{TEMPLATES.find(t => t.id === selectedTemplate)?.name.toUpperCase()}</h1>
+                                    <h1 className="text-2xl font-bold text-center mb-2">{templates.find(t => t.id === selectedTemplate)?.name.toUpperCase()}</h1>
                                     <p className="text-center text-gray-500 text-sm">Generated via OSReaper</p>
                                 </div>
                                 
