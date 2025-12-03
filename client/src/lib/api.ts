@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { User, Deal, Task, InsertUser, Meeting, Notification, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess } from "@shared/schema";
+import type { User, Deal, Task, InsertUser, Meeting, Notification, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess, DocumentTemplate, InsertDocumentTemplate } from "@shared/schema";
 
 // Generic API request helper
 export async function apiRequest(method: string, url: string, body?: any): Promise<Response> {
@@ -1148,6 +1148,74 @@ export function useDeleteClientPortalAccess() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["client-portal-access"] });
+    },
+  });
+}
+
+// ===== DOCUMENT TEMPLATE API =====
+export function useDocumentTemplates() {
+  return useQuery({
+    queryKey: ["document-templates"],
+    queryFn: async () => {
+      const res = await fetch("/api/document-templates");
+      if (!res.ok) throw new Error("Failed to fetch document templates");
+      return res.json() as Promise<DocumentTemplate[]>;
+    },
+  });
+}
+
+export function useCreateDocumentTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (template: Omit<InsertDocumentTemplate, 'createdBy'>) => {
+      const res = await fetch("/api/document-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(template),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create document template");
+      }
+      return res.json() as Promise<DocumentTemplate>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["document-templates"] });
+    },
+  });
+}
+
+export function useUpdateDocumentTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<InsertDocumentTemplate> }) => {
+      const res = await fetch(`/api/document-templates/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update document template");
+      }
+      return res.json() as Promise<DocumentTemplate>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["document-templates"] });
+    },
+  });
+}
+
+export function useDeleteDocumentTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/document-templates/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete document template");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["document-templates"] });
     },
   });
 }

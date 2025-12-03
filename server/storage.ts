@@ -2,7 +2,7 @@ import { eq, and, desc, gt } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@shared/schema";
-import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess } from "@shared/schema";
+import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess, DocumentTemplate, InsertDocumentTemplate } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -160,6 +160,13 @@ export interface IStorage {
   createClientPortalAccess(access: InsertClientPortalAccess): Promise<ClientPortalAccess>;
   updateClientPortalAccess(id: string, updates: Partial<InsertClientPortalAccess>): Promise<ClientPortalAccess | undefined>;
   deleteClientPortalAccess(id: string): Promise<void>;
+  
+  // Document Template operations
+  getDocumentTemplate(id: string): Promise<DocumentTemplate | undefined>;
+  getAllDocumentTemplates(): Promise<DocumentTemplate[]>;
+  createDocumentTemplate(template: InsertDocumentTemplate): Promise<DocumentTemplate>;
+  updateDocumentTemplate(id: string, updates: Partial<InsertDocumentTemplate>): Promise<DocumentTemplate | undefined>;
+  deleteDocumentTemplate(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -845,6 +852,33 @@ export class DatabaseStorage implements IStorage {
   
   async deleteClientPortalAccess(id: string): Promise<void> {
     await db.delete(schema.clientPortalAccess).where(eq(schema.clientPortalAccess.id, id));
+  }
+  
+  // Document Template operations
+  async getDocumentTemplate(id: string): Promise<DocumentTemplate | undefined> {
+    const [template] = await db.select().from(schema.documentTemplates).where(eq(schema.documentTemplates.id, id));
+    return template;
+  }
+  
+  async getAllDocumentTemplates(): Promise<DocumentTemplate[]> {
+    return await db.select().from(schema.documentTemplates).orderBy(schema.documentTemplates.name);
+  }
+  
+  async createDocumentTemplate(template: InsertDocumentTemplate): Promise<DocumentTemplate> {
+    const [created] = await db.insert(schema.documentTemplates).values(template).returning();
+    return created;
+  }
+  
+  async updateDocumentTemplate(id: string, updates: Partial<InsertDocumentTemplate>): Promise<DocumentTemplate | undefined> {
+    const [updated] = await db.update(schema.documentTemplates)
+      .set(updates)
+      .where(eq(schema.documentTemplates.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteDocumentTemplate(id: string): Promise<void> {
+    await db.delete(schema.documentTemplates).where(eq(schema.documentTemplates.id, id));
   }
 }
 

@@ -6,7 +6,7 @@ import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import bcrypt from "bcryptjs";
-import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema, insertAssistantConversationSchema, insertAssistantMessageSchema, insertTimeEntrySchema, insertTimeOffRequestSchema, insertAuditLogSchema, insertInvestorSchema, insertInvestorInteractionSchema, insertOkrSchema, insertStakeholderSchema, insertAnnouncementSchema, insertPollSchema, insertMentorshipPairingSchema, insertClientPortalAccessSchema } from "@shared/schema";
+import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema, insertAssistantConversationSchema, insertAssistantMessageSchema, insertTimeEntrySchema, insertTimeOffRequestSchema, insertAuditLogSchema, insertInvestorSchema, insertInvestorInteractionSchema, insertOkrSchema, insertStakeholderSchema, insertAnnouncementSchema, insertPollSchema, insertMentorshipPairingSchema, insertClientPortalAccessSchema, insertDocumentTemplateSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import { sendMeetingInvite, sendPasswordResetEmail } from "./email";
 import { validateBody, loginSchema, signupSchema, forgotPasswordSchema, resetPasswordSchema } from "./validation";
@@ -2947,6 +2947,79 @@ Guidelines:
       res.json({ message: "Client portal access deleted" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete client portal access" });
+    }
+  });
+
+  // ===== DOCUMENT TEMPLATE ROUTES =====
+  
+  // Get all document templates
+  app.get("/api/document-templates", requireAuth, async (req, res) => {
+    try {
+      const templates = await storage.getAllDocumentTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error('Get document templates error:', error);
+      res.status(500).json({ error: "Failed to fetch document templates" });
+    }
+  });
+  
+  // Get single document template
+  app.get("/api/document-templates/:id", requireAuth, async (req, res) => {
+    try {
+      const template = await storage.getDocumentTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Document template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch document template" });
+    }
+  });
+  
+  // Create document template
+  app.post("/api/document-templates", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const result = insertDocumentTemplateSchema.safeParse({
+        ...req.body,
+        createdBy: user.id,
+      });
+      if (!result.success) {
+        return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      const template = await storage.createDocumentTemplate(result.data);
+      res.status(201).json(template);
+    } catch (error) {
+      console.error('Create document template error:', error);
+      res.status(500).json({ error: "Failed to create document template" });
+    }
+  });
+  
+  // Update document template
+  app.patch("/api/document-templates/:id", requireAuth, async (req, res) => {
+    try {
+      const template = await storage.getDocumentTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Document template not found" });
+      }
+      const updated = await storage.updateDocumentTemplate(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update document template" });
+    }
+  });
+  
+  // Delete document template (CEO only)
+  app.delete("/api/document-templates/:id", requireCEO, async (req, res) => {
+    try {
+      const template = await storage.getDocumentTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Document template not found" });
+      }
+      await storage.deleteDocumentTemplate(req.params.id);
+      res.json({ message: "Document template deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete document template" });
     }
   });
 

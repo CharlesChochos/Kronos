@@ -587,3 +587,26 @@ export const insertClientPortalAccessSchema = createInsertSchema(clientPortalAcc
 
 export type InsertClientPortalAccess = z.infer<typeof insertClientPortalAccessSchema>;
 export type ClientPortalAccess = typeof clientPortalAccess.$inferSelect;
+
+// Document Templates table
+export const documentTemplates = pgTable("document_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull().default('General'), // Legal, Deal, Analysis, Governance, General
+  complexity: text("complexity").notNull().default('Medium'), // Low, Medium, High
+  content: text("content"), // Template content/structure
+  lastUsed: text("last_used"), // ISO date string
+  usageCount: integer("usage_count").default(0),
+  createdBy: varchar("created_by").references(() => users.id),
+  isDefault: boolean("is_default").default(false), // System default templates
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDocumentTemplateSchema = createInsertSchema(documentTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDocumentTemplate = z.infer<typeof insertDocumentTemplateSchema>;
+export type DocumentTemplate = typeof documentTemplates.$inferSelect;
