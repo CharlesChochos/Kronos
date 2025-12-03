@@ -58,6 +58,9 @@ export type TaggedInvestor = {
   type: string; // e.g., 'PE', 'VC', 'Strategic', 'Family Office'
   status: string; // e.g., 'Contacted', 'Interested', 'Passed', 'In DD'
   notes?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
 };
 
 // Audit Trail Entry type

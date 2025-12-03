@@ -19,15 +19,9 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion";
 import type { TaggedInvestor } from "@shared/schema";
+import { SHARED_INVESTORS } from "@/lib/investors";
 
-const INVESTORS = [
-  { id: 1, name: "Ironclad PE", type: "Private Equity", focus: "Industrials", checkSize: "$50M - $200M", matchScore: 95, tags: ["Buyout", "Growth"], email: "deals@ironcladpe.com", phone: "+1 212-555-0101", website: "ironcladpe.com" },
-  { id: 2, name: "Horizon Legacy", type: "Family Office", focus: "Healthcare", checkSize: "$10M - $50M", matchScore: 88, tags: ["Long-term", "Minority"], email: "investments@horizonlegacy.com", phone: "+1 415-555-0102", website: "horizonlegacy.com" },
-  { id: 3, name: "Quantum Strategic", type: "Strategic", focus: "Technology", checkSize: "$100M+", matchScore: 92, tags: ["M&A", "Synergy"], email: "bd@quantumstrategic.com", phone: "+1 650-555-0103", website: "quantumstrategic.com" },
-  { id: 4, name: "Bedrock Industries", type: "Strategic", focus: "Industrials", checkSize: "$500M+", matchScore: 75, tags: ["Consolidation"], email: "corp@bedrockindustries.com", phone: "+1 312-555-0104", website: "bedrockindustries.com" },
-  { id: 5, name: "Apex Ventures", type: "Venture Capital", focus: "Technology", checkSize: "$5M - $25M", matchScore: 82, tags: ["Early Stage", "Growth"], email: "pitch@apexvc.com", phone: "+1 628-555-0105", website: "apexventures.com" },
-  { id: 6, name: "Sterling Capital", type: "Private Equity", focus: "Consumer", checkSize: "$75M - $300M", matchScore: 79, tags: ["Buyout", "Carve-out"], email: "deals@sterlingcap.com", phone: "+1 617-555-0106", website: "sterlingcapital.com" },
-];
+const INVESTORS = SHARED_INVESTORS;
 
 export default function InvestorMatching() {
   const { data: currentUser } = useCurrentUser();
@@ -84,7 +78,10 @@ export default function InvestorMatching() {
       firm: investor.name,
       type: investor.type,
       status: 'Contacted',
-      notes: `Check size: ${investor.checkSize}, Focus: ${investor.focus}, Email: ${investor.email}`,
+      notes: `Check size: ${investor.checkSize}, Focus: ${investor.focus}`,
+      email: investor.email,
+      phone: investor.phone,
+      website: investor.website,
     };
     
     try {
