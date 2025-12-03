@@ -25,9 +25,10 @@ import {
   AlertCircle,
   CheckCircle
 } from "lucide-react";
-import { useCurrentUser, useDeals } from "@/lib/api";
+import { useCurrentUser, useDeals, useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent, CalendarEventType } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, parseISO } from "date-fns";
+import { toast } from "sonner";
 
 type InvestorEvent = {
   id: string;
@@ -40,54 +41,6 @@ type InvestorEvent = {
   notes?: string;
   location?: string;
 };
-
-const demoEvents: InvestorEvent[] = [
-  {
-    id: '1',
-    title: 'LP Meeting - First Round Capital',
-    date: new Date(),
-    type: 'meeting',
-    investor: 'First Round Capital',
-    deal: 'TechCorp Acquisition',
-    status: 'scheduled',
-    location: 'NYC Office'
-  },
-  {
-    id: '2',
-    title: 'Due Diligence Call',
-    date: new Date(Date.now() + 86400000),
-    type: 'call',
-    investor: 'Andreessen Horowitz',
-    status: 'scheduled',
-  },
-  {
-    id: '3',
-    title: 'Term Sheet Deadline',
-    date: new Date(Date.now() + 86400000 * 3),
-    type: 'deadline',
-    investor: 'Sequoia Capital',
-    deal: 'FinServe IPO',
-    status: 'pending',
-  },
-  {
-    id: '4',
-    title: 'Investor Presentation',
-    date: new Date(Date.now() + 86400000 * 5),
-    type: 'presentation',
-    investor: 'Blackstone',
-    deal: 'RetailMax M&A',
-    status: 'scheduled',
-    location: 'Virtual - Zoom'
-  },
-  {
-    id: '5',
-    title: 'Follow-up with GP',
-    date: new Date(Date.now() + 86400000 * 7),
-    type: 'followup',
-    investor: 'KKR',
-    status: 'pending',
-  },
-];
 
 const eventTypeColors: Record<string, string> = {
   meeting: 'bg-blue-500',
@@ -108,10 +61,13 @@ const eventTypeLabels: Record<string, string> = {
 export default function CapitalRaisingCalendar() {
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [] } = useDeals();
+  const { data: calendarEvents = [], isLoading: eventsLoading } = useCalendarEvents();
+  const createEventMutation = useCreateCalendarEvent();
+  const updateEventMutation = useUpdateCalendarEvent();
+  const deleteEventMutation = useDeleteCalendarEvent();
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [events, setEvents] = useState<InvestorEvent[]>(demoEvents);
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
   
@@ -125,6 +81,21 @@ export default function CapitalRaisingCalendar() {
     location: '',
     notes: '',
   });
+  
+  // Transform database events to component format
+  const events: InvestorEvent[] = useMemo(() => {
+    return calendarEvents.map((event: CalendarEventType) => ({
+      id: event.id || '',
+      title: event.title,
+      date: event.date ? parseISO(event.date) : new Date(),
+      type: (event.type || 'meeting') as InvestorEvent['type'],
+      investor: event.investor || 'Unknown Investor',
+      deal: event.dealName || undefined,
+      status: (event.status || 'scheduled') as 'scheduled' | 'completed' | 'pending',
+      notes: event.notes || undefined,
+      location: event.location || undefined,
+    }));
+  }, [calendarEvents]);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -151,39 +122,49 @@ export default function CapitalRaisingCalendar() {
       .slice(0, 10);
   }, [filteredEvents]);
 
-  const handleAddEvent = () => {
-    if (!newEvent.title || !newEvent.date || !newEvent.investor) return;
-    
-    const eventDate = new Date(newEvent.date);
-    if (newEvent.time) {
-      const [hours, minutes] = newEvent.time.split(':');
-      eventDate.setHours(parseInt(hours), parseInt(minutes));
+  const handleAddEvent = async () => {
+    if (!newEvent.title || !newEvent.date || !newEvent.investor) {
+      toast.error("Please fill in all required fields");
+      return;
     }
     
-    const event: InvestorEvent = {
-      id: crypto.randomUUID(),
-      title: newEvent.title,
-      date: eventDate,
-      type: newEvent.type,
-      investor: newEvent.investor,
-      deal: newEvent.deal || undefined,
-      status: 'scheduled',
-      location: newEvent.location || undefined,
-      notes: newEvent.notes || undefined,
-    };
+    // Find the deal to get its name
+    const selectedDeal = deals.find((d: any) => d.id === newEvent.deal);
     
-    setEvents(prev => [...prev, event]);
-    setShowAddEvent(false);
-    setNewEvent({
-      title: '',
-      date: '',
-      time: '',
-      type: 'meeting',
-      investor: '',
-      deal: '',
-      location: '',
-      notes: '',
-    });
+    try {
+      await createEventMutation.mutateAsync({
+        title: newEvent.title,
+        date: newEvent.date,
+        time: newEvent.time || null,
+        type: newEvent.type,
+        description: null,
+        dealId: newEvent.deal || null,
+        dealName: selectedDeal?.name || null,
+        location: newEvent.location || null,
+        participants: [],
+        isAllDay: false,
+        color: null,
+        investor: newEvent.investor || null,
+        status: 'scheduled',
+        notes: newEvent.notes || null,
+      });
+      
+      toast.success("Event added successfully");
+      setShowAddEvent(false);
+      setNewEvent({
+        title: '',
+        date: '',
+        time: '',
+        type: 'meeting',
+        investor: '',
+        deal: '',
+        location: '',
+        notes: '',
+      });
+    } catch (error) {
+      toast.error("Failed to create event");
+      console.error("Failed to create event:", error);
+    }
   };
 
   const investorStats = useMemo(() => {

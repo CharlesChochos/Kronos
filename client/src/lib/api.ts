@@ -1270,6 +1270,7 @@ export type UserPreferencesType = {
   theme: string;
   complianceDefaults: { sec: boolean; finra: boolean; legal: boolean };
   marketSymbols: string[];
+  settings?: Record<string, any>; // General settings (notifications, display, account preferences)
   updatedAt?: string;
 };
 
@@ -1427,6 +1428,9 @@ export type CalendarEventType = {
   participants: string[];
   isAllDay: boolean | null;
   color: string | null;
+  investor: string | null;
+  status: string | null;
+  notes: string | null;
   createdBy: string | null;
   createdAt: string;
 };

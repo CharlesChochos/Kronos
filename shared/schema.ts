@@ -638,6 +638,7 @@ export const userPreferences = pgTable("user_preferences", {
   theme: text("theme").default('system'), // light, dark, system
   complianceDefaults: jsonb("compliance_defaults").default({ sec: false, finra: false, legal: true }),
   marketSymbols: jsonb("market_symbols").default(['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY']),
+  settings: jsonb("settings").default({}), // General settings (notifications, display, account preferences)
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -687,7 +688,7 @@ export type DealTemplate = typeof dealTemplates.$inferSelect;
 export const calendarEvents = pgTable("calendar_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
-  type: text("type").notNull().default('deadline'), // deadline, meeting, milestone, filing
+  type: text("type").notNull().default('deadline'), // deadline, meeting, milestone, filing, call, followup, presentation
   date: text("date").notNull(), // ISO date string
   time: text("time"), // HH:MM format
   description: text("description"),
@@ -697,6 +698,9 @@ export const calendarEvents = pgTable("calendar_events", {
   participants: jsonb("participants").default([]).$type<string[]>(),
   isAllDay: boolean("is_all_day").default(false),
   color: text("color"), // Hex color for calendar display
+  investor: text("investor"), // For capital raising events - investor name
+  status: text("status").default('scheduled'), // scheduled, completed, pending
+  notes: text("notes"), // Additional notes
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });

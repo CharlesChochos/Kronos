@@ -26,7 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDashboardContext } from "@/contexts/DashboardContext";
-import { useNotifications, useDeals, useTasks, useUsers, useLogout, useCurrentUser, useMarkNotificationRead, useUpdateUserProfile, useChangePassword } from "@/lib/api";
+import { useNotifications, useDeals, useTasks, useUsers, useLogout, useCurrentUser, useMarkNotificationRead, useUpdateUserProfile, useChangePassword, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -66,41 +66,136 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     confirmPassword: '',
   });
   
-  // Sidebar collapsed state - persist to localStorage
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    const saved = localStorage.getItem('sidebarCollapsed');
-    return saved === 'true';
-  });
+  // User preferences from database
+  const { data: userPrefs, isLoading: prefsLoading } = useUserPreferences();
+  const saveUserPrefs = useSaveUserPreferences();
   
-  // Save sidebar state to localStorage when it changes
+  // Default settings values
+  const DEFAULT_SETTINGS = {
+    dealUpdates: true,
+    taskReminders: true,
+    teamActivity: false,
+    weeklySummary: true,
+    desktopAlerts: false,
+    darkMode: true,
+    compactView: false,
+    animations: true,
+    autoRefresh: true,
+    twoFactorAuth: false,
+  };
+  
+  // Sidebar collapsed state - from database preferences
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarInitialized, setSidebarInitialized] = useState(false);
+  
+  // Settings preferences - from database preferences
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [settingsInitialized, setSettingsInitialized] = useState(false);
+  
+  // Refs for tracking last saved state and mounted status
+  const isMountedRef = useRef(true);
+  const lastSavedSidebarRef = useRef(false);
+  const lastSavedSettingsRef = useRef(DEFAULT_SETTINGS);
+  
   useEffect(() => {
-    localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed));
-  }, [sidebarCollapsed]);
-  
-  // Settings preferences - persist to localStorage
-  const [settings, setSettings] = useState(() => {
-    const saved = localStorage.getItem('userSettings');
-    return saved ? JSON.parse(saved) : {
-      // Notifications
-      dealUpdates: true,
-      taskReminders: true,
-      teamActivity: false,
-      weeklySummary: true,
-      desktopAlerts: false,
-      // Display
-      darkMode: true,
-      compactView: false,
-      animations: true,
-      autoRefresh: true,
-      // Account
-      twoFactorAuth: false,
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
     };
-  });
+  }, []);
   
-  // Save settings to localStorage
+  // Hydrate sidebar state from user preferences
   useEffect(() => {
-    localStorage.setItem('userSettings', JSON.stringify(settings));
-  }, [settings]);
+    if (!prefsLoading && !sidebarInitialized) {
+      const savedState = userPrefs?.sidebarCollapsed ?? false;
+      setSidebarCollapsed(savedState);
+      lastSavedSidebarRef.current = savedState;
+      setSidebarInitialized(true);
+    }
+  }, [prefsLoading, userPrefs, sidebarInitialized]);
+  
+  // Hydrate settings from user preferences
+  useEffect(() => {
+    if (!prefsLoading && !settingsInitialized) {
+      const savedSettings = userPrefs?.settings as typeof DEFAULT_SETTINGS | undefined;
+      if (savedSettings && typeof savedSettings === 'object') {
+        const mergedSettings = { ...DEFAULT_SETTINGS, ...savedSettings };
+        setSettings(mergedSettings);
+        lastSavedSettingsRef.current = mergedSettings;
+      }
+      setSettingsInitialized(true);
+    }
+  }, [prefsLoading, userPrefs, settingsInitialized]);
+  
+  // Helper to extract only mutable preference fields (strip readonly columns)
+  const getMutablePrefs = (prefs: any) => {
+    if (!prefs) return {};
+    const { id, userId, updatedAt, ...mutableFields } = prefs;
+    return mutableFields;
+  };
+  
+  // Save sidebar state to database (debounced) - merge with existing preferences
+  const saveSidebarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  useEffect(() => {
+    if (!sidebarInitialized) return;
+    if (saveSidebarTimeoutRef.current) {
+      clearTimeout(saveSidebarTimeoutRef.current);
+    }
+    saveSidebarTimeoutRef.current = setTimeout(async () => {
+      if (!isMountedRef.current) return;
+      try {
+        // Merge with existing preferences (stripped of readonly fields)
+        const mutablePrefs = getMutablePrefs(userPrefs);
+        await saveUserPrefs.mutateAsync({
+          ...mutablePrefs,
+          sidebarCollapsed,
+        });
+        lastSavedSidebarRef.current = sidebarCollapsed;
+      } catch (error) {
+        console.error('Failed to save sidebar state:', error);
+        if (isMountedRef.current) {
+          setSidebarCollapsed(lastSavedSidebarRef.current);
+        }
+      }
+    }, 500);
+    return () => {
+      if (saveSidebarTimeoutRef.current) {
+        clearTimeout(saveSidebarTimeoutRef.current);
+      }
+    };
+  }, [sidebarCollapsed, sidebarInitialized, userPrefs]);
+  
+  // Save settings to database (debounced) - merge with existing preferences
+  const saveSettingsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  useEffect(() => {
+    if (!settingsInitialized) return;
+    if (saveSettingsTimeoutRef.current) {
+      clearTimeout(saveSettingsTimeoutRef.current);
+    }
+    saveSettingsTimeoutRef.current = setTimeout(async () => {
+      if (!isMountedRef.current) return;
+      try {
+        // Merge with existing preferences (stripped of readonly fields)
+        const mutablePrefs = getMutablePrefs(userPrefs);
+        await saveUserPrefs.mutateAsync({
+          ...mutablePrefs,
+          settings,
+        });
+        lastSavedSettingsRef.current = settings;
+      } catch (error) {
+        console.error('Failed to save settings:', error);
+        toast.error('Failed to save settings - reverting changes');
+        if (isMountedRef.current) {
+          setSettings(lastSavedSettingsRef.current);
+        }
+      }
+    }, 1000);
+    return () => {
+      if (saveSettingsTimeoutRef.current) {
+        clearTimeout(saveSettingsTimeoutRef.current);
+      }
+    };
+  }, [settings, settingsInitialized, userPrefs]);
   
   const updateSetting = (key: string, value: boolean) => {
     setSettings((prev: any) => ({ ...prev, [key]: value }));
