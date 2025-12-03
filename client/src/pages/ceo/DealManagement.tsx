@@ -13,17 +13,30 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Search, Filter, MoreVertical, ArrowRight, Calendar, DollarSign, Briefcase, 
   Pencil, Trash2, Eye, Users, Phone, Mail, MessageSquare, Plus, X, 
   Building2, TrendingUp, FileText, Clock, CheckCircle2, ChevronRight,
-  UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload
+  UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload, GitCompare, ArrowUpDown, BarChart3
 } from "lucide-react";
 import { useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isToday, isBefore, isAfter, parseISO } from "date-fns";
 import type { Deal, PodTeamMember, TaggedInvestor, AuditEntry } from "@shared/schema";
+import {
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  ResponsiveContainer,
+  Legend,
+  Tooltip
+} from "recharts";
+
+const COMPARISON_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 const DEAL_STAGES = ['Origination', 'Execution', 'Negotiation', 'Due Diligence', 'Signing', 'Closed'];
 const INVESTOR_TYPES = ['PE', 'VC', 'Strategic', 'Family Office', 'Hedge Fund', 'Sovereign Wealth'];
@@ -70,11 +83,14 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
-  const [viewMode, setViewMode] = useState<'grid' | 'calendar'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'calendar' | 'compare'>('grid');
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('week');
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [selectedCalendarDeal, setSelectedCalendarDeal] = useState<Deal | null>(null);
   const [calendarDealSearch, setCalendarDealSearch] = useState("");
+  
+  const [selectedCompareDeals, setSelectedCompareDeals] = useState<string[]>([]);
+  const [compareSortBy, setCompareSortBy] = useState<string>("value");
   
   // Task detail modal for calendar view
   const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
@@ -436,16 +452,27 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                 size="sm"
                 className={cn("rounded-none border-r border-border", viewMode === 'grid' && "bg-primary/10 text-primary")}
                 onClick={() => setViewMode('grid')}
+                data-testid="button-view-grid"
               >
                 <LayoutGrid className="w-4 h-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm"
-                className={cn("rounded-none", viewMode === 'calendar' && "bg-primary/10 text-primary")}
+                className={cn("rounded-none border-r border-border", viewMode === 'calendar' && "bg-primary/10 text-primary")}
                 onClick={() => setViewMode('calendar')}
+                data-testid="button-view-calendar"
               >
                 <CalendarDays className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className={cn("rounded-none", viewMode === 'compare' && "bg-primary/10 text-primary")}
+                onClick={() => setViewMode('compare')}
+                data-testid="button-view-compare"
+              >
+                <GitCompare className="w-4 h-4" />
               </Button>
             </div>
             <DropdownMenu>
@@ -989,11 +1016,324 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
         </div>
         )}
 
-        {filteredDeals.length === 0 && (
+        {filteredDeals.length === 0 && viewMode !== 'compare' && (
           <div className="text-center py-12 text-muted-foreground">
             {searchQuery || stageFilter ? "No deals match your search criteria" : "No deals yet. Create your first deal!"}
           </div>
         )}
+
+        {/* Comparison View */}
+        {viewMode === 'compare' && (() => {
+          const selectedDealsData = deals.filter(d => selectedCompareDeals.includes(d.id));
+          
+          const getStageValue = (stage: string) => {
+            const stageIndex = DEAL_STAGES.indexOf(stage);
+            return ((stageIndex + 1) / DEAL_STAGES.length) * 100;
+          };
+          
+          const getTeamScore = (deal: Deal) => {
+            const podTeam = (deal.podTeam as PodTeamMember[]) || [];
+            return Math.min(podTeam.length * 20, 100);
+          };
+          
+          const getInvestorScore = (deal: Deal) => {
+            const investors = (deal.taggedInvestors as TaggedInvestor[]) || [];
+            return Math.min(investors.length * 15, 100);
+          };
+          
+          const getDocumentScore = (deal: Deal) => {
+            const attachments = (deal.attachments as any[]) || [];
+            return Math.min(attachments.length * 10, 100);
+          };
+          
+          const maxValue = Math.max(...deals.map(d => d.value || 0), 1);
+          
+          const radarData = [
+            { metric: 'Deal Value', fullMark: 100, ...Object.fromEntries(selectedDealsData.map(d => [d.name, ((d.value || 0) / maxValue) * 100])) },
+            { metric: 'Stage Progress', fullMark: 100, ...Object.fromEntries(selectedDealsData.map(d => [d.name, getStageValue(d.stage)])) },
+            { metric: 'Team Size', fullMark: 100, ...Object.fromEntries(selectedDealsData.map(d => [d.name, getTeamScore(d)])) },
+            { metric: 'Investors', fullMark: 100, ...Object.fromEntries(selectedDealsData.map(d => [d.name, getInvestorScore(d)])) },
+            { metric: 'Documents', fullMark: 100, ...Object.fromEntries(selectedDealsData.map(d => [d.name, getDocumentScore(d)])) },
+            { metric: 'Progress', fullMark: 100, ...Object.fromEntries(selectedDealsData.map(d => [d.name, d.progress || 0])) },
+          ];
+          
+          const toggleDealSelection = (dealId: string) => {
+            if (selectedCompareDeals.includes(dealId)) {
+              setSelectedCompareDeals(selectedCompareDeals.filter(id => id !== dealId));
+            } else if (selectedCompareDeals.length < 5) {
+              setSelectedCompareDeals([...selectedCompareDeals, dealId]);
+            } else {
+              toast.error("You can compare up to 5 deals at a time");
+            }
+          };
+          
+          const sortedDeals = [...deals].sort((a, b) => {
+            switch (compareSortBy) {
+              case 'value': return (b.value || 0) - (a.value || 0);
+              case 'stage': return getStageValue(b.stage) - getStageValue(a.stage);
+              case 'name': return a.name.localeCompare(b.name);
+              default: return 0;
+            }
+          });
+          
+          return (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Deal Selection Panel */}
+                <Card className="lg:col-span-1">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Briefcase className="w-5 h-5" /> Select Deals
+                      </CardTitle>
+                      <Badge variant="secondary">{selectedCompareDeals.length}/5</Badge>
+                    </div>
+                    <CardDescription>Choose up to 5 deals to compare</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Select value={compareSortBy} onValueChange={setCompareSortBy}>
+                        <SelectTrigger className="w-full">
+                          <ArrowUpDown className="w-4 h-4 mr-2" />
+                          <SelectValue placeholder="Sort by" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="value">Sort by Value</SelectItem>
+                          <SelectItem value="stage">Sort by Stage</SelectItem>
+                          <SelectItem value="name">Sort by Name</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <ScrollArea className="h-[400px]">
+                      <div className="space-y-2 pr-4">
+                        {sortedDeals.map((deal) => (
+                          <div
+                            key={deal.id}
+                            className={cn(
+                              "p-3 rounded-lg border cursor-pointer transition-all",
+                              selectedCompareDeals.includes(deal.id)
+                                ? "border-primary bg-primary/10"
+                                : "border-border hover:border-primary/50"
+                            )}
+                            onClick={() => toggleDealSelection(deal.id)}
+                            data-testid={`compare-deal-${deal.id}`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <Checkbox
+                                    checked={selectedCompareDeals.includes(deal.id)}
+                                    onCheckedChange={() => toggleDealSelection(deal.id)}
+                                  />
+                                  <span className="font-medium truncate">{deal.name}</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-1">{deal.client}</div>
+                              </div>
+                              <Badge variant="outline" className="shrink-0">${deal.value}M</Badge>
+                            </div>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Badge className="text-xs" variant="secondary">{deal.stage}</Badge>
+                              <Badge className={cn(
+                                "text-xs",
+                                deal.status === 'Active' ? "bg-green-500/20 text-green-400" :
+                                deal.status === 'On Hold' ? "bg-yellow-500/20 text-yellow-400" :
+                                "bg-gray-500/20 text-gray-400"
+                              )}>{deal.status}</Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                    {selectedCompareDeals.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setSelectedCompareDeals([])}
+                      >
+                        Clear Selection
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Comparison Charts */}
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5" /> Deal Comparison
+                    </CardTitle>
+                    <CardDescription>
+                      {selectedCompareDeals.length === 0 
+                        ? "Select deals from the left panel to compare them"
+                        : `Comparing ${selectedCompareDeals.length} deal${selectedCompareDeals.length > 1 ? 's' : ''}`}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedCompareDeals.length === 0 ? (
+                      <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+                        <div className="text-center">
+                          <GitCompare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                          <p>Select at least one deal to see comparison</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RadarChart data={radarData}>
+                            <PolarGrid stroke="hsl(var(--border))" />
+                            <PolarAngleAxis 
+                              dataKey="metric" 
+                              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                            />
+                            <PolarRadiusAxis 
+                              angle={30} 
+                              domain={[0, 100]} 
+                              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                            />
+                            {selectedDealsData.map((deal, index) => (
+                              <Radar
+                                key={deal.id}
+                                name={deal.name}
+                                dataKey={deal.name}
+                                stroke={COMPARISON_COLORS[index % COMPARISON_COLORS.length]}
+                                fill={COMPARISON_COLORS[index % COMPARISON_COLORS.length]}
+                                fillOpacity={0.2}
+                              />
+                            ))}
+                            <Legend />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: 'hsl(var(--card))',
+                                border: '1px solid hsl(var(--border))',
+                                borderRadius: '8px'
+                              }}
+                            />
+                          </RadarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Comparison Table */}
+              {selectedCompareDeals.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Detailed Comparison</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Metric</th>
+                            {selectedDealsData.map((deal, index) => (
+                              <th 
+                                key={deal.id} 
+                                className="text-left py-3 px-4 text-sm font-medium"
+                                style={{ color: COMPARISON_COLORS[index % COMPARISON_COLORS.length] }}
+                              >
+                                {deal.name}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b border-border/50">
+                            <td className="py-3 px-4 text-sm text-muted-foreground">Deal Value</td>
+                            {selectedDealsData.map(deal => (
+                              <td key={deal.id} className="py-3 px-4 font-mono font-semibold">${deal.value}M</td>
+                            ))}
+                          </tr>
+                          <tr className="border-b border-border/50">
+                            <td className="py-3 px-4 text-sm text-muted-foreground">Client</td>
+                            {selectedDealsData.map(deal => (
+                              <td key={deal.id} className="py-3 px-4">{deal.client}</td>
+                            ))}
+                          </tr>
+                          <tr className="border-b border-border/50">
+                            <td className="py-3 px-4 text-sm text-muted-foreground">Sector</td>
+                            {selectedDealsData.map(deal => (
+                              <td key={deal.id} className="py-3 px-4">{deal.sector}</td>
+                            ))}
+                          </tr>
+                          <tr className="border-b border-border/50">
+                            <td className="py-3 px-4 text-sm text-muted-foreground">Stage</td>
+                            {selectedDealsData.map(deal => (
+                              <td key={deal.id} className="py-3 px-4">
+                                <Badge variant="secondary">{deal.stage}</Badge>
+                              </td>
+                            ))}
+                          </tr>
+                          <tr className="border-b border-border/50">
+                            <td className="py-3 px-4 text-sm text-muted-foreground">Status</td>
+                            {selectedDealsData.map(deal => (
+                              <td key={deal.id} className="py-3 px-4">
+                                <Badge className={cn(
+                                  deal.status === 'Active' ? "bg-green-500/20 text-green-400" :
+                                  deal.status === 'On Hold' ? "bg-yellow-500/20 text-yellow-400" :
+                                  "bg-gray-500/20 text-gray-400"
+                                )}>{deal.status}</Badge>
+                              </td>
+                            ))}
+                          </tr>
+                          <tr className="border-b border-border/50">
+                            <td className="py-3 px-4 text-sm text-muted-foreground">Progress</td>
+                            {selectedDealsData.map(deal => (
+                              <td key={deal.id} className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-24 h-2 bg-secondary rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-primary" 
+                                      style={{ width: `${deal.progress || 0}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-sm">{deal.progress || 0}%</span>
+                                </div>
+                              </td>
+                            ))}
+                          </tr>
+                          <tr className="border-b border-border/50">
+                            <td className="py-3 px-4 text-sm text-muted-foreground">Lead</td>
+                            {selectedDealsData.map(deal => (
+                              <td key={deal.id} className="py-3 px-4">{deal.lead}</td>
+                            ))}
+                          </tr>
+                          <tr className="border-b border-border/50">
+                            <td className="py-3 px-4 text-sm text-muted-foreground">Team Size</td>
+                            {selectedDealsData.map(deal => (
+                              <td key={deal.id} className="py-3 px-4">
+                                {((deal.podTeam as PodTeamMember[]) || []).length} members
+                              </td>
+                            ))}
+                          </tr>
+                          <tr className="border-b border-border/50">
+                            <td className="py-3 px-4 text-sm text-muted-foreground">Tagged Investors</td>
+                            {selectedDealsData.map(deal => (
+                              <td key={deal.id} className="py-3 px-4">
+                                {((deal.taggedInvestors as TaggedInvestor[]) || []).length} investors
+                              </td>
+                            ))}
+                          </tr>
+                          <tr>
+                            <td className="py-3 px-4 text-sm text-muted-foreground">Documents</td>
+                            {selectedDealsData.map(deal => (
+                              <td key={deal.id} className="py-3 px-4">
+                                {((deal.attachments as any[]) || []).length} files
+                              </td>
+                            ))}
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Deal Room Sheet */}

@@ -14,13 +14,11 @@ import InvestorMatching from "@/pages/ceo/InvestorMatching";
 import EmployeeInvestorMatching from "@/pages/employee/InvestorMatching";
 import TeamAssignment from "@/pages/ceo/TeamAssignment";
 import TeamPerformance from "@/pages/ceo/TeamPerformance";
-import DealComparison from "@/pages/shared/DealComparison";
 import InvestorCRM from "@/pages/ceo/InvestorCRM";
 import ClientPortal from "@/pages/shared/ClientPortal";
 import MentorshipPairing from "@/pages/shared/MentorshipPairing";
 import GoalSettingOKRs from "@/pages/shared/GoalSettingOKRs";
 import DealAnnouncements from "@/pages/shared/DealAnnouncements";
-import QuickPolls from "@/pages/shared/QuickPolls";
 import StakeholderDirectory from "@/pages/shared/StakeholderDirectory";
 import EventCalendar from "@/pages/shared/EventCalendar";
 import MyTasks from "@/pages/employee/MyTasks";
@@ -36,14 +34,12 @@ const CeoDealManagement = () => <DealManagement role="CEO" />;
 const EmployeeDealManagement = () => <DealManagement role="Employee" />;
 const CeoChat = () => <Chat role="CEO" />;
 const EmployeeChat = () => <Chat role="Employee" />;
-const CeoDealComparison = () => <DealComparison role="CEO" />;
 const CeoClientPortal = () => <ClientPortal role="CEO" />;
 const CeoMentorshipPairing = () => <MentorshipPairing role="CEO" />;
 const CeoGoalSettingOKRs = () => <GoalSettingOKRs role="CEO" />;
 const EmployeeGoalSettingOKRs = () => <GoalSettingOKRs role="Employee" />;
 const CeoDealAnnouncements = () => <DealAnnouncements role="CEO" />;
 const EmployeeDealAnnouncements = () => <DealAnnouncements role="Employee" />;
-const CeoQuickPolls = () => <QuickPolls role="CEO" />;
 const CeoStakeholderDirectory = () => <StakeholderDirectory role="CEO" />;
 const EmployeeStakeholderDirectory = () => <StakeholderDirectory role="Employee" />;
 const CeoEventCalendar = () => <EventCalendar role="CEO" />;
@@ -123,9 +119,6 @@ function Router() {
       <Route path="/ceo/team-performance">
         {() => <ProtectedRoute component={TeamPerformance} />}
       </Route>
-      <Route path="/ceo/deal-comparison">
-        {() => <ProtectedRoute component={CeoDealComparison} />}
-      </Route>
       <Route path="/ceo/investor-crm">
         {() => <ProtectedRoute component={InvestorCRM} />}
       </Route>
@@ -140,9 +133,6 @@ function Router() {
       </Route>
       <Route path="/ceo/announcements">
         {() => <ProtectedRoute component={CeoDealAnnouncements} />}
-      </Route>
-      <Route path="/ceo/polls">
-        {() => <ProtectedRoute component={CeoQuickPolls} />}
       </Route>
       <Route path="/ceo/calendar">
         {() => <ProtectedRoute component={CeoEventCalendar} />}
