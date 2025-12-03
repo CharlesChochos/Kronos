@@ -401,3 +401,10 @@ export const insertInvestorInteractionSchema = createInsertSchema(investorIntera
 
 export type InsertInvestorInteraction = z.infer<typeof insertInvestorInteractionSchema>;
 export type InvestorInteraction = typeof investorInteractions.$inferSelect;
+
+// Sessions table (for PostgreSQL session storage)
+export const sessions = pgTable("sessions", {
+  sid: varchar("sid").primaryKey(),
+  sess: jsonb("sess").notNull(),
+  expire: timestamp("expire", { precision: 6 }).notNull(),
+});

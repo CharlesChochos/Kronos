@@ -4,15 +4,21 @@ import { storage } from "./storage";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema, insertAssistantConversationSchema, insertAssistantMessageSchema, insertTimeEntrySchema, insertTimeOffRequestSchema, insertAuditLogSchema, insertInvestorSchema, insertInvestorInteractionSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import { sendMeetingInvite, sendPasswordResetEmail } from "./email";
+import { validateBody, loginSchema, signupSchema, forgotPasswordSchema, resetPasswordSchema } from "./validation";
+import { generalLimiter, authLimiter, strictLimiter, uploadLimiter, aiLimiter } from "./rateLimiter";
 import OpenAI from "openai";
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import multer from "multer";
+
+// PostgreSQL session store
+const PgSession = connectPgSimple(session);
 
 // Initialize OpenAI client with Replit AI Integrations
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
@@ -25,15 +31,22 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Session configuration
+  // Session configuration with PostgreSQL store
   app.use(
     session({
+      store: new PgSession({
+        conString: process.env.DATABASE_URL,
+        tableName: 'sessions',
+        createTableIfMissing: true,
+      }),
       secret: process.env.SESSION_SECRET || "osreaper-secret-key-change-in-production",
       resave: false,
       saveUninitialized: false,
       cookie: {
         secure: process.env.NODE_ENV === "production",
+        httpOnly: true,
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+        sameSite: 'lax',
       },
     })
   );
@@ -104,7 +117,7 @@ export async function registerRoutes(
   // ===== AUTH ROUTES =====
   
   // Sign up
-  app.post("/api/auth/signup", async (req, res) => {
+  app.post("/api/auth/signup", authLimiter, async (req, res) => {
     try {
       const result = insertUserSchema.safeParse(req.body);
       if (!result.success) {
@@ -131,7 +144,7 @@ export async function registerRoutes(
   });
 
   // Login
-  app.post("/api/auth/login", (req, res, next) => {
+  app.post("/api/auth/login", authLimiter, validateBody(loginSchema), (req, res, next) => {
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
         return res.status(500).json({ error: "Authentication error" });
@@ -159,13 +172,9 @@ export async function registerRoutes(
   });
 
   // Forgot Password - Request Reset
-  app.post("/api/auth/forgot-password", async (req, res) => {
+  app.post("/api/auth/forgot-password", strictLimiter, validateBody(forgotPasswordSchema), async (req, res) => {
     try {
       const { email } = req.body;
-      
-      if (!email) {
-        return res.status(400).json({ error: "Email is required" });
-      }
 
       const user = await storage.getUserByEmail(email);
       
@@ -212,17 +221,9 @@ export async function registerRoutes(
   });
 
   // Reset Password - Verify Token and Update Password
-  app.post("/api/auth/reset-password", async (req, res) => {
+  app.post("/api/auth/reset-password", strictLimiter, validateBody(resetPasswordSchema), async (req, res) => {
     try {
       const { token, newPassword } = req.body;
-      
-      if (!token || !newPassword) {
-        return res.status(400).json({ error: "Token and new password are required" });
-      }
-
-      if (newPassword.length < 6) {
-        return res.status(400).json({ error: "Password must be at least 6 characters long" });
-      }
 
       // Find valid token
       const resetToken = await storage.getValidPasswordResetToken(token);
@@ -323,7 +324,7 @@ export async function registerRoutes(
   });
 
   // Upload file using multer
-  app.post("/api/upload", requireAuth, upload.single('file'), (req, res) => {
+  app.post("/api/upload", uploadLimiter, requireAuth, upload.single('file'), (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -445,7 +446,7 @@ export async function registerRoutes(
   });
 
   // Create deal (CEO only)
-  app.post("/api/deals", requireCEO, async (req, res) => {
+  app.post("/api/deals", generalLimiter, requireCEO, async (req, res) => {
     try {
       const result = insertDealSchema.safeParse(req.body);
       if (!result.success) {
@@ -539,7 +540,7 @@ export async function registerRoutes(
   });
 
   // Create task (CEO only)
-  app.post("/api/tasks", requireCEO, async (req, res) => {
+  app.post("/api/tasks", generalLimiter, requireCEO, async (req, res) => {
     try {
       const result = insertTaskSchema.safeParse(req.body);
       if (!result.success) {
@@ -622,7 +623,7 @@ export async function registerRoutes(
   });
 
   // Create meeting (CEO only)
-  app.post("/api/meetings", requireCEO, async (req, res) => {
+  app.post("/api/meetings", generalLimiter, requireCEO, async (req, res) => {
     try {
       // Extract email formatting fields before validation (they're not in schema)
       const { localDate, localTime, organizerTimezone, ...meetingData } = req.body;
@@ -1140,7 +1141,7 @@ Consider common investment banking tasks like:
   });
   
   // Send message to Reaper and get AI response
-  app.post("/api/assistant/conversations/:id/messages", requireAuth, async (req, res) => {
+  app.post("/api/assistant/conversations/:id/messages", aiLimiter, requireAuth, async (req, res) => {
     try {
       const currentUser = req.user as any;
       const conversation = await storage.getAssistantConversation(req.params.id);
@@ -2384,7 +2385,7 @@ Guidelines:
   });
   
   // Create investor (CEO only)
-  app.post("/api/investors", requireCEO, async (req, res) => {
+  app.post("/api/investors", generalLimiter, requireCEO, async (req, res) => {
     try {
       const user = req.user as any;
       const result = insertInvestorSchema.safeParse(req.body);
