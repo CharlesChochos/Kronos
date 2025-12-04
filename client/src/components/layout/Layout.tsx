@@ -1701,21 +1701,24 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                       if (notification.link) {
                         setLocation(notification.link);
                       } else {
-                        const rolePrefix = role === 'CEO' ? '/ceo' : '/employee';
                         const title = notification.title?.toLowerCase() || '';
                         const message = notification.message?.toLowerCase() || '';
                         if (title.includes('deal') || message.includes('deal')) {
-                          setLocation(`${rolePrefix}/deals`);
+                          setLocation(role === 'CEO' ? '/ceo/deals' : '/employee/deals');
                         } else if (title.includes('task') || message.includes('task')) {
-                          setLocation(`${rolePrefix}/tasks`);
-                        } else if (title.includes('meeting') || message.includes('meeting')) {
-                          setLocation(`${rolePrefix}/meetings`);
+                          setLocation(role === 'CEO' ? '/ceo/dashboard' : '/employee/tasks');
+                        } else if (title.includes('meeting') || message.includes('meeting') || title.includes('calendar')) {
+                          setLocation(role === 'CEO' ? '/ceo/calendar' : '/employee/calendar');
                         } else if (title.includes('document') || message.includes('document')) {
-                          setLocation(`${rolePrefix}/document-library`);
+                          setLocation(role === 'CEO' ? '/ceo/document-library' : '/employee/document-library');
                         } else if (title.includes('user') || message.includes('approved') || message.includes('pending')) {
                           setLocation('/ceo/team');
                         } else if (title.includes('investor') || message.includes('investor')) {
-                          setLocation(`${rolePrefix}/investor-matching`);
+                          setLocation(role === 'CEO' ? '/ceo/investors' : '/employee/investors');
+                        } else if (title.includes('announcement')) {
+                          setLocation(role === 'CEO' ? '/ceo/announcements' : '/employee/announcements');
+                        } else {
+                          setLocation(role === 'CEO' ? '/ceo/dashboard' : '/employee/home');
                         }
                       }
                     }}
