@@ -199,7 +199,7 @@ export async function registerRoutes(
             title: 'New Signup Request',
             message: `${user.name} (${user.jobTitle || 'No title'}) has requested access to the platform`,
             type: 'info',
-            link: '/ceo/users',
+            link: '/ceo/admin',
           });
         }
       }
@@ -1927,7 +1927,7 @@ Guidelines:
                     title: 'New Message',
                     message: `${currentUser.name}: ${args.content.slice(0, 50)}${args.content.length > 50 ? '...' : ''}`,
                     type: 'info',
-                    link: '/chat',
+                    link: '/ceo/chat',
                   });
                   
                   toolResults.push({
@@ -2007,7 +2007,7 @@ Guidelines:
                     title: 'New File Shared',
                     message: `${currentUser.name} shared: ${args.filename}`,
                     type: 'info',
-                    link: '/chat',
+                    link: '/ceo/chat',
                   });
                   
                   toolResults.push({
@@ -2324,7 +2324,7 @@ Guidelines:
             title: 'New Message',
             message: `${currentUser.name}: ${content.slice(0, 50)}${content.length > 50 ? '...' : ''}`,
             type: 'info',
-            link: '/chat',
+            link: '/ceo/chat',
           });
         }
       }
@@ -2397,7 +2397,7 @@ Guidelines:
         title: 'New Message',
         message: `${currentUser.name}: ${content.slice(0, 50)}${content.length > 50 ? '...' : ''}`,
         type: 'info',
-        link: '/chat',
+        link: '/ceo/chat',
       });
       
       res.json({
@@ -3396,7 +3396,7 @@ Guidelines:
               ? `You have been paired with ${mentee.name} as their mentor. A kickoff meeting has been scheduled.`
               : `You have been paired with ${mentor.name} as your mentor. A kickoff meeting has been scheduled.`,
             type: 'info',
-            link: '/mentorship',
+            link: '/ceo/mentorship',
           });
         }
       }

@@ -1699,7 +1699,23 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                       }
                       setShowNotificationsSheet(false);
                       if (notification.link) {
-                        setLocation(notification.link);
+                        let link = notification.link;
+                        const isCeo = role === 'CEO';
+                        const linkMap: Record<string, string> = {
+                          '/ceo/users': '/ceo/admin',
+                          '/mentorship': isCeo ? '/ceo/mentorship' : '/employee/home',
+                          '/chat': isCeo ? '/ceo/chat' : '/employee/chat',
+                          '/ceo/chat': isCeo ? '/ceo/chat' : '/employee/chat',
+                          '/ceo/dashboard': isCeo ? '/ceo/dashboard' : '/employee/home',
+                          '/ceo/calendar': isCeo ? '/ceo/calendar' : '/employee/calendar',
+                          '/ceo/mentorship': isCeo ? '/ceo/mentorship' : '/employee/home',
+                        };
+                        if (linkMap[link]) {
+                          link = linkMap[link];
+                        } else if (!isCeo && link.startsWith('/ceo/')) {
+                          link = link.replace('/ceo/', '/employee/');
+                        }
+                        setLocation(link);
                       } else {
                         const title = notification.title?.toLowerCase() || '';
                         const message = notification.message?.toLowerCase() || '';
