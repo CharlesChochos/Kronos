@@ -130,6 +130,14 @@ export async function registerRoutes(
     }
     res.status(403).json({ error: "Access denied. CEO role required." });
   };
+  
+  // Middleware to block external users from internal routes
+  const requireInternal = (req: any, res: any, next: any) => {
+    if (req.isAuthenticated() && req.user?.role !== 'External') {
+      return next();
+    }
+    res.status(403).json({ error: "Access denied. Internal users only." });
+  };
 
   // ===== AUTH ROUTES =====
   
@@ -466,7 +474,7 @@ export async function registerRoutes(
   // ===== USER ROUTES =====
   
   // Get all users (CEO only can see all, employees see limited view)
-  app.get("/api/users", requireAuth, async (req, res) => {
+  app.get("/api/users", requireAuth, requireInternal, async (req, res) => {
     try {
       const currentUser = req.user as any;
       const users = await storage.getAllUsers();
@@ -489,7 +497,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/users/:id", requireAuth, async (req, res) => {
+  app.get("/api/users/:id", requireAuth, requireInternal, async (req, res) => {
     try {
       const currentUser = req.user as any;
       const user = await storage.getUser(req.params.id);
@@ -658,7 +666,7 @@ export async function registerRoutes(
 
   // ===== DEAL ROUTES =====
   
-  app.get("/api/deals", requireAuth, async (req, res) => {
+  app.get("/api/deals", requireAuth, requireInternal, async (req, res) => {
     try {
       const deals = await storage.getAllDeals();
       res.json(deals);
@@ -667,7 +675,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/deals/:id", requireAuth, async (req, res) => {
+  app.get("/api/deals/:id", requireAuth, requireInternal, async (req, res) => {
     try {
       const deal = await storage.getDeal(req.params.id);
       if (!deal) {
@@ -695,7 +703,7 @@ export async function registerRoutes(
   });
 
   // Update deal (CEO can update any deal, employees can only update deals they're assigned to)
-  app.patch("/api/deals/:id", requireAuth, async (req, res) => {
+  app.patch("/api/deals/:id", requireAuth, requireInternal, async (req, res) => {
     try {
       const user = req.user as any;
       const deal = await storage.getDeal(req.params.id);
@@ -776,7 +784,7 @@ export async function registerRoutes(
 
   // ===== TASK ROUTES =====
   
-  app.get("/api/tasks", requireAuth, async (req, res) => {
+  app.get("/api/tasks", requireAuth, requireInternal, async (req, res) => {
     try {
       const { userId, dealId } = req.query;
       let tasks;
@@ -793,7 +801,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/tasks/:id", requireAuth, async (req, res) => {
+  app.get("/api/tasks/:id", requireAuth, requireInternal, async (req, res) => {
     try {
       const task = await storage.getTask(req.params.id);
       if (!task) {
@@ -821,7 +829,7 @@ export async function registerRoutes(
   });
 
   // Update task (CEO can update any, employees can only update their own task status)
-  app.patch("/api/tasks/:id", requireAuth, async (req, res) => {
+  app.patch("/api/tasks/:id", requireAuth, requireInternal, async (req, res) => {
     try {
       const currentUser = req.user as any;
       const existingTask = await storage.getTask(req.params.id);
@@ -913,7 +921,7 @@ export async function registerRoutes(
 
   // ===== MEETING ROUTES =====
   
-  app.get("/api/meetings", requireAuth, async (req, res) => {
+  app.get("/api/meetings", requireAuth, requireInternal, async (req, res) => {
     try {
       const meetings = await storage.getAllMeetings();
       res.json(meetings);
@@ -922,7 +930,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/meetings/:id", requireAuth, async (req, res) => {
+  app.get("/api/meetings/:id", requireAuth, requireInternal, async (req, res) => {
     try {
       const meeting = await storage.getMeeting(req.params.id);
       if (!meeting) {
@@ -1044,7 +1052,7 @@ export async function registerRoutes(
 
   // ===== NOTIFICATION ROUTES =====
   
-  app.get("/api/notifications", requireAuth, async (req, res) => {
+  app.get("/api/notifications", requireAuth, requireInternal, async (req, res) => {
     try {
       const currentUser = req.user as any;
       const notifications = await storage.getNotificationsByUser(currentUser.id);
@@ -1054,7 +1062,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/notifications/:id/read", requireAuth, async (req, res) => {
+  app.patch("/api/notifications/:id/read", requireAuth, requireInternal, async (req, res) => {
     try {
       await storage.markNotificationRead(req.params.id);
       res.json({ message: "Notification marked as read" });
@@ -1063,7 +1071,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/notifications/:id", requireAuth, async (req, res) => {
+  app.delete("/api/notifications/:id", requireAuth, requireInternal, async (req, res) => {
     try {
       await storage.deleteNotification(req.params.id);
       res.json({ message: "Notification deleted successfully" });
@@ -1565,7 +1573,7 @@ Consider common investment banking tasks like:
   // ===== REAPER ASSISTANT ROUTES =====
   
   // Get user's assistant conversations
-  app.get("/api/assistant/conversations", requireAuth, async (req, res) => {
+  app.get("/api/assistant/conversations", requireAuth, requireInternal, async (req, res) => {
     try {
       const currentUser = req.user as any;
       const conversations = await storage.getAssistantConversationsByUser(currentUser.id);
@@ -1577,7 +1585,7 @@ Consider common investment banking tasks like:
   });
   
   // Create new assistant conversation
-  app.post("/api/assistant/conversations", requireAuth, async (req, res) => {
+  app.post("/api/assistant/conversations", requireAuth, requireInternal, async (req, res) => {
     try {
       const currentUser = req.user as any;
       
@@ -1599,7 +1607,7 @@ Consider common investment banking tasks like:
   });
   
   // Get messages for a conversation
-  app.get("/api/assistant/conversations/:id/messages", requireAuth, async (req, res) => {
+  app.get("/api/assistant/conversations/:id/messages", requireAuth, requireInternal, async (req, res) => {
     try {
       const currentUser = req.user as any;
       const conversation = await storage.getAssistantConversation(req.params.id);
@@ -1621,7 +1629,7 @@ Consider common investment banking tasks like:
   });
   
   // Send message to Reaper and get AI response
-  app.post("/api/assistant/conversations/:id/messages", aiLimiter, requireAuth, async (req, res) => {
+  app.post("/api/assistant/conversations/:id/messages", aiLimiter, requireAuth, requireInternal, async (req, res) => {
     try {
       const currentUser = req.user as any;
       const conversation = await storage.getAssistantConversation(req.params.id);
@@ -2100,7 +2108,7 @@ Guidelines:
   // ===== CHAT SYSTEM ROUTES =====
   
   // Get user's conversations
-  app.get("/api/chat/conversations", requireAuth, async (req, res) => {
+  app.get("/api/chat/conversations", requireAuth, requireInternal, async (req, res) => {
     try {
       const currentUser = req.user as any;
       const conversations = await storage.getConversationsByUser(currentUser.id);
@@ -2140,7 +2148,7 @@ Guidelines:
   });
   
   // Create new conversation or get existing one
-  app.post("/api/chat/conversations", requireAuth, async (req, res) => {
+  app.post("/api/chat/conversations", requireAuth, requireInternal, async (req, res) => {
     try {
       const currentUser = req.user as any;
       const { participantId, isGroup, name, participantIds } = req.body;
@@ -2196,7 +2204,7 @@ Guidelines:
   });
   
   // Get messages for a conversation
-  app.get("/api/chat/conversations/:id/messages", requireAuth, async (req, res) => {
+  app.get("/api/chat/conversations/:id/messages", requireAuth, requireInternal, async (req, res) => {
     try {
       const currentUser = req.user as any;
       const conversation = await storage.getConversation(req.params.id);
@@ -3998,6 +4006,343 @@ Guidelines:
       res.json({ message: "Investor deactivated" });
     } catch (error) {
       res.status(500).json({ error: "Failed to deactivate investor" });
+    }
+  });
+  
+  // ===== CLIENT PORTAL EXTERNAL USER ROUTES =====
+  
+  // Get all portal invites (CEO only)
+  app.get("/api/portal/invites", requireCEO, async (req, res) => {
+    try {
+      const invites = await storage.getAllClientPortalInvites();
+      res.json(invites);
+    } catch (error) {
+      console.error('Get portal invites error:', error);
+      res.status(500).json({ error: "Failed to fetch invites" });
+    }
+  });
+  
+  // Create portal invite (CEO only) - sends email invitation
+  app.post("/api/portal/invites", generalLimiter, requireCEO, async (req, res) => {
+    try {
+      const { email, name, organization, dealIds, accessLevel, message } = req.body;
+      const user = req.user as any;
+      
+      if (!email || !name || !dealIds || dealIds.length === 0) {
+        return res.status(400).json({ error: "Email, name, and at least one deal are required" });
+      }
+      
+      // Check if email already has a pending invite
+      const existingInvites = await storage.getAllClientPortalInvites();
+      const pendingInvite = existingInvites.find(i => i.email === email && i.status === 'pending');
+      if (pendingInvite) {
+        return res.status(400).json({ error: "This email already has a pending invitation" });
+      }
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "A user with this email already exists" });
+      }
+      
+      // Generate secure token
+      const token = crypto.randomBytes(32).toString('hex');
+      
+      // Set expiration to 7 days from now
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+      
+      const invite = await storage.createClientPortalInvite({
+        email,
+        name,
+        organization: organization || null,
+        token,
+        dealIds,
+        accessLevel: accessLevel || 'view',
+        invitedBy: user.id,
+        inviterName: user.name,
+        message: message || null,
+        status: 'pending',
+        expiresAt,
+      });
+      
+      // Send invitation email via Resend
+      try {
+        const { sendPortalInviteEmail } = await import('./email');
+        await sendPortalInviteEmail({
+          to: email,
+          recipientName: name,
+          inviterName: user.name,
+          organization: organization || undefined,
+          message: message || undefined,
+          token,
+          expiresAt,
+        });
+      } catch (emailError) {
+        console.error('Failed to send invite email:', emailError);
+        // Continue - invite is created, just email failed
+      }
+      
+      await createAuditLog(req, 'portal_invite_created', 'portal_invite', invite.id, email, { organization, dealIds, accessLevel });
+      res.status(201).json(invite);
+    } catch (error) {
+      console.error('Create portal invite error:', error);
+      res.status(500).json({ error: "Failed to create invitation" });
+    }
+  });
+  
+  // Revoke portal invite (CEO only)
+  app.post("/api/portal/invites/:id/revoke", requireCEO, async (req, res) => {
+    try {
+      const invite = await storage.getClientPortalInvite(req.params.id);
+      if (!invite) {
+        return res.status(404).json({ error: "Invite not found" });
+      }
+      
+      const updated = await storage.updateClientPortalInvite(req.params.id, { status: 'revoked' });
+      await createAuditLog(req, 'portal_invite_revoked', 'portal_invite', req.params.id, invite.email);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to revoke invitation" });
+    }
+  });
+  
+  // Get invite by token (public - for registration)
+  app.get("/api/portal/register/:token", async (req, res) => {
+    try {
+      const invite = await storage.getClientPortalInviteByToken(req.params.token);
+      if (!invite) {
+        return res.status(404).json({ error: "Invalid or expired invitation" });
+      }
+      
+      // Get deal names for display
+      const dealNames: string[] = [];
+      const dealIds = invite.dealIds as string[] || [];
+      for (const dealId of dealIds) {
+        const deal = await storage.getDeal(dealId);
+        if (deal) dealNames.push(deal.name);
+      }
+      
+      res.json({
+        email: invite.email,
+        name: invite.name,
+        organization: invite.organization,
+        inviterName: invite.inviterName,
+        accessLevel: invite.accessLevel,
+        dealNames,
+        expiresAt: invite.expiresAt,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to validate invitation" });
+    }
+  });
+  
+  // Complete registration from invite (public)
+  app.post("/api/portal/register/:token", authLimiter, async (req, res) => {
+    try {
+      const { password, phone } = req.body;
+      
+      if (!password || password.length < 8) {
+        return res.status(400).json({ error: "Password must be at least 8 characters" });
+      }
+      
+      const invite = await storage.getClientPortalInviteByToken(req.params.token);
+      if (!invite) {
+        return res.status(404).json({ error: "Invalid or expired invitation" });
+      }
+      
+      // Create external user
+      const user = await storage.createExternalUser({
+        name: invite.name,
+        email: invite.email,
+        password,
+        phone: phone || null,
+        isExternal: true,
+        externalOrganization: invite.organization || undefined,
+        invitedBy: invite.invitedBy,
+        role: 'External',
+        status: 'active',
+      });
+      
+      // Mark invite as accepted
+      await storage.updateClientPortalInvite(invite.id, {
+        status: 'accepted',
+        acceptedAt: new Date(),
+        userId: user.id,
+      });
+      
+      // Log user in
+      req.login(user, (err) => {
+        if (err) {
+          console.error('Auto-login error:', err);
+          return res.status(201).json({ success: true, message: "Account created. Please log in." });
+        }
+        
+        res.status(201).json({
+          success: true,
+          user: sanitizeUser(user),
+        });
+      });
+      
+      // Audit log
+      await createAuditLog(req, 'external_user_registered', 'user', user.id, invite.name, { 
+        organization: invite.organization,
+        invitedBy: invite.invitedBy 
+      });
+    } catch (error) {
+      console.error('Portal registration error:', error);
+      res.status(500).json({ error: "Failed to complete registration" });
+    }
+  });
+  
+  // External user login (separate endpoint for external portal)
+  app.post("/api/portal/login", authLimiter, (req, res, next) => {
+    passport.authenticate("local", async (err: any, user: any, info: any) => {
+      if (err) return next(err);
+      if (!user) {
+        return res.status(401).json({ error: info?.message || "Invalid credentials" });
+      }
+      
+      // Verify this is an external user
+      if (!user.isExternal) {
+        return res.status(403).json({ error: "Please use the main login for internal users" });
+      }
+      
+      req.login(user, (err) => {
+        if (err) return next(err);
+        res.json(sanitizeUser(user));
+      });
+    })(req, res, next);
+  });
+  
+  // Get external user's accessible deals
+  app.get("/api/portal/my-deals", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!user.isExternal) {
+        return res.status(403).json({ error: "This endpoint is for external users only" });
+      }
+      
+      const deals = await storage.getExternalUserDeals(user.id);
+      res.json(deals);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch deals" });
+    }
+  });
+  
+  // Get portal updates for a deal (external users)
+  app.get("/api/portal/deals/:dealId/updates", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      
+      // If external user, verify they have access to this deal
+      if (user.isExternal) {
+        const userDeals = await storage.getExternalUserDeals(user.id);
+        if (!userDeals.some(d => d.id === req.params.dealId)) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+      
+      const updates = await storage.getClientPortalUpdatesByDeal(req.params.dealId);
+      // For external users, only show public updates
+      const visibleUpdates = user.isExternal 
+        ? updates.filter(u => u.isPublic)
+        : updates;
+      
+      res.json(visibleUpdates);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch updates" });
+    }
+  });
+  
+  // Create portal update (internal users only)
+  app.post("/api/portal/deals/:dealId/updates", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.isExternal) {
+        return res.status(403).json({ error: "External users cannot create updates" });
+      }
+      
+      const { title, content, type, isPublic } = req.body;
+      if (!title || !content) {
+        return res.status(400).json({ error: "Title and content are required" });
+      }
+      
+      const update = await storage.createClientPortalUpdate({
+        dealId: req.params.dealId,
+        title,
+        content,
+        type: type || 'update',
+        authorId: user.id,
+        authorName: user.name,
+        isPublic: isPublic !== false,
+      });
+      
+      res.status(201).json(update);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create update" });
+    }
+  });
+  
+  // Get portal messages for a deal
+  app.get("/api/portal/deals/:dealId/messages", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      
+      // If external user, verify they have access to this deal
+      if (user.isExternal) {
+        const userDeals = await storage.getExternalUserDeals(user.id);
+        if (!userDeals.some(d => d.id === req.params.dealId)) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+      
+      const messages = await storage.getClientPortalMessagesByDeal(req.params.dealId);
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+  
+  // Send portal message
+  app.post("/api/portal/deals/:dealId/messages", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      
+      // If external user, verify they have access to this deal
+      if (user.isExternal) {
+        const userDeals = await storage.getExternalUserDeals(user.id);
+        if (!userDeals.some(d => d.id === req.params.dealId)) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+      
+      const { content } = req.body;
+      if (!content) {
+        return res.status(400).json({ error: "Message content is required" });
+      }
+      
+      const message = await storage.createClientPortalMessage({
+        dealId: req.params.dealId,
+        senderId: user.id,
+        senderName: user.name,
+        isExternal: user.isExternal || false,
+        content,
+      });
+      
+      res.status(201).json(message);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+  
+  // Get all external users (CEO only)
+  app.get("/api/portal/users", requireCEO, async (req, res) => {
+    try {
+      const users = await storage.getExternalUsers();
+      res.json(users.map(sanitizeUser));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch external users" });
     }
   });
 

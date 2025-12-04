@@ -30,6 +30,9 @@ import InvestorDatabase from "@/pages/ceo/InvestorDatabase";
 import DealTemplates from "@/pages/shared/DealTemplates";
 import DocumentManagement from "@/pages/shared/DocumentManagement";
 import AuditLogs from "@/pages/ceo/AuditLogs";
+import PortalLogin from "@/pages/portal/PortalLogin";
+import PortalRegister from "@/pages/portal/PortalRegister";
+import PortalDashboard from "@/pages/portal/PortalDashboard";
 import { useEffect } from "react";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 
@@ -73,6 +76,41 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   }
 
   if (!user) {
+    return null;
+  }
+
+  return <Component />;
+}
+
+function PortalProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { data: user, isLoading } = useCurrentUser();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      setLocation("/portal/login");
+    }
+  }, [user, isLoading, setLocation]);
+
+  useEffect(() => {
+    if (!isLoading && user && user.role !== 'External') {
+      if (user.role === 'CEO') {
+        setLocation("/ceo/dashboard");
+      } else {
+        setLocation("/employee/home");
+      }
+    }
+  }, [user, isLoading, setLocation]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user || user.role !== 'External') {
     return null;
   }
 
@@ -198,6 +236,13 @@ function Router() {
       </Route>
       <Route path="/employee/document-library">
         {() => <ProtectedRoute component={EmployeeDocumentManagement} />}
+      </Route>
+      
+      {/* External Portal Routes */}
+      <Route path="/portal/login" component={PortalLogin} />
+      <Route path="/portal/register/:token" component={PortalRegister} />
+      <Route path="/portal">
+        {() => <PortalProtectedRoute component={PortalDashboard} />}
       </Route>
 
       <Route component={NotFound} />

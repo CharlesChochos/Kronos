@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { User, Deal, Task, InsertUser, Meeting, Notification, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess, DocumentTemplate, InsertDocumentTemplate } from "@shared/schema";
 
+export type { User, Deal, Task, Meeting, Notification };
+
 // Generic API request helper
 export async function apiRequest(method: string, url: string, body?: any): Promise<Response> {
   const res = await fetch(url, {
@@ -1753,6 +1755,279 @@ export function useDisable2FA() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["2fa-status"] });
       queryClient.invalidateQueries({ queryKey: ["auth"] });
+    },
+  });
+}
+
+// ===== CLIENT PORTAL API =====
+
+export type PortalInvite = {
+  id: string;
+  email: string;
+  name: string;
+  organization?: string;
+  token: string;
+  dealIds: string[];
+  accessLevel: string;
+  invitedBy: string;
+  inviterName: string;
+  message?: string;
+  status: string;
+  expiresAt: string;
+  acceptedAt?: string;
+  userId?: string;
+  createdAt: string;
+};
+
+export type PortalUpdate = {
+  id: string;
+  dealId: string;
+  title: string;
+  content: string;
+  type: string;
+  authorId: string;
+  authorName: string;
+  isPublic: boolean;
+  createdAt: string;
+};
+
+export type PortalMessage = {
+  id: string;
+  dealId: string;
+  senderId: string;
+  senderName: string;
+  isExternal: boolean;
+  content: string;
+  createdAt: string;
+};
+
+// Get all portal invites (CEO only)
+export function usePortalInvites() {
+  return useQuery({
+    queryKey: ["portal-invites"],
+    queryFn: async () => {
+      const res = await fetch("/api/portal/invites", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch portal invites");
+      return res.json() as Promise<PortalInvite[]>;
+    },
+  });
+}
+
+// Create portal invite
+export function useCreatePortalInvite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      email: string;
+      name: string;
+      organization?: string;
+      dealIds: string[];
+      accessLevel?: string;
+      message?: string;
+    }) => {
+      const res = await fetch("/api/portal/invites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create invite");
+      }
+      return res.json() as Promise<PortalInvite>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portal-invites"] });
+    },
+  });
+}
+
+// Revoke portal invite
+export function useRevokePortalInvite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/portal/invites/${id}/revoke`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to revoke invite");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portal-invites"] });
+    },
+  });
+}
+
+// Get invite details by token (public)
+export function usePortalInviteByToken(token: string | null) {
+  return useQuery({
+    queryKey: ["portal-invite-token", token],
+    queryFn: async () => {
+      if (!token) return null;
+      const res = await fetch(`/api/portal/register/${token}`);
+      if (!res.ok) {
+        if (res.status === 404) return null;
+        throw new Error("Failed to fetch invite");
+      }
+      return res.json() as Promise<{
+        email: string;
+        name: string;
+        organization?: string;
+        inviterName: string;
+        accessLevel: string;
+        dealNames: string[];
+        expiresAt: string;
+      }>;
+    },
+    enabled: !!token,
+  });
+}
+
+// Complete portal registration
+export function usePortalRegister() {
+  return useMutation({
+    mutationFn: async ({ token, password, phone }: { token: string; password: string; phone?: string }) => {
+      const res = await fetch(`/api/portal/register/${token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ password, phone }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Registration failed");
+      }
+      return res.json();
+    },
+  });
+}
+
+// Portal login (external users)
+export function usePortalLogin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ email, password }: { email: string; password: string }) => {
+      const res = await fetch("/api/portal/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Login failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["auth"] });
+    },
+  });
+}
+
+// Get external user's deals
+export function usePortalDeals() {
+  return useQuery({
+    queryKey: ["portal-my-deals"],
+    queryFn: async () => {
+      const res = await fetch("/api/portal/my-deals", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch deals");
+      return res.json() as Promise<Deal[]>;
+    },
+  });
+}
+
+// Get portal updates for a deal
+export function usePortalUpdates(dealId: string | null) {
+  return useQuery({
+    queryKey: ["portal-updates", dealId],
+    queryFn: async () => {
+      if (!dealId) return [];
+      const res = await fetch(`/api/portal/deals/${dealId}/updates`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch updates");
+      return res.json() as Promise<PortalUpdate[]>;
+    },
+    enabled: !!dealId,
+  });
+}
+
+// Create portal update (internal users)
+export function useCreatePortalUpdate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      dealId: string;
+      title: string;
+      content: string;
+      type?: string;
+      isPublic?: boolean;
+    }) => {
+      const res = await fetch(`/api/portal/deals/${data.dealId}/updates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create update");
+      }
+      return res.json() as Promise<PortalUpdate>;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["portal-updates", vars.dealId] });
+    },
+  });
+}
+
+// Get portal messages for a deal
+export function usePortalMessages(dealId: string | null) {
+  return useQuery({
+    queryKey: ["portal-messages", dealId],
+    queryFn: async () => {
+      if (!dealId) return [];
+      const res = await fetch(`/api/portal/deals/${dealId}/messages`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch messages");
+      return res.json() as Promise<PortalMessage[]>;
+    },
+    enabled: !!dealId,
+  });
+}
+
+// Send portal message
+export function useSendPortalMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { dealId: string; content: string }) => {
+      const res = await fetch(`/api/portal/deals/${data.dealId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content: data.content }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to send message");
+      }
+      return res.json() as Promise<PortalMessage>;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["portal-messages", vars.dealId] });
+    },
+  });
+}
+
+// Get all external users (CEO only)
+export function useExternalUsers() {
+  return useQuery({
+    queryKey: ["external-users"],
+    queryFn: async () => {
+      const res = await fetch("/api/portal/users", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch external users");
+      return res.json();
     },
   });
 }

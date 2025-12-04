@@ -2,7 +2,7 @@ import { eq, and, desc, gt } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@shared/schema";
-import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess, DocumentTemplate, InsertDocumentTemplate, InvestorMatch, InsertInvestorMatch, UserPreferences, InsertUserPreferences, DealTemplate, InsertDealTemplate, CalendarEvent, InsertCalendarEvent, TaskAttachmentRecord, InsertTaskAttachmentRecord } from "@shared/schema";
+import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess, DocumentTemplate, InsertDocumentTemplate, InvestorMatch, InsertInvestorMatch, UserPreferences, InsertUserPreferences, DealTemplate, InsertDealTemplate, CalendarEvent, InsertCalendarEvent, TaskAttachmentRecord, InsertTaskAttachmentRecord, ClientPortalInvite, InsertClientPortalInvite, ClientPortalMessage, InsertClientPortalMessage, ClientPortalUpdate, InsertClientPortalUpdate } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -223,6 +223,28 @@ export interface IStorage {
   createDocument(doc: schema.InsertDocumentTable): Promise<schema.DocumentTable>;
   updateDocument(id: string, updates: Partial<schema.InsertDocumentTable>): Promise<schema.DocumentTable | undefined>;
   deleteDocument(id: string): Promise<void>;
+  
+  // Client Portal Invite operations
+  getClientPortalInvite(id: string): Promise<ClientPortalInvite | undefined>;
+  getClientPortalInviteByToken(token: string): Promise<ClientPortalInvite | undefined>;
+  getClientPortalInvitesByInviter(inviterId: string): Promise<ClientPortalInvite[]>;
+  getAllClientPortalInvites(): Promise<ClientPortalInvite[]>;
+  createClientPortalInvite(invite: InsertClientPortalInvite): Promise<ClientPortalInvite>;
+  updateClientPortalInvite(id: string, updates: Partial<InsertClientPortalInvite & { acceptedAt?: Date; userId?: string; status?: string }>): Promise<ClientPortalInvite | undefined>;
+  deleteClientPortalInvite(id: string): Promise<void>;
+  
+  // Client Portal Message operations
+  getClientPortalMessagesByDeal(dealId: string): Promise<ClientPortalMessage[]>;
+  createClientPortalMessage(message: InsertClientPortalMessage): Promise<ClientPortalMessage>;
+  
+  // Client Portal Update operations
+  getClientPortalUpdatesByDeal(dealId: string): Promise<ClientPortalUpdate[]>;
+  createClientPortalUpdate(update: InsertClientPortalUpdate): Promise<ClientPortalUpdate>;
+  
+  // External User operations
+  getExternalUsers(): Promise<User[]>;
+  createExternalUser(user: InsertUser & { isExternal: boolean; externalOrganization?: string; invitedBy?: string }): Promise<User>;
+  getExternalUserDeals(userId: string): Promise<Deal[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1172,6 +1194,116 @@ export class DatabaseStorage implements IStorage {
     await db.update(schema.documentsTable)
       .set({ isArchived: true })
       .where(eq(schema.documentsTable.id, id));
+  }
+  
+  // Client Portal Invite operations
+  async getClientPortalInvite(id: string): Promise<ClientPortalInvite | undefined> {
+    const [invite] = await db.select().from(schema.clientPortalInvites).where(eq(schema.clientPortalInvites.id, id));
+    return invite;
+  }
+  
+  async getClientPortalInviteByToken(token: string): Promise<ClientPortalInvite | undefined> {
+    const [invite] = await db.select().from(schema.clientPortalInvites)
+      .where(and(
+        eq(schema.clientPortalInvites.token, token),
+        eq(schema.clientPortalInvites.status, 'pending'),
+        gt(schema.clientPortalInvites.expiresAt, new Date())
+      ));
+    return invite;
+  }
+  
+  async getClientPortalInvitesByInviter(inviterId: string): Promise<ClientPortalInvite[]> {
+    return await db.select().from(schema.clientPortalInvites)
+      .where(eq(schema.clientPortalInvites.invitedBy, inviterId))
+      .orderBy(desc(schema.clientPortalInvites.createdAt));
+  }
+  
+  async getAllClientPortalInvites(): Promise<ClientPortalInvite[]> {
+    return await db.select().from(schema.clientPortalInvites)
+      .orderBy(desc(schema.clientPortalInvites.createdAt));
+  }
+  
+  async createClientPortalInvite(invite: InsertClientPortalInvite): Promise<ClientPortalInvite> {
+    const [created] = await db.insert(schema.clientPortalInvites).values(invite).returning();
+    return created;
+  }
+  
+  async updateClientPortalInvite(id: string, updates: Partial<InsertClientPortalInvite & { acceptedAt?: Date; userId?: string; status?: string }>): Promise<ClientPortalInvite | undefined> {
+    const [updated] = await db.update(schema.clientPortalInvites)
+      .set(updates)
+      .where(eq(schema.clientPortalInvites.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteClientPortalInvite(id: string): Promise<void> {
+    await db.delete(schema.clientPortalInvites).where(eq(schema.clientPortalInvites.id, id));
+  }
+  
+  // Client Portal Message operations
+  async getClientPortalMessagesByDeal(dealId: string): Promise<ClientPortalMessage[]> {
+    return await db.select().from(schema.clientPortalMessages)
+      .where(eq(schema.clientPortalMessages.dealId, dealId))
+      .orderBy(schema.clientPortalMessages.createdAt);
+  }
+  
+  async createClientPortalMessage(message: InsertClientPortalMessage): Promise<ClientPortalMessage> {
+    const [created] = await db.insert(schema.clientPortalMessages).values(message).returning();
+    return created;
+  }
+  
+  // Client Portal Update operations
+  async getClientPortalUpdatesByDeal(dealId: string): Promise<ClientPortalUpdate[]> {
+    return await db.select().from(schema.clientPortalUpdates)
+      .where(eq(schema.clientPortalUpdates.dealId, dealId))
+      .orderBy(desc(schema.clientPortalUpdates.createdAt));
+  }
+  
+  async createClientPortalUpdate(update: InsertClientPortalUpdate): Promise<ClientPortalUpdate> {
+    const [created] = await db.insert(schema.clientPortalUpdates).values(update).returning();
+    return created;
+  }
+  
+  // External User operations
+  async getExternalUsers(): Promise<User[]> {
+    return await db.select().from(schema.users)
+      .where(eq(schema.users.isExternal, true))
+      .orderBy(desc(schema.users.createdAt));
+  }
+  
+  async createExternalUser(user: InsertUser & { isExternal: boolean; externalOrganization?: string; invitedBy?: string }): Promise<User> {
+    const hashedPassword = await bcrypt.hash(user.password, 10);
+    const [created] = await db.insert(schema.users)
+      .values({ ...user, password: hashedPassword, role: 'External', status: 'active' })
+      .returning();
+    return created;
+  }
+  
+  async getExternalUserDeals(userId: string): Promise<Deal[]> {
+    // Get deals from portal invites for this user
+    const invites = await db.select().from(schema.clientPortalInvites)
+      .where(and(
+        eq(schema.clientPortalInvites.userId, userId),
+        eq(schema.clientPortalInvites.status, 'accepted')
+      ));
+    
+    if (invites.length === 0) return [];
+    
+    // Collect all deal IDs from invites
+    const dealIds = new Set<string>();
+    for (const invite of invites) {
+      const ids = invite.dealIds as string[] || [];
+      ids.forEach(id => dealIds.add(id));
+    }
+    
+    // Fetch deals
+    const deals: Deal[] = [];
+    for (const dealId of dealIds) {
+      const [deal] = await db.select().from(schema.deals).where(eq(schema.deals.id, dealId));
+      if (deal) deals.push(deal);
+    }
+    
+    return deals;
   }
 }
 

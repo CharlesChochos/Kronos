@@ -348,3 +348,134 @@ export async function sendPasswordResetEmail(data: PasswordResetEmailData): Prom
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
+
+export interface PortalInviteEmailData {
+  to: string;
+  recipientName: string;
+  inviterName: string;
+  organization?: string;
+  message?: string;
+  token: string;
+  expiresAt: Date;
+}
+
+export async function sendPortalInviteEmail(data: PortalInviteEmailData): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { client, fromEmail } = await getUncachableResendClient();
+    
+    // Build the registration URL
+    const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : process.env.REPLIT_DOMAINS
+        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+        : 'http://localhost:5000';
+    const registerUrl = `${baseUrl}/portal/register/${data.token}`;
+    
+    // Format expiration date
+    const expiresDate = new Date(data.expiresAt);
+    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'];
+    const formattedExpiry = `${months[expiresDate.getMonth()]} ${expiresDate.getDate()}, ${expiresDate.getFullYear()}`;
+    
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #1a1a2e; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center; }
+            .header h1 { margin: 0; font-size: 24px; }
+            .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px; }
+            .message-box { background: white; border-radius: 8px; padding: 25px; margin: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+            .button { display: inline-block; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white !important; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0; }
+            .button:hover { opacity: 0.9; }
+            .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+            .personal-message { background: #f0f4ff; border-left: 4px solid #1a1a2e; padding: 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+            .expiry { color: #666; font-size: 13px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Client Portal Invitation</h1>
+              <p style="margin: 10px 0 0 0; opacity: 0.9;">You've been invited to OSReaper</p>
+            </div>
+            <div class="content">
+              <div class="message-box">
+                <p>Hi ${data.recipientName},</p>
+                <p><strong>${data.inviterName}</strong> has invited you to access the OSReaper Client Portal${data.organization ? ` for <strong>${data.organization}</strong>` : ''}.</p>
+                
+                ${data.message ? `
+                <div class="personal-message">
+                  <p style="margin: 0; font-style: italic;">"${data.message}"</p>
+                  <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">— ${data.inviterName}</p>
+                </div>
+                ` : ''}
+                
+                <p>Through the portal, you'll be able to:</p>
+                <ul>
+                  <li>View deal progress and updates</li>
+                  <li>Access shared documents</li>
+                  <li>Communicate with the team</li>
+                </ul>
+                
+                <p style="text-align: center;">
+                  <a href="${registerUrl}" class="button">Accept Invitation</a>
+                </p>
+                
+                <p class="expiry">
+                  <strong>Note:</strong> This invitation expires on ${formattedExpiry}. If you have any questions, please reach out to ${data.inviterName}.
+                </p>
+              </div>
+            </div>
+            <div class="footer">
+              <p>OSReaper - Investment Banking Operations Platform</p>
+              <p>This is an automated message from OSReaper.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const emailText = `
+Client Portal Invitation
+
+Hi ${data.recipientName},
+
+${data.inviterName} has invited you to access the OSReaper Client Portal${data.organization ? ` for ${data.organization}` : ''}.
+
+${data.message ? `Personal message from ${data.inviterName}: "${data.message}"` : ''}
+
+Through the portal, you'll be able to:
+- View deal progress and updates
+- Access shared documents
+- Communicate with the team
+
+To accept this invitation, visit: ${registerUrl}
+
+This invitation expires on ${formattedExpiry}.
+
+---
+OSReaper - Investment Banking Operations Platform
+    `.trim();
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      to: data.to,
+      subject: `${data.inviterName} invited you to OSReaper Client Portal`,
+      html: emailHtml,
+      text: emailText,
+    });
+
+    if (result.error) {
+      return { success: false, error: result.error.message };
+    }
+
+    console.log(`Successfully sent portal invite to: ${data.to}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to send portal invite email:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}

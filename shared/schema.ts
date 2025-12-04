@@ -11,7 +11,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   phone: text("phone"),
   avatar: text("avatar"),
-  role: text("role").notNull().default('Associate'),
+  role: text("role").notNull().default('Associate'), // CEO, Managing Director, Director, Associate, Analyst, External
   jobTitle: text("job_title"),
   status: text("status").notNull().default('pending'), // pending, active, suspended
   score: integer("score").default(0),
@@ -20,6 +20,10 @@ export const users = pgTable("users", {
   preferences: jsonb("preferences").default({}),
   twoFactorEnabled: boolean("two_factor_enabled").default(false),
   twoFactorSecret: text("two_factor_secret"),
+  // External user fields (for Client Portal access)
+  isExternal: boolean("is_external").default(false),
+  externalOrganization: text("external_organization"), // Company/org name for external users
+  invitedBy: varchar("invited_by"), // User ID who invited this external user
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -821,3 +825,73 @@ export const insertDocumentTableSchema = createInsertSchema(documentsTable).omit
 
 export type InsertDocumentTable = z.infer<typeof insertDocumentTableSchema>;
 export type DocumentTable = typeof documentsTable.$inferSelect;
+
+// Client Portal Invites table - for inviting external users to access the portal
+export const clientPortalInvites = pgTable("client_portal_invites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull(),
+  name: text("name").notNull(),
+  organization: text("organization"), // Client/investor company name
+  token: text("token").notNull().unique(), // Secure invite token
+  dealIds: jsonb("deal_ids").default([]).$type<string[]>(), // Deals they'll have access to
+  accessLevel: text("access_level").notNull().default('view'), // view, comment, edit
+  invitedBy: varchar("invited_by").references(() => users.id).notNull(),
+  inviterName: text("inviter_name").notNull(),
+  message: text("message"), // Optional personal message in invite email
+  status: text("status").notNull().default('pending'), // pending, accepted, expired, revoked
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  userId: varchar("user_id").references(() => users.id), // Set when invite is accepted and user is created
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertClientPortalInviteSchema = createInsertSchema(clientPortalInvites).omit({
+  id: true,
+  createdAt: true,
+  acceptedAt: true,
+  userId: true,
+});
+
+export type InsertClientPortalInvite = z.infer<typeof insertClientPortalInviteSchema>;
+export type ClientPortalInvite = typeof clientPortalInvites.$inferSelect;
+
+// Client Portal Messages table - for communication between external clients and internal team
+export const clientPortalMessages = pgTable("client_portal_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  senderId: varchar("sender_id").references(() => users.id).notNull(),
+  senderName: text("sender_name").notNull(),
+  isExternal: boolean("is_external").default(false), // True if sent by external client
+  content: text("content").notNull(),
+  attachments: jsonb("attachments").default([]).$type<{ filename: string; url: string; size: number }[]>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertClientPortalMessageSchema = createInsertSchema(clientPortalMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertClientPortalMessage = z.infer<typeof insertClientPortalMessageSchema>;
+export type ClientPortalMessage = typeof clientPortalMessages.$inferSelect;
+
+// Client Portal Updates table - progress updates visible to external clients
+export const clientPortalUpdates = pgTable("client_portal_updates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  type: text("type").notNull().default('update'), // update, milestone, document, meeting
+  authorId: varchar("author_id").references(() => users.id).notNull(),
+  authorName: text("author_name").notNull(),
+  isPublic: boolean("is_public").default(true), // Whether visible to external clients
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertClientPortalUpdateSchema = createInsertSchema(clientPortalUpdates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertClientPortalUpdate = z.infer<typeof insertClientPortalUpdateSchema>;
+export type ClientPortalUpdate = typeof clientPortalUpdates.$inferSelect;
