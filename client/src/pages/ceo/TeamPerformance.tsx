@@ -68,13 +68,15 @@ export default function TeamPerformance() {
       
       const onTimeCompletions = completedTasks.filter(t => {
         const dueDate = new Date(t.dueDate);
-        const completedDate = t.createdAt ? new Date(t.createdAt) : new Date();
+        const completedDate = t.completedAt ? new Date(t.completedAt) : null;
+        if (!completedDate) return false;
         return completedDate <= dueDate;
       }).length;
       
-      const onTimeRate = completedTasks.length > 0
-        ? Math.round((onTimeCompletions / completedTasks.length) * 100)
-        : 0;
+      const tasksWithCompletionDate = completedTasks.filter(t => t.completedAt).length;
+      const onTimeRate = tasksWithCompletionDate > 0
+        ? Math.round((onTimeCompletions / tasksWithCompletionDate) * 100)
+        : taskCompletionRate;
 
       return {
         ...user,
@@ -94,8 +96,8 @@ export default function TeamPerformance() {
     const totalTasks = teamMembers.reduce((sum, m) => sum + m.totalTasks, 0);
     const completedTasks = teamMembers.reduce((sum, m) => sum + m.completedTasks, 0);
     const activeDeals = teamMembers.reduce((sum, m) => sum + m.activeDeals, 0);
-    const avgCompletionRate = teamMembers.length > 0
-      ? Math.round(teamMembers.reduce((sum, m) => sum + m.taskCompletionRate, 0) / teamMembers.length)
+    const avgCompletionRate = totalTasks > 0
+      ? Math.round((completedTasks / totalTasks) * 100)
       : 0;
     
     return { totalTasks, completedTasks, activeDeals, avgCompletionRate };

@@ -23,10 +23,16 @@ import {
   Loader2
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import { useCurrentUser, useUsers, useDeals, useTasks, useCreateTask, useCreateTaskAttachment } from "@/lib/api";
+import { useCurrentUser, useUsers, useDeals, useTasks, useCreateTask, useCreateTaskAttachment, useUpdateDeal } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Deal, User } from "@shared/schema";
+
+type PodTeamMember = {
+  name: string;
+  role: string;
+  userId?: string;
+};
 
 type UploadedFile = {
   id: string;
@@ -45,8 +51,10 @@ export default function TeamAssignment() {
   const { data: tasks = [] } = useTasks();
   const createTask = useCreateTask();
   const createAttachment = useCreateTaskAttachment();
+  const updateDeal = useUpdateDeal();
   const [highlightedUserId, setHighlightedUserId] = useState<string | null>(null);
   const userRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const [taskDealId, setTaskDealId] = useState<string | null>(null);
 
   const [selectedDeal, setSelectedDeal] = useState<string | null>(null);
   
@@ -143,7 +151,7 @@ export default function TeamAssignment() {
   };
 
   const handleAssignTask = async () => {
-    if (!selectedUser || !selectedDeal || !newTask.title) {
+    if (!selectedUser || !taskDealId || !newTask.title) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -159,7 +167,7 @@ export default function TeamAssignment() {
       const createdTask = await createTask.mutateAsync({
         title: newTask.title,
         description: newTask.description || null,
-        dealId: selectedDeal,
+        dealId: taskDealId,
         assignedTo: selectedUser.id,
         assignedBy: currentUser?.id || null,
         priority: newTask.priority,
@@ -184,18 +192,73 @@ export default function TeamAssignment() {
       setNewTask({ title: '', description: '', priority: 'Medium', type: 'Analysis', dueDate: new Date().toISOString().split('T')[0] });
       setUploadedFiles([]);
       setSelectedUser(null);
+      setTaskDealId(null);
     } catch (error: any) {
       toast.error(error.message || "Failed to assign task");
     }
   };
 
   const openAssignModal = (user: User) => {
+    setSelectedUser(user);
+    setTaskDealId(selectedDeal);
+    setShowAssignModal(true);
+  };
+
+  const isUserInDealTeam = (userId: string, dealId: string) => {
+    const deal = deals.find(d => d.id === dealId);
+    if (!deal) return false;
+    const podTeam = (deal.podTeam as PodTeamMember[]) || [];
+    return podTeam.some(m => m.userId === userId);
+  };
+
+  const handleAddToTeam = async (user: User) => {
     if (!selectedDeal) {
       toast.error("Please select a deal first");
       return;
     }
-    setSelectedUser(user);
-    setShowAssignModal(true);
+    const deal = deals.find(d => d.id === selectedDeal);
+    if (!deal) return;
+    
+    const currentPodTeam = (deal.podTeam as PodTeamMember[]) || [];
+    if (currentPodTeam.some(m => m.userId === user.id)) {
+      toast.info(`${user.name} is already on this deal team`);
+      return;
+    }
+    
+    const newMember: PodTeamMember = {
+      name: user.name,
+      role: user.jobTitle || user.role,
+      userId: user.id,
+    };
+    
+    try {
+      await updateDeal.mutateAsync({
+        id: deal.id,
+        podTeam: [...currentPodTeam, newMember],
+      });
+      toast.success(`${user.name} added to ${deal.name} team`);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add team member");
+    }
+  };
+
+  const handleRemoveFromTeam = async (user: User) => {
+    if (!selectedDeal) return;
+    const deal = deals.find(d => d.id === selectedDeal);
+    if (!deal) return;
+    
+    const currentPodTeam = (deal.podTeam as PodTeamMember[]) || [];
+    const updatedTeam = currentPodTeam.filter(m => m.userId !== user.id);
+    
+    try {
+      await updateDeal.mutateAsync({
+        id: deal.id,
+        podTeam: updatedTeam,
+      });
+      toast.success(`${user.name} removed from ${deal.name} team`);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to remove team member");
+    }
   };
 
 
@@ -346,14 +409,39 @@ export default function TeamAssignment() {
                                 </div>
                               </div>
                               
-                              <Button 
-                                className="w-full" 
-                                size="sm"
-                                onClick={() => openAssignModal(user)}
-                                data-testid={`button-assign-${user.id}`}
-                              >
-                                <UserPlus className="w-4 h-4 mr-2" /> Assign Task
-                              </Button>
+                              <div className="flex gap-2">
+                                {isUserInDealTeam(user.id, selectedDeal!) ? (
+                                  <Button 
+                                    variant="outline"
+                                    className="flex-1 border-red-500/30 text-red-400 hover:bg-red-500/10" 
+                                    size="sm"
+                                    onClick={() => handleRemoveFromTeam(user)}
+                                    disabled={updateDeal.isPending}
+                                    data-testid={`button-remove-team-${user.id}`}
+                                  >
+                                    <X className="w-4 h-4 mr-1" /> Remove
+                                  </Button>
+                                ) : (
+                                  <Button 
+                                    variant="outline"
+                                    className="flex-1 border-green-500/30 text-green-400 hover:bg-green-500/10" 
+                                    size="sm"
+                                    onClick={() => handleAddToTeam(user)}
+                                    disabled={updateDeal.isPending}
+                                    data-testid={`button-add-team-${user.id}`}
+                                  >
+                                    <UserPlus className="w-4 h-4 mr-1" /> Add
+                                  </Button>
+                                )}
+                                <Button 
+                                  className="flex-1" 
+                                  size="sm"
+                                  onClick={() => openAssignModal(user)}
+                                  data-testid={`button-assign-${user.id}`}
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-1" /> Task
+                                </Button>
+                              </div>
                             </CardContent>
                           </Card>
                         );
@@ -382,8 +470,18 @@ export default function TeamAssignment() {
             <DialogTitle>Assign Task to {selectedUser?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-            <div className="text-sm text-muted-foreground">
-              Assigning to deal: <span className="font-medium text-foreground">{currentDeal?.name}</span>
+            <div className="space-y-2">
+              <Label>Related Deal *</Label>
+              <Select value={taskDealId || ""} onValueChange={(v) => setTaskDealId(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a deal..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {deals.filter(d => d.status === 'Active').map(deal => (
+                    <SelectItem key={deal.id} value={deal.id}>{deal.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Task Title *</Label>

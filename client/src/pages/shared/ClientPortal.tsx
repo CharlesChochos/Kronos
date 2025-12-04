@@ -29,9 +29,10 @@ import {
   Bell,
   Download,
   Upload,
-  Loader2
+  Loader2,
+  Trash2
 } from "lucide-react";
-import { useDeals, useClientPortalAccess, useCreateClientPortalAccess, useUpdateClientPortalAccess } from "@/lib/api";
+import { useDeals, useClientPortalAccess, useCreateClientPortalAccess, useUpdateClientPortalAccess, useDeleteClientPortalAccess } from "@/lib/api";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import type { ClientPortalAccess } from "@shared/schema";
@@ -41,6 +42,7 @@ export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
   const { data: clientAccess = [], isLoading } = useClientPortalAccess();
   const createAccess = useCreateClientPortalAccess();
   const updateAccess = useUpdateClientPortalAccess();
+  const deleteAccess = useDeleteClientPortalAccess();
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -122,6 +124,19 @@ export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
   const copyPortalLink = (url: string) => {
     navigator.clipboard.writeText(url);
     toast.success("Portal link copied to clipboard");
+  };
+
+  const handleDeleteAccess = async (id: string, clientName: string) => {
+    if (!confirm(`Are you sure you want to delete portal access for ${clientName}? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      await deleteAccess.mutateAsync(id);
+      toast.success("Portal access deleted");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete portal access");
+    }
   };
 
   const getAccessBadge = (level: string) => {
@@ -280,6 +295,15 @@ export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
                               onCheckedChange={() => toggleAccess(access.id, access.isActive)}
                               data-testid={`toggle-access-${access.id}`}
                             />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:bg-destructive/10"
+                              onClick={() => handleDeleteAccess(access.id, access.clientName)}
+                              data-testid={`delete-access-${access.id}`}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
                           </div>
                         </div>
                         <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">

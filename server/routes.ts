@@ -849,7 +849,14 @@ export async function registerRoutes(
         return res.status(400).json({ error: fromError(result.error).toString() });
       }
       
-      const task = await storage.updateTask(req.params.id, result.data);
+      const updateData = { ...result.data };
+      if (updateData.status === 'Completed' && existingTask.status !== 'Completed') {
+        (updateData as any).completedAt = new Date();
+      } else if (updateData.status && updateData.status !== 'Completed' && existingTask.status === 'Completed') {
+        (updateData as any).completedAt = null;
+      }
+      
+      const task = await storage.updateTask(req.params.id, updateData);
       const changes: Record<string, any> = {};
       if (result.data.status && result.data.status !== existingTask.status) {
         changes.status = { from: existingTask.status, to: result.data.status };
@@ -3305,6 +3312,43 @@ Guidelines:
         return res.status(400).json({ error: fromError(result.error).toString() });
       }
       const pairing = await storage.createMentorshipPairing(result.data);
+      
+      const allUsers = await storage.getAllUsers();
+      const mentor = allUsers.find(u => u.id === result.data.mentorId);
+      const mentee = allUsers.find(u => u.id === result.data.menteeId);
+      
+      if (mentor && mentee) {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() + 7);
+        startDate.setHours(10, 0, 0, 0);
+        
+        await storage.createMeeting({
+          title: `Mentorship Session: ${mentor.name} & ${mentee.name}`,
+          description: `Initial mentorship meeting between ${mentor.name} (mentor) and ${mentee.name} (mentee). Focus area: ${result.data.focusArea || 'General development'}`,
+          scheduledFor: startDate,
+          duration: 60,
+          location: null,
+          dealId: null,
+          organizerId: (req.user as any)?.id || null,
+          participants: [mentor.email, mentee.email],
+          status: 'scheduled',
+          videoPlatform: null,
+          videoLink: null,
+        });
+        
+        for (const user of [mentor, mentee]) {
+          await storage.createNotification({
+            userId: user.id,
+            title: 'New Mentorship Pairing',
+            message: user.id === mentor.id 
+              ? `You have been paired with ${mentee.name} as their mentor. A kickoff meeting has been scheduled.`
+              : `You have been paired with ${mentor.name} as your mentor. A kickoff meeting has been scheduled.`,
+            type: 'info',
+            link: '/mentorship',
+          });
+        }
+      }
+      
       res.status(201).json(pairing);
     } catch (error) {
       console.error('Create mentorship pairing error:', error);

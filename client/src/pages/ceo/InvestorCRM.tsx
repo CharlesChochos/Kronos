@@ -25,9 +25,10 @@ import {
   MessageSquare,
   Users,
   Briefcase,
-  Loader2
+  Loader2,
+  Trash2
 } from "lucide-react";
-import { useCurrentUser, useInvestors, useInvestor, useCreateInvestor, useCreateInvestorInteraction } from "@/lib/api";
+import { useCurrentUser, useInvestors, useInvestor, useCreateInvestor, useCreateInvestorInteraction, useDeleteInvestor } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { toast } from "sonner";
@@ -53,6 +54,7 @@ export default function InvestorCRM() {
   const { data: selectedInvestorData } = useInvestor(selectedInvestorId || '');
   const createInvestor = useCreateInvestor();
   const createInteraction = useCreateInvestorInteraction();
+  const deleteInvestor = useDeleteInvestor();
 
   const [newInvestor, setNewInvestor] = useState({
     name: '',
@@ -153,6 +155,22 @@ export default function InvestorCRM() {
       setNewInteraction({ type: 'Call', notes: '' });
     } catch (error) {
       toast.error('Failed to log interaction');
+    }
+  };
+
+  const handleDeleteInvestor = async () => {
+    if (!selectedInvestorId) return;
+    
+    if (!confirm('Are you sure you want to delete this investor? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      await deleteInvestor.mutateAsync(selectedInvestorId);
+      toast.success('Investor deleted');
+      setSelectedInvestorId(null);
+    } catch (error) {
+      toast.error('Failed to delete investor');
     }
   };
 
@@ -341,10 +359,22 @@ export default function InvestorCRM() {
                         </div>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => setShowAddInteraction(true)}>
-                      <Plus className="w-4 h-4 mr-1" />
-                      Log Interaction
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setShowAddInteraction(true)}>
+                        <Plus className="w-4 h-4 mr-1" />
+                        Log Interaction
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleDeleteInvestor}
+                        disabled={deleteInvestor.isPending}
+                        className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                        data-testid="button-delete-investor"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>

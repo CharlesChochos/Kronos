@@ -124,6 +124,7 @@ export const tasks = pgTable("tasks", {
   status: text("status").notNull().default('Pending'),
   type: text("type").notNull(),
   attachments: jsonb("attachments").default([]).$type<TaskAttachment[]>(),
+  completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
