@@ -226,7 +226,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
         </div>
         {!collapsed && (
           <div>
-            <h1 className="font-display font-bold text-lg leading-none tracking-tight">OSReaper</h1>
+            <h1 className="font-display font-bold text-lg leading-none tracking-tight">Kronos</h1>
             <p className="text-xs text-muted-foreground mt-0.5">v2.4</p>
           </div>
         )}

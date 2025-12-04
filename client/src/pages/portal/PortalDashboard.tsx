@@ -59,7 +59,7 @@ export default function PortalDashboard() {
                 <Building2 className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h1 className="text-lg font-semibold">OSReaper</h1>
+                <h1 className="text-lg font-semibold">Kronos</h1>
                 <p className="text-xs text-muted-foreground">Client Portal</p>
               </div>
             </div>

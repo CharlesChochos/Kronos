@@ -166,7 +166,7 @@ export async function sendMeetingInvite(data: MeetingInviteData): Promise<{ succ
               <p>Please add this to your calendar and be prepared to join at the scheduled time.</p>
             </div>
             <div class="footer">
-              <p>This invitation was sent via OSReaper</p>
+              <p>This invitation was sent via Kronos</p>
               <p>Investment Banking Operations Platform</p>
             </div>
           </div>
@@ -189,7 +189,7 @@ ${data.videoLink ? `Video Conference: ${data.videoLink}` : ''}
 Please add this to your calendar and be prepared to join at the scheduled time.
 
 ---
-This invitation was sent via OSReaper
+This invitation was sent via Kronos
 Investment Banking Operations Platform
     `.trim();
 
@@ -243,7 +243,7 @@ export async function sendNotificationEmail(
         <body>
           <div class="container">
             <div class="header">
-              <h1>OSReaper Notification</h1>
+              <h1>Kronos Notification</h1>
             </div>
             <div class="content">
               <div class="message">
@@ -251,7 +251,7 @@ export async function sendNotificationEmail(
               </div>
             </div>
             <div class="footer">
-              <p>OSReaper - Investment Banking Operations Platform</p>
+              <p>Kronos - Investment Banking Operations Platform</p>
             </div>
           </div>
         </body>
@@ -312,7 +312,7 @@ export async function sendPasswordResetEmail(data: PasswordResetEmailData): Prom
             <div class="content">
               <div class="message">
                 <p>Hi ${data.userName},</p>
-                <p>We received a request to reset your password for your OSReaper account. Click the button below to create a new password:</p>
+                <p>We received a request to reset your password for your Kronos account. Click the button below to create a new password:</p>
                 <p style="text-align: center;">
                   <a href="${data.resetLink}" class="button">Reset Password</a>
                 </p>
@@ -322,7 +322,7 @@ export async function sendPasswordResetEmail(data: PasswordResetEmailData): Prom
               </div>
             </div>
             <div class="footer">
-              <p>OSReaper - Investment Banking Operations Platform</p>
+              <p>Kronos - Investment Banking Operations Platform</p>
               <p>This is an automated message, please do not reply.</p>
             </div>
           </div>
@@ -333,7 +333,7 @@ export async function sendPasswordResetEmail(data: PasswordResetEmailData): Prom
     const result = await client.emails.send({
       from: fromEmail,
       to: data.email,
-      subject: 'Reset Your OSReaper Password',
+      subject: 'Reset Your Kronos Password',
       html: emailHtml,
       text: `Hi ${data.userName}, We received a request to reset your password. Visit this link to reset it: ${data.resetLink}. This link expires in 1 hour. If you didn't request this, you can ignore this email.`,
     });
@@ -399,12 +399,12 @@ export async function sendPortalInviteEmail(data: PortalInviteEmailData): Promis
           <div class="container">
             <div class="header">
               <h1>Client Portal Invitation</h1>
-              <p style="margin: 10px 0 0 0; opacity: 0.9;">You've been invited to OSReaper</p>
+              <p style="margin: 10px 0 0 0; opacity: 0.9;">You've been invited to Kronos</p>
             </div>
             <div class="content">
               <div class="message-box">
                 <p>Hi ${data.recipientName},</p>
-                <p><strong>${data.inviterName}</strong> has invited you to access the OSReaper Client Portal${data.organization ? ` for <strong>${data.organization}</strong>` : ''}.</p>
+                <p><strong>${data.inviterName}</strong> has invited you to access the Kronos Client Portal${data.organization ? ` for <strong>${data.organization}</strong>` : ''}.</p>
                 
                 ${data.message ? `
                 <div class="personal-message">
@@ -430,8 +430,8 @@ export async function sendPortalInviteEmail(data: PortalInviteEmailData): Promis
               </div>
             </div>
             <div class="footer">
-              <p>OSReaper - Investment Banking Operations Platform</p>
-              <p>This is an automated message from OSReaper.</p>
+              <p>Kronos - Investment Banking Operations Platform</p>
+              <p>This is an automated message from Kronos.</p>
             </div>
           </div>
         </body>
@@ -443,7 +443,7 @@ Client Portal Invitation
 
 Hi ${data.recipientName},
 
-${data.inviterName} has invited you to access the OSReaper Client Portal${data.organization ? ` for ${data.organization}` : ''}.
+${data.inviterName} has invited you to access the Kronos Client Portal${data.organization ? ` for ${data.organization}` : ''}.
 
 ${data.message ? `Personal message from ${data.inviterName}: "${data.message}"` : ''}
 
@@ -457,13 +457,13 @@ To accept this invitation, visit: ${registerUrl}
 This invitation expires on ${formattedExpiry}.
 
 ---
-OSReaper - Investment Banking Operations Platform
+Kronos - Investment Banking Operations Platform
     `.trim();
 
     const result = await client.emails.send({
       from: fromEmail,
       to: data.to,
-      subject: `${data.inviterName} invited you to OSReaper Client Portal`,
+      subject: `${data.inviterName} invited you to Kronos Client Portal`,
       html: emailHtml,
       text: emailText,
     });

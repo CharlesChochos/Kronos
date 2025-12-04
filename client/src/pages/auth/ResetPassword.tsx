@@ -148,7 +148,7 @@ export default function ResetPassword() {
           <div className="flex justify-center">
             <img 
               src={logo} 
-              alt="OSReaper Logo" 
+              alt="Kronos Logo" 
               className="w-16 h-16 object-contain"
             />
           </div>

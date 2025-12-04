@@ -1518,15 +1518,15 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                           <Rocket className="w-4 h-4 text-green-500" />
                         </div>
                         <div className="text-left">
-                          <p className="font-medium text-sm">Get Started with OSReaper</p>
+                          <p className="font-medium text-sm">Get Started with Kronos</p>
                           <p className="text-xs text-muted-foreground">Learn the basics of the platform</p>
                         </div>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent className="text-sm text-muted-foreground space-y-4 pt-2">
                       <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
-                        <h5 className="font-medium text-foreground">Welcome to OSReaper</h5>
-                        <p>OSReaper is your comprehensive investment banking operations platform designed to streamline deal management, task assignments, and investor relations.</p>
+                        <h5 className="font-medium text-foreground">Welcome to Kronos</h5>
+                        <p>Kronos is your comprehensive investment banking operations platform designed to streamline deal management, task assignments, and investor relations.</p>
                         
                         <h5 className="font-medium text-foreground mt-4">Quick Start Guide</h5>
                         <ol className="list-decimal list-inside space-y-2">
@@ -1619,7 +1619,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                     <AccordionContent className="text-sm text-muted-foreground space-y-4 pt-2">
                       <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
                         <h5 className="font-medium text-foreground">Investor Matching Overview</h5>
-                        <p>OSReaper's intelligent investor matching system helps you identify the most suitable investors for each deal based on multiple criteria.</p>
+                        <p>Kronos's intelligent investor matching system helps you identify the most suitable investors for each deal based on multiple criteria.</p>
                         
                         <h5 className="font-medium text-foreground mt-4">How Matching Works</h5>
                         <ol className="list-decimal list-inside space-y-2 text-xs">
@@ -1862,7 +1862,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
         </DialogContent>
       </Dialog>
       
-      {/* Reaper AI Assistant - Global access */}
+      {/* Kronos AI Assistant - Global access */}
       <ReaperAssistant />
     </div>
   );

@@ -85,7 +85,7 @@ export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
 
   // Generate portal URL from access token or ID
   const getPortalUrl = (access: ClientPortalAccess) => {
-    return `https://portal.osreaper.com/c/${access.accessToken || access.id.substring(0, 8)}`;
+    return `https://portal.kronos.com/c/${access.accessToken || access.id.substring(0, 8)}`;
   };
 
   const filteredAccess = clientAccess.filter(access => {

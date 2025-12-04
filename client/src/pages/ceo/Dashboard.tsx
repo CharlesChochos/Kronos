@@ -472,7 +472,7 @@ export default function Dashboard() {
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(24);
       doc.setFont('helvetica', 'bold');
-      doc.text('OSReaper', margin, 25);
+      doc.text('Kronos', margin, 25);
       
       doc.setFontSize(12);
       doc.setFont('helvetica', 'normal');
@@ -641,11 +641,11 @@ export default function Dashboard() {
       doc.setTextColor(...mutedColor);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
-      doc.text('OSReaper - Investment Banking Operations Platform', pageWidth / 2, footerY, { align: 'center' });
+      doc.text('Kronos - Investment Banking Operations Platform', pageWidth / 2, footerY, { align: 'center' });
       doc.text(`Page 1 of 1`, pageWidth - margin, footerY, { align: 'right' });
       
       // Save the PDF
-      doc.save(`osreaper-dashboard-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      doc.save(`kronos-dashboard-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
       toast.success("Report downloaded successfully!");
     } catch (error) {
       console.error('Failed to generate PDF:', error);

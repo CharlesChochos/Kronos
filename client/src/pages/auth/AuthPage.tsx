@@ -341,7 +341,7 @@ export default function AuthPage() {
             </div>
           </div>
           <div>
-            <CardTitle className="text-2xl font-display font-bold tracking-tight">OSReaper</CardTitle>
+            <CardTitle className="text-2xl font-display font-bold tracking-tight">Kronos</CardTitle>
             <CardDescription className="text-muted-foreground mt-2">
               Enterprise Investment Banking Platform
             </CardDescription>

@@ -42,7 +42,7 @@ export async function registerRoutes(
         tableName: 'sessions',
         createTableIfMissing: true,
       }),
-      secret: process.env.SESSION_SECRET || "osreaper-secret-key-change-in-production",
+      secret: process.env.SESSION_SECRET || "kronos-secret-key-change-in-production",
       resave: false,
       saveUninitialized: false,
       cookie: {
@@ -1309,7 +1309,7 @@ export async function registerRoutes(
       const secret = authenticator.generateSecret();
       
       // Generate the otpauth URL
-      const otpauthUrl = authenticator.keyuri(user.email, 'OSReaper', secret);
+      const otpauthUrl = authenticator.keyuri(user.email, 'Kronos', secret);
       
       // Generate QR code as data URL
       const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
@@ -1490,7 +1490,7 @@ Deal Information:
 - Description: ${dealData.description || 'N/A'}
 ` : 'No specific deal context provided.';
 
-      const prompt = `You are a professional investment banking document generator for OSReaper platform.
+      const prompt = `You are a professional investment banking document generator for Kronos platform.
 
 Generate a complete, professional ${templateName} document based on the following context:
 
@@ -1775,7 +1775,7 @@ Consider common investment banking tasks like:
         }));
       
       // Build the system prompt
-      const systemPrompt = `You are Reaper, an AI assistant for OSReaper - an investment banking operations platform. You help ${currentUser.role === 'CEO' ? 'executives' : 'team members'} manage deals, tasks, and collaborate with their team.
+      const systemPrompt = `You are Kronos, an AI assistant for the Kronos investment banking operations platform. You help ${currentUser.role === 'CEO' ? 'executives' : 'team members'} manage deals, tasks, and collaborate with their team.
 
 Your capabilities:
 - Answer questions about deals, tasks, and team activities

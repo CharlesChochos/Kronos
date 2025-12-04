@@ -283,7 +283,7 @@ export function ReaperAssistant() {
                   <Sparkles className="w-4 h-4 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-sm">Reaper</h3>
+                  <h3 className="font-semibold text-sm">Kronos</h3>
                   <p className="text-[10px] text-muted-foreground">AI Assistant</p>
                 </div>
               </div>
@@ -526,7 +526,7 @@ export function ReaperAssistant() {
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Ask Reaper anything..."
+                        placeholder="Ask Kronos anything..."
                         className="resize-none min-h-[44px] max-h-[120px]"
                         disabled={sendMessage.isPending}
                         data-testid="input-assistant-message"

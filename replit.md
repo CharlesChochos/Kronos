@@ -1,6 +1,6 @@
 # Overview
 
-OSReaper (formerly Equiturn OS) is a full-stack investment banking operations platform built with a React/Vite frontend and Express backend. The application provides role-based interfaces for CEOs and employees to manage deals, tasks, documents, investor matching, and team assignments. It uses a PostgreSQL database via Neon for data persistence and implements session-based authentication with Passport.js.
+Kronos is a full-stack investment banking operations platform built with a React/Vite frontend and Express backend. The application provides role-based interfaces for CEOs and employees to manage deals, tasks, documents, investor matching, and team assignments. It uses a PostgreSQL database via Neon for data persistence and implements session-based authentication with Passport.js.
 
 # User Preferences
 
@@ -141,10 +141,10 @@ Preferred communication style: Simple, everyday language.
 - Uses Replit Connectors for secure API key management (no hardcoded secrets)
 - Meeting invites are sent automatically when scheduling meetings with external participants
 - Email service preserves organizer's local timezone for accurate meeting time display
-- Beautifully formatted HTML emails with OSReaper branding
+- Beautifully formatted HTML emails with Kronos branding
 - Graceful error handling - meeting creation succeeds even if email fails
 
-## AI Assistant (Reaper)
+## AI Assistant (Kronos)
 
 **Overview**
 - Platform-wide AI assistant accessible via floating button in the bottom-right corner
@@ -170,7 +170,7 @@ Preferred communication style: Simple, everyday language.
 - `POST /api/assistant/conversations/:id/messages` - Send message and get AI response
 
 **Frontend Component**
-- `ReaperAssistant.tsx` - Slide-out panel with conversation management
+- `ReaperAssistant.tsx` - Slide-out panel with conversation management (displays as "Kronos" to users)
 - Integrated globally via Layout component
 - Auto-selects most recent conversation when opened
 
