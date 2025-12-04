@@ -148,7 +148,8 @@ export default function DocumentManagement({ role = 'CEO' }: DocumentManagementP
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64Content = reader.result as string;
-        const selectedDeal = deals.find(d => d.id === uploadForm.dealId);
+        const dealIdToUse = uploadForm.dealId === "none" ? undefined : uploadForm.dealId || undefined;
+        const selectedDeal = dealIdToUse ? deals.find(d => d.id === dealIdToUse) : undefined;
 
         await createDocument.mutateAsync({
           title: uploadForm.title,
@@ -159,7 +160,7 @@ export default function DocumentManagement({ role = 'CEO' }: DocumentManagementP
           mimeType: uploadForm.file!.type,
           size: uploadForm.file!.size,
           content: base64Content,
-          dealId: uploadForm.dealId || undefined,
+          dealId: dealIdToUse,
           dealName: selectedDeal?.name || undefined,
           tags: uploadForm.tags ? uploadForm.tags.split(',').map(t => t.trim()) : [],
         });
@@ -379,7 +380,7 @@ export default function DocumentManagement({ role = 'CEO' }: DocumentManagementP
                       <SelectValue placeholder="Select a deal" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No deal association</SelectItem>
+                      <SelectItem value="none">No deal association</SelectItem>
                       {deals.map((deal) => (
                         <SelectItem key={deal.id} value={deal.id}>
                           {deal.name}
@@ -676,12 +677,13 @@ export default function DocumentManagement({ role = 'CEO' }: DocumentManagementP
                 <div className="space-y-2">
                   <Label>Associate with Deal</Label>
                   <Select
-                    value={selectedDocument.dealId || ""}
+                    value={selectedDocument.dealId || "none"}
                     onValueChange={(value) => {
-                      const deal = deals.find(d => d.id === value);
+                      const dealIdToUse = value === "none" ? undefined : value;
+                      const deal = dealIdToUse ? deals.find(d => d.id === dealIdToUse) : undefined;
                       setSelectedDocument({
                         ...selectedDocument,
-                        dealId: value || undefined,
+                        dealId: dealIdToUse,
                         dealName: deal?.name || undefined,
                       });
                     }}
@@ -690,7 +692,7 @@ export default function DocumentManagement({ role = 'CEO' }: DocumentManagementP
                       <SelectValue placeholder="No deal association" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No deal association</SelectItem>
+                      <SelectItem value="none">No deal association</SelectItem>
                       {deals.map((deal) => (
                         <SelectItem key={deal.id} value={deal.id}>
                           {deal.name}

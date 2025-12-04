@@ -230,6 +230,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     setShowNotificationsSheet,
     showResourcesSheet,
     setShowResourcesSheet,
+    showCustomizeSheet,
     setShowCustomizeSheet
   } = useDashboardContext();
   
@@ -815,7 +816,10 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                   <>
                     <DropdownMenuItem 
                       className="focus:bg-primary/10 focus:text-primary cursor-pointer"
-                      onClick={() => setShowCustomizeSheet(true)}
+                      onClick={() => {
+                        setLocation('/ceo/dashboard');
+                        setTimeout(() => setShowCustomizeSheet(true), 100);
+                      }}
                       data-testid="menu-item-customize"
                     >
                       <Palette className="w-4 h-4 mr-2" />
@@ -1684,7 +1688,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                   <div 
                     key={notification.id} 
                     className={cn(
-                      "p-4 rounded-lg border transition-colors cursor-pointer",
+                      "p-4 rounded-lg border transition-colors cursor-pointer hover:bg-primary/10",
                       notification.read 
                         ? "bg-secondary/20 border-border" 
                         : "bg-primary/5 border-primary/20"
@@ -1692,6 +1696,27 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                     onClick={() => {
                       if (!notification.read) {
                         markNotificationRead.mutate(notification.id);
+                      }
+                      setShowNotificationsSheet(false);
+                      if (notification.link) {
+                        setLocation(notification.link);
+                      } else {
+                        const rolePrefix = role === 'CEO' ? '/ceo' : '/employee';
+                        const title = notification.title?.toLowerCase() || '';
+                        const message = notification.message?.toLowerCase() || '';
+                        if (title.includes('deal') || message.includes('deal')) {
+                          setLocation(`${rolePrefix}/deals`);
+                        } else if (title.includes('task') || message.includes('task')) {
+                          setLocation(`${rolePrefix}/tasks`);
+                        } else if (title.includes('meeting') || message.includes('meeting')) {
+                          setLocation(`${rolePrefix}/meetings`);
+                        } else if (title.includes('document') || message.includes('document')) {
+                          setLocation(`${rolePrefix}/document-library`);
+                        } else if (title.includes('user') || message.includes('approved') || message.includes('pending')) {
+                          setLocation('/ceo/team');
+                        } else if (title.includes('investor') || message.includes('investor')) {
+                          setLocation(`${rolePrefix}/investor-matching`);
+                        }
                       }
                     }}
                   >
@@ -1709,7 +1734,10 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                         {notification.type === 'error' && <X className="w-4 h-4" />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{notification.title}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">{notification.title}</p>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                        </div>
                         <p className="text-xs text-muted-foreground mt-1">{notification.message}</p>
                       </div>
                     </div>

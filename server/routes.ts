@@ -256,11 +256,20 @@ export async function registerRoutes(
   });
 
   // Logout
-  app.post("/api/auth/logout", (req, res) => {
+  app.post("/api/auth/logout", async (req, res) => {
+    const user = req.user as any;
+    const userId = user?.id;
+    const userName = user?.name;
+    
     req.logout((err) => {
       if (err) {
         return res.status(500).json({ error: "Logout error" });
       }
+      
+      if (userId && userName) {
+        createAuditLog(req, 'logout', 'user', userId, userName, {}).catch(() => {});
+      }
+      
       res.json({ message: "Logged out successfully" });
     });
   });
@@ -331,6 +340,14 @@ export async function registerRoutes(
 
       // Mark token as used
       await storage.markPasswordResetTokenUsed(resetToken.id);
+      
+      // Get user for audit log (safely handle if userId is valid)
+      if (resetToken.userId) {
+        const user = await storage.getUser(resetToken.userId);
+        if (user) {
+          await createAuditLog(req, 'password_reset', 'user', user.id, user.name, { method: 'reset_token' });
+        }
+      }
 
       res.json({ message: "Password has been reset successfully. You can now log in with your new password." });
     } catch (error) {
@@ -970,6 +987,13 @@ export async function registerRoutes(
       }
       const meeting = await storage.createMeeting(result.data);
       
+      // Log meeting creation
+      await createAuditLog(req, 'meeting_created', 'meeting', meeting.id, meeting.title, { 
+        scheduledFor: String(meeting.scheduledFor), 
+        location: meeting.location || null, 
+        participantCount: Array.isArray(result.data.participants) ? result.data.participants.length : 0
+      });
+      
       // Create notifications for participants
       const currentUser = req.user as any;
       const participantEmails: string[] = [];
@@ -1034,6 +1058,14 @@ export async function registerRoutes(
       if (!meeting) {
         return res.status(404).json({ error: "Meeting not found" });
       }
+      
+      await createAuditLog(req, 'meeting_updated', 'meeting', meeting.id, meeting.title, {
+        title: result.data.title,
+        scheduledFor: result.data.scheduledFor ? String(result.data.scheduledFor) : undefined,
+        location: result.data.location,
+        status: result.data.status
+      });
+      
       res.json(meeting);
     } catch (error) {
       res.status(500).json({ error: "Failed to update meeting" });
@@ -1043,7 +1075,13 @@ export async function registerRoutes(
   // Delete meeting (CEO only)
   app.delete("/api/meetings/:id", requireCEO, async (req, res) => {
     try {
+      const meeting = await storage.getMeeting(req.params.id);
       await storage.deleteMeeting(req.params.id);
+      
+      if (meeting) {
+        await createAuditLog(req, 'meeting_deleted', 'meeting', req.params.id, meeting.title, { scheduledFor: String(meeting.scheduledFor) });
+      }
+      
       res.json({ message: "Meeting deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete meeting" });
@@ -1202,6 +1240,9 @@ export async function registerRoutes(
       }
       
       const updatedUser = await storage.updateUserProfile(req.params.id, updates);
+      
+      await createAuditLog(req, 'profile_updated', 'user', req.params.id, updatedUser?.name || currentUser.name, updates);
+      
       res.json(updatedUser);
     } catch (error: any) {
       if (error.code === '23505') {
@@ -1241,6 +1282,9 @@ export async function registerRoutes(
       }
       
       await storage.updateUserPassword(req.params.id, newPassword);
+      
+      await createAuditLog(req, 'password_changed', 'user', req.params.id, user.name, { method: 'self_service' });
+      
       res.json({ message: "Password updated successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to update password" });
@@ -3573,6 +3617,13 @@ Guidelines:
         return res.status(400).json({ error: fromError(result.error).toString() });
       }
       const match = await storage.createInvestorMatch(result.data);
+      
+      await createAuditLog(req, 'investor_matched', 'investor_match', match.id?.toString(), `Investor ${req.body.investorId} - Deal ${req.body.dealId}`, {
+        dealId: req.body.dealId,
+        investorId: req.body.investorId,
+        status: req.body.status
+      });
+      
       res.status(201).json(match);
     } catch (error) {
       console.error('Create investor match error:', error);
@@ -3584,6 +3635,12 @@ Guidelines:
   app.delete("/api/investor-matches/:dealId/:investorId", requireAuth, async (req, res) => {
     try {
       await storage.deleteInvestorMatch(req.params.dealId, parseInt(req.params.investorId));
+      
+      await createAuditLog(req, 'investor_match_removed', 'investor_match', undefined, `Investor ${req.params.investorId} - Deal ${req.params.dealId}`, {
+        dealId: req.params.dealId,
+        investorId: req.params.investorId
+      });
+      
       res.json({ message: "Investor match deleted" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete investor match" });
@@ -3782,6 +3839,14 @@ Guidelines:
         return res.status(400).json({ error: fromError(result.error).toString() });
       }
       const event = await storage.createCalendarEvent(result.data);
+      
+      await createAuditLog(req, 'calendar_event_created', 'calendar_event', event.id, event.title, {
+        date: event.date,
+        investor: event.investor,
+        dealId: event.dealId,
+        status: event.status
+      });
+      
       res.status(201).json(event);
     } catch (error) {
       console.error('Create calendar event error:', error);
@@ -3797,6 +3862,9 @@ Guidelines:
         return res.status(404).json({ error: "Calendar event not found" });
       }
       const updated = await storage.updateCalendarEvent(req.params.id, req.body);
+      
+      await createAuditLog(req, 'calendar_event_updated', 'calendar_event', updated?.id || req.params.id, updated?.title || event.title, req.body);
+      
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update calendar event" });
@@ -3811,6 +3879,13 @@ Guidelines:
         return res.status(404).json({ error: "Calendar event not found" });
       }
       await storage.deleteCalendarEvent(req.params.id);
+      
+      await createAuditLog(req, 'calendar_event_deleted', 'calendar_event', req.params.id, event.title, {
+        date: event.date,
+        investor: event.investor,
+        dealId: event.dealId
+      });
+      
       res.json({ message: "Calendar event deleted" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete calendar event" });
