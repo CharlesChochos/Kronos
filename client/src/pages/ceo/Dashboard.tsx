@@ -256,13 +256,15 @@ export default function Dashboard() {
   const rawMarketNews = marketNewsResponse?.data || [];
   const newsSource = marketNewsResponse?.source || 'sample';
   
-  // Filter for investment banking related news
-  const ibKeywords = ['merger', 'm&a', 'acquisition', 'ipo', 'capital', 'deal', 'buyout', 'investment', 'equity', 'debt', 'bond', 'underwriting', 'financing', 'valuation', 'securities', 'advisory', 'banking', 'fund', 'private equity', 'venture', 'syndicate', 'offering', 'raise', 'billion', 'million'];
-  const marketNews = rawMarketNews.filter((news: any) => {
+  // Filter for investment banking and finance related news - broader filter to ensure content shows
+  const financeKeywords = ['merger', 'm&a', 'acquisition', 'ipo', 'capital', 'deal', 'buyout', 'investment', 'equity', 'debt', 'bond', 'underwriting', 'financing', 'valuation', 'securities', 'advisory', 'banking', 'fund', 'private equity', 'venture', 'syndicate', 'offering', 'raise', 'billion', 'million', 'stock', 'market', 'trading', 'earnings', 'revenue', 'profit', 'growth', 'company', 'business', 'economy', 'financial', 'investor', 'shares', 'nasdaq', 'dow', 's&p', 'fed', 'rate', 'inflation', 'gdp', 'sector', 'industry', 'quarter', 'forecast', 'analyst', 'dividend', 'portfolio'];
+  const filteredNews = rawMarketNews.filter((news: any) => {
     const headline = news.headline?.toLowerCase() || '';
     const summary = news.summary?.toLowerCase() || '';
-    return ibKeywords.some(keyword => headline.includes(keyword) || summary.includes(keyword));
+    return financeKeywords.some(keyword => headline.includes(keyword) || summary.includes(keyword));
   });
+  // If no news matches the filter, show all news (fallback to raw data)
+  const marketNews = filteredNews.length > 0 ? filteredNews : rawMarketNews;
 
   // Compute analytics
   const activeDeals = deals.filter(d => d.status === 'Active');
