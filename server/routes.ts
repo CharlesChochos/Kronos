@@ -182,6 +182,20 @@ export async function registerRoutes(
       // Create audit log for signup
       await createAuditLog(req, 'user_signup', 'user', user.id, user.name, { email: user.email, role: user.role, status: user.status, jobTitle: user.jobTitle });
       
+      // Notify all CEOs about new signup request
+      if (!isFirstUser) {
+        const ceos = allUsers.filter(u => u.role === 'CEO' && u.status === 'active');
+        for (const ceo of ceos) {
+          await storage.createNotification({
+            userId: ceo.id,
+            title: 'New Signup Request',
+            message: `${user.name} (${user.jobTitle || 'No title'}) has requested access to the platform`,
+            type: 'info',
+            link: '/ceo/users',
+          });
+        }
+      }
+      
       // If first user (CEO), auto-login
       if (isFirstUser) {
         req.login(user, (err) => {
@@ -722,6 +736,23 @@ export async function registerRoutes(
       if (result.data.lead && result.data.lead !== deal.lead) changes.lead = { from: deal.lead, to: result.data.lead };
       if (Object.keys(changes).length > 0) {
         await createAuditLog(req, 'deal_updated', 'deal', deal.id, deal.name, changes);
+        
+        // Notify CEOs about deal stage/status changes (if updated by non-CEO)
+        if ((changes.stage || changes.status) && user.role !== 'CEO') {
+          const allUsers = await storage.getAllUsers();
+          const ceos = allUsers.filter(u => u.role === 'CEO' && u.status === 'active');
+          for (const ceo of ceos) {
+            await storage.createNotification({
+              userId: ceo.id,
+              title: 'Deal Status Update',
+              message: changes.stage 
+                ? `${deal.name} moved from ${changes.stage.from} to ${changes.stage.to} by ${user.name}`
+                : `${deal.name} status changed to ${changes.status.to} by ${user.name}`,
+              type: 'info',
+              link: '/ceo/deals',
+            });
+          }
+        }
       }
       res.json(updatedDeal);
     } catch (error) {
@@ -834,6 +865,23 @@ export async function registerRoutes(
           await createAuditLog(req, 'task_completed', 'task', existingTask.id, existingTask.title, changes);
         } else {
           await createAuditLog(req, 'task_updated', 'task', existingTask.id, existingTask.title, changes);
+        }
+        
+        // Notify CEOs about task status changes (if updated by non-CEO)
+        if (changes.status && currentUser.role !== 'CEO') {
+          const allUsers = await storage.getAllUsers();
+          const ceos = allUsers.filter(u => u.role === 'CEO' && u.status === 'active');
+          for (const ceo of ceos) {
+            await storage.createNotification({
+              userId: ceo.id,
+              title: changes.status.to === 'Completed' ? 'Task Completed' : 'Task Status Update',
+              message: changes.status.to === 'Completed'
+                ? `${currentUser.name} completed "${existingTask.title}"`
+                : `${currentUser.name} updated "${existingTask.title}" status to ${changes.status.to}`,
+              type: changes.status.to === 'Completed' ? 'success' : 'info',
+              link: '/ceo/dashboard',
+            });
+          }
         }
       }
       res.json(task);

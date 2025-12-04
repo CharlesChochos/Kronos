@@ -442,8 +442,8 @@ export default function UserManagement() {
                     <TableRow className="border-border hover:bg-transparent">
                       <TableHead>User</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>Job Title</TableHead>
-                      <TableHead>Role</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Access Level</TableHead>
                       <TableHead>2FA</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -474,7 +474,7 @@ export default function UserManagement() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={roleColors[user.role] || ""}>
-                            {user.role}
+                            {user.role === 'Associate' ? 'Standard' : user.role === 'Analyst' ? 'Basic' : user.role}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -502,7 +502,7 @@ export default function UserManagement() {
                               data-testid={`button-change-role-${user.id}`}
                             >
                               <UserCog className="h-4 w-4" />
-                              Role
+                              Access
                             </Button>
                             <Button
                               size="sm"
@@ -552,8 +552,8 @@ export default function UserManagement() {
                     <TableRow className="border-border hover:bg-transparent">
                       <TableHead>User</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>Job Title</TableHead>
-                      <TableHead>Role</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Access Level</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -582,8 +582,8 @@ export default function UserManagement() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={roleColors[user.role] || ""}>
-                            {user.role}
+                          <Badge variant="outline" className={`${roleColors[user.role] || ""} opacity-50`}>
+                            {user.role === 'Associate' ? 'Standard' : user.role === 'Analyst' ? 'Basic' : user.role}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
@@ -672,23 +672,23 @@ export default function UserManagement() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserCog className="h-5 w-5" />
-              Change User Role
+              Change Access Level
             </DialogTitle>
             <DialogDescription>
-              Update the role for {selectedUser?.name}
+              Update the platform access level for {selectedUser?.name}. This controls what features and data they can access.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Select value={newRole} onValueChange={setNewRole}>
               <SelectTrigger data-testid="select-role">
-                <SelectValue placeholder="Select a role" />
+                <SelectValue placeholder="Select access level" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="CEO">CEO</SelectItem>
+                <SelectItem value="CEO">CEO (Full Access)</SelectItem>
                 <SelectItem value="Managing Director">Managing Director</SelectItem>
                 <SelectItem value="Director">Director</SelectItem>
-                <SelectItem value="Associate">Associate</SelectItem>
-                <SelectItem value="Analyst">Analyst</SelectItem>
+                <SelectItem value="Associate">Standard</SelectItem>
+                <SelectItem value="Analyst">Basic</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -705,7 +705,7 @@ export default function UserManagement() {
               disabled={changeRoleMutation.isPending || !newRole}
               data-testid="button-confirm-role-change"
             >
-              {changeRoleMutation.isPending ? "Updating..." : "Update Role"}
+              {changeRoleMutation.isPending ? "Updating..." : "Update Access"}
             </Button>
           </DialogFooter>
         </DialogContent>
