@@ -1391,7 +1391,7 @@ export default function Dashboard() {
               <Card className="bg-card border-border">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Upcoming</CardTitle>
-                  <Link href="/ceo/event-calendar" className="hover:text-primary transition-colors">
+                  <Link href="/ceo/calendar" className="hover:text-primary transition-colors">
                     <Calendar className="w-4 h-4 text-muted-foreground hover:text-primary cursor-pointer" />
                   </Link>
                 </CardHeader>

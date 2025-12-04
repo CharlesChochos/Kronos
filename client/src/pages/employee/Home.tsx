@@ -657,7 +657,7 @@ export default function EmployeeHome() {
             </CardTitle>
             <CardDescription>Your meetings and events for today</CardDescription>
           </div>
-          <Link href="/employee/event-calendar" className="hover:text-primary transition-colors">
+          <Link href="/employee/calendar" className="hover:text-primary transition-colors">
             <Calendar className="w-5 h-5 text-muted-foreground hover:text-primary cursor-pointer" />
           </Link>
         </CardHeader>
