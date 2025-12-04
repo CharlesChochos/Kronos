@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -79,10 +79,10 @@ import {
   Video,
   Link as LinkIcon
 } from "lucide-react";
-import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
+import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews, useUserPreferences, useSaveUserPreferences, useCalendarEvents } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { format, subDays } from "date-fns";
+import { format, subDays, startOfDay, isAfter, isSameDay } from "date-fns";
 import { jsPDF } from "jspdf";
 import type { User as UserType, Deal, Task } from "@shared/schema";
 import { useDashboardContext } from "@/contexts/DashboardContext";
@@ -113,6 +113,7 @@ export default function Dashboard() {
   const { data: tasks = [], isLoading: tasksLoading } = useTasks();
   const { data: notifications = [] } = useNotifications();
   const { data: meetings = [] } = useMeetings();
+  const { data: calendarEvents = [] } = useCalendarEvents();
   const createDeal = useCreateDeal();
   const createMeeting = useCreateMeeting();
   const updateUserPreferences = useUpdateUserPreferences();
@@ -1373,44 +1374,79 @@ export default function Dashboard() {
 
         {/* Right Column: Meetings & Activity Widgets */}
         <div className="col-span-12 md:col-span-3 space-y-6">
-          {/* Upcoming Meetings Widget */}
-          {widgets.find(w => w.id === 'upcomingMeetings')?.enabled && (
-            <Card className="bg-card border-border">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Upcoming</CardTitle>
-                <Calendar className="w-4 h-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {meetings.length === 0 ? (
-                  <div className="text-center py-4 text-muted-foreground text-xs">No upcoming meetings</div>
-                ) : (
-                  meetings.slice(0, 3).map((meeting) => (
-                    <div key={meeting.id} className="p-2 bg-secondary/30 rounded-lg">
-                      <div className="text-sm font-medium truncate">{meeting.title}</div>
-                      <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
-                        <Clock className="w-3 h-3" />
-                        {meeting.scheduledFor ? format(new Date(meeting.scheduledFor), 'MMM d, h:mm a') : 'TBD'}
-                      </div>
-                      {meeting.location && (
-                        <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          <span className="truncate">{meeting.location}</span>
+          {/* Upcoming Meetings & Events Widget */}
+          {widgets.find(w => w.id === 'upcomingMeetings')?.enabled && (() => {
+            const today = startOfDay(new Date());
+            const upcomingEvents = calendarEvents
+              .filter(e => {
+                const eventDate = startOfDay(new Date(e.date));
+                return isAfter(eventDate, today) || isSameDay(eventDate, today);
+              })
+              .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+              .slice(0, 3);
+            const upcomingMeetings = meetings.slice(0, 3);
+            const hasItems = upcomingMeetings.length > 0 || upcomingEvents.length > 0;
+            
+            return (
+              <Card className="bg-card border-border">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Upcoming</CardTitle>
+                  <Link href="/ceo/event-calendar" className="hover:text-primary transition-colors">
+                    <Calendar className="w-4 h-4 text-muted-foreground hover:text-primary cursor-pointer" />
+                  </Link>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {!hasItems ? (
+                    <div className="text-center py-4 text-muted-foreground text-xs">No upcoming meetings or events</div>
+                  ) : (
+                    <>
+                      {upcomingMeetings.map((meeting) => (
+                        <div key={meeting.id} className="p-2 bg-secondary/30 rounded-lg">
+                          <div className="text-sm font-medium truncate">{meeting.title}</div>
+                          <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
+                            <Clock className="w-3 h-3" />
+                            {meeting.scheduledFor ? format(new Date(meeting.scheduledFor), 'MMM d, h:mm a') : 'TBD'}
+                          </div>
+                          {meeting.location && (
+                            <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              <span className="truncate">{meeting.location}</span>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  ))
-                )}
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="w-full text-xs text-muted-foreground hover:text-primary"
-                  onClick={() => setShowScheduleMeetingModal(true)}
-                >
-                  <Plus className="w-3 h-3 mr-1" /> Schedule Meeting
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+                      ))}
+                      {upcomingEvents.map((event) => (
+                        <div key={event.id} className="p-2 bg-primary/10 rounded-lg border border-primary/20">
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline" className="text-[8px] px-1 py-0">Event</Badge>
+                            <span className="text-sm font-medium truncate">{event.title}</span>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
+                            <Clock className="w-3 h-3" />
+                            {format(new Date(event.date), 'MMM d, h:mm a')}
+                          </div>
+                          {event.investor && (
+                            <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <Users className="w-3 h-3" />
+                              <span className="truncate">{event.investor}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="w-full text-xs text-muted-foreground hover:text-primary"
+                    onClick={() => setShowScheduleMeetingModal(true)}
+                  >
+                    <Plus className="w-3 h-3 mr-1" /> Schedule Meeting
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {/* Recent Activity Widget */}
           {widgets.find(w => w.id === 'recentActivity')?.enabled && (
@@ -1586,174 +1622,131 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Schedule Meeting Modal */}
+      {/* Schedule Meeting Modal - Simplified */}
       <Dialog open={showScheduleMeetingModal} onOpenChange={setShowScheduleMeetingModal}>
-        <DialogContent className="bg-card border-border max-w-lg">
+        <DialogContent className="bg-card border-border max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-primary" />
+              <Video className="w-5 h-5 text-primary" />
               Schedule Meeting
             </DialogTitle>
-            <DialogDescription>Schedule a meeting and notify participants via email.</DialogDescription>
+            <DialogDescription>Click a platform to create your meeting, then paste the link below.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-6 py-4">
+            {/* Platform Icons */}
+            <div className="space-y-3">
+              <Label className="text-sm text-muted-foreground">1. Create meeting on your platform</Label>
+              <div className="flex justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => openVideoApp('zoom')}
+                  className={cn(
+                    "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all hover:scale-105",
+                    newMeeting.videoPlatform === 'zoom' 
+                      ? "border-blue-500 bg-blue-500/10" 
+                      : "border-border hover:border-blue-500/50"
+                  )}
+                  data-testid="button-zoom"
+                >
+                  <div className="w-12 h-12 rounded-lg bg-blue-500 flex items-center justify-center">
+                    <Video className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-sm font-medium">Zoom</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openVideoApp('google_meet')}
+                  className={cn(
+                    "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all hover:scale-105",
+                    newMeeting.videoPlatform === 'google_meet' 
+                      ? "border-green-500 bg-green-500/10" 
+                      : "border-border hover:border-green-500/50"
+                  )}
+                  data-testid="button-meet"
+                >
+                  <div className="w-12 h-12 rounded-lg bg-green-500 flex items-center justify-center">
+                    <Video className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-sm font-medium">Google Meet</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openVideoApp('teams')}
+                  className={cn(
+                    "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all hover:scale-105",
+                    newMeeting.videoPlatform === 'teams' 
+                      ? "border-purple-500 bg-purple-500/10" 
+                      : "border-border hover:border-purple-500/50"
+                  )}
+                  data-testid="button-teams"
+                >
+                  <div className="w-12 h-12 rounded-lg bg-purple-500 flex items-center justify-center">
+                    <Video className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-sm font-medium">Teams</span>
+                </button>
+              </div>
+            </div>
+            
+            {/* Meeting Link Input */}
             <div className="space-y-2">
-              <Label>Meeting Title *</Label>
+              <Label className="text-sm text-muted-foreground">2. Paste your meeting link</Label>
               <Input 
-                placeholder="Q4 Deal Review" 
-                value={newMeeting.title}
-                onChange={(e) => setNewMeeting({ ...newMeeting, title: e.target.value })}
+                placeholder="https://zoom.us/j/... or https://meet.google.com/..."
+                value={newMeeting.videoLink}
+                onChange={(e) => setNewMeeting({ ...newMeeting, videoLink: e.target.value })}
+                className="text-sm"
+                data-testid="input-video-link"
               />
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            {/* Basic Meeting Info */}
+            <div className="space-y-4 pt-2 border-t">
               <div className="space-y-2">
-                <Label>Date *</Label>
+                <Label>Meeting Title</Label>
                 <Input 
-                  type="date" 
-                  value={newMeeting.scheduledFor}
-                  onChange={(e) => setNewMeeting({ ...newMeeting, scheduledFor: e.target.value })}
+                  placeholder="Q4 Deal Review" 
+                  value={newMeeting.title}
+                  onChange={(e) => setNewMeeting({ ...newMeeting, title: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Time *</Label>
-                <Input 
-                  type="time" 
-                  value={newMeeting.scheduledTime}
-                  onChange={(e) => setNewMeeting({ ...newMeeting, scheduledTime: e.target.value })}
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Duration (minutes)</Label>
-                <Select value={newMeeting.duration.toString()} onValueChange={(v) => setNewMeeting({ ...newMeeting, duration: parseInt(v) })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="15">15 minutes</SelectItem>
-                    <SelectItem value="30">30 minutes</SelectItem>
-                    <SelectItem value="45">45 minutes</SelectItem>
-                    <SelectItem value="60">1 hour</SelectItem>
-                    <SelectItem value="90">1.5 hours</SelectItem>
-                    <SelectItem value="120">2 hours</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Related Deal</Label>
-                <Select value={newMeeting.dealId} onValueChange={(v) => setNewMeeting({ ...newMeeting, dealId: v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select deal..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {deals.map(deal => (
-                      <SelectItem key={deal.id} value={deal.id}>{deal.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4" /> Location
-                </Label>
-                <Input 
-                  placeholder="Conference Room A" 
-                  value={newMeeting.location}
-                  onChange={(e) => setNewMeeting({ ...newMeeting, location: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Video Conference</Label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={newMeeting.videoPlatform === 'zoom' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => openVideoApp('zoom')}
-                    className="flex-1"
-                    data-testid="button-zoom"
-                  >
-                    <Video className="w-4 h-4 mr-1" />
-                    Zoom
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={newMeeting.videoPlatform === 'google_meet' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => openVideoApp('google_meet')}
-                    className="flex-1"
-                    data-testid="button-meet"
-                  >
-                    <Video className="w-4 h-4 mr-1" />
-                    Meet
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={newMeeting.videoPlatform === 'teams' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => openVideoApp('teams')}
-                    className="flex-1"
-                    data-testid="button-teams"
-                  >
-                    <Video className="w-4 h-4 mr-1" />
-                    Teams
-                  </Button>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Date</Label>
+                  <Input 
+                    type="date" 
+                    value={newMeeting.scheduledFor}
+                    onChange={(e) => setNewMeeting({ ...newMeeting, scheduledFor: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Time</Label>
+                  <Input 
+                    type="time" 
+                    value={newMeeting.scheduledTime}
+                    onChange={(e) => setNewMeeting({ ...newMeeting, scheduledTime: e.target.value })}
+                  />
                 </div>
               </div>
-            </div>
-            
-            {newMeeting.videoPlatform && (
+              
               <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <LinkIcon className="w-4 h-4" /> Meeting Link
-                </Label>
+                <Label>Invite Participants (emails, comma-separated)</Label>
                 <Input 
-                  placeholder="Paste your meeting link here..."
-                  value={newMeeting.videoLink}
-                  onChange={(e) => setNewMeeting({ ...newMeeting, videoLink: e.target.value })}
-                  data-testid="input-video-link"
+                  placeholder="john@company.com, jane@client.com"
+                  value={newMeeting.participants}
+                  onChange={(e) => setNewMeeting({ ...newMeeting, participants: e.target.value })}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Create a meeting in the app that opened, then paste the link here.
-                </p>
               </div>
-            )}
-            
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Mail className="w-4 h-4" /> Participants (email addresses)
-              </Label>
-              <Textarea 
-                placeholder="Enter email addresses separated by commas..."
-                value={newMeeting.participants}
-                onChange={(e) => setNewMeeting({ ...newMeeting, participants: e.target.value })}
-                rows={2}
-              />
-              <p className="text-xs text-muted-foreground">
-                Participants will receive email notifications about this meeting.
-              </p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Description / Agenda</Label>
-              <Textarea 
-                placeholder="Meeting agenda and discussion points..."
-                value={newMeeting.description}
-                onChange={(e) => setNewMeeting({ ...newMeeting, description: e.target.value })}
-                rows={3}
-              />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowScheduleMeetingModal(false)}>Cancel</Button>
-            <Button onClick={handleScheduleMeeting} disabled={createMeeting.isPending}>
-              {createMeeting.isPending ? "Scheduling..." : "Schedule & Send Invites"}
+            <Button 
+              onClick={handleScheduleMeeting} 
+              disabled={createMeeting.isPending || !newMeeting.title || !newMeeting.scheduledFor}
+            >
+              {createMeeting.isPending ? "Scheduling..." : "Schedule Meeting"}
             </Button>
           </DialogFooter>
         </DialogContent>

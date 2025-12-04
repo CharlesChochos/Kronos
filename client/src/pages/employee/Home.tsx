@@ -56,12 +56,12 @@ import {
   PieChartIcon,
   Activity
 } from "lucide-react";
-import { useCurrentUser, useTasks, useDeals, useMeetings, useNotifications, useUsers, useUpdateTask, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
+import { useCurrentUser, useTasks, useDeals, useMeetings, useNotifications, useUsers, useUpdateTask, useUserPreferences, useSaveUserPreferences, useCalendarEvents } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import type { UserPreferences } from "@shared/schema";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
-import { format, isToday, isTomorrow, parseISO, subDays } from "date-fns";
+import { format, isToday, isTomorrow, parseISO, subDays, startOfDay, isSameDay } from "date-fns";
 import { toast } from "sonner";
 import type { PodTeamMember, Task } from "@shared/schema";
 
@@ -72,6 +72,7 @@ export default function EmployeeHome() {
   const { data: meetings = [] } = useMeetings();
   const { data: notifications = [] } = useNotifications();
   const { data: users = [] } = useUsers();
+  const { data: calendarEvents = [] } = useCalendarEvents();
   const updateTask = useUpdateTask();
   const queryClient = useQueryClient();
   const { data: userPrefs, isLoading: prefsLoading } = useUserPreferences();
@@ -638,46 +639,81 @@ export default function EmployeeHome() {
       </Card>
   );
 
-  const renderSchedule = () => widgetSettings.showSchedule && (
-    <Card className="bg-card border-border" key="schedule">
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-primary" />
-          Today's Schedule
-        </CardTitle>
-        <CardDescription>Your meetings and events for today</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {todayMeetings.length > 0 ? (
-          <div className="space-y-3">
-            {todayMeetings.map((meeting: any) => (
-              <div 
-                key={meeting.id} 
-                className="flex items-center gap-3 p-3 bg-secondary/20 rounded-lg"
-              >
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex flex-col items-center justify-center">
-                  <span className="text-xs font-bold text-primary">
-                    {format(new Date(meeting.scheduledFor), 'HH:mm')}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{meeting.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {meeting.location || 'No location'} • {meeting.duration} min
-                  </p>
-                </div>
-              </div>
-            ))}
+  const renderSchedule = () => {
+    const today = startOfDay(new Date());
+    const todayCalendarEvents = calendarEvents.filter(e => {
+      const eventDate = startOfDay(new Date(e.date));
+      return isSameDay(eventDate, today);
+    });
+    const hasItems = todayMeetings.length > 0 || todayCalendarEvents.length > 0;
+    
+    return widgetSettings.showSchedule && (
+      <Card className="bg-card border-border" key="schedule">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary" />
+              Today's Schedule
+            </CardTitle>
+            <CardDescription>Your meetings and events for today</CardDescription>
           </div>
-        ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p>No meetings scheduled for today</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+          <Link href="/employee/event-calendar" className="hover:text-primary transition-colors">
+            <Calendar className="w-5 h-5 text-muted-foreground hover:text-primary cursor-pointer" />
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {hasItems ? (
+            <div className="space-y-3">
+              {todayMeetings.map((meeting: any) => (
+                <div 
+                  key={meeting.id} 
+                  className="flex items-center gap-3 p-3 bg-secondary/20 rounded-lg"
+                >
+                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex flex-col items-center justify-center">
+                    <span className="text-xs font-bold text-primary">
+                      {format(new Date(meeting.scheduledFor), 'HH:mm')}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{meeting.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {meeting.location || 'No location'} • {meeting.duration} min
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {todayCalendarEvents.map((event: any) => (
+                <div 
+                  key={event.id} 
+                  className="flex items-center gap-3 p-3 bg-primary/10 rounded-lg border border-primary/20"
+                >
+                  <div className="w-12 h-12 rounded-lg bg-primary/20 flex flex-col items-center justify-center">
+                    <span className="text-xs font-bold text-primary">
+                      {format(new Date(event.date), 'HH:mm')}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">Event</span>
+                      <p className="font-medium text-sm">{event.title}</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {event.investor || event.deal || 'General event'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p>No meetings or events scheduled for today</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   const renderQuickActions = () => widgetSettings.showQuickActions && (
     <Card className="bg-card border-border" key="quickActions">

@@ -148,6 +148,10 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   const saveSidebarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
     if (!sidebarInitialized) return;
+    
+    // Skip save if sidebar state hasn't changed
+    if (sidebarCollapsed === lastSavedSidebarRef.current) return;
+    
     if (saveSidebarTimeoutRef.current) {
       clearTimeout(saveSidebarTimeoutRef.current);
     }
@@ -163,9 +167,6 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
         lastSavedSidebarRef.current = sidebarCollapsed;
       } catch (error) {
         console.error('Failed to save sidebar state:', error);
-        if (isMountedRef.current) {
-          setSidebarCollapsed(lastSavedSidebarRef.current);
-        }
       }
     }, 2000);
     return () => {
@@ -173,12 +174,16 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
         clearTimeout(saveSidebarTimeoutRef.current);
       }
     };
-  }, [sidebarCollapsed, sidebarInitialized, userPrefs]);
+  }, [sidebarCollapsed, sidebarInitialized]);
   
   // Save settings to database (debounced) - merge with existing preferences
   const saveSettingsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
     if (!settingsInitialized) return;
+    
+    // Skip save if settings haven't actually changed
+    if (JSON.stringify(settings) === JSON.stringify(lastSavedSettingsRef.current)) return;
+    
     if (saveSettingsTimeoutRef.current) {
       clearTimeout(saveSettingsTimeoutRef.current);
     }
@@ -194,10 +199,6 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
         lastSavedSettingsRef.current = settings;
       } catch (error) {
         console.error('Failed to save settings:', error);
-        toast.error('Failed to save settings - reverting changes');
-        if (isMountedRef.current) {
-          setSettings(lastSavedSettingsRef.current);
-        }
       }
     }, 2000);
     return () => {
@@ -205,7 +206,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
         clearTimeout(saveSettingsTimeoutRef.current);
       }
     };
-  }, [settings, settingsInitialized, userPrefs]);
+  }, [settings, settingsInitialized]);
   
   const updateSetting = (key: string, value: boolean) => {
     setSettings((prev: any) => ({ ...prev, [key]: value }));
