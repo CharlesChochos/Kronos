@@ -1102,9 +1102,9 @@ export default function MyTasks() {
         </DialogContent>
       </Dialog>
 
-      {/* Floating Create Task Button */}
+      {/* Floating Create Task Button - positioned left of Kronos assistant */}
       <Button
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-lg z-50"
+        className="fixed bottom-6 right-24 w-14 h-14 rounded-full shadow-lg z-50 bg-primary hover:bg-primary/90"
         onClick={() => setShowCreateTaskModal(true)}
         data-testid="button-create-task-fab"
       >
