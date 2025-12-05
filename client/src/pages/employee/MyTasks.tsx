@@ -547,8 +547,18 @@ export default function MyTasks() {
                 <Sparkles className="w-5 h-5 text-primary" />
                 Today's Focus
               </CardTitle>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                {currentSwipeIndex + 1} / {swipeableTasks.length}
+              <div className="flex items-center gap-3">
+                <Button 
+                  size="sm" 
+                  onClick={() => setShowCreateTaskModal(true)}
+                  data-testid="button-create-task"
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Create Task
+                </Button>
+                <div className="text-sm text-muted-foreground">
+                  {currentSwipeIndex + 1} / {swipeableTasks.length}
+                </div>
               </div>
             </div>
             <CardDescription className="text-xs">
@@ -1102,14 +1112,6 @@ export default function MyTasks() {
         </DialogContent>
       </Dialog>
 
-      {/* Floating Create Task Button - positioned left of Kronos assistant */}
-      <Button
-        className="fixed bottom-6 right-24 w-14 h-14 rounded-full shadow-lg z-50 bg-primary hover:bg-primary/90"
-        onClick={() => setShowCreateTaskModal(true)}
-        data-testid="button-create-task-fab"
-      >
-        <Plus className="w-6 h-6" />
-      </Button>
     </Layout>
   );
 

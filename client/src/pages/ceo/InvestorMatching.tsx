@@ -110,21 +110,13 @@ export default function InvestorMatching() {
     return dealKeywords.some(dk => focusKeywords.some(fk => dk.includes(fk) || fk.includes(dk)));
   };
   
-  // First filter to remove already matched/rejected investors
-  const unprocessedInvestors = INVESTORS.filter(inv => 
+  // Filter investors: must not be matched/rejected AND must have exact sector match
+  const availableInvestors = INVESTORS.filter(inv => 
     !matchedInvestors.some(m => m.id === inv.id) && 
-    !rejectedInvestors.includes(inv.id)
+    !rejectedInvestors.includes(inv.id) &&
+    currentDeal?.sector && 
+    inv.focus.toLowerCase() === currentDeal.sector.toLowerCase()
   );
-  
-  // Then try to filter by sector - if no matches, show all remaining investors
-  const sectorMatchedInvestors = unprocessedInvestors.filter(inv => 
-    isSectorMatch(inv.focus, currentDeal?.sector)
-  );
-  
-  // Fall back to all unprocessed investors if no sector matches found
-  const availableInvestors = sectorMatchedInvestors.length > 0 
-    ? sectorMatchedInvestors 
-    : unprocessedInvestors;
     
   const currentInvestor = availableInvestors[0];
 
