@@ -70,7 +70,7 @@ Preferred communication style: Simple, everyday language.
 **Schema Design**
 - **Users table**: Authentication, roles (CEO/Associate/Director/Managing Director/Analyst), jobTitle (Junior Analyst/Analyst/Associate/Senior Associate/VP/Other), performance metrics (score, active deals, completed tasks), status (active/pending/suspended), 2FA fields (twoFactorEnabled, twoFactorSecret)
 - **Deals table**: Deal information including stage, value, client, sector, lead, progress percentage, status, and description
-- **Tasks table**: Task assignments with references to users and deals, priority levels, due dates, and status tracking
+- **Tasks table**: Task assignments with references to users and deals, priority levels, due dates, status tracking, and dealStage for per-stage organization
 - **Meetings table**: Meeting scheduling with title, date/time, attendees, location, deal association, and description
 - **Notifications table**: User notifications with type (info/success/warning/alert), title, message, read status, and link reference
 - **investor_matches table**: Stores investor match/reject decisions per user with status (matched/rejected/pending)
