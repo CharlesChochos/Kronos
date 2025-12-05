@@ -121,6 +121,7 @@ export const tasks = pgTable("tasks", {
   title: text("title").notNull(),
   description: text("description"),
   dealId: varchar("deal_id").references(() => deals.id),
+  dealStage: text("deal_stage"), // Stage this task belongs to
   assignedTo: varchar("assigned_to").references(() => users.id),
   assignedBy: varchar("assigned_by").references(() => users.id),
   priority: text("priority").notNull().default('Medium'),
@@ -895,3 +896,114 @@ export const insertClientPortalUpdateSchema = createInsertSchema(clientPortalUpd
 
 export type InsertClientPortalUpdate = z.infer<typeof insertClientPortalUpdateSchema>;
 export type ClientPortalUpdate = typeof clientPortalUpdates.$inferSelect;
+
+// Deal Fees table - tracks different fee types per deal
+export const dealFees = pgTable("deal_fees", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  feeType: text("fee_type").notNull(), // engagement, monthly, success, transaction, spread
+  amount: integer("amount"), // Fixed amount in dollars (for engagement, monthly)
+  percentage: integer("percentage"), // Percentage x100 (e.g., 250 = 2.5%) for success, transaction, spread
+  currency: text("currency").default('USD'),
+  description: text("description"),
+  billingFrequency: text("billing_frequency"), // one-time, monthly, on-close
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDealFeeSchema = createInsertSchema(dealFees).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDealFee = z.infer<typeof insertDealFeeSchema>;
+export type DealFee = typeof dealFees.$inferSelect;
+
+// Stage Documents table - documents attached to specific deal stages
+export const stageDocuments = pgTable("stage_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  stage: text("stage").notNull(), // Origination, Due Diligence, Negotiation, etc.
+  documentId: varchar("document_id").references(() => documentsTable.id),
+  title: text("title").notNull(),
+  filename: text("filename"),
+  url: text("url"),
+  mimeType: text("mime_type"),
+  size: integer("size"),
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  uploaderName: text("uploader_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStageDocumentSchema = createInsertSchema(stageDocuments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertStageDocument = z.infer<typeof insertStageDocumentSchema>;
+export type StageDocument = typeof stageDocuments.$inferSelect;
+
+// Stage Pod Members table - pod team assignments per deal stage (leader may change)
+export const stagePodMembers = pgTable("stage_pod_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  stage: text("stage").notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  userName: text("user_name").notNull(),
+  role: text("role").notNull(), // Lead, Analyst, Associate, Director, etc.
+  email: text("email"),
+  phone: text("phone"),
+  isLead: boolean("is_lead").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStagePodMemberSchema = createInsertSchema(stagePodMembers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertStagePodMember = z.infer<typeof insertStagePodMemberSchema>;
+export type StagePodMember = typeof stagePodMembers.$inferSelect;
+
+// Stage Voice Notes table - voice recordings attached to stages
+export const stageVoiceNotes = pgTable("stage_voice_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  stage: text("stage").notNull(),
+  title: text("title").notNull(),
+  filename: text("filename").notNull(),
+  url: text("url"),
+  duration: integer("duration"), // in seconds
+  transcript: text("transcript"),
+  recordedBy: varchar("recorded_by").references(() => users.id),
+  recorderName: text("recorder_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStageVoiceNoteSchema = createInsertSchema(stageVoiceNotes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertStageVoiceNote = z.infer<typeof insertStageVoiceNoteSchema>;
+export type StageVoiceNote = typeof stageVoiceNotes.$inferSelect;
+
+// Task Comments table - comments on tasks for discussion
+export const taskComments = pgTable("task_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").references(() => tasks.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  userName: text("user_name").notNull(),
+  userAvatar: text("user_avatar"),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTaskCommentSchema = createInsertSchema(taskComments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertTaskComment = z.infer<typeof insertTaskCommentSchema>;
+export type TaskComment = typeof taskComments.$inferSelect;

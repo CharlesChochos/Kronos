@@ -2,7 +2,7 @@ import { eq, and, desc, gt } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@shared/schema";
-import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess, DocumentTemplate, InsertDocumentTemplate, InvestorMatch, InsertInvestorMatch, UserPreferences, InsertUserPreferences, DealTemplate, InsertDealTemplate, CalendarEvent, InsertCalendarEvent, TaskAttachmentRecord, InsertTaskAttachmentRecord, ClientPortalInvite, InsertClientPortalInvite, ClientPortalMessage, InsertClientPortalMessage, ClientPortalUpdate, InsertClientPortalUpdate } from "@shared/schema";
+import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess, DocumentTemplate, InsertDocumentTemplate, InvestorMatch, InsertInvestorMatch, UserPreferences, InsertUserPreferences, DealTemplate, InsertDealTemplate, CalendarEvent, InsertCalendarEvent, TaskAttachmentRecord, InsertTaskAttachmentRecord, ClientPortalInvite, InsertClientPortalInvite, ClientPortalMessage, InsertClientPortalMessage, ClientPortalUpdate, InsertClientPortalUpdate, DealFee, InsertDealFee, StageDocument, InsertStageDocument, StagePodMember, InsertStagePodMember, StageVoiceNote, InsertStageVoiceNote, TaskComment, InsertTaskComment } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -245,6 +245,38 @@ export interface IStorage {
   getExternalUsers(): Promise<User[]>;
   createExternalUser(user: InsertUser & { isExternal: boolean; externalOrganization?: string; invitedBy?: string }): Promise<User>;
   getExternalUserDeals(userId: string): Promise<Deal[]>;
+  
+  // Deal Fee operations
+  getDealFees(dealId: string): Promise<DealFee[]>;
+  createDealFee(fee: InsertDealFee): Promise<DealFee>;
+  updateDealFee(id: string, updates: Partial<InsertDealFee>): Promise<DealFee | undefined>;
+  deleteDealFee(id: string): Promise<void>;
+  getAllDealFees(): Promise<DealFee[]>;
+  
+  // Stage Document operations
+  getStageDocuments(dealId: string, stage?: string): Promise<StageDocument[]>;
+  createStageDocument(doc: InsertStageDocument): Promise<StageDocument>;
+  deleteStageDocument(id: string): Promise<void>;
+  
+  // Stage Pod Member operations
+  getStagePodMembers(dealId: string, stage?: string): Promise<StagePodMember[]>;
+  createStagePodMember(member: InsertStagePodMember): Promise<StagePodMember>;
+  updateStagePodMember(id: string, updates: Partial<InsertStagePodMember>): Promise<StagePodMember | undefined>;
+  deleteStagePodMember(id: string): Promise<void>;
+  
+  // Stage Voice Note operations
+  getStageVoiceNotes(dealId: string, stage?: string): Promise<StageVoiceNote[]>;
+  createStageVoiceNote(note: InsertStageVoiceNote): Promise<StageVoiceNote>;
+  deleteStageVoiceNote(id: string): Promise<void>;
+  
+  // Task Comment operations
+  getTaskComments(taskId: string): Promise<TaskComment[]>;
+  createTaskComment(comment: InsertTaskComment): Promise<TaskComment>;
+  updateTaskComment(id: string, content: string): Promise<TaskComment | undefined>;
+  deleteTaskComment(id: string): Promise<void>;
+  
+  // User search for autocomplete
+  searchUsers(query: string): Promise<User[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1304,6 +1336,150 @@ export class DatabaseStorage implements IStorage {
     }
     
     return deals;
+  }
+  
+  // Deal Fee operations
+  async getDealFees(dealId: string): Promise<DealFee[]> {
+    return await db.select().from(schema.dealFees)
+      .where(eq(schema.dealFees.dealId, dealId))
+      .orderBy(schema.dealFees.createdAt);
+  }
+  
+  async createDealFee(fee: InsertDealFee): Promise<DealFee> {
+    const [created] = await db.insert(schema.dealFees).values(fee).returning();
+    return created;
+  }
+  
+  async updateDealFee(id: string, updates: Partial<InsertDealFee>): Promise<DealFee | undefined> {
+    const [updated] = await db.update(schema.dealFees)
+      .set(updates)
+      .where(eq(schema.dealFees.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteDealFee(id: string): Promise<void> {
+    await db.delete(schema.dealFees).where(eq(schema.dealFees.id, id));
+  }
+  
+  async getAllDealFees(): Promise<DealFee[]> {
+    return await db.select().from(schema.dealFees).orderBy(desc(schema.dealFees.createdAt));
+  }
+  
+  // Stage Document operations
+  async getStageDocuments(dealId: string, stage?: string): Promise<StageDocument[]> {
+    if (stage) {
+      return await db.select().from(schema.stageDocuments)
+        .where(and(
+          eq(schema.stageDocuments.dealId, dealId),
+          eq(schema.stageDocuments.stage, stage)
+        ))
+        .orderBy(desc(schema.stageDocuments.createdAt));
+    }
+    return await db.select().from(schema.stageDocuments)
+      .where(eq(schema.stageDocuments.dealId, dealId))
+      .orderBy(desc(schema.stageDocuments.createdAt));
+  }
+  
+  async createStageDocument(doc: InsertStageDocument): Promise<StageDocument> {
+    const [created] = await db.insert(schema.stageDocuments).values(doc).returning();
+    return created;
+  }
+  
+  async deleteStageDocument(id: string): Promise<void> {
+    await db.delete(schema.stageDocuments).where(eq(schema.stageDocuments.id, id));
+  }
+  
+  // Stage Pod Member operations
+  async getStagePodMembers(dealId: string, stage?: string): Promise<StagePodMember[]> {
+    if (stage) {
+      return await db.select().from(schema.stagePodMembers)
+        .where(and(
+          eq(schema.stagePodMembers.dealId, dealId),
+          eq(schema.stagePodMembers.stage, stage)
+        ))
+        .orderBy(schema.stagePodMembers.createdAt);
+    }
+    return await db.select().from(schema.stagePodMembers)
+      .where(eq(schema.stagePodMembers.dealId, dealId))
+      .orderBy(schema.stagePodMembers.createdAt);
+  }
+  
+  async createStagePodMember(member: InsertStagePodMember): Promise<StagePodMember> {
+    const [created] = await db.insert(schema.stagePodMembers).values(member).returning();
+    return created;
+  }
+  
+  async updateStagePodMember(id: string, updates: Partial<InsertStagePodMember>): Promise<StagePodMember | undefined> {
+    const [updated] = await db.update(schema.stagePodMembers)
+      .set(updates)
+      .where(eq(schema.stagePodMembers.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteStagePodMember(id: string): Promise<void> {
+    await db.delete(schema.stagePodMembers).where(eq(schema.stagePodMembers.id, id));
+  }
+  
+  // Stage Voice Note operations
+  async getStageVoiceNotes(dealId: string, stage?: string): Promise<StageVoiceNote[]> {
+    if (stage) {
+      return await db.select().from(schema.stageVoiceNotes)
+        .where(and(
+          eq(schema.stageVoiceNotes.dealId, dealId),
+          eq(schema.stageVoiceNotes.stage, stage)
+        ))
+        .orderBy(desc(schema.stageVoiceNotes.createdAt));
+    }
+    return await db.select().from(schema.stageVoiceNotes)
+      .where(eq(schema.stageVoiceNotes.dealId, dealId))
+      .orderBy(desc(schema.stageVoiceNotes.createdAt));
+  }
+  
+  async createStageVoiceNote(note: InsertStageVoiceNote): Promise<StageVoiceNote> {
+    const [created] = await db.insert(schema.stageVoiceNotes).values(note).returning();
+    return created;
+  }
+  
+  async deleteStageVoiceNote(id: string): Promise<void> {
+    await db.delete(schema.stageVoiceNotes).where(eq(schema.stageVoiceNotes.id, id));
+  }
+  
+  // Task Comment operations
+  async getTaskComments(taskId: string): Promise<TaskComment[]> {
+    return await db.select().from(schema.taskComments)
+      .where(eq(schema.taskComments.taskId, taskId))
+      .orderBy(schema.taskComments.createdAt);
+  }
+  
+  async createTaskComment(comment: InsertTaskComment): Promise<TaskComment> {
+    const [created] = await db.insert(schema.taskComments).values(comment).returning();
+    return created;
+  }
+  
+  async updateTaskComment(id: string, content: string): Promise<TaskComment | undefined> {
+    const [updated] = await db.update(schema.taskComments)
+      .set({ content, updatedAt: new Date() })
+      .where(eq(schema.taskComments.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteTaskComment(id: string): Promise<void> {
+    await db.delete(schema.taskComments).where(eq(schema.taskComments.id, id));
+  }
+  
+  // User search for autocomplete
+  async searchUsers(query: string): Promise<User[]> {
+    const allUsers = await db.select().from(schema.users)
+      .where(eq(schema.users.status, 'active'));
+    
+    const lowerQuery = query.toLowerCase();
+    return allUsers.filter(user => 
+      user.name.toLowerCase().includes(lowerQuery) ||
+      user.email.toLowerCase().includes(lowerQuery)
+    );
   }
 }
 
