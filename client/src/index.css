@@ -234,3 +234,93 @@
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
+
+/* Compact view mode - reduces spacing throughout the app */
+:root {
+  --spacing-multiplier: 1;
+}
+
+.compact-view {
+  --spacing-multiplier: 0.7;
+  font-size: 0.95em;
+}
+
+/* Apply compact spacing to common container classes */
+.compact-view [class*="p-4"],
+.compact-view [class*="p-6"],
+.compact-view [class*="p-8"] {
+  padding: calc(var(--spacing-multiplier) * 1rem) !important;
+}
+
+.compact-view [class*="py-4"],
+.compact-view [class*="py-6"] {
+  padding-top: calc(var(--spacing-multiplier) * 0.75rem) !important;
+  padding-bottom: calc(var(--spacing-multiplier) * 0.75rem) !important;
+}
+
+.compact-view [class*="px-4"],
+.compact-view [class*="px-6"] {
+  padding-left: calc(var(--spacing-multiplier) * 1rem) !important;
+  padding-right: calc(var(--spacing-multiplier) * 1rem) !important;
+}
+
+/* Reduce gaps in flex and grid containers */
+.compact-view [class*="gap-4"],
+.compact-view [class*="gap-6"],
+.compact-view [class*="gap-8"] {
+  gap: calc(var(--spacing-multiplier) * 0.75rem) !important;
+}
+
+/* Reduce space between stacked elements */
+.compact-view [class*="space-y-4"] > * + *,
+.compact-view [class*="space-y-6"] > * + *,
+.compact-view [class*="space-y-8"] > * + * {
+  margin-top: calc(var(--spacing-multiplier) * 0.75rem) !important;
+}
+
+/* Reduce card padding */
+.compact-view [class*="CardContent"] {
+  padding: calc(var(--spacing-multiplier) * 0.75rem) !important;
+}
+
+/* Reduce text sizes slightly */
+.compact-view .text-2xl {
+  font-size: 1.25rem !important;
+}
+
+.compact-view .text-xl {
+  font-size: 1rem !important;
+}
+
+.compact-view .text-lg {
+  font-size: 0.95rem !important;
+}
+
+/* Reduce button and input heights */
+.compact-view button,
+.compact-view input,
+.compact-view select,
+.compact-view textarea {
+  min-height: auto;
+}
+
+.compact-view [class*="h-10"],
+.compact-view [class*="h-12"] {
+  height: auto !important;
+  min-height: 2rem !important;
+}
+
+/* No animations mode - disables all transitions and animations */
+.no-animations,
+.no-animations * {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
+
+.no-animations .animate-spin,
+.no-animations .animate-pulse,
+.no-animations .animate-bounce {
+  animation: none !important;
+}

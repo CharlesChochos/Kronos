@@ -71,12 +71,51 @@ export default function InvestorMatching() {
     }
   }, [deals]);
 
+  const currentDeal = deals.find(d => d.id === selectedDeal);
+  
+  const SECTOR_KEYWORDS: Record<string, string[]> = {
+    'technology': ['technology', 'tech', 'software', 'digital', 'ai', 'saas', 'cloud', 'cyber', 'it'],
+    'healthcare': ['healthcare', 'health', 'medical', 'biotech', 'pharma', 'life sciences', 'hospital'],
+    'industrials': ['industrials', 'industrial', 'manufacturing', 'infrastructure', 'construction', 'materials'],
+    'consumer': ['consumer', 'retail', 'e-commerce', 'cpg', 'consumer goods', 'food', 'beverage', 'apparel'],
+    'financial': ['financial', 'finance', 'fintech', 'banking', 'insurance', 'payments', 'wealth'],
+    'real estate': ['real estate', 'property', 'reit', 'hospitality', 'housing'],
+    'energy': ['energy', 'oil', 'gas', 'renewables', 'utilities', 'power', 'clean energy', 'solar'],
+    'media': ['media', 'entertainment', 'digital media', 'gaming', 'streaming', 'content', 'advertising'],
+    'diversified': ['diversified', 'multi-sector', 'generalist'],
+  };
+  
+  const normalizeSector = (sector: string): string => {
+    return sector.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+  };
+  
+  const getSectorKeywords = (sector: string): string[] => {
+    const normalized = normalizeSector(sector);
+    for (const [key, keywords] of Object.entries(SECTOR_KEYWORDS)) {
+      if (normalized.includes(key) || keywords.some(kw => normalized.includes(kw))) {
+        return keywords;
+      }
+    }
+    return [normalized, 'diversified'];
+  };
+  
+  const isSectorMatch = (investorFocus: string, dealSector: string | undefined) => {
+    if (!dealSector) return true;
+    const normalizedFocus = normalizeSector(investorFocus);
+    if (normalizedFocus.includes('diversified')) return true;
+    
+    const dealKeywords = getSectorKeywords(dealSector);
+    const focusKeywords = getSectorKeywords(investorFocus);
+    
+    return dealKeywords.some(dk => focusKeywords.some(fk => dk.includes(fk) || fk.includes(dk)));
+  };
+  
   const availableInvestors = INVESTORS.filter(inv => 
     !matchedInvestors.some(m => m.id === inv.id) && 
-    !rejectedInvestors.includes(inv.id)
+    !rejectedInvestors.includes(inv.id) &&
+    isSectorMatch(inv.focus, currentDeal?.sector)
   );
   const currentInvestor = availableInvestors[0];
-  const currentDeal = deals.find(d => d.id === selectedDeal);
 
   const addInvestorToTaggedList = async (investor: typeof INVESTORS[0]) => {
     if (!selectedDeal) return;

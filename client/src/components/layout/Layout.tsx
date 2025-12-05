@@ -213,6 +213,34 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     toast.success(`Setting updated`);
   };
   
+  // Apply display settings to the document
+  useEffect(() => {
+    const root = document.documentElement;
+    
+    // Dark mode - toggle the dark class on html element
+    if (settings.darkMode) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    
+    // Compact view - add/remove compact class
+    if (settings.compactView) {
+      root.classList.add('compact-view');
+      root.style.setProperty('--compact-spacing', '0.5');
+    } else {
+      root.classList.remove('compact-view');
+      root.style.removeProperty('--compact-spacing');
+    }
+    
+    // Animations - disable/enable animations
+    if (settings.animations) {
+      root.classList.remove('no-animations');
+    } else {
+      root.classList.add('no-animations');
+    }
+  }, [settings.darkMode, settings.compactView, settings.animations]);
+  
   // Photo upload ref
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -888,16 +916,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                         ref={photoInputRef}
                         accept="image/*"
                         className="hidden"
-                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setIsUploadingPhoto(true);
-                            setTimeout(() => {
-                              setIsUploadingPhoto(false);
-                              toast.success("Photo updated!");
-                            }, 1500);
-                          }
-                        }}
+                        onChange={handlePhotoUpload}
                       />
                       <Button
                         size="sm"

@@ -34,9 +34,10 @@ import {
   X,
   Loader2,
   Brain,
-  Flag
+  Flag,
+  Plus
 } from "lucide-react";
-import { useCurrentUser, useTasks, useDeals, useUpdateTask, useUsers, apiRequest, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
+import { useCurrentUser, useTasks, useDeals, useUpdateTask, useCreateTask, useUsers, apiRequest, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import type { UserPreferences } from "@shared/schema";
 import { cn } from "@/lib/utils";
@@ -54,11 +55,21 @@ export default function MyTasks() {
   const { data: deals = [] } = useDeals();
   const { data: users = [] } = useUsers();
   const updateTask = useUpdateTask();
+  const createTask = useCreateTask();
   const queryClient = useQueryClient();
   const { data: userPrefs, isLoading: prefsLoading } = useUserPreferences();
   const saveUserPrefs = useSaveUserPreferences();
   
   const [searchQuery, setSearchQuery] = useState("");
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
+  const [newTaskForm, setNewTaskForm] = useState({
+    title: '',
+    description: '',
+    priority: 'Medium' as 'Low' | 'Medium' | 'High' | 'Urgent',
+    dueDate: '',
+    dealId: '',
+    type: 'General' as 'General' | 'Document Review' | 'Due Diligence' | 'Client Communication' | 'Financial Analysis' | 'Legal' | 'Compliance'
+  });
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
   const [currentSwipeIndex, setCurrentSwipeIndex] = useState(0);
@@ -348,6 +359,48 @@ export default function MyTasks() {
       }
     } else {
       setLocation(`/employee/deals?id=${id}`);
+    }
+  };
+
+  const handleCreateTask = async () => {
+    if (!newTaskForm.title.trim()) {
+      toast.error("Please enter a task title");
+      return;
+    }
+    
+    try {
+      const taskData: any = {
+        title: newTaskForm.title.trim(),
+        description: newTaskForm.description.trim() || null,
+        priority: newTaskForm.priority,
+        status: 'Pending',
+        type: newTaskForm.type,
+        assignedTo: currentUser?.id || '',
+      };
+      if (newTaskForm.dueDate) {
+        taskData.dueDate = newTaskForm.dueDate;
+      }
+      if (newTaskForm.dealId) {
+        taskData.dealId = newTaskForm.dealId;
+        const selectedDeal = deals.find(d => d.id === newTaskForm.dealId);
+        if (selectedDeal) {
+          taskData.dealStage = selectedDeal.stage;
+        }
+      }
+      await createTask.mutateAsync(taskData);
+      
+      toast.success("Task created successfully!");
+      setShowCreateTaskModal(false);
+      setNewTaskForm({
+        title: '',
+        description: '',
+        priority: 'Medium',
+        dueDate: '',
+        dealId: '',
+        type: 'General'
+      });
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create task");
     }
   };
 
@@ -919,6 +972,144 @@ export default function MyTasks() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Create Task Dialog */}
+      <Dialog open={showCreateTaskModal} onOpenChange={setShowCreateTaskModal}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-primary" />
+              Create New Task
+            </DialogTitle>
+            <DialogDescription>
+              Add a new task to your to-do list
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Task Title *</Label>
+              <Input
+                placeholder="Enter task title..."
+                value={newTaskForm.title}
+                onChange={(e) => setNewTaskForm({ ...newTaskForm, title: e.target.value })}
+                data-testid="input-new-task-title"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Add details about this task..."
+                value={newTaskForm.description}
+                onChange={(e) => setNewTaskForm({ ...newTaskForm, description: e.target.value })}
+                rows={3}
+                className="resize-none"
+                data-testid="textarea-new-task-description"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Select 
+                  value={newTaskForm.priority} 
+                  onValueChange={(value: 'Low' | 'Medium' | 'High' | 'Urgent') => setNewTaskForm({ ...newTaskForm, priority: value })}
+                >
+                  <SelectTrigger data-testid="select-new-task-priority">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Low">Low</SelectItem>
+                    <SelectItem value="Medium">Medium</SelectItem>
+                    <SelectItem value="High">High</SelectItem>
+                    <SelectItem value="Urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select 
+                  value={newTaskForm.type} 
+                  onValueChange={(value: typeof newTaskForm.type) => setNewTaskForm({ ...newTaskForm, type: value })}
+                >
+                  <SelectTrigger data-testid="select-new-task-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="General">General</SelectItem>
+                    <SelectItem value="Document Review">Document Review</SelectItem>
+                    <SelectItem value="Due Diligence">Due Diligence</SelectItem>
+                    <SelectItem value="Client Communication">Client Communication</SelectItem>
+                    <SelectItem value="Financial Analysis">Financial Analysis</SelectItem>
+                    <SelectItem value="Legal">Legal</SelectItem>
+                    <SelectItem value="Compliance">Compliance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Due Date</Label>
+              <Input
+                type="date"
+                value={newTaskForm.dueDate}
+                onChange={(e) => setNewTaskForm({ ...newTaskForm, dueDate: e.target.value })}
+                data-testid="input-new-task-due-date"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Related Deal (Optional)</Label>
+              <Select 
+                value={newTaskForm.dealId} 
+                onValueChange={(value) => setNewTaskForm({ ...newTaskForm, dealId: value })}
+              >
+                <SelectTrigger data-testid="select-new-task-deal">
+                  <SelectValue placeholder="Select a deal..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No deal</SelectItem>
+                  {deals.map(deal => (
+                    <SelectItem key={deal.id} value={deal.id}>{deal.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateTaskModal(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateTask} 
+              disabled={createTask.isPending}
+              data-testid="button-create-task-submit"
+            >
+              {createTask.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Task
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Floating Create Task Button */}
+      <Button
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-lg z-50"
+        onClick={() => setShowCreateTaskModal(true)}
+        data-testid="button-create-task-fab"
+      >
+        <Plus className="w-6 h-6" />
+      </Button>
     </Layout>
   );
 
