@@ -73,50 +73,22 @@ export default function InvestorMatching() {
 
   const currentDeal = deals.find(d => d.id === selectedDeal);
   
-  const SECTOR_KEYWORDS: Record<string, string[]> = {
-    'technology': ['technology', 'tech', 'software', 'digital', 'ai', 'saas', 'cloud', 'cyber', 'it'],
-    'healthcare': ['healthcare', 'health', 'medical', 'biotech', 'pharma', 'life sciences', 'hospital'],
-    'industrials': ['industrials', 'industrial', 'manufacturing', 'infrastructure', 'construction', 'materials'],
-    'consumer': ['consumer', 'retail', 'e-commerce', 'cpg', 'consumer goods', 'food', 'beverage', 'apparel'],
-    'financial': ['financial', 'finance', 'fintech', 'banking', 'insurance', 'payments', 'wealth'],
-    'real estate': ['real estate', 'property', 'reit', 'hospitality', 'housing'],
-    'energy': ['energy', 'oil', 'gas', 'renewables', 'utilities', 'power', 'clean energy', 'solar'],
-    'media': ['media', 'entertainment', 'digital media', 'gaming', 'streaming', 'content', 'advertising'],
-    'diversified': ['diversified', 'multi-sector', 'generalist'],
-  };
-  
-  const normalizeSector = (sector: string): string => {
-    return sector.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
-  };
-  
-  const getSectorKeywords = (sector: string): string[] => {
-    const normalized = normalizeSector(sector);
-    for (const [key, keywords] of Object.entries(SECTOR_KEYWORDS)) {
-      if (normalized.includes(key) || keywords.some(kw => normalized.includes(kw))) {
-        return keywords;
-      }
-    }
-    return [normalized, 'diversified'];
-  };
-  
-  const isSectorMatch = (investorFocus: string, dealSector: string | undefined) => {
-    if (!dealSector) return true;
-    const normalizedFocus = normalizeSector(investorFocus);
-    if (normalizedFocus.includes('diversified')) return true;
-    
-    const dealKeywords = getSectorKeywords(dealSector);
-    const focusKeywords = getSectorKeywords(investorFocus);
-    
-    return dealKeywords.some(dk => focusKeywords.some(fk => dk.includes(fk) || fk.includes(dk)));
-  };
+  // Get deal sector for exact matching
+  const dealSector = currentDeal?.sector?.toLowerCase().trim() || '';
   
   // Filter investors: must not be matched/rejected AND must have exact sector match
-  const availableInvestors = INVESTORS.filter(inv => 
-    !matchedInvestors.some(m => m.id === inv.id) && 
-    !rejectedInvestors.includes(inv.id) &&
-    currentDeal?.sector && 
-    inv.focus.toLowerCase() === currentDeal.sector.toLowerCase()
-  );
+  const availableInvestors = useMemo(() => {
+    if (!dealSector) return [];
+    
+    return INVESTORS.filter(inv => {
+      const investorFocus = inv.focus.toLowerCase().trim();
+      const isNotMatched = !matchedInvestors.some(m => m.id === inv.id);
+      const isNotRejected = !rejectedInvestors.includes(inv.id);
+      const sectorMatches = investorFocus === dealSector;
+      
+      return isNotMatched && isNotRejected && sectorMatches;
+    });
+  }, [dealSector, matchedInvestors, rejectedInvestors]);
     
   const currentInvestor = availableInvestors[0];
 
@@ -409,7 +381,7 @@ export default function InvestorMatching() {
             ) : (
               <Card className="w-full max-w-lg p-12 text-center">
                 {/* Check if there are ANY investors with matching sector (before filtering by matched/rejected) */}
-                {currentDeal?.sector && INVESTORS.some(inv => inv.focus.toLowerCase() === currentDeal.sector.toLowerCase()) ? (
+                {dealSector && INVESTORS.some(inv => inv.focus.toLowerCase().trim() === dealSector) ? (
                   <>
                     <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
                       <Check className="w-8 h-8 text-green-500" />

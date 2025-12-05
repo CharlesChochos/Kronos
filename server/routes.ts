@@ -1069,8 +1069,8 @@ export async function registerRoutes(
     }
   });
 
-  // Create task (CEO only)
-  app.post("/api/tasks", generalLimiter, requireCEO, async (req, res) => {
+  // Create task (any authenticated user)
+  app.post("/api/tasks", generalLimiter, requireAuth, async (req, res) => {
     try {
       const result = insertTaskSchema.safeParse(req.body);
       if (!result.success) {
