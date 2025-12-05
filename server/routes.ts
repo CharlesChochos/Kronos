@@ -799,6 +799,245 @@ export async function registerRoutes(
     }
   });
 
+  // ===== DEAL FEES ROUTES =====
+  
+  app.get("/api/deals/:dealId/fees", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const fees = await storage.getDealFees(req.params.dealId);
+      res.json(fees);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch deal fees" });
+    }
+  });
+
+  app.get("/api/deal-fees", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const fees = await storage.getAllDealFees();
+      res.json(fees);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch all deal fees" });
+    }
+  });
+
+  app.post("/api/deals/:dealId/fees", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const fee = await storage.createDealFee({
+        ...req.body,
+        dealId: req.params.dealId,
+      });
+      res.json(fee);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create deal fee" });
+    }
+  });
+
+  app.patch("/api/deal-fees/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const fee = await storage.updateDealFee(req.params.id, req.body);
+      if (!fee) {
+        return res.status(404).json({ error: "Fee not found" });
+      }
+      res.json(fee);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update deal fee" });
+    }
+  });
+
+  app.delete("/api/deal-fees/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      await storage.deleteDealFee(req.params.id);
+      res.json({ message: "Fee deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete deal fee" });
+    }
+  });
+
+  // ===== STAGE-BASED ROUTES =====
+
+  // Stage Documents
+  app.get("/api/deals/:dealId/stage-documents", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const { stage } = req.query;
+      const docs = await storage.getStageDocuments(req.params.dealId, stage as string | undefined);
+      res.json(docs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch stage documents" });
+    }
+  });
+
+  app.post("/api/deals/:dealId/stage-documents", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const doc = await storage.createStageDocument({
+        ...req.body,
+        dealId: req.params.dealId,
+        uploadedBy: user.id,
+        uploaderName: user.name,
+      });
+      res.json(doc);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create stage document" });
+    }
+  });
+
+  app.delete("/api/stage-documents/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      await storage.deleteStageDocument(req.params.id);
+      res.json({ message: "Document deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete stage document" });
+    }
+  });
+
+  // Stage Pod Members
+  app.get("/api/deals/:dealId/stage-pod-members", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const { stage } = req.query;
+      const members = await storage.getStagePodMembers(req.params.dealId, stage as string | undefined);
+      res.json(members);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch stage pod members" });
+    }
+  });
+
+  app.post("/api/deals/:dealId/stage-pod-members", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const member = await storage.createStagePodMember({
+        ...req.body,
+        dealId: req.params.dealId,
+      });
+      res.json(member);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to add stage pod member" });
+    }
+  });
+
+  app.patch("/api/stage-pod-members/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const member = await storage.updateStagePodMember(req.params.id, req.body);
+      if (!member) {
+        return res.status(404).json({ error: "Pod member not found" });
+      }
+      res.json(member);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update stage pod member" });
+    }
+  });
+
+  app.delete("/api/stage-pod-members/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      await storage.deleteStagePodMember(req.params.id);
+      res.json({ message: "Pod member removed successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove stage pod member" });
+    }
+  });
+
+  // Stage Voice Notes
+  app.get("/api/deals/:dealId/stage-voice-notes", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const { stage } = req.query;
+      const notes = await storage.getStageVoiceNotes(req.params.dealId, stage as string | undefined);
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch stage voice notes" });
+    }
+  });
+
+  app.post("/api/deals/:dealId/stage-voice-notes", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const note = await storage.createStageVoiceNote({
+        ...req.body,
+        dealId: req.params.dealId,
+        recordedBy: user.id,
+        recorderName: user.name,
+      });
+      res.json(note);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create stage voice note" });
+    }
+  });
+
+  app.delete("/api/stage-voice-notes/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      await storage.deleteStageVoiceNote(req.params.id);
+      res.json({ message: "Voice note deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete stage voice note" });
+    }
+  });
+
+  // ===== TASK COMMENTS ROUTES =====
+
+  app.get("/api/tasks/:taskId/comments", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const comments = await storage.getTaskComments(req.params.taskId);
+      res.json(comments);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch task comments" });
+    }
+  });
+
+  app.post("/api/tasks/:taskId/comments", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const comment = await storage.createTaskComment({
+        taskId: req.params.taskId,
+        userId: user.id,
+        userName: user.name,
+        userAvatar: user.avatar,
+        content: req.body.content,
+      });
+      res.json(comment);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create task comment" });
+    }
+  });
+
+  app.patch("/api/task-comments/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const comment = await storage.updateTaskComment(req.params.id, req.body.content);
+      if (!comment) {
+        return res.status(404).json({ error: "Comment not found" });
+      }
+      res.json(comment);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update task comment" });
+    }
+  });
+
+  app.delete("/api/task-comments/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      await storage.deleteTaskComment(req.params.id);
+      res.json({ message: "Comment deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete task comment" });
+    }
+  });
+
+  // ===== USER SEARCH ROUTE (for autocomplete) =====
+
+  app.get("/api/users/search", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q || typeof q !== 'string') {
+        return res.json([]);
+      }
+      const users = await storage.searchUsers(q);
+      res.json(users.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        phone: u.phone,
+        role: u.role,
+        avatar: u.avatar,
+      })));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to search users" });
+    }
+  });
+
   // ===== TASK ROUTES =====
   
   app.get("/api/tasks", requireAuth, requireInternal, async (req, res) => {

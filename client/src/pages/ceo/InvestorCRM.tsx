@@ -8,6 +8,17 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -160,10 +171,6 @@ export default function InvestorCRM() {
 
   const handleDeleteInvestor = async () => {
     if (!selectedInvestorId) return;
-    
-    if (!confirm('Are you sure you want to delete this investor? This action cannot be undone.')) {
-      return;
-    }
     
     try {
       await deleteInvestor.mutateAsync(selectedInvestorId);
@@ -364,16 +371,33 @@ export default function InvestorCRM() {
                         <Plus className="w-4 h-4 mr-1" />
                         Log Interaction
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={handleDeleteInvestor}
-                        disabled={deleteInvestor.isPending}
-                        className="border-red-500/30 text-red-400 hover:bg-red-500/10"
-                        data-testid="button-delete-investor"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            disabled={deleteInvestor.isPending}
+                            className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                            data-testid="button-delete-investor"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action cannot be undone. This will permanently delete {selectedInvestor.name} from {selectedInvestor.firm} and all their interaction history.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDeleteInvestor}>
+                              Delete Investor
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
                 </CardHeader>

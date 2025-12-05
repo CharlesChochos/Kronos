@@ -79,7 +79,7 @@ import {
   Video,
   Link as LinkIcon
 } from "lucide-react";
-import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews, useUserPreferences, useSaveUserPreferences, useCalendarEvents } from "@/lib/api";
+import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews, useUserPreferences, useSaveUserPreferences, useCalendarEvents, useAllDealFees } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, subDays, startOfDay, isAfter, isSameDay } from "date-fns";
@@ -96,6 +96,8 @@ type WidgetConfig = {
 const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'quickActions', name: 'Quick Actions', enabled: true },
   { id: 'activeDeals', name: 'Active Deals Analytics', enabled: true },
+  { id: 'capitalAtWork', name: 'Capital At Work', enabled: true },
+  { id: 'feeSummary', name: 'Fee Summary', enabled: true },
   { id: 'marketPulse', name: 'Market Pulse', enabled: true },
   { id: 'marketIntelligence', name: 'Market Intelligence', enabled: true },
   { id: 'teamTaskProgress', name: 'Team Task Progress', enabled: true },
@@ -113,6 +115,7 @@ export default function Dashboard() {
   const { data: tasks = [], isLoading: tasksLoading } = useTasks();
   const { data: notifications = [] } = useNotifications();
   const { data: meetings = [] } = useMeetings();
+  const { data: allDealFees = [] } = useAllDealFees();
   const { data: calendarEvents = [] } = useCalendarEvents();
   const createDeal = useCreateDeal();
   const createMeeting = useCreateMeeting();
@@ -1073,6 +1076,104 @@ export default function Dashboard() {
                 </div>
               </CardContent>
               </Card>
+          )}
+
+          {widgets.find(w => w.id === 'capitalAtWork')?.enabled && (
+            <Card className="bg-card border-border overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Capital At Work</CardTitle>
+                <DollarSign className="w-4 h-4 text-primary" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-center py-4">
+                  <div className="text-4xl font-bold text-primary">
+                    ${activeDeals.reduce((sum, d) => sum + (d.value || 0), 0).toLocaleString()}M
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">Total Active Deal Value</div>
+                </div>
+                <Separator className="bg-border/50" />
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <div className="text-lg font-semibold text-green-400">
+                      {deals.filter(d => d.status === 'Active').length}
+                    </div>
+                    <div className="text-[9px] text-muted-foreground uppercase">Active</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-semibold text-yellow-400">
+                      {deals.filter(d => d.status === 'On Hold').length}
+                    </div>
+                    <div className="text-[9px] text-muted-foreground uppercase">On Hold</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-semibold text-muted-foreground">
+                      {deals.filter(d => d.status === 'Closed').length}
+                    </div>
+                    <div className="text-[9px] text-muted-foreground uppercase">Closed</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {widgets.find(w => w.id === 'feeSummary')?.enabled && (
+            <Card className="bg-card border-border overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Fee Summary</CardTitle>
+                <Briefcase className="w-4 h-4 text-primary" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {(() => {
+                  const feesByType = allDealFees.reduce((acc, fee) => {
+                    const type = fee.feeType || 'other';
+                    if (!acc[type]) acc[type] = { total: 0, count: 0 };
+                    if (fee.amount) {
+                      acc[type].total += fee.amount;
+                      acc[type].count++;
+                    }
+                    return acc;
+                  }, {} as Record<string, { total: number; count: number }>);
+                  
+                  const feeLabels: Record<string, string> = {
+                    engagement: 'Engagement Fees',
+                    monthly: 'Monthly Retainers',
+                    success: 'Success Fees',
+                    transaction: 'Transaction Fees',
+                    spread: 'Spreads'
+                  };
+                  
+                  const totalFees = Object.values(feesByType).reduce((sum, f) => sum + f.total, 0);
+                  
+                  return (
+                    <>
+                      <div className="text-center py-2">
+                        <div className="text-2xl font-bold text-green-400">
+                          ${totalFees.toLocaleString()}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Total Fixed Fees</div>
+                      </div>
+                      <Separator className="bg-border/50" />
+                      <div className="space-y-2">
+                        {Object.entries(feesByType).map(([type, data]) => (
+                          <div key={type} className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground truncate">{feeLabels[type] || type}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-[9px] px-1">{data.count}</Badge>
+                              <span className="font-mono text-green-400">${data.total.toLocaleString()}</span>
+                            </div>
+                          </div>
+                        ))}
+                        {Object.keys(feesByType).length === 0 && (
+                          <div className="text-center text-xs text-muted-foreground py-4">
+                            No fees configured yet
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
+              </CardContent>
+            </Card>
           )}
           
           {widgets.find(w => w.id === 'marketPulse')?.enabled && (

@@ -2031,3 +2031,399 @@ export function useExternalUsers() {
     },
   });
 }
+
+// ===== DEAL FEES HOOKS =====
+
+export type DealFeeType = {
+  id: string;
+  dealId: string;
+  feeType: string;
+  amount: number | null;
+  percentage: number | null;
+  currency: string | null;
+  description: string | null;
+  billingFrequency: string | null;
+  createdAt: string;
+};
+
+export function useDealFees(dealId: string) {
+  return useQuery({
+    queryKey: ["deal-fees", dealId],
+    queryFn: async () => {
+      const res = await fetch(`/api/deals/${dealId}/fees`);
+      if (!res.ok) throw new Error("Failed to fetch deal fees");
+      return res.json() as Promise<DealFeeType[]>;
+    },
+    enabled: !!dealId,
+  });
+}
+
+export function useAllDealFees() {
+  return useQuery({
+    queryKey: ["all-deal-fees"],
+    queryFn: async () => {
+      const res = await fetch("/api/deal-fees");
+      if (!res.ok) throw new Error("Failed to fetch all deal fees");
+      return res.json() as Promise<DealFeeType[]>;
+    },
+  });
+}
+
+export function useCreateDealFee() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ dealId, fee }: { dealId: string; fee: Omit<DealFeeType, 'id' | 'dealId' | 'createdAt'> }) => {
+      const res = await fetch(`/api/deals/${dealId}/fees`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fee),
+      });
+      if (!res.ok) throw new Error("Failed to create deal fee");
+      return res.json() as Promise<DealFeeType>;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["deal-fees", vars.dealId] });
+      queryClient.invalidateQueries({ queryKey: ["all-deal-fees"] });
+    },
+  });
+}
+
+export function useUpdateDealFee() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<DealFeeType> }) => {
+      const res = await fetch(`/api/deal-fees/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error("Failed to update deal fee");
+      return res.json() as Promise<DealFeeType>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deal-fees"] });
+      queryClient.invalidateQueries({ queryKey: ["all-deal-fees"] });
+    },
+  });
+}
+
+export function useDeleteDealFee() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/deal-fees/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete deal fee");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deal-fees"] });
+      queryClient.invalidateQueries({ queryKey: ["all-deal-fees"] });
+    },
+  });
+}
+
+// ===== STAGE DOCUMENTS HOOKS =====
+
+export type StageDocumentType = {
+  id: string;
+  dealId: string;
+  stage: string;
+  documentId: string | null;
+  title: string;
+  filename: string | null;
+  url: string | null;
+  mimeType: string | null;
+  size: number | null;
+  uploadedBy: string | null;
+  uploaderName: string | null;
+  createdAt: string;
+};
+
+export function useStageDocuments(dealId: string, stage?: string) {
+  return useQuery({
+    queryKey: ["stage-documents", dealId, stage],
+    queryFn: async () => {
+      const url = stage 
+        ? `/api/deals/${dealId}/stage-documents?stage=${encodeURIComponent(stage)}`
+        : `/api/deals/${dealId}/stage-documents`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch stage documents");
+      return res.json() as Promise<StageDocumentType[]>;
+    },
+    enabled: !!dealId,
+  });
+}
+
+export function useCreateStageDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ dealId, doc }: { dealId: string; doc: Omit<StageDocumentType, 'id' | 'dealId' | 'uploadedBy' | 'uploaderName' | 'createdAt'> }) => {
+      const res = await fetch(`/api/deals/${dealId}/stage-documents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(doc),
+      });
+      if (!res.ok) throw new Error("Failed to create stage document");
+      return res.json() as Promise<StageDocumentType>;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["stage-documents", vars.dealId] });
+    },
+  });
+}
+
+export function useDeleteStageDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/stage-documents/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete stage document");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stage-documents"] });
+    },
+  });
+}
+
+// ===== STAGE POD MEMBERS HOOKS =====
+
+export type StagePodMemberType = {
+  id: string;
+  dealId: string;
+  stage: string;
+  userId: string;
+  userName: string;
+  role: string;
+  email: string | null;
+  phone: string | null;
+  isLead: boolean | null;
+  createdAt: string;
+};
+
+export function useStagePodMembers(dealId: string, stage?: string) {
+  return useQuery({
+    queryKey: ["stage-pod-members", dealId, stage],
+    queryFn: async () => {
+      const url = stage 
+        ? `/api/deals/${dealId}/stage-pod-members?stage=${encodeURIComponent(stage)}`
+        : `/api/deals/${dealId}/stage-pod-members`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch stage pod members");
+      return res.json() as Promise<StagePodMemberType[]>;
+    },
+    enabled: !!dealId,
+  });
+}
+
+export function useCreateStagePodMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ dealId, member }: { dealId: string; member: Omit<StagePodMemberType, 'id' | 'dealId' | 'createdAt'> }) => {
+      const res = await fetch(`/api/deals/${dealId}/stage-pod-members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(member),
+      });
+      if (!res.ok) throw new Error("Failed to add stage pod member");
+      return res.json() as Promise<StagePodMemberType>;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["stage-pod-members", vars.dealId] });
+    },
+  });
+}
+
+export function useUpdateStagePodMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<StagePodMemberType> }) => {
+      const res = await fetch(`/api/stage-pod-members/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error("Failed to update stage pod member");
+      return res.json() as Promise<StagePodMemberType>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stage-pod-members"] });
+    },
+  });
+}
+
+export function useDeleteStagePodMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/stage-pod-members/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to remove stage pod member");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stage-pod-members"] });
+    },
+  });
+}
+
+// ===== STAGE VOICE NOTES HOOKS =====
+
+export type StageVoiceNoteType = {
+  id: string;
+  dealId: string;
+  stage: string;
+  title: string;
+  filename: string;
+  url: string | null;
+  duration: number | null;
+  transcript: string | null;
+  recordedBy: string | null;
+  recorderName: string | null;
+  createdAt: string;
+};
+
+export function useStageVoiceNotes(dealId: string, stage?: string) {
+  return useQuery({
+    queryKey: ["stage-voice-notes", dealId, stage],
+    queryFn: async () => {
+      const url = stage 
+        ? `/api/deals/${dealId}/stage-voice-notes?stage=${encodeURIComponent(stage)}`
+        : `/api/deals/${dealId}/stage-voice-notes`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch stage voice notes");
+      return res.json() as Promise<StageVoiceNoteType[]>;
+    },
+    enabled: !!dealId,
+  });
+}
+
+export function useCreateStageVoiceNote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ dealId, note }: { dealId: string; note: Omit<StageVoiceNoteType, 'id' | 'dealId' | 'recordedBy' | 'recorderName' | 'createdAt'> }) => {
+      const res = await fetch(`/api/deals/${dealId}/stage-voice-notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(note),
+      });
+      if (!res.ok) throw new Error("Failed to create stage voice note");
+      return res.json() as Promise<StageVoiceNoteType>;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["stage-voice-notes", vars.dealId] });
+    },
+  });
+}
+
+export function useDeleteStageVoiceNote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/stage-voice-notes/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete stage voice note");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stage-voice-notes"] });
+    },
+  });
+}
+
+// ===== TASK COMMENTS HOOKS =====
+
+export type TaskCommentType = {
+  id: string;
+  taskId: string;
+  userId: string;
+  userName: string;
+  userAvatar: string | null;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function useTaskComments(taskId: string) {
+  return useQuery({
+    queryKey: ["task-comments", taskId],
+    queryFn: async () => {
+      const res = await fetch(`/api/tasks/${taskId}/comments`);
+      if (!res.ok) throw new Error("Failed to fetch task comments");
+      return res.json() as Promise<TaskCommentType[]>;
+    },
+    enabled: !!taskId,
+  });
+}
+
+export function useCreateTaskComment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, content }: { taskId: string; content: string }) => {
+      const res = await fetch(`/api/tasks/${taskId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) throw new Error("Failed to create task comment");
+      return res.json() as Promise<TaskCommentType>;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["task-comments", vars.taskId] });
+    },
+  });
+}
+
+export function useUpdateTaskComment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, content }: { id: string; content: string }) => {
+      const res = await fetch(`/api/task-comments/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) throw new Error("Failed to update task comment");
+      return res.json() as Promise<TaskCommentType>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task-comments"] });
+    },
+  });
+}
+
+export function useDeleteTaskComment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/task-comments/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete task comment");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task-comments"] });
+    },
+  });
+}
+
+// ===== USER SEARCH HOOK =====
+
+export type UserSearchResult = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  role: string;
+  avatar: string | null;
+};
+
+export function useUserSearch(query: string) {
+  return useQuery({
+    queryKey: ["user-search", query],
+    queryFn: async () => {
+      if (!query || query.length < 2) return [];
+      const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error("Failed to search users");
+      return res.json() as Promise<UserSearchResult[]>;
+    },
+    enabled: query.length >= 2,
+  });
+}

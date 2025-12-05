@@ -21,7 +21,8 @@ import {
   MessageCircle,
   X,
   Check,
-  Loader2
+  Loader2,
+  Download
 } from "lucide-react";
 import { useCurrentUser, useUsers } from "@/lib/api";
 import { useDashboardContext } from "@/contexts/DashboardContext";
@@ -411,11 +412,34 @@ export default function Chat({ role }: ChatProps) {
                                 )}
                                 <p className="text-sm">{message.content}</p>
                                 {message.attachments && message.attachments.length > 0 && (
-                                  <div className="mt-2 space-y-1">
+                                  <div className="mt-2 space-y-1.5">
                                     {message.attachments.map((att, idx) => (
-                                      <div key={idx} className="flex items-center gap-2 text-xs opacity-80">
-                                        <File className="w-3 h-3" />
-                                        <span>{att.filename}</span>
+                                      <div 
+                                        key={idx} 
+                                        className={cn(
+                                          "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors",
+                                          isOwnMessage 
+                                            ? "bg-primary-foreground/10 hover:bg-primary-foreground/20" 
+                                            : "bg-background/50 hover:bg-background/80"
+                                        )}
+                                        onClick={() => {
+                                          if (att.url) {
+                                            window.open(att.url, '_blank');
+                                          } else {
+                                            toast.info("File preview not available");
+                                          }
+                                        }}
+                                        data-testid={`attachment-${att.id || idx}`}
+                                      >
+                                        <File className="w-4 h-4 flex-shrink-0" />
+                                        <div className="flex-1 min-w-0">
+                                          <span className="text-xs font-medium truncate block">{att.filename}</span>
+                                          <span className="text-[10px] opacity-70">
+                                            {att.size ? `${(att.size / 1024).toFixed(1)} KB` : ''} 
+                                            {att.type ? ` • ${att.type.split('/')[1]?.toUpperCase() || att.type}` : ''}
+                                          </span>
+                                        </div>
+                                        <Download className="w-3 h-3 opacity-60" />
                                       </div>
                                     ))}
                                   </div>

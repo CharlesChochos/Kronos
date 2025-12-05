@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,11 +6,24 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Users, 
   Plus, 
@@ -27,7 +40,12 @@ import {
   Pencil,
   Trash2,
   ExternalLink,
-  Calendar
+  Calendar,
+  Upload,
+  FileSpreadsheet,
+  CheckCircle,
+  AlertCircle,
+  Loader2
 } from "lucide-react";
 import { useDeals, useStakeholders, useCreateStakeholder, useUpdateStakeholder, useDeleteStakeholder } from "@/lib/api";
 import { toast } from "sonner";
@@ -65,9 +83,27 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedStakeholder, setSelectedStakeholder] = useState<LocalStakeholder | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importData, setImportData] = useState<Array<Record<string, string>>>([]);
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [isImporting, setIsImporting] = useState(false);
+  const [importColumnMap, setImportColumnMap] = useState<Record<string, string>>({
+    name: '',
+    title: '',
+    company: '',
+    type: '',
+    email: '',
+    phone: '',
+    linkedin: '',
+    website: '',
+    location: '',
+    notes: ''
+  });
 
   const investorStakeholders: LocalStakeholder[] = useMemo(() => SHARED_INVESTORS.map((inv) => ({
     id: `inv-${inv.id}`,
@@ -207,6 +243,143 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
   };
 
   const typeCounts = getTypeCounts();
+  
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      const lines = content.split('\n').filter(line => line.trim());
+      
+      if (lines.length === 0) {
+        toast.error("File is empty");
+        return;
+      }
+      
+      const delimiter = content.includes('\t') ? '\t' : ',';
+      const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
+      
+      const rows = lines.slice(1).map(line => {
+        const values = line.split(delimiter).map(v => v.trim().replace(/^"|"$/g, ''));
+        const row: Record<string, string> = {};
+        headers.forEach((header, i) => {
+          row[header] = values[i] || '';
+        });
+        return row;
+      }).filter(row => Object.values(row).some(v => v));
+      
+      setImportData(rows);
+      setSelectedRows(new Set(rows.map((_, i) => i)));
+      
+      const autoMap: Record<string, string> = { ...importColumnMap };
+      const lowerHeaders = headers.map(h => h.toLowerCase());
+      
+      const fieldMappings: Record<string, string[]> = {
+        name: ['name', 'full name', 'contact name', 'stakeholder', 'person'],
+        title: ['title', 'job title', 'position', 'role'],
+        company: ['company', 'organization', 'firm', 'employer', 'org'],
+        type: ['type', 'category', 'stakeholder type'],
+        email: ['email', 'e-mail', 'email address', 'mail'],
+        phone: ['phone', 'telephone', 'mobile', 'cell', 'phone number'],
+        linkedin: ['linkedin', 'linked in', 'linkedin url', 'li'],
+        website: ['website', 'web', 'url', 'site'],
+        location: ['location', 'city', 'address', 'region', 'country'],
+        notes: ['notes', 'comments', 'description', 'remarks']
+      };
+      
+      Object.entries(fieldMappings).forEach(([field, aliases]) => {
+        const match = headers.find((h, i) => 
+          aliases.some(alias => lowerHeaders[i].includes(alias))
+        );
+        if (match) autoMap[field] = match;
+      });
+      
+      setImportColumnMap(autoMap);
+      setShowImportModal(true);
+    };
+    
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+  
+  const toggleRowSelection = (index: number) => {
+    const newSelected = new Set(selectedRows);
+    if (newSelected.has(index)) {
+      newSelected.delete(index);
+    } else {
+      newSelected.add(index);
+    }
+    setSelectedRows(newSelected);
+  };
+  
+  const toggleAllRows = () => {
+    if (selectedRows.size === importData.length) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(importData.map((_, i) => i)));
+    }
+  };
+  
+  const handleImportSubmit = async () => {
+    if (!importColumnMap.name || !importColumnMap.company) {
+      toast.error("Please map Name and Company columns");
+      return;
+    }
+    
+    if (selectedRows.size === 0) {
+      toast.error("Please select at least one row to import");
+      return;
+    }
+    
+    setIsImporting(true);
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (const index of selectedRows) {
+      const row = importData[index];
+      if (!row) continue;
+      
+      const typeValue = row[importColumnMap.type]?.toLowerCase() || 'other';
+      const validTypes: StakeholderType[] = ['investor', 'advisor', 'legal', 'banker', 'consultant', 'client', 'other'];
+      const type = validTypes.includes(typeValue as StakeholderType) ? typeValue as StakeholderType : 'other';
+      
+      try {
+        await createStakeholderMutation.mutateAsync({
+          name: row[importColumnMap.name] || '',
+          title: row[importColumnMap.title] || '',
+          company: row[importColumnMap.company] || '',
+          type,
+          email: row[importColumnMap.email] || undefined,
+          phone: row[importColumnMap.phone] || undefined,
+          linkedin: row[importColumnMap.linkedin] || undefined,
+          website: row[importColumnMap.website] || undefined,
+          location: row[importColumnMap.location] || undefined,
+          notes: row[importColumnMap.notes] || undefined,
+          deals: [],
+          isFavorite: false
+        });
+        successCount++;
+      } catch (error) {
+        errorCount++;
+      }
+    }
+    
+    setIsImporting(false);
+    setShowImportModal(false);
+    setImportData([]);
+    setSelectedRows(new Set());
+    
+    if (successCount > 0) {
+      toast.success(`Successfully imported ${successCount} stakeholder${successCount > 1 ? 's' : ''}`);
+    }
+    if (errorCount > 0) {
+      toast.error(`Failed to import ${errorCount} stakeholder${errorCount > 1 ? 's' : ''}`);
+    }
+  };
+  
+  const importHeaders = importData.length > 0 ? Object.keys(importData[0]) : [];
 
   return (
     <Layout role={role}>
@@ -216,9 +389,25 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
             <h1 className="text-2xl font-display font-bold">External Stakeholder Directory</h1>
             <p className="text-muted-foreground">Manage contacts for investors, advisors, legal counsel, and more</p>
           </div>
-          <Button onClick={() => setShowCreateModal(true)} data-testid="button-add-stakeholder">
-            <Plus className="w-4 h-4 mr-2" /> Add Stakeholder
-          </Button>
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.tsv,.txt"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+            <Button 
+              variant="outline" 
+              onClick={() => fileInputRef.current?.click()}
+              data-testid="button-import-stakeholders"
+            >
+              <Upload className="w-4 h-4 mr-2" /> Import CSV
+            </Button>
+            <Button onClick={() => setShowCreateModal(true)} data-testid="button-add-stakeholder">
+              <Plus className="w-4 h-4 mr-2" /> Add Stakeholder
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-6 gap-4">
@@ -376,9 +565,27 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
                               <Button variant="ghost" size="sm" onClick={() => { setSelectedStakeholder(stakeholder); setShowEditModal(true); }}>
                                 <Pencil className="w-3 h-3" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => deleteStakeholder(stakeholder.id)} className="text-destructive">
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="text-destructive">
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This action cannot be undone. This will permanently remove {stakeholder.name} from {stakeholder.company} from the directory.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => deleteStakeholder(stakeholder.id)}>
+                                      Remove Stakeholder
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </div>
                           </div>
 
@@ -651,6 +858,155 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateModal(false)}>Cancel</Button>
             <Button onClick={handleCreateStakeholder} data-testid="button-submit-stakeholder">Add Stakeholder</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Modal */}
+      <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
+        <DialogContent className="max-w-4xl max-h-[80vh] bg-card border-border overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5" />
+              Import Stakeholders
+            </DialogTitle>
+            <DialogDescription>
+              Map your CSV columns to stakeholder fields and select rows to import
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-5 gap-2 p-3 bg-secondary/30 rounded-lg">
+              <div className="space-y-1">
+                <Label className="text-xs">Name *</Label>
+                <Select value={importColumnMap.name} onValueChange={(v) => setImportColumnMap({ ...importColumnMap, name: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Select column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {importHeaders.map(h => (
+                      <SelectItem key={h} value={h}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Title</Label>
+                <Select value={importColumnMap.title} onValueChange={(v) => setImportColumnMap({ ...importColumnMap, title: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Select column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {importHeaders.map(h => (
+                      <SelectItem key={h} value={h}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Company *</Label>
+                <Select value={importColumnMap.company} onValueChange={(v) => setImportColumnMap({ ...importColumnMap, company: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Select column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {importHeaders.map(h => (
+                      <SelectItem key={h} value={h}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Type</Label>
+                <Select value={importColumnMap.type} onValueChange={(v) => setImportColumnMap({ ...importColumnMap, type: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Select column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {importHeaders.map(h => (
+                      <SelectItem key={h} value={h}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Email</Label>
+                <Select value={importColumnMap.email} onValueChange={(v) => setImportColumnMap({ ...importColumnMap, email: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Select column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {importHeaders.map(h => (
+                      <SelectItem key={h} value={h}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                {selectedRows.size} of {importData.length} rows selected
+              </span>
+              <Button variant="ghost" size="sm" onClick={toggleAllRows}>
+                {selectedRows.size === importData.length ? 'Deselect All' : 'Select All'}
+              </Button>
+            </div>
+
+            <ScrollArea className="h-[300px] border border-border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox 
+                        checked={selectedRows.size === importData.length && importData.length > 0}
+                        onCheckedChange={toggleAllRows}
+                      />
+                    </TableHead>
+                    {importHeaders.slice(0, 5).map(h => (
+                      <TableHead key={h} className="text-xs">{h}</TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {importData.map((row, index) => (
+                    <TableRow 
+                      key={index}
+                      className={cn(!selectedRows.has(index) && "opacity-50")}
+                    >
+                      <TableCell>
+                        <Checkbox 
+                          checked={selectedRows.has(index)}
+                          onCheckedChange={() => toggleRowSelection(index)}
+                        />
+                      </TableCell>
+                      {importHeaders.slice(0, 5).map(h => (
+                        <TableCell key={h} className="text-xs truncate max-w-[150px]">
+                          {row[h] || '-'}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImportModal(false)}>Cancel</Button>
+            <Button onClick={handleImportSubmit} disabled={isImporting}>
+              {isImporting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Import {selectedRows.size} Stakeholders
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -8,6 +8,17 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -386,17 +397,34 @@ export default function UserManagement() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-1 border-red-500/30 text-red-400 hover:bg-red-500/10"
-                              onClick={() => rejectMutation.mutate(user.id)}
-                              disabled={rejectMutation.isPending}
-                              data-testid={`button-reject-${user.id}`}
-                            >
-                              <UserX className="h-4 w-4" />
-                              Reject
-                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1 border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                  disabled={rejectMutation.isPending}
+                                  data-testid={`button-reject-${user.id}`}
+                                >
+                                  <UserX className="h-4 w-4" />
+                                  Reject
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will reject {user.name}'s registration request. They will need to submit a new registration if they want to access the platform.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => rejectMutation.mutate(user.id)}>
+                                    Reject Registration
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                             <Button
                               size="sm"
                               className="gap-1 bg-green-600 hover:bg-green-700"

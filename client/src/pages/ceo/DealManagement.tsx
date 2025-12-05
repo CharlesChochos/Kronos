@@ -6,6 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -21,7 +32,10 @@ import {
   UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload, GitCompare, ArrowUpDown, BarChart3,
   Mic, MicOff, Play, Pause, Square, Volume2
 } from "lucide-react";
-import { useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks } from "@/lib/api";
+import { useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks, useCreateDealFee } from "@/lib/api";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isToday, isBefore, isAfter, parseISO } from "date-fns";
@@ -76,6 +90,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const createDeal = useCreateDeal();
   const updateDeal = useUpdateDeal();
   const deleteDeal = useDeleteDeal();
+  const createDealFee = useCreateDealFee();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<string | null>(null);
@@ -96,6 +111,10 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   // Task detail modal for calendar view
   const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
   const [selectedCalendarTask, setSelectedCalendarTask] = useState<any>(null);
+  
+  // Delete deal confirmation dialog
+  const [showDeleteDealDialog, setShowDeleteDealDialog] = useState(false);
+  const [dealToDelete, setDealToDelete] = useState<string | null>(null);
   
   const openTaskDetail = (task: any, deal: Deal) => {
     setSelectedCalendarTask({ ...task, deal });
@@ -142,12 +161,30 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
     name: '',
     client: '',
     sector: 'Technology',
+    customSector: '',
     value: '',
     stage: 'Origination',
     lead: '',
     status: 'Active',
     progress: 0,
   });
+  
+  const [newDealFees, setNewDealFees] = useState<{
+    engagement: string;
+    monthly: string;
+    success: string;
+    transaction: string;
+    spread: string;
+  }>({
+    engagement: '',
+    monthly: '',
+    success: '',
+    transaction: '',
+    spread: '',
+  });
+  
+  const SECTORS = ['Technology', 'Healthcare', 'Energy', 'Consumer', 'Industrials', 'Financial', 'Other'];
+  const [sectorOpen, setSectorOpen] = useState(false);
 
   const [newTeamMember, setNewTeamMember] = useState<PodTeamMember>({
     name: '',
@@ -156,6 +193,17 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
     phone: '',
     slack: '',
   });
+  const [teamMemberSearch, setTeamMemberSearch] = useState('');
+  const [teamMemberOpen, setTeamMemberOpen] = useState(false);
+  
+  const filteredUsers = useMemo(() => {
+    if (!teamMemberSearch || teamMemberSearch.length < 2) return [];
+    const query = teamMemberSearch.toLowerCase();
+    return allUsers.filter(user => 
+      user.name.toLowerCase().includes(query) || 
+      user.email.toLowerCase().includes(query)
+    ).slice(0, 5);
+  }, [allUsers, teamMemberSearch]);
 
   const [newInvestor, setNewInvestor] = useState<Omit<TaggedInvestor, 'id'>>({
     name: '',
@@ -293,11 +341,14 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
       toast.error("Please enter a valid deal value");
       return;
     }
+    
+    const finalSector = newDeal.sector === 'Other' && newDeal.customSector ? newDeal.customSector : newDeal.sector;
+    
     try {
-      await createDeal.mutateAsync({
+      const createdDeal = await createDeal.mutateAsync({
         name: newDeal.name,
         client: newDeal.client,
-        sector: newDeal.sector,
+        sector: finalSector,
         value: parsedValue,
         stage: newDeal.stage,
         lead: newDeal.lead || currentUser?.name || 'Unassigned',
@@ -315,9 +366,47 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
           details: `Deal "${newDeal.name}" created with initial stage: ${newDeal.stage}`,
         }],
       });
+      
+      const feePromises = [];
+      if (newDealFees.engagement && parseFloat(newDealFees.engagement) > 0) {
+        feePromises.push(createDealFee.mutateAsync({
+          dealId: createdDeal.id,
+          fee: { feeType: 'engagement', amount: parseFloat(newDealFees.engagement), percentage: null, currency: 'USD', description: 'Engagement fee', billingFrequency: 'one-time' }
+        }));
+      }
+      if (newDealFees.monthly && parseFloat(newDealFees.monthly) > 0) {
+        feePromises.push(createDealFee.mutateAsync({
+          dealId: createdDeal.id,
+          fee: { feeType: 'monthly', amount: parseFloat(newDealFees.monthly), percentage: null, currency: 'USD', description: 'Monthly retainer', billingFrequency: 'monthly' }
+        }));
+      }
+      if (newDealFees.success && parseFloat(newDealFees.success) > 0) {
+        feePromises.push(createDealFee.mutateAsync({
+          dealId: createdDeal.id,
+          fee: { feeType: 'success', amount: null, percentage: parseFloat(newDealFees.success), currency: 'USD', description: 'Success fee', billingFrequency: 'on-close' }
+        }));
+      }
+      if (newDealFees.transaction && parseFloat(newDealFees.transaction) > 0) {
+        feePromises.push(createDealFee.mutateAsync({
+          dealId: createdDeal.id,
+          fee: { feeType: 'transaction', amount: null, percentage: parseFloat(newDealFees.transaction), currency: 'USD', description: 'Transaction fee', billingFrequency: 'on-close' }
+        }));
+      }
+      if (newDealFees.spread && parseFloat(newDealFees.spread) > 0) {
+        feePromises.push(createDealFee.mutateAsync({
+          dealId: createdDeal.id,
+          fee: { feeType: 'spread', amount: null, percentage: parseFloat(newDealFees.spread), currency: 'USD', description: 'Spread', billingFrequency: 'on-close' }
+        }));
+      }
+      
+      if (feePromises.length > 0) {
+        await Promise.all(feePromises);
+      }
+      
       toast.success("Deal created successfully!");
       setShowNewDealModal(false);
-      setNewDeal({ name: '', client: '', sector: 'Technology', value: '', stage: 'Origination', lead: '', status: 'Active', progress: 0 });
+      setNewDeal({ name: '', client: '', sector: 'Technology', customSector: '', value: '', stage: 'Origination', lead: '', status: 'Active', progress: 0 });
+      setNewDealFees({ engagement: '', monthly: '', success: '', transaction: '', spread: '' });
     } catch (error: any) {
       toast.error(error.message || "Failed to create deal");
     }
@@ -529,7 +618,6 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   };
 
   const handleDeleteDeal = async (dealId: string) => {
-    if (!confirm("Are you sure you want to delete this deal?")) return;
     try {
       await deleteDeal.mutateAsync(dealId);
       toast.success("Deal deleted successfully!");
@@ -1054,7 +1142,13 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                         <Pencil className="w-4 h-4 mr-2" /> Edit Deal
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-red-500" onClick={() => handleDeleteDeal(deal.id)}>
+                      <DropdownMenuItem 
+                        className="text-red-500" 
+                        onClick={() => {
+                          setDealToDelete(deal.id);
+                          setShowDeleteDealDialog(true);
+                        }}
+                      >
                         <Trash2 className="w-4 h-4 mr-2" /> Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -1611,14 +1705,31 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                                 <a href={`slack://user?team=&id=${member.slack}`}><MessageSquare className="w-4 h-4 text-purple-500" /></a>
                               </Button>
                             )}
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => handleRemoveTeamMember(index)}
-                            >
-                              <X className="w-4 h-4 text-red-500" />
-                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <X className="w-4 h-4 text-red-500" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will remove {member.name} from the pod team. This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleRemoveTeamMember(index)}>
+                                    Remove
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         </div>
                       ))}
@@ -1636,11 +1747,73 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       <UserPlus className="w-4 h-4" /> Add Team Member
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <Input 
-                        placeholder="Name *" 
-                        value={newTeamMember.name}
-                        onChange={(e) => setNewTeamMember({ ...newTeamMember, name: e.target.value })}
-                      />
+                      <Popover open={teamMemberOpen} onOpenChange={setTeamMemberOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" role="combobox" className="w-full justify-start font-normal">
+                            {newTeamMember.name || "Search team member..."}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0" align="start">
+                          <Command>
+                            <CommandInput 
+                              placeholder="Type name or email..." 
+                              value={teamMemberSearch}
+                              onValueChange={setTeamMemberSearch}
+                            />
+                            <CommandList>
+                              {teamMemberSearch.length >= 2 && filteredUsers.length === 0 && (
+                                <CommandEmpty>
+                                  <div className="p-2 text-sm">
+                                    <p className="text-muted-foreground mb-2">No users found. Add manually:</p>
+                                    <Input 
+                                      placeholder="Enter name"
+                                      value={newTeamMember.name}
+                                      onChange={(e) => setNewTeamMember({ ...newTeamMember, name: e.target.value })}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && newTeamMember.name) {
+                                          setTeamMemberOpen(false);
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                </CommandEmpty>
+                              )}
+                              <CommandGroup>
+                                {filteredUsers.map((user) => (
+                                  <CommandItem
+                                    key={user.id}
+                                    value={user.name}
+                                    onSelect={() => {
+                                      setNewTeamMember({
+                                        ...newTeamMember,
+                                        name: user.name,
+                                        email: user.email || '',
+                                        phone: user.phone || '',
+                                        role: user.jobTitle || user.role || '',
+                                        userId: user.id,
+                                      });
+                                      setTeamMemberSearch('');
+                                      setTeamMemberOpen(false);
+                                    }}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs">
+                                      {user.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="font-medium">{user.name}</div>
+                                      <div className="text-xs text-muted-foreground">{user.email} • {user.role}</div>
+                                    </div>
+                                    {newTeamMember.name === user.name && (
+                                      <Check className="w-4 h-4 text-primary" />
+                                    )}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <Input 
                         placeholder="Role *" 
                         value={newTeamMember.role}
@@ -1707,14 +1880,31 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                                   ))}
                                 </SelectContent>
                               </Select>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => handleRemoveInvestor(investor.id)}
-                              >
-                                <X className="w-4 h-4 text-red-500" />
-                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <X className="w-4 h-4 text-red-500" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will remove {investor.name} from {investor.firm} from this deal. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleRemoveInvestor(investor.id)}>
+                                      Remove
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </div>
                           </div>
                           {investor.notes && (
@@ -2087,19 +2277,60 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
               </div>
               <div className="space-y-2">
                 <Label>Sector</Label>
-                <Select value={newDeal.sector} onValueChange={(v) => setNewDeal({ ...newDeal, sector: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Technology">Technology</SelectItem>
-                    <SelectItem value="Healthcare">Healthcare</SelectItem>
-                    <SelectItem value="Energy">Energy</SelectItem>
-                    <SelectItem value="Consumer">Consumer</SelectItem>
-                    <SelectItem value="Industrials">Industrials</SelectItem>
-                    <SelectItem value="Financial">Financial</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Popover open={sectorOpen} onOpenChange={setSectorOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" aria-expanded={sectorOpen} className="w-full justify-between">
+                      {newDeal.sector === 'Other' && newDeal.customSector ? newDeal.customSector : newDeal.sector}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Search sector or type custom..." />
+                      <CommandList>
+                        <CommandEmpty>
+                          <div className="p-2">
+                            <p className="text-sm text-muted-foreground mb-2">No sector found. Add custom:</p>
+                            <Input 
+                              placeholder="Enter custom sector"
+                              value={newDeal.customSector}
+                              onChange={(e) => setNewDeal({ ...newDeal, customSector: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && newDeal.customSector) {
+                                  setNewDeal({ ...newDeal, sector: 'Other' });
+                                  setSectorOpen(false);
+                                }
+                              }}
+                            />
+                          </div>
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {SECTORS.map((sector) => (
+                            <CommandItem
+                              key={sector}
+                              value={sector}
+                              onSelect={() => {
+                                setNewDeal({ ...newDeal, sector, customSector: sector === 'Other' ? newDeal.customSector : '' });
+                                setSectorOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", newDeal.sector === sector ? "opacity-100" : "opacity-0")} />
+                              {sector}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {newDeal.sector === 'Other' && (
+                  <Input 
+                    placeholder="Enter custom sector name"
+                    value={newDeal.customSector}
+                    onChange={(e) => setNewDeal({ ...newDeal, customSector: e.target.value })}
+                    className="mt-2"
+                  />
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -2123,6 +2354,65 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                   value={newDeal.lead}
                   onChange={(e) => setNewDeal({ ...newDeal, lead: e.target.value })}
                 />
+              </div>
+            </div>
+            
+            <div className="border-t border-border pt-4 mt-4">
+              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Fee Structure (Optional)
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Engagement Fee ($)</Label>
+                  <Input 
+                    type="number" 
+                    placeholder="0" 
+                    value={newDealFees.engagement}
+                    onChange={(e) => setNewDealFees({ ...newDealFees, engagement: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Monthly Retainer ($)</Label>
+                  <Input 
+                    type="number" 
+                    placeholder="0" 
+                    value={newDealFees.monthly}
+                    onChange={(e) => setNewDealFees({ ...newDealFees, monthly: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3 mt-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Success Fee (%)</Label>
+                  <Input 
+                    type="number" 
+                    placeholder="0" 
+                    step="0.1"
+                    value={newDealFees.success}
+                    onChange={(e) => setNewDealFees({ ...newDealFees, success: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Transaction Fee (%)</Label>
+                  <Input 
+                    type="number" 
+                    placeholder="0" 
+                    step="0.1"
+                    value={newDealFees.transaction}
+                    onChange={(e) => setNewDealFees({ ...newDealFees, transaction: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Spread (%)</Label>
+                  <Input 
+                    type="number" 
+                    placeholder="0" 
+                    step="0.1"
+                    value={newDealFees.spread}
+                    onChange={(e) => setNewDealFees({ ...newDealFees, spread: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -2297,6 +2587,33 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Deal Confirmation Dialog */}
+      <AlertDialog open={showDeleteDealDialog} onOpenChange={setShowDeleteDealDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this deal and all its associated data including team members, investors, and documents.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDealToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (dealToDelete) {
+                  handleDeleteDeal(dealToDelete);
+                  setDealToDelete(null);
+                  setShowDeleteDealDialog(false);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Deal
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }
