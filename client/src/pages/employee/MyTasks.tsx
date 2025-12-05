@@ -380,7 +380,7 @@ export default function MyTasks() {
       if (newTaskForm.dueDate) {
         taskData.dueDate = newTaskForm.dueDate;
       }
-      if (newTaskForm.dealId) {
+      if (newTaskForm.dealId && newTaskForm.dealId !== 'none') {
         taskData.dealId = newTaskForm.dealId;
         const selectedDeal = deals.find(d => d.id === newTaskForm.dealId);
         if (selectedDeal) {
@@ -1079,7 +1079,7 @@ export default function MyTasks() {
                   <SelectValue placeholder="Select a deal..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No deal</SelectItem>
+                  <SelectItem value="none">No deal</SelectItem>
                   {deals.map(deal => (
                     <SelectItem key={deal.id} value={deal.id}>{deal.name}</SelectItem>
                   ))}

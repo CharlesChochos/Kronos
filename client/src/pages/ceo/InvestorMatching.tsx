@@ -408,12 +408,28 @@ export default function InvestorMatching() {
               </div>
             ) : (
               <Card className="w-full max-w-lg p-12 text-center">
-                <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
-                  <Check className="w-8 h-8 text-green-500" />
-                </div>
-                <h3 className="text-xl font-bold mb-2">All Caught Up!</h3>
-                <p className="text-muted-foreground mb-4">You've reviewed all available investors for this deal.</p>
-                <Button onClick={resetMatches}>Review Again</Button>
+                {/* Check if there are ANY investors with matching sector (before filtering by matched/rejected) */}
+                {currentDeal?.sector && INVESTORS.some(inv => inv.focus.toLowerCase() === currentDeal.sector.toLowerCase()) ? (
+                  <>
+                    <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
+                      <Check className="w-8 h-8 text-green-500" />
+                    </div>
+                    <h3 className="text-xl font-bold mb-2">All Caught Up!</h3>
+                    <p className="text-muted-foreground mb-4">You've reviewed all available investors for this deal.</p>
+                    <Button onClick={resetMatches}>Review Again</Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-16 h-16 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-4">
+                      <X className="w-8 h-8 text-orange-500" />
+                    </div>
+                    <h3 className="text-xl font-bold mb-2">No Matching Investors</h3>
+                    <p className="text-muted-foreground mb-4">
+                      No investors in our database focus on the <span className="font-medium text-foreground">{currentDeal?.sector}</span> sector.
+                    </p>
+                    <p className="text-sm text-muted-foreground">Try selecting a different deal or add new investors to your database.</p>
+                  </>
+                )}
               </Card>
             )}
         </div>
