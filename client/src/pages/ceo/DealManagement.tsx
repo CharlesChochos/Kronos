@@ -32,7 +32,13 @@ import {
   UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload, GitCompare, ArrowUpDown, BarChart3,
   Mic, MicOff, Play, Pause, Square, Volume2
 } from "lucide-react";
-import { useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks, useCreateDealFee } from "@/lib/api";
+import { 
+  useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks, useCreateDealFee,
+  useStageDocuments, useCreateStageDocument, useDeleteStageDocument,
+  useStagePodMembers, useCreateStagePodMember, useDeleteStagePodMember,
+  useStageVoiceNotes, useCreateStageVoiceNote, useDeleteStageVoiceNote,
+  useTaskComments, useCreateTaskComment
+} from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Check, ChevronsUpDown } from "lucide-react";
@@ -56,6 +62,608 @@ const COMPARISON_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'
 const DEAL_STAGES = ['Origination', 'Execution', 'Negotiation', 'Due Diligence', 'Signing', 'Closed'];
 const INVESTOR_TYPES = ['PE', 'VC', 'Strategic', 'Family Office', 'Hedge Fund', 'Sovereign Wealth'];
 const INVESTOR_STATUSES = ['Contacted', 'Interested', 'In DD', 'Term Sheet', 'Passed', 'Closed'];
+
+type StageWorkSectionProps = {
+  dealId: string;
+  dealStage: string;
+  allUsers: any[];
+  currentUser: any;
+  allTasks: any[];
+  activeStageTab: string;
+  setActiveStageTab: (stage: string) => void;
+  createStageDocument: any;
+  deleteStageDocument: any;
+  createStagePodMember: any;
+  deleteStagePodMember: any;
+  createStageVoiceNote: any;
+  deleteStageVoiceNote: any;
+  createTaskComment: any;
+};
+
+function StageWorkSection({
+  dealId,
+  dealStage,
+  allUsers,
+  currentUser,
+  allTasks,
+  activeStageTab,
+  setActiveStageTab,
+  createStageDocument,
+  deleteStageDocument,
+  createStagePodMember,
+  deleteStagePodMember,
+  createStageVoiceNote,
+  deleteStageVoiceNote,
+  createTaskComment
+}: StageWorkSectionProps) {
+  const { data: stageDocuments = [] } = useStageDocuments(dealId, activeStageTab);
+  const { data: stagePodMembers = [] } = useStagePodMembers(dealId, activeStageTab);
+  const { data: stageVoiceNotes = [] } = useStageVoiceNotes(dealId, activeStageTab);
+  
+  const [showAddDocument, setShowAddDocument] = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [documentTitle, setDocumentTitle] = useState("");
+  const [documentCategory, setDocumentCategory] = useState("General");
+  const [memberSearch, setMemberSearch] = useState("");
+  const [memberOpen, setMemberOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [memberRole, setMemberRole] = useState("");
+  
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [voiceTitle, setVoiceTitle] = useState("");
+  const recordingInterval = useRef<NodeJS.Timeout | null>(null);
+  
+  const [expandedTask, setExpandedTask] = useState<string | null>(null);
+  
+  useEffect(() => {
+    return () => {
+      if (recordingInterval.current) {
+        clearInterval(recordingInterval.current);
+      }
+    };
+  }, []);
+  
+  const stageTasks = useMemo(() => {
+    return allTasks.filter((task: any) => 
+      task.dealId === dealId && 
+      (task.dealStage === activeStageTab || (!task.dealStage && activeStageTab === dealStage))
+    );
+  }, [allTasks, dealId, activeStageTab, dealStage]);
+  
+  const filteredMembers = useMemo(() => {
+    if (!memberSearch || memberSearch.length < 2) return [];
+    const query = memberSearch.toLowerCase();
+    return allUsers.filter((user: any) => 
+      user.name.toLowerCase().includes(query) || 
+      user.email.toLowerCase().includes(query)
+    ).slice(0, 5);
+  }, [allUsers, memberSearch]);
+  
+  const handleAddDocument = async () => {
+    if (!documentTitle) {
+      toast.error("Please enter a document title");
+      return;
+    }
+    try {
+      await createStageDocument.mutateAsync({
+        dealId,
+        stage: activeStageTab,
+        document: {
+          title: documentTitle,
+          category: documentCategory,
+          uploadedBy: currentUser?.id || ''
+        }
+      });
+      toast.success("Document added to stage");
+      setDocumentTitle("");
+      setDocumentCategory("General");
+      setShowAddDocument(false);
+    } catch (error) {
+      toast.error("Failed to add document");
+    }
+  };
+  
+  const handleAddMember = async () => {
+    if (!selectedMember) {
+      toast.error("Please select a team member");
+      return;
+    }
+    try {
+      await createStagePodMember.mutateAsync({
+        dealId,
+        stage: activeStageTab,
+        member: {
+          userId: selectedMember.id,
+          role: memberRole || selectedMember.role || 'Team Member'
+        }
+      });
+      toast.success("Team member added to stage");
+      setSelectedMember(null);
+      setMemberSearch("");
+      setMemberRole("");
+      setShowAddMember(false);
+    } catch (error) {
+      toast.error("Failed to add team member");
+    }
+  };
+  
+  const startRecording = () => {
+    setIsRecording(true);
+    setRecordingTime(0);
+    recordingInterval.current = setInterval(() => {
+      setRecordingTime(prev => prev + 1);
+    }, 1000);
+    toast.info("Recording started");
+  };
+  
+  const stopRecording = async () => {
+    setIsRecording(false);
+    if (recordingInterval.current) {
+      clearInterval(recordingInterval.current);
+    }
+    
+    if (recordingTime > 0) {
+      try {
+        await createStageVoiceNote.mutateAsync({
+          dealId,
+          stage: activeStageTab,
+          voiceNote: {
+            title: voiceTitle || `Note ${format(new Date(), 'MMM d, h:mm a')}`,
+            duration: recordingTime,
+            authorId: currentUser?.id || '',
+            authorName: currentUser?.name || 'Unknown'
+          }
+        });
+        toast.success("Voice note saved!");
+      } catch (error) {
+        toast.error("Failed to save voice note");
+      }
+    }
+    
+    setVoiceTitle("");
+    setRecordingTime(0);
+  };
+  
+  const cancelRecording = () => {
+    setIsRecording(false);
+    if (recordingInterval.current) {
+      clearInterval(recordingInterval.current);
+    }
+    setRecordingTime(0);
+    setVoiceTitle("");
+  };
+  
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  const getStageIndex = (stage: string) => DEAL_STAGES.indexOf(stage);
+  
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-1 p-1 bg-secondary/30 rounded-lg">
+        {DEAL_STAGES.map((stage, index) => {
+          const isCurrentStage = dealStage === stage;
+          const isPastStage = getStageIndex(dealStage) > index;
+          const isActive = activeStageTab === stage;
+          return (
+            <Button
+              key={stage}
+              variant={isActive ? "default" : "ghost"}
+              size="sm"
+              className={cn(
+                "flex-1 text-xs relative",
+                isActive && "bg-primary text-primary-foreground",
+                !isActive && isCurrentStage && "ring-1 ring-primary/50",
+                !isActive && isPastStage && "text-muted-foreground"
+              )}
+              onClick={() => setActiveStageTab(stage)}
+            >
+              {stage}
+              {isCurrentStage && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
+              )}
+            </Button>
+          );
+        })}
+      </div>
+      
+      <div className="text-xs text-muted-foreground text-center">
+        Viewing stage: <span className="font-medium text-foreground">{activeStageTab}</span>
+        {activeStageTab === dealStage && <span className="ml-1 text-green-500">(Current)</span>}
+      </div>
+      
+      <div className="grid grid-cols-3 gap-3">
+        <Card className="bg-secondary/20">
+          <CardContent className="p-3 text-center">
+            <FileText className="w-4 h-4 mx-auto mb-1 text-blue-400" />
+            <div className="text-lg font-bold">{stageDocuments.length}</div>
+            <div className="text-xs text-muted-foreground">Documents</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-secondary/20">
+          <CardContent className="p-3 text-center">
+            <Users className="w-4 h-4 mx-auto mb-1 text-green-400" />
+            <div className="text-lg font-bold">{stagePodMembers.length}</div>
+            <div className="text-xs text-muted-foreground">Team</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-secondary/20">
+          <CardContent className="p-3 text-center">
+            <Mic className="w-4 h-4 mx-auto mb-1 text-purple-400" />
+            <div className="text-lg font-bold">{stageVoiceNotes.length}</div>
+            <div className="text-xs text-muted-foreground">Notes</div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h5 className="text-sm font-medium flex items-center gap-2">
+            <FileText className="w-4 h-4 text-blue-400" /> Stage Documents
+          </h5>
+          <Button size="sm" variant="ghost" onClick={() => setShowAddDocument(!showAddDocument)}>
+            <Plus className="w-4 h-4" />
+          </Button>
+        </div>
+        
+        {showAddDocument && (
+          <div className="p-3 bg-secondary/30 rounded-lg space-y-2">
+            <Input
+              placeholder="Document title"
+              value={documentTitle}
+              onChange={(e) => setDocumentTitle(e.target.value)}
+              className="h-8 text-sm"
+            />
+            <Select value={documentCategory} onValueChange={setDocumentCategory}>
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="General">General</SelectItem>
+                <SelectItem value="Financial">Financial</SelectItem>
+                <SelectItem value="Legal">Legal</SelectItem>
+                <SelectItem value="Technical">Technical</SelectItem>
+                <SelectItem value="Presentation">Presentation</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleAddDocument} className="flex-1">Add</Button>
+              <Button size="sm" variant="outline" onClick={() => setShowAddDocument(false)}>Cancel</Button>
+            </div>
+          </div>
+        )}
+        
+        <ScrollArea className="h-[100px]">
+          {stageDocuments.length === 0 ? (
+            <div className="text-center text-sm text-muted-foreground py-4">
+              No documents for this stage
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {stageDocuments.map((doc: any) => (
+                <div key={doc.id} className="flex items-center justify-between p-2 bg-secondary/20 rounded text-sm group">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-3 h-3 text-blue-400" />
+                    <span className="truncate">{doc.title}</span>
+                    <Badge variant="secondary" className="text-xs">{doc.category}</Badge>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                    onClick={() => deleteStageDocument.mutate({ dealId, documentId: doc.id })}
+                  >
+                    <X className="w-3 h-3 text-red-400" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+      
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h5 className="text-sm font-medium flex items-center gap-2">
+            <Users className="w-4 h-4 text-green-400" /> Stage Team
+          </h5>
+          <Button size="sm" variant="ghost" onClick={() => setShowAddMember(!showAddMember)}>
+            <Plus className="w-4 h-4" />
+          </Button>
+        </div>
+        
+        {showAddMember && (
+          <div className="p-3 bg-secondary/30 rounded-lg space-y-2">
+            <Popover open={memberOpen} onOpenChange={setMemberOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-between h-8 text-sm">
+                  {selectedMember ? selectedMember.name : "Search team member..."}
+                  <ChevronsUpDown className="ml-2 h-3 w-3" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput 
+                    placeholder="Type name..." 
+                    value={memberSearch}
+                    onValueChange={setMemberSearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>No users found</CommandEmpty>
+                    <CommandGroup>
+                      {filteredMembers.map((user: any) => (
+                        <CommandItem
+                          key={user.id}
+                          onSelect={() => {
+                            setSelectedMember(user);
+                            setMemberRole(user.role || '');
+                            setMemberOpen(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", selectedMember?.id === user.id ? "opacity-100" : "opacity-0")} />
+                          <div>
+                            <div>{user.name}</div>
+                            <div className="text-xs text-muted-foreground">{user.email}</div>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            <Input
+              placeholder="Role for this stage"
+              value={memberRole}
+              onChange={(e) => setMemberRole(e.target.value)}
+              className="h-8 text-sm"
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleAddMember} className="flex-1">Add</Button>
+              <Button size="sm" variant="outline" onClick={() => setShowAddMember(false)}>Cancel</Button>
+            </div>
+          </div>
+        )}
+        
+        <ScrollArea className="h-[80px]">
+          {stagePodMembers.length === 0 ? (
+            <div className="text-center text-sm text-muted-foreground py-4">
+              No team members for this stage
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {stagePodMembers.map((member: any) => (
+                <div key={member.id} className="flex items-center gap-1 px-2 py-1 bg-secondary/30 rounded-full text-xs group">
+                  <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xs">
+                    {member.userName?.charAt(0) || '?'}
+                  </div>
+                  <span>{member.userName || 'Unknown'}</span>
+                  <span className="text-muted-foreground">({member.role})</span>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-4 w-4 opacity-0 group-hover:opacity-100"
+                    onClick={() => deleteStagePodMember.mutate({ dealId, memberId: member.id })}
+                  >
+                    <X className="w-3 h-3 text-red-400" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+      
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h5 className="text-sm font-medium flex items-center gap-2">
+            <Mic className="w-4 h-4 text-purple-400" /> Voice Notes
+          </h5>
+        </div>
+        
+        {isRecording ? (
+          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg space-y-2">
+            <div className="flex items-center justify-center gap-2 text-red-400">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              Recording: {formatDuration(recordingTime)}
+            </div>
+            <Input
+              placeholder="Voice note title (optional)"
+              value={voiceTitle}
+              onChange={(e) => setVoiceTitle(e.target.value)}
+              className="h-8 text-sm"
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={stopRecording} className="flex-1 bg-red-500 hover:bg-red-600">
+                <Square className="w-3 h-3 mr-1" /> Stop & Save
+              </Button>
+              <Button size="sm" variant="outline" onClick={cancelRecording}>Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full" 
+            onClick={startRecording}
+          >
+            <Mic className="w-4 h-4 mr-2 text-purple-400" /> Start Recording
+          </Button>
+        )}
+        
+        <ScrollArea className="h-[80px]">
+          {stageVoiceNotes.length === 0 ? (
+            <div className="text-center text-sm text-muted-foreground py-4">
+              No voice notes for this stage
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {stageVoiceNotes.map((note: any) => (
+                <div key={note.id} className="flex items-center justify-between p-2 bg-secondary/20 rounded text-sm group">
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" className="h-6 w-6">
+                      <Play className="w-3 h-3 text-purple-400" />
+                    </Button>
+                    <div>
+                      <span className="truncate">{note.title}</span>
+                      <span className="text-xs text-muted-foreground ml-2">{formatDuration(note.duration)}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{note.authorName}</span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                      onClick={() => deleteStageVoiceNote.mutate({ dealId, voiceNoteId: note.id })}
+                    >
+                      <X className="w-3 h-3 text-red-400" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+      
+      {/* Tasks Section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h5 className="text-sm font-medium flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-orange-400" /> Deal Tasks
+          </h5>
+          <Badge variant="secondary" className="text-xs">{stageTasks.length} tasks</Badge>
+        </div>
+        
+        <ScrollArea className="h-[150px]">
+          {stageTasks.length === 0 ? (
+            <div className="text-center text-sm text-muted-foreground py-4">
+              No tasks for this deal
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {stageTasks.map((task: any) => (
+                <div key={task.id} className="bg-secondary/20 rounded-lg overflow-hidden">
+                  <div 
+                    className="flex items-center justify-between p-2 cursor-pointer hover:bg-secondary/30"
+                    onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "w-2 h-2 rounded-full",
+                        task.status === 'Completed' ? "bg-green-500" :
+                        task.status === 'In Progress' ? "bg-blue-500" :
+                        "bg-yellow-500"
+                      )} />
+                      <span className="text-sm truncate">{task.title}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {task.priority}
+                      </Badge>
+                      <ChevronRight className={cn(
+                        "w-4 h-4 transition-transform",
+                        expandedTask === task.id && "rotate-90"
+                      )} />
+                    </div>
+                  </div>
+                  
+                  {expandedTask === task.id && (
+                    <TaskComments 
+                      taskId={task.id}
+                      currentUser={currentUser}
+                      createTaskComment={createTaskComment}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+    </div>
+  );
+}
+
+function TaskComments({ 
+  taskId,
+  currentUser,
+  createTaskComment
+}: { 
+  taskId: string;
+  currentUser: any;
+  createTaskComment: any;
+}) {
+  const { data: comments = [] } = useTaskComments(taskId);
+  const [newComment, setNewComment] = useState("");
+  
+  const handleAddComment = async () => {
+    if (!newComment.trim()) return;
+    try {
+      await createTaskComment.mutateAsync({
+        taskId,
+        comment: {
+          content: newComment.trim(),
+          authorId: currentUser?.id || '',
+          authorName: currentUser?.name || 'Unknown'
+        }
+      });
+      toast.success("Comment added");
+      setNewComment("");
+    } catch (error) {
+      toast.error("Failed to add comment");
+    }
+  };
+  
+  return (
+    <div className="p-2 border-t border-border/50 space-y-2">
+      <div className="text-xs text-muted-foreground">Comments ({comments.length})</div>
+      
+      {comments.length > 0 && (
+        <div className="space-y-1 max-h-[100px] overflow-y-auto">
+          {comments.map((comment: any) => (
+            <div key={comment.id} className="p-2 bg-secondary/30 rounded text-xs">
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-medium">{comment.authorName}</span>
+                <span className="text-muted-foreground">
+                  {format(new Date(comment.createdAt), 'MMM d, h:mm a')}
+                </span>
+              </div>
+              <p>{comment.content}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      <div className="flex gap-2">
+        <Input
+          placeholder="Add a comment..."
+          value={newComment}
+          onChange={(e) => setNewComment(e.target.value)}
+          className="h-7 text-xs"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleAddComment();
+            }
+          }}
+        />
+        <Button 
+          size="sm" 
+          className="h-7 px-2"
+          onClick={handleAddComment}
+        >
+          <Plus className="w-3 h-3" />
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 type DealManagementProps = {
   role?: 'CEO' | 'Employee';
@@ -91,6 +699,15 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const updateDeal = useUpdateDeal();
   const deleteDeal = useDeleteDeal();
   const createDealFee = useCreateDealFee();
+  
+  // Stage-based mutations
+  const createStageDocument = useCreateStageDocument();
+  const deleteStageDocument = useDeleteStageDocument();
+  const createStagePodMember = useCreateStagePodMember();
+  const deleteStagePodMember = useDeleteStagePodMember();
+  const createStageVoiceNote = useCreateStageVoiceNote();
+  const deleteStageVoiceNote = useDeleteStageVoiceNote();
+  const createTaskComment = useCreateTaskComment();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<string | null>(null);
@@ -99,6 +716,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [activeStageTab, setActiveStageTab] = useState("Origination");
   const [viewMode, setViewMode] = useState<'grid' | 'calendar' | 'compare'>('grid');
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('week');
   const [calendarDate, setCalendarDate] = useState(new Date());
@@ -1614,12 +2232,13 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
 
               {/* Tabs */}
               <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
-                <TabsList className="grid grid-cols-6 bg-secondary/50">
+                <TabsList className="grid grid-cols-7 bg-secondary/50">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="stages">Stage Work</TabsTrigger>
                   <TabsTrigger value="team">Pod Team</TabsTrigger>
                   <TabsTrigger value="investors">Investors</TabsTrigger>
-                  <TabsTrigger value="documents">Documents</TabsTrigger>
-                  <TabsTrigger value="voice">Voice Notes</TabsTrigger>
+                  <TabsTrigger value="documents">Docs</TabsTrigger>
+                  <TabsTrigger value="voice">Voice</TabsTrigger>
                   <TabsTrigger value="audit">Audit</TabsTrigger>
                 </TabsList>
 
@@ -1666,6 +2285,26 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       <p className="mt-1 text-sm">{selectedDeal.description}</p>
                     </div>
                   )}
+                </TabsContent>
+
+                {/* Stage Work Tab */}
+                <TabsContent value="stages" className="mt-4 space-y-4">
+                  <StageWorkSection 
+                    dealId={selectedDeal.id}
+                    dealStage={selectedDeal.stage}
+                    allUsers={allUsers}
+                    currentUser={currentUser}
+                    allTasks={allTasks}
+                    activeStageTab={activeStageTab}
+                    setActiveStageTab={setActiveStageTab}
+                    createStageDocument={createStageDocument}
+                    deleteStageDocument={deleteStageDocument}
+                    createStagePodMember={createStagePodMember}
+                    deleteStagePodMember={deleteStagePodMember}
+                    createStageVoiceNote={createStageVoiceNote}
+                    deleteStageVoiceNote={deleteStageVoiceNote}
+                    createTaskComment={createTaskComment}
+                  />
                 </TabsContent>
 
                 {/* Pod Team Tab */}
