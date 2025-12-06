@@ -1115,6 +1115,44 @@ export default function Dashboard() {
               </Card>
           )}
 
+          {/* Recent Activity Widget */}
+          {widgets.find(w => w.id === 'recentActivity')?.enabled && (
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Activity</CardTitle>
+                <Activity className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {notifications.length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground text-xs">No recent activity</div>
+                ) : (
+                  notifications.slice(0, 4).map((notification) => (
+                    <div 
+                      key={notification.id} 
+                      className={cn(
+                        "p-2 rounded-lg text-xs",
+                        notification.read ? "bg-secondary/20" : "bg-primary/10 border border-primary/20"
+                      )}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className={cn(
+                          "w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0",
+                          notification.type === 'success' ? "bg-green-500" :
+                          notification.type === 'warning' ? "bg-yellow-500" :
+                          notification.type === 'alert' ? "bg-red-500" : "bg-blue-500"
+                        )} />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium truncate">{notification.title}</div>
+                          <div className="text-muted-foreground text-[10px] truncate">{notification.message}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {widgets.find(w => w.id === 'capitalAtWork')?.enabled && (
             <Card className="bg-card border-border overflow-hidden">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -1587,44 +1625,6 @@ export default function Dashboard() {
               </Card>
             );
           })()}
-
-          {/* Recent Activity Widget */}
-          {widgets.find(w => w.id === 'recentActivity')?.enabled && (
-            <Card className="bg-card border-border">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Activity</CardTitle>
-                <Activity className="w-4 h-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {notifications.length === 0 ? (
-                  <div className="text-center py-4 text-muted-foreground text-xs">No recent activity</div>
-                ) : (
-                  notifications.slice(0, 4).map((notification) => (
-                    <div 
-                      key={notification.id} 
-                      className={cn(
-                        "p-2 rounded-lg text-xs",
-                        notification.read ? "bg-secondary/20" : "bg-primary/10 border border-primary/20"
-                      )}
-                    >
-                      <div className="flex items-start gap-2">
-                        <div className={cn(
-                          "w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0",
-                          notification.type === 'success' ? "bg-green-500" :
-                          notification.type === 'warning' ? "bg-yellow-500" :
-                          notification.type === 'alert' ? "bg-red-500" : "bg-blue-500"
-                        )} />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium truncate">{notification.title}</div>
-                          <div className="text-muted-foreground text-[10px] truncate">{notification.message}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          )}
         </div>
           </div>
         </TabsContent>

@@ -200,7 +200,7 @@ export default function DocumentManagement({ role = 'CEO' }: DocumentManagementP
   
   const [activeTab, setActiveTab] = useState<'templates' | 'library'>('templates');
   const [selectedTemplate, setSelectedTemplate] = useState<typeof ibTemplates[0] | null>(null);
-  const [selectedDealForGeneration, setSelectedDealForGeneration] = useState<string>("");
+  const [selectedDealForGeneration, setSelectedDealForGeneration] = useState<string>("none");
   const [generatedContent, setGeneratedContent] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -369,7 +369,8 @@ export default function DocumentManagement({ role = 'CEO' }: DocumentManagementP
     setIsGenerating(true);
     
     try {
-      const dealData = selectedDealForGeneration ? deals.find(d => d.id === selectedDealForGeneration) : null;
+      const hasDeal = selectedDealForGeneration && selectedDealForGeneration !== "none";
+      const dealData = hasDeal ? deals.find(d => d.id === selectedDealForGeneration) : null;
       
       const response = await fetch('/api/generate-document', {
         method: 'POST',
@@ -377,7 +378,7 @@ export default function DocumentManagement({ role = 'CEO' }: DocumentManagementP
         credentials: 'include',
         body: JSON.stringify({
           templateName: selectedTemplate.name,
-          dealId: selectedDealForGeneration || undefined,
+          dealId: hasDeal ? selectedDealForGeneration : undefined,
           deal: dealData,
           compliance: { sec: true, finra: true, legal: true }
         })
@@ -405,7 +406,8 @@ export default function DocumentManagement({ role = 'CEO' }: DocumentManagementP
     }
     
     try {
-      const dealData = selectedDealForGeneration ? deals.find(d => d.id === selectedDealForGeneration) : null;
+      const hasDeal = selectedDealForGeneration && selectedDealForGeneration !== "none";
+      const dealData = hasDeal ? deals.find(d => d.id === selectedDealForGeneration) : null;
       const textEncoder = new TextEncoder();
       const contentBytes = textEncoder.encode(generatedContent);
       
@@ -422,7 +424,7 @@ export default function DocumentManagement({ role = 'CEO' }: DocumentManagementP
         mimeType: 'text/plain',
         size: contentBytes.length,
         content: base64Content,
-        dealId: selectedDealForGeneration || undefined,
+        dealId: hasDeal ? selectedDealForGeneration : undefined,
         dealName: dealData?.name || undefined,
         tags: ['ai-generated', selectedTemplate.category.toLowerCase()],
       });
@@ -716,7 +718,7 @@ export default function DocumentManagement({ role = 'CEO' }: DocumentManagementP
                               <SelectValue placeholder="Link to deal" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">No deal</SelectItem>
+                              <SelectItem value="none">No deal</SelectItem>
                               {deals.map((deal) => (
                                 <SelectItem key={deal.id} value={deal.id}>
                                   {deal.name}
@@ -765,7 +767,7 @@ export default function DocumentManagement({ role = 'CEO' }: DocumentManagementP
                         <h3 className="font-semibold text-lg mb-2">Ready to Generate</h3>
                         <p className="text-muted-foreground max-w-md mb-4">
                           Click "Generate" to create a {selectedTemplate.name} document. 
-                          {selectedDealForGeneration && ' The document will be customized for the selected deal.'}
+                          {selectedDealForGeneration && selectedDealForGeneration !== "none" && ' The document will be customized for the selected deal.'}
                         </p>
                         <Button
                           onClick={handleGenerateDocument}
