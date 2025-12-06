@@ -140,11 +140,48 @@ export default function Dashboard() {
   const [widgets, setWidgets] = useState<WidgetConfig[]>(DEFAULT_WIDGETS);
   const [widgetsInitialized, setWidgetsInitialized] = useState(false);
   
+  // Normalize widget order: Recent Activity should come before Capital At Work and Fee Summary
+  const normalizeWidgetOrder = (widgets: WidgetConfig[]): WidgetConfig[] => {
+    const recentActivityIndex = widgets.findIndex(w => w.id === 'recentActivity');
+    const capitalAtWorkIndex = widgets.findIndex(w => w.id === 'capitalAtWork');
+    const feeSummaryIndex = widgets.findIndex(w => w.id === 'feeSummary');
+    
+    // If Recent Activity is after Capital At Work or Fee Summary, we need to reorder
+    if (recentActivityIndex > capitalAtWorkIndex || recentActivityIndex > feeSummaryIndex) {
+      // Create a new array with the correct order
+      const result = widgets.filter(w => !['recentActivity', 'capitalAtWork', 'feeSummary'].includes(w.id));
+      
+      // Find the position where we should insert (after upcomingMeetings if it exists)
+      const upcomingMeetingsIndex = result.findIndex(w => w.id === 'upcomingMeetings');
+      const insertPosition = upcomingMeetingsIndex >= 0 ? upcomingMeetingsIndex + 1 : result.length;
+      
+      // Insert in correct order: Recent Activity, then Capital At Work, then Fee Summary
+      const recentActivity = widgets.find(w => w.id === 'recentActivity');
+      const capitalAtWork = widgets.find(w => w.id === 'capitalAtWork');
+      const feeSummary = widgets.find(w => w.id === 'feeSummary');
+      
+      const toInsert = [recentActivity, capitalAtWork, feeSummary].filter(Boolean) as WidgetConfig[];
+      result.splice(insertPosition, 0, ...toInsert);
+      
+      return result;
+    }
+    
+    return widgets;
+  };
+  
   // Load widget config from user preferences when available
   useEffect(() => {
     if (!prefsLoading && userPrefs?.dashboardWidgets && userPrefs.dashboardWidgets.length > 0 && !widgetsInitialized) {
-      setWidgets(userPrefs.dashboardWidgets as WidgetConfig[]);
+      // Normalize the order to ensure Recent Activity comes before Capital At Work and Fee Summary
+      const loadedWidgets = userPrefs.dashboardWidgets as WidgetConfig[];
+      const normalizedWidgets = normalizeWidgetOrder(loadedWidgets);
+      setWidgets(normalizedWidgets);
       setWidgetsInitialized(true);
+      
+      // If order was changed, save the corrected order
+      if (JSON.stringify(loadedWidgets) !== JSON.stringify(normalizedWidgets)) {
+        saveUserPrefs.mutateAsync({ dashboardWidgets: normalizedWidgets });
+      }
     } else if (!prefsLoading && !widgetsInitialized) {
       setWidgetsInitialized(true);
     }
