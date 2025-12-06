@@ -1114,142 +1114,6 @@ export default function Dashboard() {
               </CardContent>
               </Card>
           )}
-
-          {/* Recent Activity Widget */}
-          {widgets.find(w => w.id === 'recentActivity')?.enabled && (
-            <Card className="bg-card border-border">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Activity</CardTitle>
-                <Activity className="w-4 h-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {notifications.length === 0 ? (
-                  <div className="text-center py-4 text-muted-foreground text-xs">No recent activity</div>
-                ) : (
-                  notifications.slice(0, 4).map((notification) => (
-                    <div 
-                      key={notification.id} 
-                      className={cn(
-                        "p-2 rounded-lg text-xs",
-                        notification.read ? "bg-secondary/20" : "bg-primary/10 border border-primary/20"
-                      )}
-                    >
-                      <div className="flex items-start gap-2">
-                        <div className={cn(
-                          "w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0",
-                          notification.type === 'success' ? "bg-green-500" :
-                          notification.type === 'warning' ? "bg-yellow-500" :
-                          notification.type === 'alert' ? "bg-red-500" : "bg-blue-500"
-                        )} />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium truncate">{notification.title}</div>
-                          <div className="text-muted-foreground text-[10px] truncate">{notification.message}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {widgets.find(w => w.id === 'capitalAtWork')?.enabled && (
-            <Card className="bg-card border-border overflow-hidden">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Capital At Work</CardTitle>
-                <DollarSign className="w-4 h-4 text-primary" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-center py-4">
-                  <div className="text-4xl font-bold text-primary">
-                    ${activeDeals.reduce((sum, d) => sum + (d.value || 0), 0).toLocaleString()}M
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">Total Active Deal Value</div>
-                </div>
-                <Separator className="bg-border/50" />
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <div className="text-lg font-semibold text-green-400">
-                      {deals.filter(d => d.status === 'Active').length}
-                    </div>
-                    <div className="text-[9px] text-muted-foreground uppercase">Active</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-semibold text-yellow-400">
-                      {deals.filter(d => d.status === 'On Hold').length}
-                    </div>
-                    <div className="text-[9px] text-muted-foreground uppercase">On Hold</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-semibold text-muted-foreground">
-                      {deals.filter(d => d.status === 'Closed').length}
-                    </div>
-                    <div className="text-[9px] text-muted-foreground uppercase">Closed</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {widgets.find(w => w.id === 'feeSummary')?.enabled && (
-            <Card className="bg-card border-border overflow-hidden">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Fee Summary</CardTitle>
-                <Briefcase className="w-4 h-4 text-primary" />
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {(() => {
-                  const feesByType = allDealFees.reduce((acc, fee) => {
-                    const type = fee.feeType || 'other';
-                    if (!acc[type]) acc[type] = { total: 0, count: 0 };
-                    if (fee.amount) {
-                      acc[type].total += fee.amount;
-                      acc[type].count++;
-                    }
-                    return acc;
-                  }, {} as Record<string, { total: number; count: number }>);
-                  
-                  const feeLabels: Record<string, string> = {
-                    engagement: 'Engagement Fees',
-                    monthly: 'Monthly Retainers',
-                    success: 'Success Fees',
-                    transaction: 'Transaction Fees',
-                    spread: 'Spreads'
-                  };
-                  
-                  const totalFees = Object.values(feesByType).reduce((sum, f) => sum + f.total, 0);
-                  
-                  return (
-                    <>
-                      <div className="text-center py-2">
-                        <div className="text-2xl font-bold text-green-400">
-                          ${totalFees.toLocaleString()}
-                        </div>
-                        <div className="text-xs text-muted-foreground">Total Fixed Fees</div>
-                      </div>
-                      <Separator className="bg-border/50" />
-                      <div className="space-y-2">
-                        {Object.entries(feesByType).map(([type, data]) => (
-                          <div key={type} className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground truncate">{feeLabels[type] || type}</span>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="secondary" className="text-[9px] px-1">{data.count}</Badge>
-                              <span className="font-mono text-green-400">${data.total.toLocaleString()}</span>
-                            </div>
-                          </div>
-                        ))}
-                        {Object.keys(feesByType).length === 0 && (
-                          <div className="text-center text-xs text-muted-foreground py-4">
-                            No fees configured yet
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  );
-                })()}
-              </CardContent>
-            </Card>
-          )}
           
           {widgets.find(w => w.id === 'marketPulse')?.enabled && (
             <Card className="bg-card border-border">
@@ -1625,6 +1489,144 @@ export default function Dashboard() {
               </Card>
             );
           })()}
+
+          {/* Recent Activity Widget */}
+          {widgets.find(w => w.id === 'recentActivity')?.enabled && (
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Activity</CardTitle>
+                <Activity className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {notifications.length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground text-xs">No recent activity</div>
+                ) : (
+                  notifications.slice(0, 4).map((notification) => (
+                    <div 
+                      key={notification.id} 
+                      className={cn(
+                        "p-2 rounded-lg text-xs",
+                        notification.read ? "bg-secondary/20" : "bg-primary/10 border border-primary/20"
+                      )}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className={cn(
+                          "w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0",
+                          notification.type === 'success' ? "bg-green-500" :
+                          notification.type === 'warning' ? "bg-yellow-500" :
+                          notification.type === 'alert' ? "bg-red-500" : "bg-blue-500"
+                        )} />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium truncate">{notification.title}</div>
+                          <div className="text-muted-foreground text-[10px] truncate">{notification.message}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Capital At Work Widget */}
+          {widgets.find(w => w.id === 'capitalAtWork')?.enabled && (
+            <Card className="bg-card border-border overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Capital At Work</CardTitle>
+                <DollarSign className="w-4 h-4 text-primary" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-center py-4">
+                  <div className="text-4xl font-bold text-primary">
+                    ${activeDeals.reduce((sum, d) => sum + (d.value || 0), 0).toLocaleString()}M
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">Total Active Deal Value</div>
+                </div>
+                <Separator className="bg-border/50" />
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <div className="text-lg font-semibold text-green-400">
+                      {deals.filter(d => d.status === 'Active').length}
+                    </div>
+                    <div className="text-[9px] text-muted-foreground uppercase">Active</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-semibold text-yellow-400">
+                      {deals.filter(d => d.status === 'On Hold').length}
+                    </div>
+                    <div className="text-[9px] text-muted-foreground uppercase">On Hold</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-semibold text-muted-foreground">
+                      {deals.filter(d => d.status === 'Closed').length}
+                    </div>
+                    <div className="text-[9px] text-muted-foreground uppercase">Closed</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Fee Summary Widget */}
+          {widgets.find(w => w.id === 'feeSummary')?.enabled && (
+            <Card className="bg-card border-border overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Fee Summary</CardTitle>
+                <Briefcase className="w-4 h-4 text-primary" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {(() => {
+                  const feesByType = allDealFees.reduce((acc, fee) => {
+                    const type = fee.feeType || 'other';
+                    if (!acc[type]) acc[type] = { total: 0, count: 0 };
+                    if (fee.amount) {
+                      acc[type].total += fee.amount;
+                      acc[type].count++;
+                    }
+                    return acc;
+                  }, {} as Record<string, { total: number; count: number }>);
+                  
+                  const feeLabels: Record<string, string> = {
+                    engagement: 'Engagement Fees',
+                    monthly: 'Monthly Retainers',
+                    success: 'Success Fees',
+                    transaction: 'Transaction Fees',
+                    spread: 'Spreads'
+                  };
+                  
+                  const totalFees = Object.values(feesByType).reduce((sum, f) => sum + f.total, 0);
+                  
+                  return (
+                    <>
+                      <div className="text-center py-2">
+                        <div className="text-2xl font-bold text-green-400">
+                          ${totalFees.toLocaleString()}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Total Fixed Fees</div>
+                      </div>
+                      <Separator className="bg-border/50" />
+                      <div className="space-y-2">
+                        {Object.entries(feesByType).map(([type, data]) => (
+                          <div key={type} className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground truncate">{feeLabels[type] || type}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-[9px] px-1">{data.count}</Badge>
+                              <span className="font-mono text-green-400">${data.total.toLocaleString()}</span>
+                            </div>
+                          </div>
+                        ))}
+                        {Object.keys(feesByType).length === 0 && (
+                          <div className="text-center text-xs text-muted-foreground py-4">
+                            No fees configured yet
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          )}
         </div>
           </div>
         </TabsContent>
