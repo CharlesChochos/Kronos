@@ -152,7 +152,7 @@ function Router() {
         {() => <ProtectedRoute component={CeoDealManagement} />}
       </Route>
       <Route path="/ceo/documents">
-        {() => <ProtectedRoute component={CeoDocumentGenerator} />}
+        {() => <ProtectedRoute component={CeoDocumentManagement} />}
       </Route>
       <Route path="/ceo/investors">
         {() => <ProtectedRoute component={InvestorMatching} />}
@@ -211,7 +211,7 @@ function Router() {
         {() => <ProtectedRoute component={MyTasks} />}
       </Route>
       <Route path="/employee/documents">
-        {() => <ProtectedRoute component={EmployeeDocumentGenerator} />}
+        {() => <ProtectedRoute component={EmployeeDocumentManagement} />}
       </Route>
       <Route path="/employee/deals">
         {() => <ProtectedRoute component={EmployeeDealManagement} />}
