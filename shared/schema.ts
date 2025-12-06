@@ -624,7 +624,7 @@ export type DocumentTemplate = typeof documentTemplates.$inferSelect;
 export const investorMatches = pgTable("investor_matches", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   dealId: varchar("deal_id").references(() => deals.id).notNull(),
-  investorId: integer("investor_id").notNull(), // ID from shared investors list
+  investorId: varchar("investor_id").notNull(), // Stakeholder ID (type='investor')
   status: text("status").notNull().default('matched'), // matched, rejected
   matchedBy: varchar("matched_by").references(() => users.id),
   matchedAt: timestamp("matched_at").defaultNow(),

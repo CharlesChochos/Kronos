@@ -96,13 +96,13 @@ type WidgetConfig = {
 const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'quickActions', name: 'Quick Actions', enabled: true },
   { id: 'activeDeals', name: 'Active Deals Analytics', enabled: true },
-  { id: 'capitalAtWork', name: 'Capital At Work', enabled: true },
-  { id: 'feeSummary', name: 'Fee Summary', enabled: true },
   { id: 'marketPulse', name: 'Market Pulse', enabled: true },
   { id: 'marketIntelligence', name: 'Market Intelligence', enabled: true },
   { id: 'teamTaskProgress', name: 'Team Task Progress', enabled: true },
   { id: 'upcomingMeetings', name: 'Upcoming Meetings', enabled: true },
   { id: 'recentActivity', name: 'Recent Activity', enabled: true },
+  { id: 'capitalAtWork', name: 'Capital At Work', enabled: true },
+  { id: 'feeSummary', name: 'Fee Summary', enabled: true },
   { id: 'dealPipeline', name: 'Deal Pipeline Overview', enabled: false },
   { id: 'performanceMetrics', name: 'Performance Metrics', enabled: false },
 ];

@@ -103,14 +103,43 @@ export default function TeamPerformance() {
     return { totalTasks, completedTasks, activeDeals, avgCompletionRate };
   }, [teamMembers]);
 
-  const monthlyPerformance = [
-    { month: 'Jul', tasks: 45, deals: 3, revenue: 25 },
-    { month: 'Aug', tasks: 52, deals: 4, revenue: 32 },
-    { month: 'Sep', tasks: 48, deals: 2, revenue: 18 },
-    { month: 'Oct', tasks: 61, deals: 5, revenue: 45 },
-    { month: 'Nov', tasks: 55, deals: 4, revenue: 38 },
-    { month: 'Dec', tasks: 58, deals: 6, revenue: 52 },
-  ];
+  // Monthly performance is calculated from actual task and deal data
+  const monthlyPerformance = useMemo(() => {
+    const now = new Date();
+    const months: { month: string; tasks: number; deals: number; revenue: number }[] = [];
+    
+    // Generate data for last 6 months based on actual tasks and deals
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+      const monthName = date.toLocaleString('default', { month: 'short' });
+      
+      // Count completed tasks in this month
+      const monthTasks = tasks.filter(t => {
+        if (t.status !== 'Completed' || !t.completedAt) return false;
+        const completedDate = new Date(t.completedAt);
+        return completedDate >= date && completedDate <= monthEnd;
+      }).length;
+      
+      // Count closed deals in this month (using createdAt as proxy since no updatedAt)
+      const monthDeals = deals.filter(d => {
+        if (d.status !== 'Closed') return false;
+        const createdAt = d.createdAt ? new Date(d.createdAt) : null;
+        return createdAt && createdAt >= date && createdAt <= monthEnd;
+      }).length;
+      
+      // Calculate revenue from closed deals
+      const monthRevenue = deals.filter(d => {
+        if (d.status !== 'Closed') return false;
+        const createdAt = d.createdAt ? new Date(d.createdAt) : null;
+        return createdAt && createdAt >= date && createdAt <= monthEnd;
+      }).reduce((sum, d) => sum + d.value, 0);
+      
+      months.push({ month: monthName, tasks: monthTasks, deals: monthDeals, revenue: monthRevenue });
+    }
+    
+    return months;
+  }, [tasks, deals]);
 
   const leaderboard = useMemo(() => {
     return [...teamMembers]

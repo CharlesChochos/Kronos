@@ -51,7 +51,6 @@ import { useDeals, useStakeholders, useCreateStakeholder, useUpdateStakeholder, 
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { SHARED_INVESTORS } from "@/lib/investors";
 import type { Stakeholder } from "@shared/schema";
 
 type StakeholderType = 'investor' | 'advisor' | 'legal' | 'banker' | 'consultant' | 'client' | 'other';
@@ -105,23 +104,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     notes: ''
   });
 
-  const investorStakeholders: LocalStakeholder[] = useMemo(() => SHARED_INVESTORS.map((inv) => ({
-    id: `inv-${inv.id}`,
-    name: inv.name,
-    title: inv.type,
-    company: inv.name,
-    type: 'investor' as const,
-    email: inv.email,
-    phone: inv.phone,
-    website: inv.website,
-    location: inv.focus,
-    notes: `${inv.type} | Check size: ${inv.checkSize} | Focus: ${inv.focus} | Tags: ${inv.tags.join(', ')}`,
-    deals: [],
-    isFavorite: inv.matchScore >= 90,
-    createdAt: "2024-01-01T00:00:00Z"
-  })), []);
-
-  const customStakeholders: LocalStakeholder[] = useMemo(() => dbStakeholders.map(s => ({
+  const stakeholders: LocalStakeholder[] = useMemo(() => dbStakeholders.map(s => ({
     id: s.id,
     name: s.name,
     title: s.title,
@@ -138,8 +121,6 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     lastContact: s.lastContact || undefined,
     createdAt: s.createdAt?.toString()
   })), [dbStakeholders]);
-
-  const stakeholders = useMemo(() => [...investorStakeholders, ...customStakeholders], [investorStakeholders, customStakeholders]);
 
   const [newStakeholder, setNewStakeholder] = useState({
     name: "",
@@ -337,7 +318,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     let successCount = 0;
     let errorCount = 0;
     
-    for (const index of selectedRows) {
+    for (const index of Array.from(selectedRows)) {
       const row = importData[index];
       if (!row) continue;
       
@@ -728,11 +709,29 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
           </ScrollArea>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
-            <Button onClick={() => {
+            <Button onClick={async () => {
               if (selectedStakeholder) {
-                setStakeholders(stakeholders.map(s => s.id === selectedStakeholder.id ? selectedStakeholder : s));
-                toast.success("Stakeholder updated");
-                setShowEditModal(false);
+                try {
+                  await updateStakeholderMutation.mutateAsync({
+                    id: selectedStakeholder.id,
+                    updates: {
+                      name: selectedStakeholder.name,
+                      title: selectedStakeholder.title,
+                      company: selectedStakeholder.company,
+                      type: selectedStakeholder.type,
+                      email: selectedStakeholder.email || null,
+                      phone: selectedStakeholder.phone || null,
+                      linkedin: selectedStakeholder.linkedin || null,
+                      website: selectedStakeholder.website || null,
+                      location: selectedStakeholder.location || null,
+                      notes: selectedStakeholder.notes || null,
+                    }
+                  });
+                  toast.success("Stakeholder updated");
+                  setShowEditModal(false);
+                } catch (error) {
+                  toast.error("Failed to update stakeholder");
+                }
               }
             }} data-testid="button-save-stakeholder">Save Changes</Button>
           </DialogFooter>

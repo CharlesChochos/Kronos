@@ -12,38 +12,72 @@ import {
   Mail,
   Phone,
   Globe,
-  Heart
+  Heart,
+  Users
 } from "lucide-react";
-import { useCurrentUser, useDeals, useUpdateDeal, useInvestorMatches, useCreateInvestorMatch, useDeleteInvestorMatch } from "@/lib/api";
+import { useCurrentUser, useDeals, useUpdateDeal, useInvestorMatches, useCreateInvestorMatch, useDeleteInvestorMatch, useStakeholders } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion";
 import type { TaggedInvestor } from "@shared/schema";
-import { SHARED_INVESTORS } from "@/lib/investors";
+import { Link } from "wouter";
 
-const INVESTORS = SHARED_INVESTORS;
+type InvestorData = {
+  id: string;
+  numericId: number;
+  name: string;
+  type: string;
+  focus: string;
+  checkSize: string;
+  matchScore: number;
+  tags: string[];
+  email: string;
+  phone: string;
+  website: string;
+};
 
 export default function InvestorMatching() {
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [], isLoading } = useDeals();
+  const { data: stakeholders = [], isLoading: stakeholdersLoading } = useStakeholders();
   const updateDeal = useUpdateDeal();
   
   const [selectedDeal, setSelectedDeal] = useState<string>('');
-  const [showContactModal, setShowContactModal] = useState<typeof INVESTORS[0] | null>(null);
+  const [showContactModal, setShowContactModal] = useState<InvestorData | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   
   const { data: investorMatches = [] } = useInvestorMatches(selectedDeal || null);
   const createMatch = useCreateInvestorMatch();
   const deleteMatch = useDeleteInvestorMatch();
   
-  const [rejectedInvestors, setRejectedInvestors] = useState<number[]>([]);
+  const [rejectedInvestors, setRejectedInvestors] = useState<string[]>([]);
+  
+  // Convert stakeholders (type='investor') to InvestorData format
+  // Use stakeholder's actual database ID for stable identification
+  const INVESTORS: InvestorData[] = useMemo(() => {
+    return stakeholders
+      .filter(s => s.type === 'investor')
+      .map((s, index) => ({
+        id: s.id,
+        numericId: index + 1,
+        name: s.name,
+        type: s.title || 'Investor',
+        focus: s.location || 'Diversified',
+        checkSize: s.notes?.match(/Check size: ([^|,]+)/)?.[1] || 'Flexible',
+        matchScore: s.isFavorite ? 95 : 80,
+        tags: s.notes?.match(/Tags: (.+)/)?.[1]?.split(', ') || [],
+        email: s.email || '',
+        phone: s.phone || '',
+        website: s.website || '',
+      }));
+  }, [stakeholders]);
   
   const matchedInvestors = useMemo(() => {
     const matchedIds = investorMatches
       .filter(m => m.status === 'matched')
       .map(m => m.investorId);
     return INVESTORS.filter(inv => matchedIds.includes(inv.id));
-  }, [investorMatches]);
+  }, [investorMatches, INVESTORS]);
   
   useEffect(() => {
     if (selectedDeal) {
@@ -88,11 +122,11 @@ export default function InvestorMatching() {
       
       return isNotMatched && isNotRejected && sectorMatches;
     });
-  }, [dealSector, matchedInvestors, rejectedInvestors]);
+  }, [dealSector, matchedInvestors, rejectedInvestors, INVESTORS]);
     
   const currentInvestor = availableInvestors[0];
 
-  const addInvestorToTaggedList = async (investor: typeof INVESTORS[0]) => {
+  const addInvestorToTaggedList = async (investor: InvestorData) => {
     if (!selectedDeal) return;
     
     const latestDeal = deals.find(d => d.id === selectedDeal);
@@ -390,6 +424,21 @@ export default function InvestorMatching() {
                     <p className="text-muted-foreground mb-4">You've reviewed all available investors for this deal.</p>
                     <Button onClick={resetMatches}>Review Again</Button>
                   </>
+                ) : INVESTORS.length === 0 ? (
+                  <>
+                    <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto mb-4">
+                      <Users className="w-8 h-8 text-blue-500" />
+                    </div>
+                    <h3 className="text-xl font-bold mb-2">No Investors Yet</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Add investors to your Stakeholder Directory to start matching them with deals.
+                    </p>
+                    <Link href="/ceo/stakeholders">
+                      <Button>
+                        <Users className="w-4 h-4 mr-2" /> Go to Stakeholder Directory
+                      </Button>
+                    </Link>
+                  </>
                 ) : (
                   <>
                     <div className="w-16 h-16 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-4">
@@ -397,9 +446,14 @@ export default function InvestorMatching() {
                     </div>
                     <h3 className="text-xl font-bold mb-2">No Matching Investors</h3>
                     <p className="text-muted-foreground mb-4">
-                      No investors in our database focus on the <span className="font-medium text-foreground">{currentDeal?.sector}</span> sector.
+                      No investors in your directory focus on the <span className="font-medium text-foreground">{currentDeal?.sector}</span> sector.
                     </p>
-                    <p className="text-sm text-muted-foreground">Try selecting a different deal or add new investors to your database.</p>
+                    <p className="text-sm text-muted-foreground mb-4">Try selecting a different deal or add investors with this sector focus.</p>
+                    <Link href="/ceo/stakeholders">
+                      <Button variant="outline">
+                        <Users className="w-4 h-4 mr-2" /> Add Investors
+                      </Button>
+                    </Link>
                   </>
                 )}
               </Card>
