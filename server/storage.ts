@@ -388,7 +388,6 @@ export class DatabaseStorage implements IStorage {
     await db.delete(schema.clientPortalUpdates).where(eq(schema.clientPortalUpdates.dealId, id));
     await db.delete(schema.clientPortalAccess).where(eq(schema.clientPortalAccess.dealId, id));
     await db.delete(schema.documentsTable).where(eq(schema.documentsTable.dealId, id));
-    await db.delete(schema.newsFeedPosts).where(eq(schema.newsFeedPosts.dealId, id));
     
     // Set dealId to null for related records with nullable FK
     await db.update(schema.activityLogs).set({ dealId: null }).where(eq(schema.activityLogs.dealId, id));
