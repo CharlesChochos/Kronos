@@ -828,6 +828,7 @@ export async function registerRoutes(
       }
       res.json({ message: "Deal deleted successfully" });
     } catch (error) {
+      console.error('Deal delete error:', error);
       res.status(500).json({ error: "Failed to delete deal" });
     }
   });

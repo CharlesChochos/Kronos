@@ -394,6 +394,7 @@ export class DatabaseStorage implements IStorage {
     await db.update(schema.activityLogs).set({ dealId: null }).where(eq(schema.activityLogs.dealId, id));
     await db.update(schema.investorInteractions).set({ dealId: null }).where(eq(schema.investorInteractions.dealId, id));
     await db.update(schema.timeEntries).set({ dealId: null }).where(eq(schema.timeEntries.dealId, id));
+    await db.update(schema.announcements).set({ dealId: null }).where(eq(schema.announcements.dealId, id));
     
     // Now delete the deal
     await db.delete(schema.deals).where(eq(schema.deals.id, id));
