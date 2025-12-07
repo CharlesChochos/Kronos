@@ -194,6 +194,46 @@ export function useDeleteDeal() {
   });
 }
 
+// Custom Sectors API
+export type CustomSector = {
+  id: string;
+  name: string;
+  createdBy: string | null;
+  createdAt: string;
+};
+
+export function useCustomSectors() {
+  return useQuery({
+    queryKey: ["custom-sectors"],
+    queryFn: async () => {
+      const res = await fetch("/api/custom-sectors");
+      if (!res.ok) throw new Error("Failed to fetch custom sectors");
+      return res.json() as Promise<CustomSector[]>;
+    },
+  });
+}
+
+export function useCreateCustomSector() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (name: string) => {
+      const res = await fetch("/api/custom-sectors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: "Failed to create custom sector" }));
+        throw new Error(error.error || "Failed to create custom sector");
+      }
+      return res.json() as Promise<CustomSector>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["custom-sectors"] });
+    },
+  });
+}
+
 // Task API
 export function useTasks(filters?: { userId?: string; dealId?: string }) {
   return useQuery({

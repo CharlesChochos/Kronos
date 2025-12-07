@@ -374,7 +374,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,.tsv,.txt"
+              accept=".csv,.tsv,.txt,.xlsx,.xls,.doc,.docx"
               className="hidden"
               onChange={handleFileUpload}
             />
@@ -383,7 +383,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
               onClick={() => fileInputRef.current?.click()}
               data-testid="button-import-stakeholders"
             >
-              <Upload className="w-4 h-4 mr-2" /> Import CSV
+              <Upload className="w-4 h-4 mr-2" /> Import File
             </Button>
             <Button onClick={() => setShowCreateModal(true)} data-testid="button-add-stakeholder">
               <Plus className="w-4 h-4 mr-2" /> Add Stakeholder

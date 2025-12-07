@@ -681,6 +681,39 @@ export async function registerRoutes(
     }
   });
 
+  // ===== CUSTOM SECTORS ROUTES =====
+  
+  app.get("/api/custom-sectors", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const sectors = await storage.getAllCustomSectors();
+      res.json(sectors);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch custom sectors" });
+    }
+  });
+  
+  app.post("/api/custom-sectors", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const { name } = req.body;
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ error: "Sector name is required" });
+      }
+      
+      const currentUser = req.user as any;
+      const sector = await storage.createCustomSector({
+        name: name.trim(),
+        createdBy: currentUser.id,
+      });
+      res.json(sector);
+    } catch (error: any) {
+      // Handle unique constraint violation (duplicate sector)
+      if (error.code === '23505') {
+        return res.status(400).json({ error: "This sector already exists" });
+      }
+      res.status(500).json({ error: "Failed to create custom sector" });
+    }
+  });
+
   // ===== DEAL ROUTES =====
   
   app.get("/api/deals", requireAuth, requireInternal, async (req, res) => {
@@ -1238,19 +1271,29 @@ export async function registerRoutes(
       const participantEmails: string[] = [];
       
       if (result.data.participants && Array.isArray(result.data.participants)) {
-        // Get all users to match emails to user IDs
+        // Get all users to match by email or user ID
         const allUsers = await storage.getAllUsers();
-        for (const participantEmail of result.data.participants as string[]) {
-          participantEmails.push(participantEmail);
-          const participant = allUsers.find(u => u.email === participantEmail);
-          if (participant && participant.id !== currentUser.id) {
-            await storage.createNotification({
-              userId: participant.id,
-              title: "New Meeting Scheduled",
-              message: `You have been invited to "${result.data.title}" by ${currentUser.name}`,
-              type: "info",
-              link: `/ceo/dashboard`,
-            });
+        for (const participantRef of result.data.participants as string[]) {
+          // Match by ID or email
+          const participant = allUsers.find(u => u.id === participantRef || u.email === participantRef);
+          if (participant) {
+            participantEmails.push(participant.email);
+            if (participant.id !== currentUser.id) {
+              // Determine correct link based on user role
+              const calendarLink = participant.role === 'CEO' ? '/ceo/calendar' : '/employee/calendar';
+              await storage.createNotification({
+                userId: participant.id,
+                title: "New Meeting Invitation",
+                message: `You have been invited to "${result.data.title}" on ${new Date(result.data.scheduledFor as Date).toLocaleDateString()} by ${currentUser.name}`,
+                type: "info",
+                link: calendarLink,
+              });
+            }
+          } else {
+            // It's an email that doesn't match any user (external invitee)
+            if (participantRef.includes('@')) {
+              participantEmails.push(participantRef);
+            }
           }
         }
       }

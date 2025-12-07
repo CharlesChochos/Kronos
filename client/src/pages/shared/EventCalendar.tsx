@@ -66,7 +66,8 @@ export default function EventCalendar({ role }: EventCalendarProps) {
     dealId: "",
     description: "",
     videoLink: "",
-    videoPlatform: ""
+    videoPlatform: "",
+    invitees: [] as string[]
   });
 
   const [newTimeOff, setNewTimeOff] = useState({
@@ -158,6 +159,14 @@ export default function EventCalendar({ role }: EventCalendarProps) {
     try {
       const scheduledFor = new Date(`${newEvent.date}T${newEvent.time}`);
       
+      // Convert user IDs to emails for the participants field (API expects emails)
+      const participantEmails = newEvent.invitees
+        .map(userId => {
+          const user = users.find(u => u.id === userId);
+          return user?.email;
+        })
+        .filter((email): email is string => !!email);
+      
       await createMeetingMutation.mutateAsync({
         title: newEvent.title,
         scheduledFor,
@@ -168,11 +177,12 @@ export default function EventCalendar({ role }: EventCalendarProps) {
         videoLink: newEvent.videoLink || null,
         videoPlatform: newEvent.videoPlatform || null,
         organizerId: currentUser?.id || null,
-        participants: [],
+        participants: participantEmails,
         status: 'scheduled',
       });
       
-      toast.success("Event created successfully!");
+      const inviteCount = newEvent.invitees.length;
+      toast.success(`Event created successfully!${inviteCount > 0 ? ` ${inviteCount} team member${inviteCount > 1 ? 's' : ''} invited.` : ''}`);
       setShowEventModal(false);
       setNewEvent({
         title: "",
@@ -183,7 +193,8 @@ export default function EventCalendar({ role }: EventCalendarProps) {
         dealId: "",
         description: "",
         videoLink: "",
-        videoPlatform: ""
+        videoPlatform: "",
+        invitees: []
       });
     } catch (error: any) {
       toast.error(error.message || "Failed to create event");
@@ -752,6 +763,51 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                 data-testid="input-event-description"
               />
             </div>
+            <div>
+              <Label>Invite Team Members</Label>
+              <div className="flex flex-wrap gap-2 mt-2 mb-2">
+                {newEvent.invitees.map((userId) => {
+                  const user = users.find(u => u.id === userId);
+                  return (
+                    <Badge key={userId} variant="secondary" className="flex items-center gap-1">
+                      {user?.name || userId}
+                      <X 
+                        className="w-3 h-3 cursor-pointer hover:text-destructive" 
+                        onClick={() => setNewEvent(prev => ({ 
+                          ...prev, 
+                          invitees: prev.invitees.filter(id => id !== userId) 
+                        }))}
+                      />
+                    </Badge>
+                  );
+                })}
+              </div>
+              <Select
+                value="none"
+                onValueChange={(v) => {
+                  if (v !== "none" && !newEvent.invitees.includes(v)) {
+                    setNewEvent(prev => ({ ...prev, invitees: [...prev.invitees, v] }));
+                  }
+                }}
+              >
+                <SelectTrigger data-testid="select-event-invitees">
+                  <SelectValue placeholder="Select team members to invite..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Select to add...</SelectItem>
+                  {users
+                    .filter(u => u.id !== currentUser?.id && !newEvent.invitees.includes(u.id))
+                    .map(user => (
+                      <SelectItem key={user.id} value={user.id}>{user.name} ({user.role})</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {newEvent.invitees.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {newEvent.invitees.length} team member{newEvent.invitees.length > 1 ? 's' : ''} will be invited
+                </p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEventModal(false)}>Cancel</Button>
@@ -803,6 +859,25 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                 <div className="flex items-center gap-2 text-sm">
                   <Briefcase className="w-4 h-4 text-muted-foreground" />
                   <Badge variant="outline">{getDealName(selectedEvent.dealId)}</Badge>
+                </div>
+              )}
+              {selectedEvent.participants && (selectedEvent.participants as string[]).length > 0 && (
+                <div>
+                  <Separator className="my-3" />
+                  <div className="flex items-center gap-2 text-sm mb-2">
+                    <User className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-medium">Invited ({(selectedEvent.participants as string[]).length})</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(selectedEvent.participants as string[]).map((participantId, idx) => {
+                      const participant = users.find(u => u.id === participantId || u.email === participantId);
+                      return (
+                        <Badge key={idx} variant="secondary">
+                          {participant?.name || participantId}
+                        </Badge>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
               {selectedEvent.description && (

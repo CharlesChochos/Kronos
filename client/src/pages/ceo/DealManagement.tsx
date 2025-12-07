@@ -37,7 +37,9 @@ import {
   useStageDocuments, useCreateStageDocument, useDeleteStageDocument,
   useStagePodMembers, useCreateStagePodMember, useDeleteStagePodMember,
   useStageVoiceNotes, useCreateStageVoiceNote, useDeleteStageVoiceNote,
-  useTaskComments, useCreateTaskComment
+  useTaskComments, useCreateTaskComment,
+  useCustomSectors, useCreateCustomSector,
+  useDealFees, type DealFeeType
 } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -700,6 +702,10 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const deleteDeal = useDeleteDeal();
   const createDealFee = useCreateDealFee();
   
+  // Custom sectors
+  const { data: customSectors = [] } = useCustomSectors();
+  const createCustomSector = useCreateCustomSector();
+  
   // Stage-based mutations
   const createStageDocument = useCreateStageDocument();
   const deleteStageDocument = useDeleteStageDocument();
@@ -716,6 +722,9 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  
+  // Fetch fees for the selected deal
+  const { data: selectedDealFees = [] } = useDealFees(selectedDeal?.id || '');
   const [activeStageTab, setActiveStageTab] = useState("Origination");
   const [viewMode, setViewMode] = useState<'grid' | 'calendar' | 'compare'>('grid');
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('week');
@@ -801,7 +810,13 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
     spread: '',
   });
   
-  const SECTORS = ['Technology', 'Healthcare', 'Energy', 'Consumer', 'Industrials', 'Financial', 'Other'];
+  const BASE_SECTORS = ['Technology', 'Healthcare', 'Energy', 'Consumer', 'Industrials', 'Financial'];
+  const SECTORS = useMemo(() => {
+    const customNames = customSectors.map(s => s.name);
+    // Combine base sectors with custom sectors, avoiding duplicates
+    const allSectors = [...BASE_SECTORS, ...customNames.filter(name => !BASE_SECTORS.includes(name))];
+    return [...allSectors, 'Other'];
+  }, [customSectors]);
   const [sectorOpen, setSectorOpen] = useState(false);
 
   const [newTeamMember, setNewTeamMember] = useState<PodTeamMember>({
@@ -962,7 +977,22 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
     
     const finalSector = newDeal.sector === 'Other' && newDeal.customSector ? newDeal.customSector : newDeal.sector;
     
+    // Save custom sector if it's a new one not in the existing list
+    const isCustomSector = newDeal.sector === 'Other' && newDeal.customSector;
+    const existingCustomSectorNames = customSectors.map(s => s.name.toLowerCase());
+    const isNewCustomSector = isCustomSector && !existingCustomSectorNames.includes(newDeal.customSector.toLowerCase()) && !BASE_SECTORS.includes(newDeal.customSector);
+    
     try {
+      // Save the custom sector first if it's new
+      if (isNewCustomSector) {
+        try {
+          await createCustomSector.mutateAsync(newDeal.customSector);
+        } catch (e) {
+          // Ignore if sector already exists (duplicate)
+          console.log("Custom sector may already exist:", e);
+        }
+      }
+      
       const createdDeal = await createDeal.mutateAsync({
         name: newDeal.name,
         client: newDeal.client,
@@ -2283,6 +2313,37 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     <div className="p-3 bg-secondary/30 rounded-lg">
                       <span className="text-muted-foreground text-sm">Description:</span>
                       <p className="mt-1 text-sm">{selectedDeal.description}</p>
+                    </div>
+                  )}
+
+                  {/* Deal Fees Section */}
+                  {selectedDealFees.length > 0 && (
+                    <div className="p-3 bg-secondary/30 rounded-lg">
+                      <div className="flex items-center gap-2 mb-3">
+                        <DollarSign className="w-4 h-4 text-primary" />
+                        <span className="font-medium text-sm">Fee Structure</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {selectedDealFees.map((fee: DealFeeType) => {
+                          const hasAmount = fee.amount !== null && fee.amount !== undefined && !isNaN(Number(fee.amount));
+                          const hasPercentage = fee.percentage !== null && fee.percentage !== undefined && !isNaN(Number(fee.percentage));
+                          return (
+                            <div key={fee.id} className="p-2 bg-background/50 rounded-md border border-border/50">
+                              <div className="text-xs text-muted-foreground capitalize">{fee.feeType.replace('-', ' ').replace('_', ' ')}</div>
+                              <div className="font-semibold text-primary">
+                                {hasAmount 
+                                  ? `$${Number(fee.amount).toLocaleString()}` 
+                                  : hasPercentage 
+                                    ? `${Number(fee.percentage)}%` 
+                                    : '-'}
+                              </div>
+                              {fee.description && (
+                                <div className="text-xs text-muted-foreground mt-1">{fee.description}</div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </TabsContent>

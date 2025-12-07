@@ -277,6 +277,10 @@ export interface IStorage {
   
   // User search for autocomplete
   searchUsers(query: string): Promise<User[]>;
+  
+  // Custom Sector operations
+  getAllCustomSectors(): Promise<schema.CustomSector[]>;
+  createCustomSector(sector: schema.InsertCustomSector): Promise<schema.CustomSector>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1480,6 +1484,16 @@ export class DatabaseStorage implements IStorage {
       user.name.toLowerCase().includes(lowerQuery) ||
       user.email.toLowerCase().includes(lowerQuery)
     );
+  }
+  
+  // Custom Sector operations
+  async getAllCustomSectors(): Promise<schema.CustomSector[]> {
+    return await db.select().from(schema.customSectors).orderBy(schema.customSectors.name);
+  }
+  
+  async createCustomSector(sector: schema.InsertCustomSector): Promise<schema.CustomSector> {
+    const [created] = await db.insert(schema.customSectors).values(sector).returning();
+    return created;
   }
 }
 

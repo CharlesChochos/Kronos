@@ -1007,3 +1007,19 @@ export const insertTaskCommentSchema = createInsertSchema(taskComments).omit({
 
 export type InsertTaskComment = z.infer<typeof insertTaskCommentSchema>;
 export type TaskComment = typeof taskComments.$inferSelect;
+
+// Custom Sectors table - user-defined sectors for deals
+export const customSectors = pgTable("custom_sectors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCustomSectorSchema = createInsertSchema(customSectors).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCustomSector = z.infer<typeof insertCustomSectorSchema>;
+export type CustomSector = typeof customSectors.$inferSelect;
