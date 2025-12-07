@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,7 @@ import {
   X,
   User
 } from "lucide-react";
-import { useCurrentUser, useMeetings, useDeals, useUsers, useCreateMeeting, useDeleteMeeting, useTimeOffRequests, useCreateTimeOffRequest, useUpdateTimeOffRequest, useGoogleCalendarStatus, useGoogleCalendarEvents, useCreateGoogleCalendarEvent, type GoogleCalendarEvent } from "@/lib/api";
+import { useCurrentUser, useMeetings, useDeals, useUsers, useCreateMeeting, useDeleteMeeting, useTimeOffRequests, useCreateTimeOffRequest, useUpdateTimeOffRequest, useGoogleCalendarStatus, useGoogleCalendarEvents, useCreateGoogleCalendarEvent, useConnectGoogleCalendar, useDisconnectGoogleCalendar, type GoogleCalendarEvent } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, isToday, parseISO, isWithinInterval, addHours } from "date-fns";
 import { toast } from "sonner";
@@ -52,6 +53,35 @@ export default function EventCalendar({ role }: EventCalendarProps) {
   const createTimeOffMutation = useCreateTimeOffRequest();
   const updateTimeOffMutation = useUpdateTimeOffRequest();
   const createGoogleEventMutation = useCreateGoogleCalendarEvent();
+  const connectGoogleCalendar = useConnectGoogleCalendar();
+  const disconnectGoogleCalendar = useDisconnectGoogleCalendar();
+  const [, setLocation] = useLocation();
+
+  // Handle OAuth callback query parameters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const connected = urlParams.get('connected');
+    const error = urlParams.get('error');
+    
+    if (connected === 'true') {
+      toast.success("Google Calendar connected successfully!");
+      // Remove query params from URL
+      window.history.replaceState({}, '', window.location.pathname);
+      // Refresh status and events
+      queryClient.invalidateQueries({ queryKey: ["google-calendar-status"] });
+      queryClient.invalidateQueries({ queryKey: ["google-calendar-events"] });
+    } else if (error) {
+      const errorMessages: Record<string, string> = {
+        'oauth_denied': 'Google Calendar authorization was denied',
+        'invalid_callback': 'Invalid authorization callback',
+        'invalid_state': 'Security validation failed. Please try again.',
+        'connection_failed': 'Failed to connect Google Calendar',
+        'not_authenticated': 'Please log in to connect Google Calendar',
+      };
+      toast.error(errorMessages[error] || 'Failed to connect Google Calendar');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -386,23 +416,61 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                         <CardTitle className="text-lg font-semibold">
                           {format(currentMonth, 'MMMM yyyy')}
                         </CardTitle>
-                        {googleCalendarStatus?.connected && (
+                        {googleCalendarStatus?.configured && (
                           <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 text-green-600 rounded-md text-xs font-medium">
-                              <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-                              Google Calendar
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => refetchGoogleEvents()}
-                              disabled={isLoadingGoogleEvents}
-                              title="Refresh Google Calendar"
-                              data-testid="button-refresh-google-calendar"
-                            >
-                              <RefreshCw className={cn("w-3 h-3", isLoadingGoogleEvents && "animate-spin")} />
-                            </Button>
+                            {googleCalendarStatus.connected ? (
+                              <>
+                                <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 text-green-600 rounded-md text-xs font-medium">
+                                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                                  Google Calendar
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => refetchGoogleEvents()}
+                                  disabled={isLoadingGoogleEvents}
+                                  title="Refresh Google Calendar"
+                                  data-testid="button-refresh-google-calendar"
+                                >
+                                  <RefreshCw className={cn("w-3 h-3", isLoadingGoogleEvents && "animate-spin")} />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 text-xs text-muted-foreground hover:text-destructive"
+                                  onClick={() => {
+                                    disconnectGoogleCalendar.mutate(undefined, {
+                                      onSuccess: () => toast.success("Google Calendar disconnected"),
+                                      onError: (error) => toast.error(error.message)
+                                    });
+                                  }}
+                                  disabled={disconnectGoogleCalendar.isPending}
+                                  data-testid="button-disconnect-google-calendar"
+                                >
+                                  Disconnect
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs gap-1.5"
+                                onClick={() => {
+                                  connectGoogleCalendar.mutate(undefined, {
+                                    onSuccess: (authUrl) => {
+                                      window.location.href = authUrl;
+                                    },
+                                    onError: (error) => toast.error(error.message)
+                                  });
+                                }}
+                                disabled={connectGoogleCalendar.isPending}
+                                data-testid="button-connect-google-calendar"
+                              >
+                                <Calendar className="w-3.5 h-3.5" />
+                                Connect Google Calendar
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>

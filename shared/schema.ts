@@ -1023,3 +1023,25 @@ export const insertCustomSectorSchema = createInsertSchema(customSectors).omit({
 
 export type InsertCustomSector = z.infer<typeof insertCustomSectorSchema>;
 export type CustomSector = typeof customSectors.$inferSelect;
+
+// Google Calendar Tokens table - per-user OAuth tokens for Google Calendar
+export const googleCalendarTokens = pgTable("google_calendar_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token"),
+  expiresAt: timestamp("expires_at"),
+  scope: text("scope"),
+  tokenType: text("token_type").default('Bearer'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertGoogleCalendarTokenSchema = createInsertSchema(googleCalendarTokens).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertGoogleCalendarToken = z.infer<typeof insertGoogleCalendarTokenSchema>;
+export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;

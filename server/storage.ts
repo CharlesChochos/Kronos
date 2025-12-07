@@ -1525,6 +1525,30 @@ export class DatabaseStorage implements IStorage {
     const [created] = await db.insert(schema.customSectors).values(sector).returning();
     return created;
   }
+
+  // Google Calendar Token operations
+  async getGoogleCalendarToken(userId: string): Promise<schema.GoogleCalendarToken | undefined> {
+    const [token] = await db.select().from(schema.googleCalendarTokens).where(eq(schema.googleCalendarTokens.userId, userId));
+    return token;
+  }
+
+  async saveGoogleCalendarToken(token: schema.InsertGoogleCalendarToken): Promise<schema.GoogleCalendarToken> {
+    const existing = await this.getGoogleCalendarToken(token.userId);
+    if (existing) {
+      const [updated] = await db
+        .update(schema.googleCalendarTokens)
+        .set({ ...token, updatedAt: new Date() })
+        .where(eq(schema.googleCalendarTokens.userId, token.userId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(schema.googleCalendarTokens).values(token).returning();
+    return created;
+  }
+
+  async deleteGoogleCalendarToken(userId: string): Promise<void> {
+    await db.delete(schema.googleCalendarTokens).where(eq(schema.googleCalendarTokens.userId, userId));
+  }
 }
 
 export const storage = new DatabaseStorage();

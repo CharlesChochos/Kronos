@@ -670,15 +670,54 @@ export type GoogleCalendarEvent = {
   source: 'google';
 };
 
+export type GoogleCalendarStatus = {
+  configured: boolean;
+  connected: boolean;
+};
+
 export function useGoogleCalendarStatus() {
   return useQuery({
     queryKey: ["google-calendar-status"],
     queryFn: async () => {
       const res = await fetch("/api/google-calendar/status");
-      if (!res.ok) return { connected: false };
-      return res.json() as Promise<{ connected: boolean }>;
+      if (!res.ok) return { configured: false, connected: false };
+      return res.json() as Promise<GoogleCalendarStatus>;
     },
     staleTime: 1000 * 60 * 5,
+  });
+}
+
+export function useConnectGoogleCalendar() {
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/google-calendar/connect");
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to get authorization URL");
+      }
+      const data = await res.json();
+      return data.authUrl as string;
+    },
+  });
+}
+
+export function useDisconnectGoogleCalendar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/google-calendar/disconnect", {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to disconnect Google Calendar");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["google-calendar-status"] });
+      queryClient.invalidateQueries({ queryKey: ["google-calendar-events"] });
+    },
   });
 }
 

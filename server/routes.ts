@@ -4074,26 +4074,111 @@ Guidelines:
     }
   });
 
-  // ===== GOOGLE CALENDAR INTEGRATION ROUTES =====
+  // ===== GOOGLE CALENDAR INTEGRATION ROUTES (PER-USER OAUTH) =====
   
-  // Check if Google Calendar is connected
+  // Check if Google Calendar integration is available and user's connection status
   app.get("/api/google-calendar/status", requireAuth, async (req, res) => {
     try {
-      const { isGoogleCalendarConnected } = await import('./googleCalendar');
-      const connected = await isGoogleCalendarConnected();
-      res.json({ connected });
+      const { isGoogleOAuthConfigured, isUserConnected } = await import('./googleCalendar');
+      const userId = (req.user as any).id;
+      
+      const configured = isGoogleOAuthConfigured();
+      if (!configured) {
+        return res.json({ configured: false, connected: false });
+      }
+      
+      const connected = await isUserConnected(userId);
+      res.json({ configured: true, connected });
     } catch (error) {
-      res.json({ connected: false });
+      res.json({ configured: false, connected: false });
     }
   });
   
-  // Fetch events from Google Calendar
+  // Get OAuth URL to connect Google Calendar
+  app.get("/api/google-calendar/connect", requireAuth, async (req, res) => {
+    try {
+      const { isGoogleOAuthConfigured, getAuthUrl } = await import('./googleCalendar');
+      
+      if (!isGoogleOAuthConfigured()) {
+        return res.status(503).json({ error: "Google Calendar integration is not configured" });
+      }
+      
+      const userId = (req.user as any).id;
+      const { url } = getAuthUrl(userId);
+      res.json({ authUrl: url });
+    } catch (error: any) {
+      console.error('Google Calendar connect error:', error);
+      res.status(500).json({ error: "Failed to generate authorization URL" });
+    }
+  });
+  
+  // OAuth callback from Google
+  app.get("/api/google-calendar/callback", async (req, res) => {
+    try {
+      const { code, state, error: oauthError } = req.query;
+      
+      if (oauthError) {
+        console.error('OAuth error from Google:', oauthError);
+        return res.redirect('/calendar?error=oauth_denied');
+      }
+      
+      if (!code || !state) {
+        return res.redirect('/calendar?error=invalid_callback');
+      }
+      
+      // Get the authenticated user from session
+      if (!req.isAuthenticated() || !req.user) {
+        return res.redirect('/auth?error=not_authenticated');
+      }
+      
+      const { validateOAuthState, handleOAuthCallback } = await import('./googleCalendar');
+      const userId = (req.user as any).id;
+      
+      // Validate that the state matches the authenticated user
+      if (!validateOAuthState(state as string, userId)) {
+        console.error('OAuth state validation failed');
+        return res.redirect('/calendar?error=invalid_state');
+      }
+      
+      // Exchange code for tokens
+      await handleOAuthCallback(code as string, userId);
+      
+      res.redirect('/calendar?connected=true');
+    } catch (error: any) {
+      console.error('Google Calendar callback error:', error);
+      res.redirect('/calendar?error=connection_failed');
+    }
+  });
+  
+  // Disconnect Google Calendar
+  app.post("/api/google-calendar/disconnect", requireAuth, async (req, res) => {
+    try {
+      const { disconnectUser } = await import('./googleCalendar');
+      const userId = (req.user as any).id;
+      
+      await disconnectUser(userId);
+      res.json({ message: "Google Calendar disconnected successfully" });
+    } catch (error: any) {
+      console.error('Google Calendar disconnect error:', error);
+      res.status(500).json({ error: "Failed to disconnect Google Calendar" });
+    }
+  });
+  
+  // Fetch events from user's Google Calendar
   app.get("/api/google-calendar/events", requireAuth, async (req, res) => {
     try {
-      const { listGoogleCalendarEvents } = await import('./googleCalendar');
+      const { listUserCalendarEvents, isUserConnected } = await import('./googleCalendar');
+      const userId = (req.user as any).id;
       const { timeMin, timeMax, maxResults } = req.query;
       
-      const events = await listGoogleCalendarEvents(
+      // Check if user is connected
+      const connected = await isUserConnected(userId);
+      if (!connected) {
+        return res.status(401).json({ error: "Google Calendar not connected" });
+      }
+      
+      const events = await listUserCalendarEvents(
+        userId,
         maxResults ? parseInt(maxResults as string) : 50,
         timeMin ? new Date(timeMin as string) : undefined,
         timeMax ? new Date(timeMax as string) : undefined
@@ -4131,17 +4216,18 @@ Guidelines:
     }
   });
   
-  // Create event in Google Calendar
+  // Create event in user's Google Calendar
   app.post("/api/google-calendar/events", generalLimiter, requireAuth, async (req, res) => {
     try {
-      const { createGoogleCalendarEvent } = await import('./googleCalendar');
+      const { createUserCalendarEvent } = await import('./googleCalendar');
+      const userId = (req.user as any).id;
       const { title, description, location, start, end, attendees, addMeetLink } = req.body;
       
       if (!title || !start || !end) {
         return res.status(400).json({ error: "Title, start, and end are required" });
       }
       
-      const event = await createGoogleCalendarEvent({
+      const event = await createUserCalendarEvent(userId, {
         summary: title,
         description,
         location,
@@ -4168,36 +4254,12 @@ Guidelines:
     }
   });
   
-  // Update event in Google Calendar
-  app.patch("/api/google-calendar/events/:eventId", requireAuth, async (req, res) => {
-    try {
-      const { updateGoogleCalendarEvent } = await import('./googleCalendar');
-      const { title, description, location, start, end } = req.body;
-      
-      const event = await updateGoogleCalendarEvent(req.params.eventId, {
-        summary: title,
-        description,
-        location,
-        start: start ? new Date(start) : undefined,
-        end: end ? new Date(end) : undefined
-      });
-      
-      res.json({
-        id: event.id,
-        title: event.summary,
-        source: 'google'
-      });
-    } catch (error: any) {
-      console.error('Google Calendar update error:', error);
-      res.status(500).json({ error: "Failed to update Google Calendar event" });
-    }
-  });
-  
-  // Delete event from Google Calendar
+  // Delete event from user's Google Calendar
   app.delete("/api/google-calendar/events/:eventId", requireAuth, async (req, res) => {
     try {
-      const { deleteGoogleCalendarEvent } = await import('./googleCalendar');
-      await deleteGoogleCalendarEvent(req.params.eventId);
+      const { deleteUserCalendarEvent } = await import('./googleCalendar');
+      const userId = (req.user as any).id;
+      await deleteUserCalendarEvent(userId, req.params.eventId);
       res.json({ message: "Event deleted from Google Calendar" });
     } catch (error: any) {
       console.error('Google Calendar delete error:', error);
