@@ -360,6 +360,42 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteDeal(id: string): Promise<void> {
+    // First, get all tasks for this deal to delete their related records
+    const dealTasks = await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.dealId, id));
+    const taskIds = dealTasks.map(t => t.id);
+    
+    // Delete task-related records first (they reference tasks)
+    for (const taskId of taskIds) {
+      await db.delete(schema.taskComments).where(eq(schema.taskComments.taskId, taskId));
+      await db.delete(schema.taskAttachmentsTable).where(eq(schema.taskAttachmentsTable.taskId, taskId));
+    }
+    
+    // Update activity logs that reference these tasks
+    for (const taskId of taskIds) {
+      await db.update(schema.activityLogs).set({ taskId: null }).where(eq(schema.activityLogs.taskId, taskId));
+    }
+    
+    // Delete all deal-related records (foreign key constraints)
+    await db.delete(schema.tasks).where(eq(schema.tasks.dealId, id));
+    await db.delete(schema.meetings).where(eq(schema.meetings.dealId, id));
+    await db.delete(schema.dealFees).where(eq(schema.dealFees.dealId, id));
+    await db.delete(schema.stageDocuments).where(eq(schema.stageDocuments.dealId, id));
+    await db.delete(schema.stagePodMembers).where(eq(schema.stagePodMembers.dealId, id));
+    await db.delete(schema.stageVoiceNotes).where(eq(schema.stageVoiceNotes.dealId, id));
+    await db.delete(schema.investorMatches).where(eq(schema.investorMatches.dealId, id));
+    await db.delete(schema.calendarEvents).where(eq(schema.calendarEvents.dealId, id));
+    await db.delete(schema.clientPortalMessages).where(eq(schema.clientPortalMessages.dealId, id));
+    await db.delete(schema.clientPortalUpdates).where(eq(schema.clientPortalUpdates.dealId, id));
+    await db.delete(schema.clientPortalAccess).where(eq(schema.clientPortalAccess.dealId, id));
+    await db.delete(schema.documentsTable).where(eq(schema.documentsTable.dealId, id));
+    await db.delete(schema.newsFeedPosts).where(eq(schema.newsFeedPosts.dealId, id));
+    
+    // Set dealId to null for related records with nullable FK
+    await db.update(schema.activityLogs).set({ dealId: null }).where(eq(schema.activityLogs.dealId, id));
+    await db.update(schema.investorInteractions).set({ dealId: null }).where(eq(schema.investorInteractions.dealId, id));
+    await db.update(schema.timeEntries).set({ dealId: null }).where(eq(schema.timeEntries.dealId, id));
+    
+    // Now delete the deal
     await db.delete(schema.deals).where(eq(schema.deals.id, id));
   }
 

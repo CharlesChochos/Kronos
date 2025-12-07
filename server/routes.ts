@@ -407,12 +407,12 @@ export async function registerRoutes(
       fileSize: 10 * 1024 * 1024, // 10MB max
     },
     fileFilter: (_req, file, cb) => {
-      const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv'];
+      const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.mp4', '.mp3', '.zip', '.rar', '.7z'];
       const ext = path.extname(file.originalname).toLowerCase();
       if (allowedExtensions.includes(ext)) {
         cb(null, true);
       } else {
-        cb(new Error('Invalid file type. Allowed: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV'));
+        cb(new Error('Invalid file type'));
       }
     }
   });

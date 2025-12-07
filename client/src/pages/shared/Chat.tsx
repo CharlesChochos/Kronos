@@ -202,14 +202,36 @@ export default function Chat({ role }: ChatProps) {
 
     for (const file of Array.from(files)) {
       try {
+        // Upload file to server first
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!uploadRes.ok) {
+          const error = await uploadRes.json();
+          throw new Error(error.error || 'Upload failed');
+        }
+        
+        const uploadedFile = await uploadRes.json();
+        
         await sendMessageMutation.mutateAsync({
           conversationId: selectedConversationId,
           content: `Shared a file: ${file.name}`,
-          attachments: [{ filename: file.name, type: file.type, size: file.size }],
+          attachments: [{ 
+            id: uploadedFile.id,
+            filename: uploadedFile.filename, 
+            type: uploadedFile.type, 
+            size: uploadedFile.size,
+            url: uploadedFile.url // Server URL for download
+          }],
         });
         toast.success("File shared successfully");
-      } catch (error) {
-        toast.error("Failed to share file");
+      } catch (error: any) {
+        toast.error(error.message || "Failed to share file");
       }
     }
   };
@@ -424,9 +446,15 @@ export default function Chat({ role }: ChatProps) {
                                         )}
                                         onClick={() => {
                                           if (att.url) {
-                                            window.open(att.url, '_blank');
+                                            // Create download link for base64 data URLs
+                                            const link = document.createElement('a');
+                                            link.href = att.url;
+                                            link.download = att.filename || 'download';
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            document.body.removeChild(link);
                                           } else {
-                                            toast.info("File preview not available");
+                                            toast.info("File not available for download");
                                           }
                                         }}
                                         data-testid={`attachment-${att.id || idx}`}

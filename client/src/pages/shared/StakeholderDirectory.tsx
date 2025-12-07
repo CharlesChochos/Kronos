@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import * as XLSX from "xlsx";
 import { 
   Users, 
   Plus, 
@@ -229,30 +230,24 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     const file = event.target.files?.[0];
     if (!file) return;
     
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      const lines = content.split('\n').filter(line => line.trim());
-      
-      if (lines.length === 0) {
-        toast.error("File is empty");
+    const ext = file.name.toLowerCase().split('.').pop() || '';
+    const isExcel = ['xlsx', 'xls'].includes(ext);
+    const isCSV = ['csv', 'tsv', 'txt'].includes(ext);
+    
+    if (!isExcel && !isCSV) {
+      toast.error("Please use a CSV, Excel (.xlsx, .xls), or text file.");
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    
+    const processData = (headers: string[], dataRows: Record<string, string>[]) => {
+      if (dataRows.length === 0) {
+        toast.error("No valid data found in file");
         return;
       }
       
-      const delimiter = content.includes('\t') ? '\t' : ',';
-      const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
-      
-      const rows = lines.slice(1).map(line => {
-        const values = line.split(delimiter).map(v => v.trim().replace(/^"|"$/g, ''));
-        const row: Record<string, string> = {};
-        headers.forEach((header, i) => {
-          row[header] = values[i] || '';
-        });
-        return row;
-      }).filter(row => Object.values(row).some(v => v));
-      
-      setImportData(rows);
-      setSelectedRows(new Set(rows.map((_, i) => i)));
+      setImportData(dataRows);
+      setSelectedRows(new Set(dataRows.map((_, i) => i)));
       
       const autoMap: Record<string, string> = { ...importColumnMap };
       const lowerHeaders = headers.map(h => h.toLowerCase());
@@ -281,7 +276,75 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
       setShowImportModal(true);
     };
     
-    reader.readAsText(file);
+    // Sanitize string values for database storage
+    const sanitizeValue = (val: any): string => {
+      if (val === null || val === undefined) return '';
+      const str = String(val);
+      // Remove null bytes and control characters, keep printable ASCII and common unicode
+      return str.replace(/\x00/g, '').replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]/g, '').trim();
+    };
+    
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(firstSheet, { defval: '' });
+          
+          if (jsonData.length === 0) {
+            toast.error("File is empty or has no data rows");
+            return;
+          }
+          
+          const headers = Object.keys(jsonData[0]).map(h => sanitizeValue(h));
+          const rows = jsonData.map(row => {
+            const sanitizedRow: Record<string, string> = {};
+            headers.forEach((header, i) => {
+              const originalKey = Object.keys(jsonData[0])[i];
+              sanitizedRow[header] = sanitizeValue(row[originalKey]);
+            });
+            return sanitizedRow;
+          }).filter(row => Object.values(row).some(v => v));
+          
+          processData(headers, rows);
+        } catch (error) {
+          console.error('Excel parsing error:', error);
+          toast.error("Failed to parse Excel file. Please ensure it's a valid spreadsheet.");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        let content = e.target?.result as string;
+        content = sanitizeValue(content);
+        
+        const lines = content.split('\n').filter(line => line.trim());
+        
+        if (lines.length === 0) {
+          toast.error("File is empty");
+          return;
+        }
+        
+        const delimiter = content.includes('\t') ? '\t' : ',';
+        const headers = lines[0].split(delimiter).map(h => sanitizeValue(h.replace(/^"|"$/g, '')));
+        
+        const rows = lines.slice(1).map(line => {
+          const values = line.split(delimiter).map(v => sanitizeValue(v.replace(/^"|"$/g, '')));
+          const row: Record<string, string> = {};
+          headers.forEach((header, i) => {
+            row[header] = values[i] || '';
+          });
+          return row;
+        }).filter(row => Object.values(row).some(v => v));
+        
+        processData(headers, rows);
+      };
+      reader.readAsText(file, 'UTF-8');
+    }
+    
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
   
@@ -374,7 +437,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,.tsv,.txt,.xlsx,.xls,.doc,.docx"
+              accept=".csv,.tsv,.txt,.xlsx,.xls"
               className="hidden"
               onChange={handleFileUpload}
             />
