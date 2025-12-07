@@ -4074,6 +4074,137 @@ Guidelines:
     }
   });
 
+  // ===== GOOGLE CALENDAR INTEGRATION ROUTES =====
+  
+  // Check if Google Calendar is connected
+  app.get("/api/google-calendar/status", requireAuth, async (req, res) => {
+    try {
+      const { isGoogleCalendarConnected } = await import('./googleCalendar');
+      const connected = await isGoogleCalendarConnected();
+      res.json({ connected });
+    } catch (error) {
+      res.json({ connected: false });
+    }
+  });
+  
+  // Fetch events from Google Calendar
+  app.get("/api/google-calendar/events", requireAuth, async (req, res) => {
+    try {
+      const { listGoogleCalendarEvents } = await import('./googleCalendar');
+      const { timeMin, timeMax, maxResults } = req.query;
+      
+      const events = await listGoogleCalendarEvents(
+        maxResults ? parseInt(maxResults as string) : 50,
+        timeMin ? new Date(timeMin as string) : undefined,
+        timeMax ? new Date(timeMax as string) : undefined
+      );
+      
+      // Transform Google Calendar events to a consistent format
+      const transformedEvents = events.map((event: any) => ({
+        id: event.id,
+        googleEventId: event.id,
+        title: event.summary || 'Untitled Event',
+        description: event.description || '',
+        location: event.location || '',
+        start: event.start?.dateTime || event.start?.date,
+        end: event.end?.dateTime || event.end?.date,
+        allDay: !event.start?.dateTime,
+        meetLink: event.hangoutLink || event.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === 'video')?.uri,
+        attendees: event.attendees?.map((a: any) => ({
+          email: a.email,
+          name: a.displayName,
+          responseStatus: a.responseStatus
+        })) || [],
+        organizer: event.organizer?.email,
+        status: event.status,
+        htmlLink: event.htmlLink,
+        source: 'google'
+      }));
+      
+      res.json(transformedEvents);
+    } catch (error: any) {
+      console.error('Google Calendar fetch error:', error);
+      if (error.message?.includes('not connected')) {
+        return res.status(401).json({ error: "Google Calendar not connected" });
+      }
+      res.status(500).json({ error: "Failed to fetch Google Calendar events" });
+    }
+  });
+  
+  // Create event in Google Calendar
+  app.post("/api/google-calendar/events", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const { createGoogleCalendarEvent } = await import('./googleCalendar');
+      const { title, description, location, start, end, attendees, addMeetLink } = req.body;
+      
+      if (!title || !start || !end) {
+        return res.status(400).json({ error: "Title, start, and end are required" });
+      }
+      
+      const event = await createGoogleCalendarEvent({
+        summary: title,
+        description,
+        location,
+        start: new Date(start),
+        end: new Date(end),
+        attendees,
+        addMeetLink: addMeetLink !== false
+      });
+      
+      res.status(201).json({
+        id: event.id,
+        googleEventId: event.id,
+        title: event.summary,
+        meetLink: event.hangoutLink || event.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === 'video')?.uri,
+        htmlLink: event.htmlLink,
+        source: 'google'
+      });
+    } catch (error: any) {
+      console.error('Google Calendar create error:', error);
+      if (error.message?.includes('not connected')) {
+        return res.status(401).json({ error: "Google Calendar not connected" });
+      }
+      res.status(500).json({ error: "Failed to create Google Calendar event" });
+    }
+  });
+  
+  // Update event in Google Calendar
+  app.patch("/api/google-calendar/events/:eventId", requireAuth, async (req, res) => {
+    try {
+      const { updateGoogleCalendarEvent } = await import('./googleCalendar');
+      const { title, description, location, start, end } = req.body;
+      
+      const event = await updateGoogleCalendarEvent(req.params.eventId, {
+        summary: title,
+        description,
+        location,
+        start: start ? new Date(start) : undefined,
+        end: end ? new Date(end) : undefined
+      });
+      
+      res.json({
+        id: event.id,
+        title: event.summary,
+        source: 'google'
+      });
+    } catch (error: any) {
+      console.error('Google Calendar update error:', error);
+      res.status(500).json({ error: "Failed to update Google Calendar event" });
+    }
+  });
+  
+  // Delete event from Google Calendar
+  app.delete("/api/google-calendar/events/:eventId", requireAuth, async (req, res) => {
+    try {
+      const { deleteGoogleCalendarEvent } = await import('./googleCalendar');
+      await deleteGoogleCalendarEvent(req.params.eventId);
+      res.json({ message: "Event deleted from Google Calendar" });
+    } catch (error: any) {
+      console.error('Google Calendar delete error:', error);
+      res.status(500).json({ error: "Failed to delete Google Calendar event" });
+    }
+  });
+
   // ===== CALENDAR EVENT ROUTES =====
   
   // Get all calendar events

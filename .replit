@@ -23,6 +23,10 @@ localPort = 40413
 externalPort = 3000
 
 [[ports]]
+localPort = 42439
+externalPort = 4200
+
+[[ports]]
 localPort = 44227
 externalPort = 3002
 
@@ -56,4 +60,4 @@ waitForPort = 5000
 
 [agent]
 mockupState = "FULLSTACK"
-integrations = ["resend:1.0.0", "javascript_openai_ai_integrations:1.0.0"]
+integrations = ["resend:1.0.0", "javascript_openai_ai_integrations:1.0.0", "google-calendar:1.0.0"]

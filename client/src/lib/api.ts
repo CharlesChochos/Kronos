@@ -652,6 +652,84 @@ export function useUpdateTimeOffRequest() {
   });
 }
 
+// ===== GOOGLE CALENDAR API =====
+export type GoogleCalendarEvent = {
+  id: string;
+  googleEventId: string;
+  title: string;
+  description: string;
+  location: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  meetLink?: string;
+  attendees: { email: string; name?: string; responseStatus?: string }[];
+  organizer?: string;
+  status?: string;
+  htmlLink?: string;
+  source: 'google';
+};
+
+export function useGoogleCalendarStatus() {
+  return useQuery({
+    queryKey: ["google-calendar-status"],
+    queryFn: async () => {
+      const res = await fetch("/api/google-calendar/status");
+      if (!res.ok) return { connected: false };
+      return res.json() as Promise<{ connected: boolean }>;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
+export function useGoogleCalendarEvents(timeMin?: Date, timeMax?: Date) {
+  return useQuery({
+    queryKey: ["google-calendar-events", timeMin?.toISOString(), timeMax?.toISOString()],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (timeMin) params.append('timeMin', timeMin.toISOString());
+      if (timeMax) params.append('timeMax', timeMax.toISOString());
+      
+      const res = await fetch(`/api/google-calendar/events?${params}`);
+      if (!res.ok) {
+        if (res.status === 401) return [];
+        throw new Error("Failed to fetch Google Calendar events");
+      }
+      return res.json() as Promise<GoogleCalendarEvent[]>;
+    },
+    staleTime: 1000 * 60,
+  });
+}
+
+export function useCreateGoogleCalendarEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (event: {
+      title: string;
+      description?: string;
+      location?: string;
+      start: string;
+      end: string;
+      attendees?: string[];
+      addMeetLink?: boolean;
+    }) => {
+      const res = await fetch("/api/google-calendar/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(event),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create Google Calendar event");
+      }
+      return res.json() as Promise<GoogleCalendarEvent>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["google-calendar-events"] });
+    },
+  });
+}
+
 // ===== AUDIT LOGS API =====
 export function useAuditLogs(limit?: number) {
   return useQuery({

@@ -26,26 +26,32 @@ import {
   X,
   User
 } from "lucide-react";
-import { useCurrentUser, useMeetings, useDeals, useUsers, useCreateMeeting, useDeleteMeeting, useTimeOffRequests, useCreateTimeOffRequest, useUpdateTimeOffRequest } from "@/lib/api";
+import { useCurrentUser, useMeetings, useDeals, useUsers, useCreateMeeting, useDeleteMeeting, useTimeOffRequests, useCreateTimeOffRequest, useUpdateTimeOffRequest, useGoogleCalendarStatus, useGoogleCalendarEvents, useCreateGoogleCalendarEvent, type GoogleCalendarEvent } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, isToday, parseISO, isWithinInterval } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, isToday, parseISO, isWithinInterval, addHours } from "date-fns";
 import { toast } from "sonner";
 import type { Meeting, TimeOffRequest } from "@shared/schema";
+import { ExternalLink, RefreshCw } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 type EventCalendarProps = {
   role: 'CEO' | 'Employee';
 };
 
 export default function EventCalendar({ role }: EventCalendarProps) {
+  const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const { data: meetings = [] } = useMeetings();
   const { data: deals = [] } = useDeals();
   const { data: users = [] } = useUsers();
   const { data: timeOffRequests = [] } = useTimeOffRequests();
+  const { data: googleCalendarStatus } = useGoogleCalendarStatus();
+  const { data: googleEvents = [], isLoading: isLoadingGoogleEvents, refetch: refetchGoogleEvents } = useGoogleCalendarEvents();
   const createMeetingMutation = useCreateMeeting();
   const deleteMeetingMutation = useDeleteMeeting();
   const createTimeOffMutation = useCreateTimeOffRequest();
   const updateTimeOffMutation = useUpdateTimeOffRequest();
+  const createGoogleEventMutation = useCreateGoogleCalendarEvent();
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -54,7 +60,8 @@ export default function EventCalendar({ role }: EventCalendarProps) {
   const [showTimeOffModal, setShowTimeOffModal] = useState(false);
   const [showDayDetail, setShowDayDetail] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Meeting | null>(null);
-  const [selectedDayItems, setSelectedDayItems] = useState<{meetings: Meeting[], timeOffs: TimeOffRequest[]}>({ meetings: [], timeOffs: [] });
+  const [selectedGoogleEvent, setSelectedGoogleEvent] = useState<GoogleCalendarEvent | null>(null);
+  const [selectedDayItems, setSelectedDayItems] = useState<{meetings: Meeting[], timeOffs: TimeOffRequest[], googleEvents: GoogleCalendarEvent[]}>({ meetings: [], timeOffs: [], googleEvents: [] });
   const [activeTab, setActiveTab] = useState("calendar");
   
   const [newEvent, setNewEvent] = useState({
@@ -108,6 +115,13 @@ export default function EventCalendar({ role }: EventCalendarProps) {
     });
   };
 
+  const getGoogleEventsForDate = (date: Date) => {
+    return googleEvents.filter(event => {
+      const eventDate = new Date(event.start);
+      return isSameDay(eventDate, date);
+    });
+  };
+
   const myTimeOffRequests = useMemo(() => {
     if (role === 'CEO') return [];
     return timeOffRequests.filter(r => r.userId === currentUser?.id);
@@ -126,8 +140,9 @@ export default function EventCalendar({ role }: EventCalendarProps) {
     setSelectedDate(date);
     const events = getEventsForDate(date);
     const timeOffs = getTimeOffForDate(date);
+    const gEvents = getGoogleEventsForDate(date);
     
-    const totalItems = events.length + timeOffs.length;
+    const totalItems = events.length + timeOffs.length + gEvents.length;
     
     if (totalItems === 0) {
       setNewEvent(prev => ({
@@ -135,11 +150,13 @@ export default function EventCalendar({ role }: EventCalendarProps) {
         date: format(date, 'yyyy-MM-dd')
       }));
       setShowEventModal(true);
-    } else if (events.length === 1 && timeOffs.length === 0) {
+    } else if (events.length === 1 && timeOffs.length === 0 && gEvents.length === 0) {
       setSelectedEvent(events[0]);
       setShowEventDetail(true);
+    } else if (gEvents.length === 1 && events.length === 0 && timeOffs.length === 0) {
+      setSelectedGoogleEvent(gEvents[0]);
     } else {
-      setSelectedDayItems({ meetings: events, timeOffs });
+      setSelectedDayItems({ meetings: events, timeOffs, googleEvents: gEvents });
       setShowDayDetail(true);
     }
   };
@@ -365,9 +382,30 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                 <Card className="bg-card border-border">
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg font-semibold">
-                        {format(currentMonth, 'MMMM yyyy')}
-                      </CardTitle>
+                      <div className="flex items-center gap-4">
+                        <CardTitle className="text-lg font-semibold">
+                          {format(currentMonth, 'MMMM yyyy')}
+                        </CardTitle>
+                        {googleCalendarStatus?.connected && (
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 text-green-600 rounded-md text-xs font-medium">
+                              <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                              Google Calendar
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => refetchGoogleEvents()}
+                              disabled={isLoadingGoogleEvents}
+                              title="Refresh Google Calendar"
+                              data-testid="button-refresh-google-calendar"
+                            >
+                              <RefreshCw className={cn("w-3 h-3", isLoadingGoogleEvents && "animate-spin")} />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
@@ -406,9 +444,11 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                       {calendarDays.map((day, idx) => {
                         const dayEvents = getEventsForDate(day);
                         const dayTimeOffs = getTimeOffForDate(day);
+                        const dayGoogleEvents = getGoogleEventsForDate(day);
                         const isCurrentMonth = isSameMonth(day, currentMonth);
                         const isSelected = selectedDate && isSameDay(day, selectedDate);
                         const hasTimeOff = dayTimeOffs.length > 0;
+                        const totalItems = dayEvents.length + dayTimeOffs.length + dayGoogleEvents.length;
                         
                         return (
                           <div
@@ -451,9 +491,23 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                                   {event.title}
                                 </div>
                               ))}
-                              {(dayEvents.length + dayTimeOffs.length) > 3 && (
+                              {dayGoogleEvents.slice(0, 2 - Math.min(dayEvents.length, 2)).map(gEvent => (
+                                <div
+                                  key={gEvent.id}
+                                  className="text-[10px] px-1 py-0.5 rounded truncate text-white bg-green-600 cursor-pointer flex items-center gap-0.5"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedGoogleEvent(gEvent);
+                                  }}
+                                  data-testid={`google-event-${gEvent.id}`}
+                                >
+                                  <Calendar className="w-2.5 h-2.5 flex-shrink-0" />
+                                  {gEvent.title}
+                                </div>
+                              ))}
+                              {totalItems > 3 && (
                                 <div className="text-[10px] text-muted-foreground px-1">
-                                  +{(dayEvents.length + dayTimeOffs.length) - 3} more
+                                  +{totalItems - 3} more
                                 </div>
                               )}
                             </div>
@@ -1031,6 +1085,37 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                   </div>
                 </div>
               )}
+              {selectedDayItems.googleEvents.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-green-500" />
+                    Google Calendar
+                  </h4>
+                  <div className="space-y-2">
+                    {selectedDayItems.googleEvents.map(gEvent => (
+                      <div
+                        key={gEvent.id}
+                        className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 cursor-pointer hover:bg-green-500/20 transition-colors"
+                        onClick={() => {
+                          setSelectedGoogleEvent(gEvent);
+                          setShowDayDetail(false);
+                        }}
+                      >
+                        <p className="font-medium">{gEvent.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(gEvent.start), 'h:mm a')} - {format(new Date(gEvent.end), 'h:mm a')}
+                        </p>
+                        {gEvent.location && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                            <MapPin className="w-3 h-3" />
+                            {gEvent.location}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </ScrollArea>
           <DialogFooter className="gap-2">
@@ -1051,6 +1136,64 @@ export default function EventCalendar({ role }: EventCalendarProps) {
               Add Event
             </Button>
             <Button variant="outline" onClick={() => setShowDayDetail(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedGoogleEvent} onOpenChange={(open) => !open && setSelectedGoogleEvent(null)}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-green-500" />
+              {selectedGoogleEvent?.title || 'Google Calendar Event'}
+            </DialogTitle>
+            <DialogDescription>Event from Google Calendar</DialogDescription>
+          </DialogHeader>
+          {selectedGoogleEvent && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Clock className="w-4 h-4" />
+                <span>
+                  {format(new Date(selectedGoogleEvent.start), 'EEEE, MMMM d, yyyy')}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Clock className="w-4 h-4" />
+                <span>
+                  {format(new Date(selectedGoogleEvent.start), 'h:mm a')} - {format(new Date(selectedGoogleEvent.end), 'h:mm a')}
+                </span>
+              </div>
+              {selectedGoogleEvent.location && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <MapPin className="w-4 h-4" />
+                  <span>{selectedGoogleEvent.location}</span>
+                </div>
+              )}
+              {selectedGoogleEvent.description && (
+                <div className="pt-2 border-t">
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {selectedGoogleEvent.description}
+                  </p>
+                </div>
+              )}
+              {selectedGoogleEvent.meetLink && (
+                <div className="pt-2">
+                  <a
+                    href={selectedGoogleEvent.meetLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <Video className="w-4 h-4" />
+                    Join Google Meet
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedGoogleEvent(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
