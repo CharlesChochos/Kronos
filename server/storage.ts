@@ -370,11 +370,6 @@ export class DatabaseStorage implements IStorage {
       await db.delete(schema.taskAttachmentsTable).where(eq(schema.taskAttachmentsTable.taskId, taskId));
     }
     
-    // Update activity logs that reference these tasks
-    for (const taskId of taskIds) {
-      await db.update(schema.activityLogs).set({ taskId: null }).where(eq(schema.activityLogs.taskId, taskId));
-    }
-    
     // Delete all deal-related records (foreign key constraints)
     await db.delete(schema.tasks).where(eq(schema.tasks.dealId, id));
     await db.delete(schema.meetings).where(eq(schema.meetings.dealId, id));
@@ -390,7 +385,6 @@ export class DatabaseStorage implements IStorage {
     await db.delete(schema.documentsTable).where(eq(schema.documentsTable.dealId, id));
     
     // Set dealId to null for related records with nullable FK
-    await db.update(schema.activityLogs).set({ dealId: null }).where(eq(schema.activityLogs.dealId, id));
     await db.update(schema.investorInteractions).set({ dealId: null }).where(eq(schema.investorInteractions.dealId, id));
     await db.update(schema.timeEntries).set({ dealId: null }).where(eq(schema.timeEntries.dealId, id));
     await db.update(schema.announcements).set({ dealId: null }).where(eq(schema.announcements.dealId, id));
