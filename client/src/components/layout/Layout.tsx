@@ -48,8 +48,31 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   const updateUserProfile = useUpdateUserProfile();
   const changePassword = useChangePassword();
   
-  // Preview mode for admins to see employee view
-  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  // Preview mode for admins to see employee view - persisted in sessionStorage
+  const [isPreviewMode, setIsPreviewMode] = useState(() => {
+    // Only Charles can use preview mode
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('kronos_preview_mode') === 'true';
+    }
+    return false;
+  });
+  
+  // Sync preview mode changes to sessionStorage
+  useEffect(() => {
+    if (isPreviewMode) {
+      sessionStorage.setItem('kronos_preview_mode', 'true');
+    } else {
+      sessionStorage.removeItem('kronos_preview_mode');
+    }
+  }, [isPreviewMode]);
+  
+  // Clear preview mode if user is not Charles
+  useEffect(() => {
+    if (currentUser && currentUser.email !== 'cchochos@equiturn.com' && isPreviewMode) {
+      setIsPreviewMode(false);
+    }
+  }, [currentUser]);
+  
   const effectiveRole = currentUser?.accessLevel === 'admin' && isPreviewMode ? 'Employee' : role;
   
   // Profile editing state
@@ -514,7 +537,8 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   };
   
   // Get access level based route prefixes
-  const rolePrefix = currentUser?.accessLevel === 'admin' ? '/ceo' : '/employee';
+  // Use effectiveRole for route prefix to support preview mode
+  const rolePrefix = effectiveRole === 'CEO' ? '/ceo' : '/employee';
   
   // Close search results when clicking outside
   useEffect(() => {
@@ -748,7 +772,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                             <button
                               key={user.id}
                               onClick={() => { 
-                                if (currentUser?.accessLevel === 'admin') {
+                                if (effectiveRole === 'CEO') {
                                   setLocation(`/ceo/team?id=${user.id}`);
                                 } else {
                                   toast.info(`${user.name}`, {
@@ -1768,42 +1792,42 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                       setShowNotificationsSheet(false);
                       if (notification.link) {
                         let link = notification.link;
-                        const isAdmin = currentUser?.accessLevel === 'admin';
+                        const isCeoRole = effectiveRole === 'CEO';
                         const linkMap: Record<string, string> = {
                           '/ceo/users': '/ceo/admin',
-                          '/mentorship': isAdmin ? '/ceo/mentorship' : '/employee/home',
-                          '/chat': isAdmin ? '/ceo/chat' : '/employee/chat',
-                          '/ceo/chat': isAdmin ? '/ceo/chat' : '/employee/chat',
-                          '/ceo/dashboard': isAdmin ? '/ceo/dashboard' : '/employee/home',
-                          '/ceo/calendar': isAdmin ? '/ceo/calendar' : '/employee/calendar',
-                          '/ceo/mentorship': isAdmin ? '/ceo/mentorship' : '/employee/home',
+                          '/mentorship': isCeoRole ? '/ceo/mentorship' : '/employee/home',
+                          '/chat': isCeoRole ? '/ceo/chat' : '/employee/chat',
+                          '/ceo/chat': isCeoRole ? '/ceo/chat' : '/employee/chat',
+                          '/ceo/dashboard': isCeoRole ? '/ceo/dashboard' : '/employee/home',
+                          '/ceo/calendar': isCeoRole ? '/ceo/calendar' : '/employee/calendar',
+                          '/ceo/mentorship': isCeoRole ? '/ceo/mentorship' : '/employee/home',
                         };
                         if (linkMap[link]) {
                           link = linkMap[link];
-                        } else if (!isAdmin && link.startsWith('/ceo/')) {
+                        } else if (!isCeoRole && link.startsWith('/ceo/')) {
                           link = link.replace('/ceo/', '/employee/');
                         }
                         setLocation(link);
                       } else {
                         const title = notification.title?.toLowerCase() || '';
                         const message = notification.message?.toLowerCase() || '';
-                        const isAdmin = currentUser?.accessLevel === 'admin';
+                        const isCeoRole = effectiveRole === 'CEO';
                         if (title.includes('deal') || message.includes('deal')) {
-                          setLocation(isAdmin ? '/ceo/deals' : '/employee/deals');
+                          setLocation(isCeoRole ? '/ceo/deals' : '/employee/deals');
                         } else if (title.includes('task') || message.includes('task')) {
-                          setLocation(isAdmin ? '/ceo/dashboard' : '/employee/tasks');
+                          setLocation(isCeoRole ? '/ceo/dashboard' : '/employee/tasks');
                         } else if (title.includes('meeting') || message.includes('meeting') || title.includes('calendar')) {
-                          setLocation(isAdmin ? '/ceo/calendar' : '/employee/calendar');
+                          setLocation(isCeoRole ? '/ceo/calendar' : '/employee/calendar');
                         } else if (title.includes('document') || message.includes('document')) {
-                          setLocation(isAdmin ? '/ceo/document-library' : '/employee/document-library');
+                          setLocation(isCeoRole ? '/ceo/document-library' : '/employee/document-library');
                         } else if (title.includes('user') || message.includes('approved') || message.includes('pending')) {
                           setLocation('/ceo/team');
                         } else if (title.includes('investor') || message.includes('investor')) {
-                          setLocation(isAdmin ? '/ceo/investors' : '/employee/investors');
+                          setLocation(isCeoRole ? '/ceo/investors' : '/employee/investors');
                         } else if (title.includes('announcement')) {
-                          setLocation(isAdmin ? '/ceo/announcements' : '/employee/announcements');
+                          setLocation(isCeoRole ? '/ceo/announcements' : '/employee/announcements');
                         } else {
-                          setLocation(isAdmin ? '/ceo/dashboard' : '/employee/home');
+                          setLocation(isCeoRole ? '/ceo/dashboard' : '/employee/home');
                         }
                       }
                     }}
@@ -1922,7 +1946,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
               Close
             </Button>
             <Button onClick={() => {
-              setLocation(`${currentUser?.accessLevel === 'admin' ? '/ceo/deals' : '/employee/tasks'}?id=${selectedSearchTask?.id}`);
+              setLocation(`${rolePrefix}/tasks?id=${selectedSearchTask?.id}`);
               setShowTaskDetailModal(false);
             }}>
               Go to Task

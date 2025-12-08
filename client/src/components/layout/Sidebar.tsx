@@ -220,7 +220,8 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
     }
   ];
 
-  const groups = currentUser?.accessLevel === 'admin' ? ceoGroups : employeeGroups;
+  // Use the role prop to determine navigation (supports preview mode for admins)
+  const groups = role === 'CEO' ? ceoGroups : employeeGroups;
 
   return (
     <div className={cn(
