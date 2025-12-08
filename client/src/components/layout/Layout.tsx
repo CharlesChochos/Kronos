@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import { Sidebar } from "./Sidebar";
 import { ReaperAssistant } from "../assistant/ReaperAssistant";
-import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check, Rocket, TrendingUp, UserCheck, ChevronRight, PanelLeftClose, PanelLeft, Camera, Trash2, Calendar, Paperclip, ExternalLink, Loader2, Shield, ShieldCheck, ShieldOff, Copy, Smartphone, QrCode } from "lucide-react";
+import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check, Rocket, TrendingUp, UserCheck, ChevronRight, PanelLeftClose, PanelLeft, Camera, Trash2, Calendar, Paperclip, ExternalLink, Loader2, Shield, ShieldCheck, ShieldOff, Copy, Smartphone, QrCode, Eye, EyeOff } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -47,6 +47,10 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   const markNotificationRead = useMarkNotificationRead();
   const updateUserProfile = useUpdateUserProfile();
   const changePassword = useChangePassword();
+  
+  // Preview mode for admins to see employee view
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const effectiveRole = currentUser?.accessLevel === 'admin' && isPreviewMode ? 'Employee' : role;
   
   // Profile editing state
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -535,9 +539,9 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     
     const query = searchQuery.toLowerCase();
     
-    // For employees, filter to only show deals where they're on the pod team
+    // For employees (or admins in preview mode), filter to only show deals where they're on the pod team
     let accessibleDeals = deals as any[];
-    if (role === 'Employee' && currentUser) {
+    if (effectiveRole === 'Employee' && currentUser) {
       accessibleDeals = (deals as any[]).filter((deal: any) => {
         if (!deal.podTeam || !Array.isArray(deal.podTeam)) return false;
         return deal.podTeam.some((member: any) => 
@@ -554,9 +558,9 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
       deal.sector?.toLowerCase().includes(query)
     ).slice(0, 5);
     
-    // For employees, filter to only show their own tasks
+    // For employees (or admins in preview mode), filter to only show their own tasks
     let accessibleTasks = tasks as any[];
-    if (role === 'Employee' && currentUser) {
+    if (effectiveRole === 'Employee' && currentUser) {
       accessibleTasks = (tasks as any[]).filter((task: any) => 
         task.assignedTo === currentUser.id
       );
@@ -567,9 +571,9 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
       task.description?.toLowerCase().includes(query)
     ).slice(0, 5);
     
-    // For employees, only show team members (not admin search capability)
+    // For employees (or admins in preview mode), only show team members (not admin search capability)
     let accessibleUsers = users as any[];
-    if (role === 'Employee') {
+    if (effectiveRole === 'Employee') {
       accessibleUsers = (users as any[]).filter((user: any) => 
         user.accessLevel !== 'admin'
       );
@@ -596,15 +600,33 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     const filteredDocuments = documents.slice(0, 5);
     
     return { deals: filteredDeals, tasks: filteredTasks, users: filteredUsers, documents: filteredDocuments };
-  }, [searchQuery, deals, tasks, users, role, currentUser]);
+  }, [searchQuery, deals, tasks, users, effectiveRole, currentUser]);
   
   const hasResults = searchResults.deals.length > 0 || searchResults.tasks.length > 0 || searchResults.users.length > 0 || searchResults.documents.length > 0;
   
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
-      <Sidebar role={role} collapsed={sidebarCollapsed} />
+      <Sidebar role={effectiveRole} collapsed={sidebarCollapsed} />
       
       <div className={cn("flex flex-col min-h-screen transition-all duration-300", sidebarCollapsed ? "pl-20" : "pl-64")}>
+        {/* Preview Mode Banner */}
+        {isPreviewMode && currentUser?.accessLevel === 'admin' && (
+          <div className="bg-amber-500 text-amber-950 px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-2">
+            <Eye className="w-4 h-4" />
+            Preview Mode: Viewing as Employee
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="ml-4 h-6 text-xs bg-amber-600 border-amber-600 hover:bg-amber-700 text-white"
+              onClick={() => {
+                setIsPreviewMode(false);
+                setLocation('/ceo/dashboard');
+              }}
+            >
+              Exit Preview
+            </Button>
+          </div>
+        )}
         {/* Header */}
         <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-40 px-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -850,6 +872,23 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                     >
                       <Palette className="w-4 h-4 mr-2" />
                       Customize Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      className="focus:bg-primary/10 focus:text-primary cursor-pointer"
+                      onClick={() => {
+                        setIsPreviewMode(!isPreviewMode);
+                        if (!isPreviewMode) {
+                          setLocation('/employee/home');
+                          toast.info("Preview mode enabled - viewing as employee");
+                        } else {
+                          setLocation('/ceo/dashboard');
+                          toast.info("Preview mode disabled - back to admin view");
+                        }
+                      }}
+                      data-testid="menu-item-preview-mode"
+                    >
+                      {isPreviewMode ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
+                      {isPreviewMode ? "Exit Employee View" : "View as Employee"}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-border" />
                   </>
