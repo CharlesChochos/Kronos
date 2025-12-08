@@ -605,29 +605,39 @@ export default function Chat({ role }: ChatProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label>Select Members (at least 2)</Label>
+              <Label>Select Members ({selectedUsers.length} selected, need at least 2)</Label>
               <ScrollArea className="h-48 border rounded-lg p-2">
-                {availableUsers.map(user => (
-                  <div key={user.id} className="flex items-center gap-3 p-2 hover:bg-secondary rounded">
-                    <Checkbox
-                      checked={selectedUsers.includes(user.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked === true) {
-                          setSelectedUsers(prev => [...prev, user.id]);
+                {availableUsers.map(user => {
+                  const isSelected = selectedUsers.includes(user.id);
+                  return (
+                    <div 
+                      key={user.id} 
+                      className={cn(
+                        "flex items-center gap-3 p-2 rounded cursor-pointer",
+                        isSelected ? "bg-primary/10" : "hover:bg-secondary"
+                      )}
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedUsers(selectedUsers.filter(id => id !== user.id));
                         } else {
-                          setSelectedUsers(prev => prev.filter(id => id !== user.id));
+                          setSelectedUsers([...selectedUsers, user.id]);
                         }
                       }}
-                      data-testid={`checkbox-user-${user.id}`}
-                    />
-                    <Avatar className="w-8 h-8">
-                      <AvatarFallback className="bg-blue-500/20 text-blue-500 text-xs">
-                        {user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm">{user.name}</span>
-                  </div>
-                ))}
+                      data-testid={`select-user-${user.id}`}
+                    >
+                      <Checkbox
+                        checked={isSelected}
+                        data-testid={`checkbox-user-${user.id}`}
+                      />
+                      <Avatar className="w-8 h-8">
+                        <AvatarFallback className="bg-blue-500/20 text-blue-500 text-xs">
+                          {user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">{user.name}</span>
+                    </div>
+                  );
+                })}
               </ScrollArea>
             </div>
           </div>
