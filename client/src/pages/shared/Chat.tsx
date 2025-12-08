@@ -616,18 +616,21 @@ export default function Chat({ role }: ChatProps) {
                         "flex items-center gap-3 p-2 rounded cursor-pointer",
                         isSelected ? "bg-primary/10" : "hover:bg-secondary"
                       )}
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         if (isSelected) {
                           setSelectedUsers(selectedUsers.filter(id => id !== user.id));
                         } else {
                           setSelectedUsers([...selectedUsers, user.id]);
                         }
                       }}
-                      data-testid={`select-user-${user.id}`}
+                      data-testid={`select-group-user-${user.id}`}
                     >
                       <Checkbox
                         checked={isSelected}
-                        data-testid={`checkbox-user-${user.id}`}
+                        className="pointer-events-none"
+                        data-testid={`checkbox-group-user-${user.id}`}
                       />
                       <Avatar className="w-8 h-8">
                         <AvatarFallback className="bg-blue-500/20 text-blue-500 text-xs">
