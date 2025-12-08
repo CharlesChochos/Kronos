@@ -50,6 +50,7 @@ import { useDocuments, useCreateDocument, useUpdateDocument, useDeleteDocument, 
 
 type DocumentManagementProps = {
   role?: 'CEO' | 'Employee';
+  defaultTab?: 'templates' | 'library';
 };
 
 const documentCategories = [
@@ -181,7 +182,7 @@ const formatFileSize = (bytes?: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-export default function DocumentManagement({ role = 'CEO' }: DocumentManagementProps) {
+export default function DocumentManagement({ role = 'CEO', defaultTab = 'templates' }: DocumentManagementProps) {
   const { data: currentUser } = useCurrentUser();
   const { data: documents = [], isLoading } = useDocuments();
   const { data: deals = [] } = useDeals();
@@ -198,7 +199,7 @@ export default function DocumentManagement({ role = 'CEO' }: DocumentManagementP
   const [selectedDocument, setSelectedDocument] = useState<DocumentRecord | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<'templates' | 'library'>('templates');
+  const [activeTab, setActiveTab] = useState<'templates' | 'library'>(defaultTab);
   const [selectedTemplate, setSelectedTemplate] = useState<typeof ibTemplates[0] | null>(null);
   const [selectedDealForGeneration, setSelectedDealForGeneration] = useState<string>("none");
   const [generatedContent, setGeneratedContent] = useState<string>("");

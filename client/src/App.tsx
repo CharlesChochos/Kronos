@@ -37,8 +37,6 @@ import { useEffect } from "react";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 
 // Wrapper components to ensure props are passed correctly with wouter
-const CeoDocumentGenerator = () => <DocumentGenerator role="CEO" />;
-const EmployeeDocumentGenerator = () => <DocumentGenerator role="Employee" />;
 const CeoDealManagement = () => <DealManagement role="CEO" />;
 const EmployeeDealManagement = () => <DealManagement role="Employee" />;
 const CeoChat = () => <Chat role="CEO" />;
@@ -54,8 +52,10 @@ const EmployeeStakeholderDirectory = () => <StakeholderDirectory role="Employee"
 const CeoEventCalendar = () => <EventCalendar role="CEO" />;
 const EmployeeEventCalendar = () => <EventCalendar role="Employee" />;
 const CeoDealTemplates = () => <DealTemplates role="CEO" />;
-const CeoDocumentManagement = () => <DocumentManagement role="CEO" />;
-const EmployeeDocumentManagement = () => <DocumentManagement role="Employee" />;
+const CeoDocumentGenerator = () => <DocumentManagement role="CEO" defaultTab="templates" />;
+const EmployeeDocumentGenerator = () => <DocumentManagement role="Employee" defaultTab="templates" />;
+const CeoDocumentLibrary = () => <DocumentManagement role="CEO" defaultTab="library" />;
+const EmployeeDocumentLibrary = () => <DocumentManagement role="Employee" defaultTab="library" />;
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { data: user, isLoading } = useCurrentUser();
@@ -200,7 +200,7 @@ function Router() {
         {() => <ProtectedRoute component={CeoDealTemplates} />}
       </Route>
       <Route path="/ceo/document-library">
-        {() => <ProtectedRoute component={CeoDocumentManagement} />}
+        {() => <ProtectedRoute component={CeoDocumentLibrary} />}
       </Route>
       
       {/* Employee Routes */}
@@ -235,7 +235,7 @@ function Router() {
         {() => <ProtectedRoute component={EmployeeStakeholderDirectory} />}
       </Route>
       <Route path="/employee/document-library">
-        {() => <ProtectedRoute component={EmployeeDocumentManagement} />}
+        {() => <ProtectedRoute component={EmployeeDocumentLibrary} />}
       </Route>
       
       {/* External Portal Routes */}
