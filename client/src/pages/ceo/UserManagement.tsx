@@ -66,10 +66,15 @@ type AuditLog = {
 
 const roleColors: Record<string, string> = {
   CEO: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  Director: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  "Managing Director": "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
   Associate: "bg-green-500/20 text-green-400 border-green-500/30",
-  Analyst: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+};
+
+const getRoleDisplay = (role: string) => {
+  return role === 'CEO' ? 'Admin' : 'Standard';
+};
+
+const getRoleColor = (role: string) => {
+  return role === 'CEO' ? roleColors.CEO : roleColors.Associate;
 };
 
 const statusColors: Record<string, string> = {
@@ -501,8 +506,8 @@ export default function UserManagement() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={roleColors[user.role] || ""}>
-                            {user.role === 'Associate' ? 'Standard' : user.role === 'Analyst' ? 'Basic' : user.role}
+                          <Badge variant="outline" className={getRoleColor(user.role)}>
+                            {getRoleDisplay(user.role)}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -610,8 +615,8 @@ export default function UserManagement() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={`${roleColors[user.role] || ""} opacity-50`}>
-                            {user.role === 'Associate' ? 'Standard' : user.role === 'Analyst' ? 'Basic' : user.role}
+                          <Badge variant="outline" className={`${getRoleColor(user.role)} opacity-50`}>
+                            {getRoleDisplay(user.role)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
@@ -712,11 +717,8 @@ export default function UserManagement() {
                 <SelectValue placeholder="Select access level" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="CEO">CEO (Full Access)</SelectItem>
-                <SelectItem value="Managing Director">Managing Director</SelectItem>
-                <SelectItem value="Director">Director</SelectItem>
+                <SelectItem value="CEO">Admin (Full Access)</SelectItem>
                 <SelectItem value="Associate">Standard</SelectItem>
-                <SelectItem value="Analyst">Basic</SelectItem>
               </SelectContent>
             </Select>
           </div>
