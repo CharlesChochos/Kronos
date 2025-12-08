@@ -465,6 +465,7 @@ export const stakeholders = pgTable("stakeholders", {
   linkedin: text("linkedin"),
   website: text("website"),
   location: text("location"),
+  focus: text("focus"), // Sector interest for investors (Technology, Healthcare, Consumer, etc.)
   notes: text("notes"),
   deals: jsonb("deals").default([]).$type<string[]>(),
   isFavorite: boolean("is_favorite").default(false),

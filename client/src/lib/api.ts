@@ -1570,7 +1570,7 @@ export function useDeleteDocument() {
 export type InvestorMatch = {
   id: string;
   dealId: string;
-  investorId: number;
+  investorId: string;
   status: string;
   matchedBy: string | null;
   matchedAt: string;
@@ -1592,7 +1592,7 @@ export function useInvestorMatches(dealId: string | null) {
 export function useCreateInvestorMatch() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (match: { dealId: string; investorId: number; status: string }) => {
+    mutationFn: async (match: { dealId: string; investorId: string; status: string }) => {
       const res = await fetch("/api/investor-matches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1613,7 +1613,7 @@ export function useCreateInvestorMatch() {
 export function useDeleteInvestorMatch() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ dealId, investorId }: { dealId: string; investorId: number }) => {
+    mutationFn: async ({ dealId, investorId }: { dealId: string; investorId: string }) => {
       const res = await fetch(`/api/investor-matches/${dealId}/${investorId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete investor match");
       return res.json();

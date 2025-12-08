@@ -67,6 +67,7 @@ type LocalStakeholder = {
   linkedin?: string;
   website?: string;
   location?: string;
+  focus?: string;
   notes?: string;
   deals: string[];
   isFavorite: boolean;
@@ -116,6 +117,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     linkedin: s.linkedin || undefined,
     website: s.website || undefined,
     location: s.location || undefined,
+    focus: s.focus || undefined,
     notes: s.notes || undefined,
     deals: s.deals || [],
     isFavorite: s.isFavorite || false,
@@ -133,6 +135,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     linkedin: "",
     website: "",
     location: "",
+    focus: "",
     notes: ""
   });
 
@@ -173,6 +176,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
         linkedin: newStakeholder.linkedin || undefined,
         website: newStakeholder.website || undefined,
         location: newStakeholder.location || undefined,
+        focus: newStakeholder.focus || undefined,
         notes: newStakeholder.notes || undefined,
         deals: [],
         isFavorite: false
@@ -181,7 +185,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
       setShowCreateModal(false);
       setNewStakeholder({
         name: "", title: "", company: "", type: "investor",
-        email: "", phone: "", linkedin: "", website: "", location: "", notes: ""
+        email: "", phone: "", linkedin: "", website: "", location: "", focus: "", notes: ""
       });
       toast.success("Stakeholder added to directory");
     } catch (error) {
@@ -740,6 +744,18 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
                   data-testid="input-edit-stakeholder-location"
                 />
               </div>
+              {selectedStakeholder?.type === 'investor' && (
+                <div>
+                  <Label>Sector Focus</Label>
+                  <Input
+                    value={selectedStakeholder?.focus || ''}
+                    onChange={(e) => setSelectedStakeholder(prev => prev ? { ...prev, focus: e.target.value } : null)}
+                    placeholder="e.g. Technology, Healthcare, Consumer"
+                    data-testid="input-edit-stakeholder-focus"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Used for matching investors to deals by sector</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>LinkedIn URL</Label>
@@ -787,6 +803,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
                       linkedin: selectedStakeholder.linkedin || null,
                       website: selectedStakeholder.website || null,
                       location: selectedStakeholder.location || null,
+                      focus: selectedStakeholder.focus || null,
                       notes: selectedStakeholder.notes || null,
                     }
                   });
@@ -887,6 +904,18 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
                   data-testid="input-stakeholder-location"
                 />
               </div>
+              {newStakeholder.type === 'investor' && (
+                <div>
+                  <Label>Sector Focus</Label>
+                  <Input
+                    value={newStakeholder.focus}
+                    onChange={(e) => setNewStakeholder({ ...newStakeholder, focus: e.target.value })}
+                    placeholder="e.g. Technology, Healthcare, Consumer"
+                    data-testid="input-stakeholder-focus"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Used for matching investors to deals by sector</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>LinkedIn URL</Label>

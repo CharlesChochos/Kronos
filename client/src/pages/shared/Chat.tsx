@@ -612,11 +612,11 @@ export default function Chat({ role }: ChatProps) {
                     <Checkbox
                       checked={selectedUsers.includes(user.id)}
                       onCheckedChange={(checked) => {
-                        setSelectedUsers(prev => 
-                          checked 
-                            ? [...prev, user.id]
-                            : prev.filter(id => id !== user.id)
-                        );
+                        if (checked === true) {
+                          setSelectedUsers(prev => [...prev, user.id]);
+                        } else {
+                          setSelectedUsers(prev => prev.filter(id => id !== user.id));
+                        }
                       }}
                       data-testid={`checkbox-user-${user.id}`}
                     />
