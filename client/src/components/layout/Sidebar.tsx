@@ -134,16 +134,16 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
   // Check if user is an admin - for showing Asset Management in CEO view
   const isAdmin = currentUser?.accessLevel === 'admin';
 
-  // CEO grouped links
+  // CEO grouped links - ordered: Dashboard, Opportunities, Deal Management, Asset Management (admin only), Documents
   const ceoGroups: CategoryGroup[] = [
     {
       category: "Platform",
       links: [
         { icon: LayoutDashboard, label: "Dashboard", path: "/ceo/dashboard" },
-        { icon: Briefcase, label: "Deal Management", path: "/ceo/deals" },
         { icon: Target, label: "Opportunities", path: "/ceo/opportunities" },
-        { icon: FileText, label: "Documents", path: "/ceo/documents" },
+        { icon: Briefcase, label: "Deal Management", path: "/ceo/deals" },
         ...(isAdmin ? [{ icon: BarChart3, label: "Asset Management", path: "/ceo/asset-management" }] : []),
+        { icon: FileText, label: "Documents", path: "/ceo/documents" },
       ]
     },
     {

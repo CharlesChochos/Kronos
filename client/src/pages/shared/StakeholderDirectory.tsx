@@ -335,9 +335,11 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
       };
       
       Object.entries(fieldMappings).forEach(([field, aliases]) => {
-        const match = headers.find((h, i) => 
-          aliases.some(alias => lowerHeaders[i].includes(alias))
-        );
+        const match = headers.find((h, i) => {
+          const lowerH = lowerHeaders[i];
+          // Check both directions: alias in header OR header in alias (for exact matches like "Email")
+          return aliases.some(alias => lowerH.includes(alias) || alias.includes(lowerH));
+        });
         if (match) autoMap[field] = match;
       });
       

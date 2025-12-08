@@ -34,7 +34,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import type { Deal, PodTeamMember } from "@shared/schema";
 
-const DEAL_TYPES = ['M&A', 'Capital Raising', 'Asset Management'];
+const DIVISIONS = ['Investment Banking', 'Asset Management'];
 const SECTORS = ['Technology', 'Healthcare', 'Finance', 'Energy', 'Consumer', 'Industrial', 'Real Estate', 'Other'];
 
 type OpportunityAttachment = {
@@ -68,7 +68,7 @@ export default function Opportunities() {
   const [selectedOpportunity, setSelectedOpportunity] = useState<Deal | null>(null);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
-  const [approvalDealType, setApprovalDealType] = useState<string>('M&A');
+  const [approvalDivision, setApprovalDivision] = useState<string>('Investment Banking');
   const [detailTab, setDetailTab] = useState<'overview' | 'attachments' | 'notes'>('overview');
   const [newNote, setNewNote] = useState("");
   
@@ -196,12 +196,18 @@ export default function Opportunities() {
   const handleApprove = async () => {
     if (!selectedOpportunity) return;
     try {
+      // Map division to dealType for database storage
+      // Investment Banking uses M&A as dealType, Asset Management stays as Asset Management
+      const dealType = approvalDivision === 'Investment Banking' ? 'M&A' : 'Asset Management';
+      
       await updateDeal.mutateAsync({
         id: selectedOpportunity.id,
-        dealType: approvalDealType,
+        dealType: dealType,
         status: 'Active',
       } as any);
-      toast.success(`Opportunity approved and moved to ${approvalDealType}`);
+      
+      const destinationPage = approvalDivision === 'Asset Management' ? 'Asset Management' : 'Deal Management';
+      toast.success(`Opportunity approved and moved to ${destinationPage}`);
       setShowApproveDialog(false);
       setShowOpportunityDetail(false);
       setSelectedOpportunity(null);
@@ -715,26 +721,31 @@ export default function Opportunities() {
           <AlertDialogHeader>
             <AlertDialogTitle>Approve Opportunity</AlertDialogTitle>
             <AlertDialogDescription>
-              Choose which division this deal should be assigned to. It will be moved to Deal Management.
+              Choose which division this deal should be assigned to.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-4">
             <Label>Assign to Division</Label>
-            <Select value={approvalDealType} onValueChange={setApprovalDealType}>
-              <SelectTrigger className="mt-2" data-testid="select-approval-type">
+            <Select value={approvalDivision} onValueChange={setApprovalDivision}>
+              <SelectTrigger className="mt-2" data-testid="select-approval-division">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {DEAL_TYPES.map(type => (
-                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                {DIVISIONS.map(division => (
+                  <SelectItem key={division} value={division}>{division}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground mt-2">
+              {approvalDivision === 'Investment Banking' 
+                ? 'Deal will appear in Deal Management page' 
+                : 'Deal will appear in Asset Management page'}
+            </p>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleApprove} className="bg-green-600 hover:bg-green-700" data-testid="button-confirm-approve">
-              Approve & Move to Deals
+              Approve & Move
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
