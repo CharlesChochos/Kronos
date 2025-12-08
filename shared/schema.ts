@@ -713,11 +713,15 @@ export const calendarEvents = pgTable("calendar_events", {
   notes: text("notes"), // Additional notes
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
+  googleCalendarEventId: text("google_calendar_event_id"), // For Google Calendar sync
+  googleCalendarSyncedAt: timestamp("google_calendar_synced_at"), // Last sync timestamp
+  syncSource: text("sync_source").default('platform'), // 'platform' or 'google' - where event originated
 });
 
 export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({
   id: true,
   createdAt: true,
+  googleCalendarSyncedAt: true,
 });
 
 export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;

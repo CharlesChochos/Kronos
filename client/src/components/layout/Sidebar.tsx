@@ -210,6 +210,12 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
         { icon: Calendar, label: "Calendar", path: "/employee/calendar" },
         { icon: Target, label: "Goals & OKRs", path: "/employee/okrs" },
       ]
+    },
+    {
+      category: "Compliance",
+      links: [
+        { icon: ClipboardList, label: "My Activity Log", path: "/employee/audit-logs" },
+      ]
     }
   ];
 

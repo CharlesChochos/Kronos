@@ -261,3 +261,179 @@ export async function deleteUserCalendarEvent(userId: string, eventId: string): 
     eventId,
   });
 }
+
+export async function updateUserCalendarEvent(
+  userId: string,
+  eventId: string,
+  event: {
+    summary?: string;
+    description?: string;
+    location?: string;
+    start?: Date;
+    end?: Date;
+    attendees?: string[];
+  }
+) {
+  const calendar = await getAuthenticatedClient(userId);
+  if (!calendar) {
+    throw new Error('Google Calendar not connected');
+  }
+
+  const eventData: calendar_v3.Schema$Event = {};
+
+  if (event.summary !== undefined) eventData.summary = event.summary;
+  if (event.description !== undefined) eventData.description = event.description;
+  if (event.location !== undefined) eventData.location = event.location;
+  
+  if (event.start) {
+    eventData.start = {
+      dateTime: event.start.toISOString(),
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    };
+  }
+  
+  if (event.end) {
+    eventData.end = {
+      dateTime: event.end.toISOString(),
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    };
+  }
+
+  if (event.attendees && event.attendees.length > 0) {
+    eventData.attendees = event.attendees.map(email => ({ email }));
+  }
+
+  const response = await calendar.events.patch({
+    calendarId: 'primary',
+    eventId,
+    requestBody: eventData,
+    sendUpdates: event.attendees?.length ? 'all' : 'none',
+  });
+
+  return response.data;
+}
+
+// Sync platform calendar event to Google Calendar
+export async function syncEventToGoogle(
+  userId: string,
+  platformEvent: {
+    id: string;
+    title: string;
+    description?: string | null;
+    location?: string | null;
+    date: string;
+    time?: string | null;
+    isAllDay?: boolean | null;
+    participants?: string[] | null;
+    googleCalendarEventId?: string | null;
+  }
+): Promise<{ googleEventId: string; action: 'created' | 'updated' }> {
+  const calendar = await getAuthenticatedClient(userId);
+  if (!calendar) {
+    throw new Error('Google Calendar not connected');
+  }
+
+  // Build start and end times
+  let startDateTime: Date;
+  let endDateTime: Date;
+  
+  if (platformEvent.time) {
+    const [hours, minutes] = platformEvent.time.split(':').map(Number);
+    startDateTime = new Date(platformEvent.date);
+    startDateTime.setHours(hours, minutes, 0, 0);
+    endDateTime = new Date(startDateTime);
+    endDateTime.setHours(endDateTime.getHours() + 1); // Default 1 hour duration
+  } else {
+    startDateTime = new Date(platformEvent.date);
+    startDateTime.setHours(9, 0, 0, 0);
+    endDateTime = new Date(startDateTime);
+    endDateTime.setHours(10, 0, 0, 0);
+  }
+
+  const eventData: calendar_v3.Schema$Event = {
+    summary: platformEvent.title,
+    description: platformEvent.description || undefined,
+    location: platformEvent.location || undefined,
+    start: platformEvent.isAllDay ? {
+      date: platformEvent.date,
+    } : {
+      dateTime: startDateTime.toISOString(),
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    },
+    end: platformEvent.isAllDay ? {
+      date: platformEvent.date,
+    } : {
+      dateTime: endDateTime.toISOString(),
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    },
+    extendedProperties: {
+      private: {
+        kronosPlatformEventId: platformEvent.id,
+      }
+    }
+  };
+
+  if (platformEvent.participants && platformEvent.participants.length > 0) {
+    // Filter for email-like participants
+    const emailParticipants = platformEvent.participants.filter(p => p.includes('@'));
+    if (emailParticipants.length > 0) {
+      eventData.attendees = emailParticipants.map(email => ({ email }));
+    }
+  }
+
+  // Check if we should update or create
+  if (platformEvent.googleCalendarEventId) {
+    try {
+      const response = await calendar.events.patch({
+        calendarId: 'primary',
+        eventId: platformEvent.googleCalendarEventId,
+        requestBody: eventData,
+        sendUpdates: 'none',
+      });
+      return { googleEventId: response.data.id!, action: 'updated' };
+    } catch (error: any) {
+      // If event doesn't exist in Google, create a new one
+      if (error.code === 404 || error.code === 410) {
+        const response = await calendar.events.insert({
+          calendarId: 'primary',
+          requestBody: eventData,
+        });
+        return { googleEventId: response.data.id!, action: 'created' };
+      }
+      throw error;
+    }
+  } else {
+    const response = await calendar.events.insert({
+      calendarId: 'primary',
+      requestBody: eventData,
+    });
+    return { googleEventId: response.data.id!, action: 'created' };
+  }
+}
+
+// Sync events from Google Calendar back to the platform
+export async function syncEventsFromGoogle(
+  userId: string,
+  timeMin?: Date,
+  timeMax?: Date
+): Promise<calendar_v3.Schema$Event[]> {
+  const calendar = await getAuthenticatedClient(userId);
+  if (!calendar) {
+    throw new Error('Google Calendar not connected');
+  }
+
+  const now = new Date();
+  const defaultTimeMin = timeMin || new Date(now.getFullYear(), now.getMonth(), 1); // First of current month
+  const defaultTimeMax = timeMax || new Date(now.getFullYear(), now.getMonth() + 3, 0); // End of 3 months from now
+
+  const response = await calendar.events.list({
+    calendarId: 'primary',
+    timeMin: defaultTimeMin.toISOString(),
+    timeMax: defaultTimeMax.toISOString(),
+    singleEvents: true,
+    orderBy: 'startTime',
+    maxResults: 250,
+  });
+
+  return response.data.items || [];
+}

@@ -139,8 +139,9 @@ const categoryColors: Record<string, string> = {
   message: "bg-orange-500/20 text-orange-400 border-orange-500/30",
 };
 
-export default function AuditLogs() {
+export default function AuditLogs({ role }: { role?: 'CEO' | 'Employee' }) {
   const { data: currentUser } = useCurrentUser();
+  const userRole = role || currentUser?.role || 'Employee';
   const [searchQuery, setSearchQuery] = useState("");
   const [filterEntityType, setFilterEntityType] = useState<string>("all");
   const [filterUser, setFilterUser] = useState<string>("all");
@@ -244,13 +245,17 @@ export default function AuditLogs() {
   };
 
   return (
-    <Layout role="CEO" pageTitle="Audit Logs" userName={currentUser?.name || ""}>
+    <Layout role={userRole as 'CEO' | 'Employee'} pageTitle="Audit Logs" userName={currentUser?.name || ""}>
       <div className="space-y-6" data-testid="audit-logs-page">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-display font-bold">Audit Logs</h1>
+            <h1 className="text-3xl font-display font-bold">
+              {userRole === 'CEO' ? 'Audit Logs' : 'My Activity Log'}
+            </h1>
             <p className="text-muted-foreground mt-1">
-              Track all user activities and system events for compliance
+              {userRole === 'CEO' 
+                ? 'Track all user activities and system events for compliance' 
+                : 'View your activity history for compliance and record keeping'}
             </p>
           </div>
         <div className="flex gap-2">
@@ -375,20 +380,22 @@ export default function AuditLogs() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={filterUser} onValueChange={setFilterUser}>
-              <SelectTrigger className="w-[200px]" data-testid="select-user">
-                <User className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="All Users" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Users</SelectItem>
-                {users.map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {userRole === 'CEO' && (
+              <Select value={filterUser} onValueChange={setFilterUser}>
+                <SelectTrigger className="w-[200px]" data-testid="select-user">
+                  <User className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="All Users" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <ScrollArea className="h-[600px]">

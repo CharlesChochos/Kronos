@@ -721,6 +721,26 @@ export function useDisconnectGoogleCalendar() {
   });
 }
 
+export function useSyncGoogleCalendar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/google-calendar/sync", {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to sync with Google Calendar");
+      }
+      return res.json() as Promise<{ message: string; imported: number; skipped: number; totalGoogleEvents: number }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["google-calendar-events"] });
+      queryClient.invalidateQueries({ queryKey: ["meetings"] });
+    },
+  });
+}
+
 export function useGoogleCalendarEvents(timeMin?: Date, timeMax?: Date) {
   return useQuery({
     queryKey: ["google-calendar-events", timeMin?.toISOString(), timeMax?.toISOString()],

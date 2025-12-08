@@ -237,6 +237,9 @@ function Router() {
       <Route path="/employee/document-library">
         {() => <ProtectedRoute component={EmployeeDocumentLibrary} />}
       </Route>
+      <Route path="/employee/audit-logs">
+        {() => <ProtectedRoute component={() => <AuditLogs role="Employee" />} />}
+      </Route>
       
       {/* External Portal Routes */}
       <Route path="/portal/login" component={PortalLogin} />

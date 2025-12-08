@@ -3175,9 +3175,10 @@ Guidelines:
   
   // ===== AUDIT LOG ROUTES =====
   
-  // Get audit logs (CEO only)
-  app.get("/api/audit-logs", requireCEO, async (req, res) => {
+  // Get audit logs (all authenticated users - CEOs see all, employees see their own)
+  app.get("/api/audit-logs", requireAuth, async (req, res) => {
     try {
+      const user = req.user as any;
       const limit = parseInt(req.query.limit as string) || 500;
       const logs = await storage.getAuditLogs(limit);
       
@@ -3192,7 +3193,12 @@ Guidelines:
         };
       });
       
-      res.json(enrichedLogs);
+      // CEOs see all logs, employees see only their own activities
+      const filteredLogs = user.role === 'CEO' 
+        ? enrichedLogs 
+        : enrichedLogs.filter((log: any) => log.userId === user.id);
+      
+      res.json(filteredLogs);
     } catch (error) {
       console.error('Get audit logs error:', error);
       res.status(500).json({ error: "Failed to fetch audit logs" });
@@ -4406,6 +4412,94 @@ Guidelines:
       res.status(500).json({ error: "Failed to delete Google Calendar event" });
     }
   });
+  
+  // Sync events from Google Calendar to platform (two-way sync)
+  app.post("/api/google-calendar/sync", requireAuth, async (req, res) => {
+    try {
+      const { syncEventsFromGoogle, isUserConnected } = await import('./googleCalendar');
+      const user = req.user as any;
+      
+      if (!await isUserConnected(user.id)) {
+        return res.status(401).json({ error: "Google Calendar not connected" });
+      }
+      
+      // Get events from Google Calendar
+      const googleEvents = await syncEventsFromGoogle(user.id);
+      
+      // Get existing platform events to check for duplicates
+      const platformEvents = await storage.getAllCalendarEvents();
+      const existingGoogleIds = new Set(platformEvents.filter(e => e.googleCalendarEventId).map(e => e.googleCalendarEventId));
+      const existingPlatformEventIds = new Set(platformEvents.map(e => e.id));
+      
+      let imported = 0;
+      let skipped = 0;
+      
+      for (const gEvent of googleEvents) {
+        if (!gEvent.id || !gEvent.summary) continue;
+        
+        // Skip if already synced (has this Google Calendar event ID)
+        if (existingGoogleIds.has(gEvent.id)) {
+          skipped++;
+          continue;
+        }
+        
+        // Check if this is a platform event by extended properties
+        const platformEventId = gEvent.extendedProperties?.private?.kronosPlatformEventId;
+        if (platformEventId && existingPlatformEventIds.has(platformEventId)) {
+          skipped++;
+          continue;
+        }
+        
+        // Extract date/time from Google event
+        let eventDate: string;
+        let eventTime: string | undefined;
+        let isAllDay = false;
+        
+        if (gEvent.start?.date) {
+          // All-day event
+          eventDate = gEvent.start.date;
+          isAllDay = true;
+        } else if (gEvent.start?.dateTime) {
+          const startDt = new Date(gEvent.start.dateTime);
+          eventDate = startDt.toISOString().split('T')[0];
+          eventTime = startDt.toTimeString().slice(0, 5);
+        } else {
+          continue; // Skip if no valid start time
+        }
+        
+        // Create platform event from Google event
+        await storage.createCalendarEvent({
+          title: gEvent.summary,
+          description: gEvent.description || undefined,
+          location: gEvent.location || undefined,
+          date: eventDate,
+          time: eventTime,
+          isAllDay,
+          type: 'meeting',
+          status: 'scheduled',
+          createdBy: user.id,
+          googleCalendarEventId: gEvent.id,
+          syncSource: 'google',
+          participants: gEvent.attendees?.map(a => a.email || '').filter(Boolean) || [],
+        });
+        
+        imported++;
+      }
+      
+      res.json({
+        message: `Sync completed: ${imported} events imported, ${skipped} already synced`,
+        imported,
+        skipped,
+        totalGoogleEvents: googleEvents.length
+      });
+    } catch (error: any) {
+      console.error('Google Calendar sync error:', error);
+      if (error.message?.includes('not connected')) {
+        return res.status(401).json({ error: "Google Calendar not connected" });
+      }
+      res.status(500).json({ error: "Failed to sync from Google Calendar" });
+    }
+  });
 
   // ===== CALENDAR EVENT ROUTES =====
   
@@ -4450,11 +4544,28 @@ Guidelines:
       const result = insertCalendarEventSchema.safeParse({
         ...req.body,
         createdBy: user.id,
+        syncSource: 'platform',
       });
       if (!result.success) {
         return res.status(400).json({ error: fromError(result.error).toString() });
       }
       const event = await storage.createCalendarEvent(result.data);
+      
+      // Sync to Google Calendar if user is connected
+      try {
+        const { isUserConnected, syncEventToGoogle } = await import('./googleCalendar');
+        if (await isUserConnected(user.id)) {
+          const syncResult = await syncEventToGoogle(user.id, event);
+          // Update the event with Google Calendar ID
+          await storage.updateCalendarEvent(event.id, {
+            googleCalendarEventId: syncResult.googleEventId,
+            googleCalendarSyncedAt: new Date(),
+          } as any);
+          event.googleCalendarEventId = syncResult.googleEventId;
+        }
+      } catch (syncError) {
+        console.log('Google Calendar sync skipped:', (syncError as Error).message);
+      }
       
       await createAuditLog(req, 'calendar_event_created', 'calendar_event', event.id, event.title, {
         date: event.date,
@@ -4473,11 +4584,29 @@ Guidelines:
   // Update calendar event
   app.patch("/api/calendar-events/:id", requireAuth, async (req, res) => {
     try {
+      const user = req.user as any;
       const event = await storage.getCalendarEvent(req.params.id);
       if (!event) {
         return res.status(404).json({ error: "Calendar event not found" });
       }
       const updated = await storage.updateCalendarEvent(req.params.id, req.body);
+      
+      // Sync to Google Calendar if user is connected
+      if (updated) {
+        try {
+          const { isUserConnected, syncEventToGoogle } = await import('./googleCalendar');
+          if (await isUserConnected(user.id)) {
+            const syncResult = await syncEventToGoogle(user.id, updated);
+            // Update sync timestamp
+            await storage.updateCalendarEvent(updated.id, {
+              googleCalendarEventId: syncResult.googleEventId,
+              googleCalendarSyncedAt: new Date(),
+            } as any);
+          }
+        } catch (syncError) {
+          console.log('Google Calendar sync skipped:', (syncError as Error).message);
+        }
+      }
       
       await createAuditLog(req, 'calendar_event_updated', 'calendar_event', updated?.id || req.params.id, updated?.title || event.title, req.body);
       
@@ -4490,10 +4619,24 @@ Guidelines:
   // Delete calendar event
   app.delete("/api/calendar-events/:id", requireAuth, async (req, res) => {
     try {
+      const user = req.user as any;
       const event = await storage.getCalendarEvent(req.params.id);
       if (!event) {
         return res.status(404).json({ error: "Calendar event not found" });
       }
+      
+      // Delete from Google Calendar if synced
+      if (event.googleCalendarEventId) {
+        try {
+          const { isUserConnected, deleteUserCalendarEvent } = await import('./googleCalendar');
+          if (await isUserConnected(user.id)) {
+            await deleteUserCalendarEvent(user.id, event.googleCalendarEventId);
+          }
+        } catch (syncError) {
+          console.log('Google Calendar delete skipped:', (syncError as Error).message);
+        }
+      }
+      
       await storage.deleteCalendarEvent(req.params.id);
       
       await createAuditLog(req, 'calendar_event_deleted', 'calendar_event', req.params.id, event.title, {

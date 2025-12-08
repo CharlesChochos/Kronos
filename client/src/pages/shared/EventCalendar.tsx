@@ -27,7 +27,7 @@ import {
   X,
   User
 } from "lucide-react";
-import { useCurrentUser, useMeetings, useDeals, useUsers, useCreateMeeting, useDeleteMeeting, useTimeOffRequests, useCreateTimeOffRequest, useUpdateTimeOffRequest, useGoogleCalendarStatus, useGoogleCalendarEvents, useCreateGoogleCalendarEvent, useConnectGoogleCalendar, useDisconnectGoogleCalendar, type GoogleCalendarEvent } from "@/lib/api";
+import { useCurrentUser, useMeetings, useDeals, useUsers, useCreateMeeting, useDeleteMeeting, useTimeOffRequests, useCreateTimeOffRequest, useUpdateTimeOffRequest, useGoogleCalendarStatus, useGoogleCalendarEvents, useCreateGoogleCalendarEvent, useConnectGoogleCalendar, useDisconnectGoogleCalendar, useSyncGoogleCalendar, type GoogleCalendarEvent } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, isToday, parseISO, isWithinInterval, addHours } from "date-fns";
 import { toast } from "sonner";
@@ -55,6 +55,7 @@ export default function EventCalendar({ role }: EventCalendarProps) {
   const createGoogleEventMutation = useCreateGoogleCalendarEvent();
   const connectGoogleCalendar = useConnectGoogleCalendar();
   const disconnectGoogleCalendar = useDisconnectGoogleCalendar();
+  const syncGoogleCalendar = useSyncGoogleCalendar();
   const [, setLocation] = useLocation();
 
   // Handle OAuth callback query parameters
@@ -434,6 +435,21 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                                   data-testid="button-refresh-google-calendar"
                                 >
                                   <RefreshCw className={cn("w-3 h-3", isLoadingGoogleEvents && "animate-spin")} />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 text-xs text-muted-foreground"
+                                  onClick={() => {
+                                    syncGoogleCalendar.mutate(undefined, {
+                                      onSuccess: (result) => toast.success(result.message),
+                                      onError: (error) => toast.error(error.message)
+                                    });
+                                  }}
+                                  disabled={syncGoogleCalendar.isPending}
+                                  data-testid="button-sync-google-calendar"
+                                >
+                                  {syncGoogleCalendar.isPending ? "Syncing..." : "Sync"}
                                 </Button>
                                 <Button
                                   variant="ghost"
