@@ -610,26 +610,23 @@ export default function Chat({ role }: ChatProps) {
                 {availableUsers.map(user => {
                   const isSelected = selectedUsers.includes(user.id);
                   return (
-                    <div 
+                    <label 
                       key={user.id} 
                       className={cn(
                         "flex items-center gap-3 p-2 rounded cursor-pointer",
                         isSelected ? "bg-primary/10" : "hover:bg-secondary"
                       )}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (isSelected) {
-                          setSelectedUsers(selectedUsers.filter(id => id !== user.id));
-                        } else {
-                          setSelectedUsers([...selectedUsers, user.id]);
-                        }
-                      }}
                       data-testid={`select-group-user-${user.id}`}
                     >
                       <Checkbox
                         checked={isSelected}
-                        className="pointer-events-none"
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedUsers([...selectedUsers, user.id]);
+                          } else {
+                            setSelectedUsers(selectedUsers.filter(id => id !== user.id));
+                          }
+                        }}
                         data-testid={`checkbox-group-user-${user.id}`}
                       />
                       <Avatar className="w-8 h-8">
@@ -638,7 +635,7 @@ export default function Chat({ role }: ChatProps) {
                         </AvatarFallback>
                       </Avatar>
                       <span className="text-sm">{user.name}</span>
-                    </div>
+                    </label>
                   );
                 })}
               </ScrollArea>
