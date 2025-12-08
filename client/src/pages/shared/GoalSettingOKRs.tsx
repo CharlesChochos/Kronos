@@ -28,7 +28,7 @@ import {
   Trash2,
   Award
 } from "lucide-react";
-import { useCurrentUser, useUsers, useOkrs, useCreateOkr, useUpdateOkr } from "@/lib/api";
+import { useCurrentUser, useUsers, useOkrs, useCreateOkr, useUpdateOkr, useDeleteOkr } from "@/lib/api";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,17 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
   const { data: okrs = [], isLoading } = useOkrs();
   const createOkrMutation = useCreateOkr();
   const updateOkrMutation = useUpdateOkr();
+  const deleteOkrMutation = useDeleteOkr();
+
+  const handleDeleteOkr = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this OKR?")) return;
+    try {
+      await deleteOkrMutation.mutateAsync(id);
+      toast.success("OKR deleted");
+    } catch (error) {
+      toast.error("Failed to delete OKR");
+    }
+  };
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -322,6 +333,20 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
                                 <p className="text-2xl font-bold">{okr.overallProgress}%</p>
                                 <Progress value={okr.overallProgress} className="w-24 h-2" />
                               </div>
+                              {(role === 'CEO' || okr.ownerId === currentUser?.id) && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteOkr(okr.id);
+                                  }}
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  data-testid={`delete-okr-${okr.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
                           </div>
 

@@ -2656,6 +2656,34 @@ Guidelines:
     }
   });
   
+  // Delete chat conversation
+  app.delete("/api/chat/conversations/:id", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const conversation = await storage.getConversation(req.params.id);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      
+      // Verify user is a member
+      const members = await storage.getConversationMembers(req.params.id);
+      if (!members.some(m => m.userId === currentUser.id)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Delete all messages first, then members, then conversation
+      await storage.deleteConversationMessages(req.params.id);
+      await storage.deleteConversationMembers(req.params.id);
+      await storage.deleteConversation(req.params.id);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      res.status(500).json({ error: "Failed to delete conversation" });
+    }
+  });
+
   // Send message to user by name (for Reaper assistant integration)
   app.post("/api/chat/send-to-user", requireAuth, async (req, res) => {
     try {

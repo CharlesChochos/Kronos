@@ -22,9 +22,10 @@ import {
   TrendingUp,
   Award,
   Heart,
-  Loader2
+  Loader2,
+  Trash2
 } from "lucide-react";
-import { useUsers, useMentorshipPairings, useCreateMentorshipPairing, useUpdateMentorshipPairing } from "@/lib/api";
+import { useUsers, useMentorshipPairings, useCreateMentorshipPairing, useUpdateMentorshipPairing, useDeleteMentorshipPairing } from "@/lib/api";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import type { MentorshipPairing } from "@shared/schema";
@@ -34,6 +35,17 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
   const { data: pairings = [], isLoading } = useMentorshipPairings();
   const createPairing = useCreateMentorshipPairing();
   const updatePairing = useUpdateMentorshipPairing();
+  const deletePairing = useDeleteMentorshipPairing();
+
+  const handleDeletePairing = async (id: string) => {
+    if (!confirm("Are you sure you want to remove this mentorship pairing?")) return;
+    try {
+      await deletePairing.mutateAsync(id);
+      toast.success("Mentorship pairing removed");
+    } catch (error) {
+      toast.error("Failed to remove pairing");
+    }
+  };
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -253,6 +265,17 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
                         </div>
                         <div className="flex items-center gap-2">
                           {getStatusBadge(pairing.status)}
+                          {role === 'CEO' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeletePairing(pairing.id)}
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              data-testid={`delete-pairing-${pairing.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
 

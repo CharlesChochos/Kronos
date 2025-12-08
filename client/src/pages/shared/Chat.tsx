@@ -22,7 +22,8 @@ import {
   X,
   Check,
   Loader2,
-  Download
+  Download,
+  Trash2
 } from "lucide-react";
 import { useCurrentUser, useUsers } from "@/lib/api";
 import { useDashboardContext } from "@/contexts/DashboardContext";
@@ -130,6 +131,29 @@ export default function Chat({ role }: ChatProps) {
       setMessageInput("");
     },
   });
+
+  // Delete conversation mutation
+  const deleteConversationMutation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      const res = await fetch(`/api/chat/conversations/${conversationId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete conversation");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      setSelectedConversationId(null);
+      toast.success("Conversation deleted");
+    },
+  });
+
+  const handleDeleteConversation = async (conversationId: string) => {
+    if (!confirm("Are you sure you want to delete this conversation?")) return;
+    try {
+      await deleteConversationMutation.mutateAsync(conversationId);
+    } catch (error) {
+      toast.error("Failed to delete conversation");
+    }
+  };
 
   // Filter users excluding current user
   const availableUsers = allUsers.filter(u => u.id !== currentUser?.id);
@@ -395,8 +419,14 @@ export default function Chat({ role }: ChatProps) {
                       </p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon">
-                    <MoreVertical className="w-4 h-4" />
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => handleDeleteConversation(selectedConversation.id)}
+                    className="text-muted-foreground hover:text-destructive"
+                    data-testid="button-delete-conversation"
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
               </CardHeader>

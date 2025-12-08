@@ -82,6 +82,9 @@ export interface IStorage {
   createMessage(message: InsertMessage): Promise<Message>;
   getUnreadMessageCount(userId: string): Promise<number>;
   markMessagesAsRead(conversationId: string, userId: string): Promise<void>;
+  deleteConversation(id: string): Promise<void>;
+  deleteConversationMessages(conversationId: string): Promise<void>;
+  deleteConversationMembers(conversationId: string): Promise<void>;
   
   // Time Entry operations
   getTimeEntry(id: string): Promise<TimeEntry | undefined>;
@@ -683,6 +686,18 @@ export class DatabaseStorage implements IStorage {
           eq(schema.conversationMembers.userId, userId)
         )
       );
+  }
+  
+  async deleteConversation(id: string): Promise<void> {
+    await db.delete(schema.conversations).where(eq(schema.conversations.id, id));
+  }
+  
+  async deleteConversationMessages(conversationId: string): Promise<void> {
+    await db.delete(schema.messages).where(eq(schema.messages.conversationId, conversationId));
+  }
+  
+  async deleteConversationMembers(conversationId: string): Promise<void> {
+    await db.delete(schema.conversationMembers).where(eq(schema.conversationMembers.conversationId, conversationId));
   }
   
   // Time Entry operations
