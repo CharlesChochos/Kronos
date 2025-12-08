@@ -5,38 +5,46 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useCurrentUser } from "@/lib/api";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import NotFound from "@/pages/not-found";
-import AuthPage from "@/pages/auth/AuthPage";
-import ResetPassword from "@/pages/auth/ResetPassword";
-import Dashboard from "@/pages/ceo/Dashboard";
-import DealManagement from "@/pages/ceo/DealManagement";
-import DocumentGenerator from "@/pages/shared/DocumentGenerator";
-import InvestorMatching from "@/pages/ceo/InvestorMatching";
-import EmployeeInvestorMatching from "@/pages/employee/InvestorMatching";
-import TeamAssignment from "@/pages/ceo/TeamAssignment";
-import TeamPerformance from "@/pages/ceo/TeamPerformance";
-import InvestorCRM from "@/pages/ceo/InvestorCRM";
-import ClientPortal from "@/pages/shared/ClientPortal";
-import MentorshipPairing from "@/pages/shared/MentorshipPairing";
-import GoalSettingOKRs from "@/pages/shared/GoalSettingOKRs";
-import DealAnnouncements from "@/pages/shared/DealAnnouncements";
-import StakeholderDirectory from "@/pages/shared/StakeholderDirectory";
-import EventCalendar from "@/pages/shared/EventCalendar";
-import MyTasks from "@/pages/employee/MyTasks";
-import EmployeeHome from "@/pages/employee/Home";
-import Chat from "@/pages/shared/Chat";
-import UserManagement from "@/pages/ceo/UserManagement";
-import InvestorDatabase from "@/pages/ceo/InvestorDatabase";
-import DealTemplates from "@/pages/shared/DealTemplates";
-import DocumentManagement from "@/pages/shared/DocumentManagement";
-import AuditLogs from "@/pages/ceo/AuditLogs";
-import Opportunities from "@/pages/ceo/Opportunities";
-import AssetManagement from "@/pages/employee/AssetManagement";
-import PortalLogin from "@/pages/portal/PortalLogin";
-import PortalRegister from "@/pages/portal/PortalRegister";
-import PortalDashboard from "@/pages/portal/PortalDashboard";
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { DashboardProvider } from "@/contexts/DashboardContext";
+
+// Loading component for lazy-loaded routes
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="text-muted-foreground">Loading...</div>
+  </div>
+);
+
+// Lazy load all page components for code splitting
+const NotFound = lazy(() => import("@/pages/not-found"));
+const AuthPage = lazy(() => import("@/pages/auth/AuthPage"));
+const ResetPassword = lazy(() => import("@/pages/auth/ResetPassword"));
+const Dashboard = lazy(() => import("@/pages/ceo/Dashboard"));
+const DealManagement = lazy(() => import("@/pages/ceo/DealManagement"));
+const InvestorMatching = lazy(() => import("@/pages/ceo/InvestorMatching"));
+const EmployeeInvestorMatching = lazy(() => import("@/pages/employee/InvestorMatching"));
+const TeamAssignment = lazy(() => import("@/pages/ceo/TeamAssignment"));
+const TeamPerformance = lazy(() => import("@/pages/ceo/TeamPerformance"));
+const InvestorCRM = lazy(() => import("@/pages/ceo/InvestorCRM"));
+const ClientPortal = lazy(() => import("@/pages/shared/ClientPortal"));
+const MentorshipPairing = lazy(() => import("@/pages/shared/MentorshipPairing"));
+const GoalSettingOKRs = lazy(() => import("@/pages/shared/GoalSettingOKRs"));
+const DealAnnouncements = lazy(() => import("@/pages/shared/DealAnnouncements"));
+const StakeholderDirectory = lazy(() => import("@/pages/shared/StakeholderDirectory"));
+const EventCalendar = lazy(() => import("@/pages/shared/EventCalendar"));
+const MyTasks = lazy(() => import("@/pages/employee/MyTasks"));
+const EmployeeHome = lazy(() => import("@/pages/employee/Home"));
+const Chat = lazy(() => import("@/pages/shared/Chat"));
+const UserManagement = lazy(() => import("@/pages/ceo/UserManagement"));
+const InvestorDatabase = lazy(() => import("@/pages/ceo/InvestorDatabase"));
+const DealTemplates = lazy(() => import("@/pages/shared/DealTemplates"));
+const DocumentManagement = lazy(() => import("@/pages/shared/DocumentManagement"));
+const AuditLogs = lazy(() => import("@/pages/ceo/AuditLogs"));
+const Opportunities = lazy(() => import("@/pages/ceo/Opportunities"));
+const AssetManagement = lazy(() => import("@/pages/employee/AssetManagement"));
+const PortalLogin = lazy(() => import("@/pages/portal/PortalLogin"));
+const PortalRegister = lazy(() => import("@/pages/portal/PortalRegister"));
+const PortalDashboard = lazy(() => import("@/pages/portal/PortalDashboard"));
 
 // Wrapper components to ensure props are passed correctly with wouter
 const CeoDealManagement = () => <DealManagement role="CEO" />;
@@ -70,11 +78,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   }, [user, isLoading, setLocation]);
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!user) {
@@ -105,11 +109,7 @@ function PortalProtectedRoute({ component: Component }: { component: React.Compo
   }, [user, isLoading, setLocation]);
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!user || user.role !== 'External') {
@@ -124,14 +124,12 @@ function Router() {
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
-    // Check if welcome animation is pending - don't redirect during animation
     const welcomePending = sessionStorage.getItem('welcomePending');
     if (welcomePending === 'true') {
-      return; // Let AuthPage handle the redirect after animation
+      return;
     }
     
     if (user && location === "/") {
-      // Use accessLevel from database - admin goes to CEO dashboard, others to employee home
       if (user.accessLevel === 'admin') {
         setLocation("/ceo/dashboard");
       } else {
@@ -141,126 +139,128 @@ function Router() {
   }, [user, location, setLocation]);
 
   return (
-    <Switch>
-      <Route path="/" component={AuthPage} />
-      <Route path="/auth" component={AuthPage} />
-      <Route path="/reset-password" component={ResetPassword} />
-      
-      {/* CEO Routes */}
-      <Route path="/ceo/dashboard">
-        {() => <ProtectedRoute component={Dashboard} />}
-      </Route>
-      <Route path="/ceo/deals">
-        {() => <ProtectedRoute component={CeoDealManagement} />}
-      </Route>
-      <Route path="/ceo/documents">
-        {() => <ProtectedRoute component={CeoDocumentGenerator} />}
-      </Route>
-      <Route path="/ceo/investors">
-        {() => <ProtectedRoute component={InvestorMatching} />}
-      </Route>
-      <Route path="/ceo/team">
-        {() => <ProtectedRoute component={TeamAssignment} />}
-      </Route>
-      <Route path="/ceo/chat">
-        {() => <ProtectedRoute component={CeoChat} />}
-      </Route>
-      <Route path="/ceo/team-performance">
-        {() => <ProtectedRoute component={TeamPerformance} />}
-      </Route>
-      <Route path="/ceo/investor-crm">
-        {() => <ProtectedRoute component={InvestorCRM} />}
-      </Route>
-      <Route path="/ceo/client-portal">
-        {() => <ProtectedRoute component={CeoClientPortal} />}
-      </Route>
-      <Route path="/ceo/mentorship">
-        {() => <ProtectedRoute component={CeoMentorshipPairing} />}
-      </Route>
-      <Route path="/ceo/okrs">
-        {() => <ProtectedRoute component={CeoGoalSettingOKRs} />}
-      </Route>
-      <Route path="/ceo/announcements">
-        {() => <ProtectedRoute component={CeoDealAnnouncements} />}
-      </Route>
-      <Route path="/ceo/calendar">
-        {() => <ProtectedRoute component={CeoEventCalendar} />}
-      </Route>
-      <Route path="/ceo/stakeholders">
-        {() => <ProtectedRoute component={CeoStakeholderDirectory} />}
-      </Route>
-      <Route path="/ceo/admin">
-        {() => <ProtectedRoute component={UserManagement} />}
-      </Route>
-      <Route path="/ceo/investor-database">
-        {() => <ProtectedRoute component={InvestorDatabase} />}
-      </Route>
-      <Route path="/ceo/audit-logs">
-        {() => <ProtectedRoute component={() => <AuditLogs role="CEO" />} />}
-      </Route>
-      <Route path="/ceo/deal-templates">
-        {() => <ProtectedRoute component={CeoDealTemplates} />}
-      </Route>
-      <Route path="/ceo/document-library">
-        {() => <ProtectedRoute component={CeoDocumentLibrary} />}
-      </Route>
-      <Route path="/ceo/opportunities">
-        {() => <ProtectedRoute component={Opportunities} />}
-      </Route>
-      <Route path="/ceo/asset-management">
-        {() => <ProtectedRoute component={() => <AssetManagement role="CEO" />} />}
-      </Route>
-      
-      {/* Employee Routes */}
-      <Route path="/employee/home">
-        {() => <ProtectedRoute component={EmployeeHome} />}
-      </Route>
-      <Route path="/employee/tasks">
-        {() => <ProtectedRoute component={MyTasks} />}
-      </Route>
-      <Route path="/employee/documents">
-        {() => <ProtectedRoute component={EmployeeDocumentGenerator} />}
-      </Route>
-      <Route path="/employee/deals">
-        {() => <ProtectedRoute component={EmployeeDealManagement} />}
-      </Route>
-      <Route path="/employee/investors">
-        {() => <ProtectedRoute component={EmployeeInvestorMatching} />}
-      </Route>
-      <Route path="/employee/chat">
-        {() => <ProtectedRoute component={EmployeeChat} />}
-      </Route>
-      <Route path="/employee/calendar">
-        {() => <ProtectedRoute component={EmployeeEventCalendar} />}
-      </Route>
-      <Route path="/employee/okrs">
-        {() => <ProtectedRoute component={EmployeeGoalSettingOKRs} />}
-      </Route>
-      <Route path="/employee/announcements">
-        {() => <ProtectedRoute component={EmployeeDealAnnouncements} />}
-      </Route>
-      <Route path="/employee/stakeholders">
-        {() => <ProtectedRoute component={EmployeeStakeholderDirectory} />}
-      </Route>
-      <Route path="/employee/document-library">
-        {() => <ProtectedRoute component={EmployeeDocumentLibrary} />}
-      </Route>
-      <Route path="/employee/asset-management">
-        {() => <ProtectedRoute component={AssetManagement} />}
-      </Route>
-      <Route path="/employee/audit-logs">
-        {() => <ProtectedRoute component={() => <AuditLogs role="Employee" />} />}
-      </Route>
-      
-      {/* External Portal Routes */}
-      <Route path="/portal/login" component={PortalLogin} />
-      <Route path="/portal/register/:token" component={PortalRegister} />
-      <Route path="/portal">
-        {() => <PortalProtectedRoute component={PortalDashboard} />}
-      </Route>
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path="/" component={AuthPage} />
+        <Route path="/auth" component={AuthPage} />
+        <Route path="/reset-password" component={ResetPassword} />
+        
+        {/* CEO Routes */}
+        <Route path="/ceo/dashboard">
+          {() => <ProtectedRoute component={Dashboard} />}
+        </Route>
+        <Route path="/ceo/deals">
+          {() => <ProtectedRoute component={CeoDealManagement} />}
+        </Route>
+        <Route path="/ceo/documents">
+          {() => <ProtectedRoute component={CeoDocumentGenerator} />}
+        </Route>
+        <Route path="/ceo/investors">
+          {() => <ProtectedRoute component={InvestorMatching} />}
+        </Route>
+        <Route path="/ceo/team">
+          {() => <ProtectedRoute component={TeamAssignment} />}
+        </Route>
+        <Route path="/ceo/chat">
+          {() => <ProtectedRoute component={CeoChat} />}
+        </Route>
+        <Route path="/ceo/team-performance">
+          {() => <ProtectedRoute component={TeamPerformance} />}
+        </Route>
+        <Route path="/ceo/investor-crm">
+          {() => <ProtectedRoute component={InvestorCRM} />}
+        </Route>
+        <Route path="/ceo/client-portal">
+          {() => <ProtectedRoute component={CeoClientPortal} />}
+        </Route>
+        <Route path="/ceo/mentorship">
+          {() => <ProtectedRoute component={CeoMentorshipPairing} />}
+        </Route>
+        <Route path="/ceo/okrs">
+          {() => <ProtectedRoute component={CeoGoalSettingOKRs} />}
+        </Route>
+        <Route path="/ceo/announcements">
+          {() => <ProtectedRoute component={CeoDealAnnouncements} />}
+        </Route>
+        <Route path="/ceo/calendar">
+          {() => <ProtectedRoute component={CeoEventCalendar} />}
+        </Route>
+        <Route path="/ceo/stakeholders">
+          {() => <ProtectedRoute component={CeoStakeholderDirectory} />}
+        </Route>
+        <Route path="/ceo/admin">
+          {() => <ProtectedRoute component={UserManagement} />}
+        </Route>
+        <Route path="/ceo/investor-database">
+          {() => <ProtectedRoute component={InvestorDatabase} />}
+        </Route>
+        <Route path="/ceo/audit-logs">
+          {() => <ProtectedRoute component={() => <AuditLogs role="CEO" />} />}
+        </Route>
+        <Route path="/ceo/deal-templates">
+          {() => <ProtectedRoute component={CeoDealTemplates} />}
+        </Route>
+        <Route path="/ceo/document-library">
+          {() => <ProtectedRoute component={CeoDocumentLibrary} />}
+        </Route>
+        <Route path="/ceo/opportunities">
+          {() => <ProtectedRoute component={Opportunities} />}
+        </Route>
+        <Route path="/ceo/asset-management">
+          {() => <ProtectedRoute component={() => <AssetManagement role="CEO" />} />}
+        </Route>
+        
+        {/* Employee Routes */}
+        <Route path="/employee/home">
+          {() => <ProtectedRoute component={EmployeeHome} />}
+        </Route>
+        <Route path="/employee/tasks">
+          {() => <ProtectedRoute component={MyTasks} />}
+        </Route>
+        <Route path="/employee/documents">
+          {() => <ProtectedRoute component={EmployeeDocumentGenerator} />}
+        </Route>
+        <Route path="/employee/deals">
+          {() => <ProtectedRoute component={EmployeeDealManagement} />}
+        </Route>
+        <Route path="/employee/investors">
+          {() => <ProtectedRoute component={EmployeeInvestorMatching} />}
+        </Route>
+        <Route path="/employee/chat">
+          {() => <ProtectedRoute component={EmployeeChat} />}
+        </Route>
+        <Route path="/employee/calendar">
+          {() => <ProtectedRoute component={EmployeeEventCalendar} />}
+        </Route>
+        <Route path="/employee/okrs">
+          {() => <ProtectedRoute component={EmployeeGoalSettingOKRs} />}
+        </Route>
+        <Route path="/employee/announcements">
+          {() => <ProtectedRoute component={EmployeeDealAnnouncements} />}
+        </Route>
+        <Route path="/employee/stakeholders">
+          {() => <ProtectedRoute component={EmployeeStakeholderDirectory} />}
+        </Route>
+        <Route path="/employee/document-library">
+          {() => <ProtectedRoute component={EmployeeDocumentLibrary} />}
+        </Route>
+        <Route path="/employee/asset-management">
+          {() => <ProtectedRoute component={AssetManagement} />}
+        </Route>
+        <Route path="/employee/audit-logs">
+          {() => <ProtectedRoute component={() => <AuditLogs role="Employee" />} />}
+        </Route>
+        
+        {/* External Portal Routes */}
+        <Route path="/portal/login" component={PortalLogin} />
+        <Route path="/portal/register/:token" component={PortalRegister} />
+        <Route path="/portal">
+          {() => <PortalProtectedRoute component={PortalDashboard} />}
+        </Route>
 
-      <Route component={NotFound} />
-    </Switch>
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 
