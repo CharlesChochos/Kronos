@@ -20,7 +20,7 @@ export async function apiRequest(method: string, url: string, body?: any): Promi
 export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (credentials: { email: string; password: string }) => {
+    mutationFn: async (credentials: { email: string; password: string; rememberMe?: boolean }) => {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

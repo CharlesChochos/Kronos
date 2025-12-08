@@ -35,6 +35,8 @@ export async function registerRoutes(
   app.set('trust proxy', 1);
   
   // Session configuration with PostgreSQL store
+  // By default, sessions expire when browser closes (no maxAge)
+  // Only persist sessions when user checks "Stay connected"
   app.use(
     session({
       store: new PgSession({
@@ -48,8 +50,8 @@ export async function registerRoutes(
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-        maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
         sameSite: 'lax',
+        // No maxAge set by default = session cookie that expires on browser close
       },
     })
   );
@@ -227,6 +229,8 @@ export async function registerRoutes(
 
   // Login
   app.post("/api/auth/login", authLimiter, validateBody(loginSchema), (req, res, next) => {
+    const { rememberMe } = req.body;
+    
     passport.authenticate("local", async (err: any, user: any, info: any) => {
       if (err) {
         return res.status(500).json({ error: "Authentication error" });
@@ -237,6 +241,8 @@ export async function registerRoutes(
       
       // Check if 2FA is enabled for this user
       if (user.twoFactorEnabled) {
+        // Store rememberMe preference for 2FA completion
+        (req.session as any).pendingRememberMe = rememberMe;
         // Don't log in yet - return a flag indicating 2FA is required
         return res.json({ 
           requiresTwoFactor: true, 
@@ -249,6 +255,18 @@ export async function registerRoutes(
         if (loginErr) {
           return res.status(500).json({ error: "Login error" });
         }
+        
+        // Configure session cookie based on rememberMe
+        // If rememberMe is true, session persists for 7 days
+        // Otherwise, session expires when browser closes (session cookie)
+        if (rememberMe) {
+          req.session.cookie.maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+        } else {
+          // Explicitly set to session cookie (expires on browser close)
+          req.session.cookie.maxAge = null as any;
+          req.session.cookie.expires = false as any;
+        }
+        
         await createAuditLog(req, 'login', 'user', user.id, user.name, { method: 'password' });
         res.json(sanitizeUser(user));
       });
@@ -1728,11 +1746,26 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid verification code" });
       }
       
+      // Get rememberMe preference stored during initial login
+      const rememberMe = (req.session as any).pendingRememberMe;
+      delete (req.session as any).pendingRememberMe;
+      
       // Log the user in
       req.login(user, async (err) => {
         if (err) {
           return res.status(500).json({ error: "Failed to complete login" });
         }
+        
+        // Configure session cookie based on rememberMe
+        // If rememberMe is true, session persists for 7 days
+        // Otherwise, session expires when browser closes (session cookie)
+        if (rememberMe) {
+          req.session.cookie.maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+        } else {
+          req.session.cookie.maxAge = null as any;
+          req.session.cookie.expires = false as any;
+        }
+        
         await createAuditLog(req, 'login_2fa', 'user', user.id, user.name, { method: 'totp' });
         res.json(sanitizeUser(user));
       });

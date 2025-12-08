@@ -179,6 +179,7 @@ export default function AuthPage() {
       const user = await loginMutation.mutateAsync({
         email: values.email,
         password: values.password,
+        rememberMe: values.rememberMe,
       });
       
       if (user?.requiresTwoFactor) {
