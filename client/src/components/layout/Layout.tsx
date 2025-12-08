@@ -814,9 +814,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                   <div className="text-left hidden md:block">
                     <p className="text-sm font-medium leading-none">{currentUser?.name || userName}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {currentUser?.role === 'Custom' && (currentUser as any)?.jobTitle 
-                        ? (currentUser as any).jobTitle 
-                        : currentUser?.role || role}
+                      {(currentUser as any)?.jobTitle || (currentUser?.accessLevel === 'admin' ? 'Administrator' : 'Team Member')}
                     </p>
                   </div>
                 </div>
@@ -932,7 +930,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                     <div>
                       <h3 className="font-semibold text-lg">{currentUser?.name || userName}</h3>
                       <Badge variant="outline" className="mt-1 text-primary border-primary/30">
-                        {currentUser?.role || role}
+                        {(currentUser as any)?.jobTitle || (currentUser?.accessLevel === 'admin' ? 'Administrator' : 'Team Member')}
                       </Badge>
                     </div>
                   </div>
