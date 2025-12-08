@@ -2693,6 +2693,35 @@ Guidelines:
     }
   });
   
+  // Update chat conversation (name)
+  app.patch("/api/chat/conversations/:id", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { name } = req.body;
+      const conversation = await storage.getConversation(req.params.id);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      
+      // Verify user is a member
+      const members = await storage.getConversationMembers(req.params.id);
+      if (!members.some(m => m.userId === currentUser.id)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ error: "Name is required" });
+      }
+      
+      const updated = await storage.updateConversation(req.params.id, { name: name.trim() });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating conversation:', error);
+      res.status(500).json({ error: "Failed to update conversation" });
+    }
+  });
+
   // Delete chat conversation
   app.delete("/api/chat/conversations/:id", requireAuth, async (req, res) => {
     try {

@@ -74,6 +74,7 @@ export interface IStorage {
   getConversationsByUser(userId: string): Promise<Conversation[]>;
   getConversationBetweenUsers(userId1: string, userId2: string): Promise<Conversation | undefined>;
   createConversation(conversation: InsertConversation): Promise<Conversation>;
+  updateConversation(id: string, updates: Partial<InsertConversation>): Promise<Conversation | undefined>;
   addConversationMember(conversationId: string, userId: string): Promise<ConversationMember>;
   getConversationMembers(conversationId: string): Promise<ConversationMember[]>;
   
@@ -623,6 +624,14 @@ export class DatabaseStorage implements IStorage {
       .values(conversation)
       .returning();
     return created;
+  }
+
+  async updateConversation(id: string, updates: Partial<InsertConversation>): Promise<Conversation | undefined> {
+    const [updated] = await db.update(schema.conversations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.conversations.id, id))
+      .returning();
+    return updated;
   }
   
   async addConversationMember(conversationId: string, userId: string): Promise<ConversationMember> {

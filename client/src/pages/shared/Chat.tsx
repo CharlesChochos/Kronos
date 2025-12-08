@@ -7,8 +7,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import { 
   Send, 
   Plus, 
@@ -23,7 +27,11 @@ import {
   Check,
   Loader2,
   Download,
-  Trash2
+  Trash2,
+  Settings,
+  Pencil,
+  Type,
+  Bell
 } from "lucide-react";
 import { useCurrentUser, useUsers } from "@/lib/api";
 import { useDashboardContext } from "@/contexts/DashboardContext";
@@ -79,6 +87,15 @@ export default function Chat({ role }: ChatProps) {
   const [showNewGroupModal, setShowNewGroupModal] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [groupName, setGroupName] = useState("");
+  const [showSettingsSheet, setShowSettingsSheet] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [newConversationName, setNewConversationName] = useState("");
+  const [chatSettings, setChatSettings] = useState({
+    fontSize: "medium",
+    notifications: true,
+    soundEnabled: true,
+    showTimestamps: true,
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -145,6 +162,36 @@ export default function Chat({ role }: ChatProps) {
       toast.success("Conversation deleted");
     },
   });
+
+  // Update conversation mutation
+  const updateConversationMutation = useMutation({
+    mutationFn: async ({ conversationId, name }: { conversationId: string; name: string }) => {
+      const res = await fetch(`/api/chat/conversations/${conversationId}`, { 
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) throw new Error("Failed to update conversation");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      setEditingName(false);
+      toast.success("Conversation updated");
+    },
+  });
+
+  const handleUpdateConversationName = async () => {
+    if (!selectedConversationId || !newConversationName.trim()) return;
+    try {
+      await updateConversationMutation.mutateAsync({
+        conversationId: selectedConversationId,
+        name: newConversationName.trim(),
+      });
+    } catch (error) {
+      toast.error("Failed to update name");
+    }
+  };
 
   const handleDeleteConversation = async (conversationId: string) => {
     if (!confirm("Are you sure you want to delete this conversation?")) return;
@@ -419,15 +466,31 @@ export default function Chat({ role }: ChatProps) {
                       </p>
                     </div>
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => handleDeleteConversation(selectedConversation.id)}
-                    className="text-muted-foreground hover:text-destructive"
-                    data-testid="button-delete-conversation"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {selectedConversation && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => {
+                          setNewConversationName(getConversationDisplayName(selectedConversation));
+                          setShowSettingsSheet(true);
+                        }}
+                        className="text-muted-foreground hover:text-primary"
+                        data-testid="button-chat-settings"
+                      >
+                        <Settings className="w-4 h-4" />
+                      </Button>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => handleDeleteConversation(selectedConversation.id)}
+                      className="text-muted-foreground hover:text-destructive"
+                      data-testid="button-delete-conversation"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
 
@@ -462,7 +525,11 @@ export default function Chat({ role }: ChatProps) {
                                 {!isOwnMessage && (
                                   <p className="text-xs font-medium mb-1 opacity-70">{message.senderName}</p>
                                 )}
-                                <p className="text-sm">{message.content}</p>
+                                <p className={cn(
+                                  chatSettings.fontSize === "small" && "text-xs",
+                                  chatSettings.fontSize === "medium" && "text-sm",
+                                  chatSettings.fontSize === "large" && "text-base"
+                                )}>{message.content}</p>
                                 {message.attachments && message.attachments.length > 0 && (
                                   <div className="mt-2 space-y-1.5">
                                     {message.attachments.map((att, idx) => (
@@ -503,12 +570,14 @@ export default function Chat({ role }: ChatProps) {
                                   </div>
                                 )}
                               </div>
-                              <p className={cn(
-                                "text-xs text-muted-foreground mt-1",
-                                isOwnMessage && "text-right"
-                              )}>
-                                {format(new Date(message.createdAt), 'HH:mm')}
-                              </p>
+                              {chatSettings.showTimestamps && (
+                                <p className={cn(
+                                  "text-xs text-muted-foreground mt-1",
+                                  isOwnMessage && "text-right"
+                                )}>
+                                  {format(new Date(message.createdAt), 'HH:mm')}
+                                </p>
+                              )}
                             </div>
                           </div>
                         );
@@ -688,6 +757,157 @@ export default function Chat({ role }: ChatProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Chat Settings Sheet */}
+      <Sheet open={showSettingsSheet} onOpenChange={setShowSettingsSheet}>
+        <SheetContent className="w-[400px] sm:w-[540px]">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5" />
+              Chat Settings
+            </SheetTitle>
+            <SheetDescription>
+              Customize your conversation preferences
+            </SheetDescription>
+          </SheetHeader>
+          
+          <div className="mt-6 space-y-6">
+            {/* Conversation Name */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Pencil className="w-4 h-4 text-muted-foreground" />
+                <Label className="font-medium">Conversation Name</Label>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={newConversationName}
+                  onChange={(e) => setNewConversationName(e.target.value)}
+                  placeholder="Enter conversation name..."
+                  data-testid="input-conversation-name"
+                />
+                <Button 
+                  onClick={handleUpdateConversationName}
+                  disabled={updateConversationMutation.isPending || !newConversationName.trim()}
+                  data-testid="button-save-name"
+                >
+                  {updateConversationMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Display Settings */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Type className="w-4 h-4 text-muted-foreground" />
+                <Label className="font-medium">Display Settings</Label>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="fontSize" className="text-sm text-muted-foreground">
+                    Font Size
+                  </Label>
+                  <Select 
+                    value={chatSettings.fontSize} 
+                    onValueChange={(value) => setChatSettings({ ...chatSettings, fontSize: value })}
+                  >
+                    <SelectTrigger className="w-32" data-testid="select-font-size">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="small">Small</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="large">Large</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm text-muted-foreground">
+                    Show Timestamps
+                  </Label>
+                  <Switch
+                    checked={chatSettings.showTimestamps}
+                    onCheckedChange={(checked) => setChatSettings({ ...chatSettings, showTimestamps: checked })}
+                    data-testid="switch-timestamps"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Notification Settings */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Bell className="w-4 h-4 text-muted-foreground" />
+                <Label className="font-medium">Notifications</Label>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm text-muted-foreground">
+                    Enable Notifications
+                  </Label>
+                  <Switch
+                    checked={chatSettings.notifications}
+                    onCheckedChange={(checked) => setChatSettings({ ...chatSettings, notifications: checked })}
+                    data-testid="switch-notifications"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm text-muted-foreground">
+                    Sound Effects
+                  </Label>
+                  <Switch
+                    checked={chatSettings.soundEnabled}
+                    onCheckedChange={(checked) => setChatSettings({ ...chatSettings, soundEnabled: checked })}
+                    data-testid="switch-sound"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Conversation Info */}
+            {selectedConversation && (
+              <div className="space-y-3">
+                <Label className="font-medium">Conversation Info</Label>
+                <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Type</span>
+                    <span>{selectedConversation.isGroup ? "Group Chat" : "Direct Message"}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Members</span>
+                    <span>{selectedConversation.members.length}</span>
+                  </div>
+                  {selectedConversation.isGroup && (
+                    <div className="pt-2">
+                      <span className="text-sm text-muted-foreground">Participants:</span>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {selectedConversation.members.map(member => (
+                          <Badge key={member.id} variant="secondary" className="text-xs">
+                            {member.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </Layout>
   );
 }

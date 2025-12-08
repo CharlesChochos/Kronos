@@ -30,6 +30,8 @@ import InvestorDatabase from "@/pages/ceo/InvestorDatabase";
 import DealTemplates from "@/pages/shared/DealTemplates";
 import DocumentManagement from "@/pages/shared/DocumentManagement";
 import AuditLogs from "@/pages/ceo/AuditLogs";
+import Opportunities from "@/pages/ceo/Opportunities";
+import AssetManagement from "@/pages/employee/AssetManagement";
 import PortalLogin from "@/pages/portal/PortalLogin";
 import PortalRegister from "@/pages/portal/PortalRegister";
 import PortalDashboard from "@/pages/portal/PortalDashboard";
@@ -202,6 +204,9 @@ function Router() {
       <Route path="/ceo/document-library">
         {() => <ProtectedRoute component={CeoDocumentLibrary} />}
       </Route>
+      <Route path="/ceo/opportunities">
+        {() => <ProtectedRoute component={Opportunities} />}
+      </Route>
       
       {/* Employee Routes */}
       <Route path="/employee/home">
@@ -236,6 +241,9 @@ function Router() {
       </Route>
       <Route path="/employee/document-library">
         {() => <ProtectedRoute component={EmployeeDocumentLibrary} />}
+      </Route>
+      <Route path="/employee/asset-management">
+        {() => <ProtectedRoute component={AssetManagement} />}
       </Route>
       <Route path="/employee/audit-logs">
         {() => <ProtectedRoute component={() => <AuditLogs role="Employee" />} />}

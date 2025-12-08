@@ -138,6 +138,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
       links: [
         { icon: LayoutDashboard, label: "Dashboard", path: "/ceo/dashboard" },
         { icon: Briefcase, label: "Deal Management", path: "/ceo/deals" },
+        { icon: Target, label: "Opportunities", path: "/ceo/opportunities" },
         { icon: FileText, label: "Documents", path: "/ceo/documents" },
       ]
     },
@@ -192,6 +193,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
         { icon: Home, label: "Home", path: "/employee/home" },
         { icon: CheckSquare, label: "My Tasks", path: "/employee/tasks" },
         { icon: Briefcase, label: "Deal Management", path: "/employee/deals" },
+        { icon: BarChart3, label: "Asset Management", path: "/employee/asset-management" },
         { icon: PieChart, label: "Investor Match", path: "/employee/investors" },
         { icon: FileText, label: "Documents", path: "/employee/documents" },
         { icon: FolderOpen, label: "Document Library", path: "/employee/document-library" },

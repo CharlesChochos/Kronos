@@ -80,10 +80,14 @@ export type AuditEntry = {
   details: string;
 };
 
+// Deal Types: 'M&A', 'Capital Raising', 'Asset Management', 'Opportunity'
+// Opportunity deals are pending approval before becoming active deals
+
 // Deals table
 export const deals = pgTable("deals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  dealType: text("deal_type").notNull().default('M&A'), // M&A, Capital Raising, Asset Management, Opportunity
   stage: text("stage").notNull().default('Origination'),
   value: integer("value").notNull(), // in millions
   client: text("client").notNull(),
