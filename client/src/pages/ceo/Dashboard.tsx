@@ -320,10 +320,23 @@ export default function Dashboard() {
   // If no news matches the filter, show all news (fallback to raw data)
   const marketNews = filteredNews.length > 0 ? filteredNews : rawMarketNews;
 
-  // Compute analytics
+  // Check if current user is Sergio (Global head of Asset Management)
+  const isAssetManagementHead = currentUser?.name?.toLowerCase().includes('sergio');
+  
+  // For Sergio, filter to Asset Management deals only for specific widgets
+  const amDeals = deals.filter((d: any) => d.dealType === 'Asset Management');
+  const amActiveDeals = amDeals.filter(d => d.status === 'Active');
+  
+  // Compute analytics using all deals (for general metrics)
   const activeDeals = deals.filter(d => d.status === 'Active');
   const totalValue = deals.reduce((sum, deal) => sum + deal.value, 0);
   const activeValue = activeDeals.reduce((sum, deal) => sum + deal.value, 0);
+  
+  // Sergio-specific active deals for widgets
+  const displayActiveDeals = isAssetManagementHead ? amActiveDeals : activeDeals;
+  const displayActiveValue = isAssetManagementHead 
+    ? amActiveDeals.reduce((sum, deal) => sum + deal.value, 0)
+    : activeValue;
   
   // Sector breakdown
   const sectorStats = useMemo(() => {
@@ -1049,10 +1062,10 @@ export default function Dashboard() {
                   <Button 
                     variant="outline" 
                     className="w-full justify-start gap-2 bg-secondary/50 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/20 transition-all"
-                    onClick={() => setShowNewDealModal(true)}
+                    onClick={() => isAssetManagementHead ? setLocation('/ceo/asset-management') : setShowNewDealModal(true)}
                     data-testid="button-new-deal"
                   >
-                    <Plus className="w-4 h-4" /> New Deal
+                    <Plus className="w-4 h-4" /> {isAssetManagementHead ? 'New AM Deal' : 'New Deal'}
                   </Button>
                   <Button 
                     variant="outline" 
@@ -1085,19 +1098,21 @@ export default function Dashboard() {
           {widgets.find(w => w.id === 'activeDeals')?.enabled && (
               <Card className="bg-card border-border overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider truncate">Active Deals</CardTitle>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setLocation('/ceo/deals')}>
+                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider truncate">
+                    {isAssetManagementHead ? 'AM Active Deals' : 'Active Deals'}
+                  </CardTitle>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setLocation(isAssetManagementHead ? '/ceo/asset-management' : '/ceo/deals')}>
                     <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
                   </Button>
                 </CardHeader>
               <CardContent className="space-y-4 overflow-hidden">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-secondary/30 rounded-lg p-2 text-center overflow-hidden">
-                    <div className="text-xl font-bold text-primary truncate">{activeDeals.length}</div>
+                    <div className="text-xl font-bold text-primary truncate">{displayActiveDeals.length}</div>
                     <div className="text-[9px] text-muted-foreground uppercase truncate">Active</div>
                   </div>
                   <div className="bg-secondary/30 rounded-lg p-2 text-center overflow-hidden">
-                    <div className="text-xl font-bold text-green-400 truncate">${activeValue.toLocaleString()}M</div>
+                    <div className="text-xl font-bold text-green-400 truncate">${displayActiveValue.toLocaleString()}M</div>
                     <div className="text-[9px] text-muted-foreground uppercase truncate">Value</div>
                   </div>
                 </div>
@@ -1134,7 +1149,7 @@ export default function Dashboard() {
                         <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden min-w-0">
                           <div 
                             className="h-full bg-primary/60 rounded-full transition-all"
-                            style={{ width: `${activeDeals.length > 0 ? (count / activeDeals.length) * 100 : 0}%` }}
+                            style={{ width: `${displayActiveDeals.length > 0 ? (count / displayActiveDeals.length) * 100 : 0}%` }}
                           />
                         </div>
                         <span className="text-[10px] font-mono w-4 text-right flex-shrink-0">{count}</span>
@@ -1563,33 +1578,37 @@ export default function Dashboard() {
           {widgets.find(w => w.id === 'capitalAtWork')?.enabled && (
             <Card className="bg-card border-border overflow-hidden">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Capital At Work</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  {isAssetManagementHead ? 'AM Capital At Work' : 'Capital At Work'}
+                </CardTitle>
                 <DollarSign className="w-4 h-4 text-primary" />
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-center py-4">
                   <div className="text-4xl font-bold text-primary">
-                    ${activeDeals.reduce((sum, d) => sum + (d.value || 0), 0).toLocaleString()}M
+                    ${displayActiveDeals.reduce((sum, d) => sum + (d.value || 0), 0).toLocaleString()}M
                   </div>
-                  <div className="text-xs text-muted-foreground mt-1">Total Active Deal Value</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {isAssetManagementHead ? 'Total AM Deal Value' : 'Total Active Deal Value'}
+                  </div>
                 </div>
                 <Separator className="bg-border/50" />
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div>
                     <div className="text-lg font-semibold text-green-400">
-                      {deals.filter(d => d.status === 'Active').length}
+                      {(isAssetManagementHead ? amDeals : deals).filter(d => d.status === 'Active').length}
                     </div>
                     <div className="text-[9px] text-muted-foreground uppercase">Active</div>
                   </div>
                   <div>
                     <div className="text-lg font-semibold text-yellow-400">
-                      {deals.filter(d => d.status === 'On Hold').length}
+                      {(isAssetManagementHead ? amDeals : deals).filter(d => d.status === 'On Hold').length}
                     </div>
                     <div className="text-[9px] text-muted-foreground uppercase">On Hold</div>
                   </div>
                   <div>
                     <div className="text-lg font-semibold text-muted-foreground">
-                      {deals.filter(d => d.status === 'Closed').length}
+                      {(isAssetManagementHead ? amDeals : deals).filter(d => d.status === 'Closed').length}
                     </div>
                     <div className="text-[9px] text-muted-foreground uppercase">Closed</div>
                   </div>
@@ -1602,12 +1621,20 @@ export default function Dashboard() {
           {widgets.find(w => w.id === 'feeSummary')?.enabled && (
             <Card className="bg-card border-border overflow-hidden">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Fee Summary</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  {isAssetManagementHead ? 'AM Fee Summary' : 'Fee Summary'}
+                </CardTitle>
                 <Briefcase className="w-4 h-4 text-primary" />
               </CardHeader>
               <CardContent className="space-y-3">
                 {(() => {
-                  const feesByType = allDealFees.reduce((acc, fee) => {
+                  // Get deal IDs for AM deals (for Sergio filtering)
+                  const amDealIds = new Set(amDeals.map(d => d.id));
+                  const relevantFees = isAssetManagementHead 
+                    ? allDealFees.filter(fee => amDealIds.has(fee.dealId))
+                    : allDealFees;
+                  
+                  const feesByType = relevantFees.reduce((acc, fee) => {
                     const type = fee.feeType || 'other';
                     if (!acc[type]) acc[type] = { total: 0, count: 0 };
                     if (fee.amount) {

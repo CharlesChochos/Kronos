@@ -25,10 +25,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { 
-  Search, Filter, MoreVertical, ArrowRight, Calendar, DollarSign, Briefcase, 
+  Search, Filter, MoreVertical, Calendar, DollarSign, Briefcase, 
   Pencil, Trash2, Eye, Users, Phone, Mail, MessageSquare, Plus, X, 
   Building2, TrendingUp, FileText, Clock, CheckCircle2, ChevronRight,
-  UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload, GitCompare, ArrowUpDown, BarChart3,
+  UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload, BarChart3,
   Mic, MicOff, Play, Pause, Square, Volume2, PieChart
 } from "lucide-react";
 import { 
@@ -56,8 +56,6 @@ import {
   Legend,
   Tooltip
 } from "recharts";
-
-const COMPARISON_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 const DEAL_STAGES = ['Origination', 'Execution', 'Negotiation', 'Due Diligence', 'Signing', 'Closed'];
 const AM_SECTORS = ['Real Estate', 'Infrastructure', 'Private Equity', 'Hedge Funds', 'Fixed Income', 'Equities', 'Commodities', 'Other'];
@@ -1025,33 +1023,6 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
       toast.error(error.message || "Failed to delete deal");
     }
   };
-
-  const toggleCompareSelect = (dealId: string) => {
-    setSelectedCompareDeals(prev => {
-      if (prev.includes(dealId)) {
-        return prev.filter(id => id !== dealId);
-      }
-      if (prev.length >= 5) {
-        toast.error("Maximum 5 deals can be compared");
-        return prev;
-      }
-      return [...prev, dealId];
-    });
-  };
-
-  const comparisonData = useMemo(() => {
-    if (selectedCompareDeals.length === 0) return [];
-    
-    const selectedDealsData = deals.filter(d => selectedCompareDeals.includes(d.id));
-    const maxValue = Math.max(...selectedDealsData.map(d => d.value), 1);
-    const maxProgress = 100;
-    
-    return [
-      { metric: 'Value', fullMark: 100, ...Object.fromEntries(selectedDealsData.map(d => [d.name, Math.round((d.value / maxValue) * 100)])) },
-      { metric: 'Progress', fullMark: 100, ...Object.fromEntries(selectedDealsData.map(d => [d.name, d.progress])) },
-      { metric: 'Stage', fullMark: 100, ...Object.fromEntries(selectedDealsData.map(d => [d.name, Math.round(((getStageIndex(d.stage) + 1) / DEAL_STAGES.length) * 100)])) },
-    ];
-  }, [selectedCompareDeals, deals]);
 
   return (
     <Layout role={userRole as 'CEO' | 'Employee'} pageTitle="Asset Management">
