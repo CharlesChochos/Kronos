@@ -25,7 +25,7 @@ import {
   ClipboardList
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useLogout, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
+import { useLogout, useUserPreferences, useSaveUserPreferences, useCurrentUser } from "@/lib/api";
 import { toast } from "sonner";
 import { useDashboardContext } from "@/contexts/DashboardContext";
 import logo from "@assets/generated_images/abstract_minimalist_layer_icon_for_fintech_logo.png";
@@ -52,6 +52,7 @@ type CategoryGroup = {
 export function Sidebar({ role, collapsed = false }: SidebarProps) {
   const [location, setLocation] = useLocation();
   const logoutMutation = useLogout();
+  const { data: currentUser } = useCurrentUser();
   const { unreadMessageCount, clearUnreadMessages } = useDashboardContext();
   const queryClient = useQueryClient();
   const { data: userPrefs, isLoading: prefsLoading } = useUserPreferences();
@@ -219,7 +220,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
     }
   ];
 
-  const groups = role === 'CEO' ? ceoGroups : employeeGroups;
+  const groups = currentUser?.accessLevel === 'admin' ? ceoGroups : employeeGroups;
 
   return (
     <div className={cn(

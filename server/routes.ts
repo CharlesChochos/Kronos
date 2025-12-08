@@ -125,12 +125,12 @@ export async function registerRoutes(
     res.status(401).json({ error: "Unauthorized" });
   };
 
-  // Middleware to check CEO role
+  // Middleware to check admin access level
   const requireCEO = (req: any, res: any, next: any) => {
-    if (req.isAuthenticated() && req.user?.role === 'CEO') {
+    if (req.isAuthenticated() && req.user?.accessLevel === 'admin') {
       return next();
     }
-    res.status(403).json({ error: "Access denied. CEO role required." });
+    res.status(403).json({ error: "Access denied. Admin access required." });
   };
   
   // Middleware to block external users from internal routes
@@ -192,9 +192,9 @@ export async function registerRoutes(
       // Create audit log for signup
       await createAuditLog(req, 'user_signup', 'user', user.id, user.name, { email: user.email, role: user.role, status: user.status, jobTitle: user.jobTitle });
       
-      // Notify all CEOs about new signup request
+      // Notify all admins about new signup request
       if (!isFirstUser) {
-        const ceos = allUsers.filter(u => u.role === 'CEO' && u.status === 'active');
+        const ceos = allUsers.filter(u => u.accessLevel === 'admin' && u.status === 'active');
         for (const ceo of ceos) {
           await storage.createNotification({
             userId: ceo.id,
@@ -515,8 +515,8 @@ export async function registerRoutes(
       const users = await storage.getAllUsers();
       const sanitizedUsers = users.map(user => sanitizeUser(user));
       
-      // CEO can see all user details
-      if (currentUser.role === 'CEO') {
+      // Admin can see all user details
+      if (currentUser.accessLevel === 'admin') {
         res.json(sanitizedUsers);
       } else {
         // Employees see limited user info (for task assignment display)
@@ -540,8 +540,8 @@ export async function registerRoutes(
         return res.status(404).json({ error: "User not found" });
       }
       
-      // CEO can see anyone, employees can only see themselves
-      if (currentUser.role !== 'CEO' && currentUser.id !== req.params.id) {
+      // Admin can see anyone, others can only see themselves
+      if (currentUser.accessLevel !== 'admin' && currentUser.id !== req.params.id) {
         return res.status(403).json({ error: "Access denied" });
       }
       
@@ -670,12 +670,12 @@ export async function registerRoutes(
         return res.status(404).json({ error: "User not found" });
       }
       
-      // Prevent demoting the last CEO
-      if (user.role === 'CEO' && role !== 'CEO') {
+      // Prevent demoting the last admin
+      if (user.accessLevel === 'admin' && role !== 'CEO') {
         const allUsers = await storage.getAllUsers();
-        const ceoCount = allUsers.filter(u => u.role === 'CEO' && u.status === 'active').length;
-        if (ceoCount <= 1) {
-          return res.status(400).json({ error: "Cannot demote the only CEO. Promote another user to CEO first." });
+        const adminCount = allUsers.filter(u => u.accessLevel === 'admin' && u.status === 'active').length;
+        if (adminCount <= 1) {
+          return res.status(400).json({ error: "Cannot demote the only admin. Promote another user to admin first." });
         }
       }
       
@@ -780,9 +780,9 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Deal not found" });
       }
       
-      // CEOs can update any deal
-      if (user.role !== 'CEO') {
-        // Employees can only update deals they're assigned to (in pod team)
+      // Admins can update any deal
+      if (user.accessLevel !== 'admin') {
+        // Non-admin users can only update deals they're assigned to (in pod team)
         const podTeam = (deal as any).podTeam || [];
         const isAssigned = podTeam.some((member: any) => 
           (user.id && (member.userId === user.id || member.id === user.id)) ||
@@ -813,10 +813,10 @@ export async function registerRoutes(
       if (Object.keys(changes).length > 0) {
         await createAuditLog(req, 'deal_updated', 'deal', deal.id, deal.name, changes);
         
-        // Notify CEOs about deal stage/status changes (if updated by non-CEO)
-        if ((changes.stage || changes.status) && user.role !== 'CEO') {
+        // Notify admins about deal stage/status changes (if updated by non-admin)
+        if ((changes.stage || changes.status) && user.accessLevel !== 'admin') {
           const allUsers = await storage.getAllUsers();
-          const ceos = allUsers.filter(u => u.role === 'CEO' && u.status === 'active');
+          const ceos = allUsers.filter(u => u.accessLevel === 'admin' && u.status === 'active');
           for (const ceo of ceos) {
             await storage.createNotification({
               userId: ceo.id,
@@ -1146,8 +1146,8 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Task not found" });
       }
       
-      // Employees can only update their own tasks (status, or forward to another user)
-      if (currentUser.role !== 'CEO') {
+      // Non-admin users can only update their own tasks (status, or forward to another user)
+      if (currentUser.accessLevel !== 'admin') {
         if (existingTask.assignedTo !== currentUser.id) {
           return res.status(403).json({ error: "You can only update your own tasks" });
         }
@@ -1190,10 +1190,10 @@ export async function registerRoutes(
           await createAuditLog(req, 'task_updated', 'task', existingTask.id, existingTask.title, changes);
         }
         
-        // Notify CEOs about task status changes (if updated by non-CEO)
-        if (changes.status && currentUser.role !== 'CEO') {
+        // Notify admins about task status changes (if updated by non-admin)
+        if (changes.status && currentUser.accessLevel !== 'admin') {
           const allUsers = await storage.getAllUsers();
-          const ceos = allUsers.filter(u => u.role === 'CEO' && u.status === 'active');
+          const ceos = allUsers.filter(u => u.accessLevel === 'admin' && u.status === 'active');
           for (const ceo of ceos) {
             await storage.createNotification({
               userId: ceo.id,
@@ -1298,8 +1298,8 @@ export async function registerRoutes(
           if (participant) {
             participantEmails.push(participant.email);
             if (participant.id !== currentUser.id) {
-              // Determine correct link based on user role
-              const calendarLink = participant.role === 'CEO' ? '/ceo/calendar' : '/employee/calendar';
+              // Determine correct link based on user access level
+              const calendarLink = participant.accessLevel === 'admin' ? '/ceo/calendar' : '/employee/calendar';
               await storage.createNotification({
                 userId: participant.id,
                 title: "New Meeting Invitation",
@@ -1488,8 +1488,8 @@ export async function registerRoutes(
   app.patch("/api/users/:id/preferences", requireAuth, async (req, res) => {
     try {
       const currentUser = req.user as any;
-      // Users can only update their own preferences
-      if (currentUser.id !== req.params.id && currentUser.role !== 'CEO') {
+      // Users can only update their own preferences (admins can update anyone's)
+      if (currentUser.id !== req.params.id && currentUser.accessLevel !== 'admin') {
         return res.status(403).json({ error: "Access denied" });
       }
       await storage.updateUserPreferences(req.params.id, req.body);
@@ -1523,13 +1523,13 @@ export async function registerRoutes(
         if (!validRoles.includes(role)) {
           return res.status(400).json({ error: "Invalid role" });
         }
-        // Prevent escalation to CEO (only existing CEOs can be CEO)
-        if (role === 'CEO' && currentUser.role !== 'CEO') {
+        // Prevent escalation to CEO (only existing admins can be CEO)
+        if (role === 'CEO' && currentUser.accessLevel !== 'admin') {
           return res.status(403).json({ error: "Cannot escalate to CEO role" });
         }
-        // Prevent CEO from changing their own role (to prevent lockout)
-        if (currentUser.role === 'CEO' && role !== 'CEO') {
-          return res.status(403).json({ error: "CEO cannot change their own role" });
+        // Prevent admin from changing their own role (to prevent lockout)
+        if (currentUser.accessLevel === 'admin' && role !== 'CEO') {
+          return res.status(403).json({ error: "Admin cannot change their own role" });
         }
         updates.role = role;
       }
@@ -2091,7 +2091,7 @@ Consider common investment banking tasks like:
         }));
       
       // Build the system prompt
-      const systemPrompt = `You are Kronos, an AI assistant for the Kronos investment banking operations platform. You help ${currentUser.role === 'CEO' ? 'executives' : 'team members'} manage deals, tasks, and collaborate with their team.
+      const systemPrompt = `You are Kronos, an AI assistant for the Kronos investment banking operations platform. You help ${currentUser.accessLevel === 'admin' ? 'executives' : 'team members'} manage deals, tasks, and collaborate with their team.
 
 Your capabilities:
 - Answer questions about deals, tasks, and team activities
@@ -2953,12 +2953,12 @@ Guidelines:
 
   // ===== TIME TRACKING ROUTES =====
   
-  // Get all time entries (CEO sees all, employees see their own)
+  // Get all time entries (admin sees all, others see their own)
   app.get("/api/time-entries", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
       let entries;
-      if (user.role === 'CEO') {
+      if (user.accessLevel === 'admin') {
         entries = await storage.getAllTimeEntries();
       } else {
         entries = await storage.getTimeEntriesByUser(user.id);
@@ -3014,7 +3014,7 @@ Guidelines:
       if (!entry) {
         return res.status(404).json({ error: "Time entry not found" });
       }
-      if (entry.userId !== user.id && user.role !== 'CEO') {
+      if (entry.userId !== user.id && user.accessLevel !== 'admin') {
         return res.status(403).json({ error: "Not authorized to update this entry" });
       }
       
@@ -3033,7 +3033,7 @@ Guidelines:
       if (!entry) {
         return res.status(404).json({ error: "Time entry not found" });
       }
-      if (entry.userId !== user.id && user.role !== 'CEO') {
+      if (entry.userId !== user.id && user.accessLevel !== 'admin') {
         return res.status(403).json({ error: "Not authorized to delete this entry" });
       }
       
@@ -3051,7 +3051,7 @@ Guidelines:
     try {
       const user = req.user as any;
       let requests;
-      if (user.role === 'CEO') {
+      if (user.accessLevel === 'admin') {
         requests = await storage.getAllTimeOffRequests();
       } else {
         requests = await storage.getTimeOffRequestsByUser(user.id);
@@ -3112,8 +3112,8 @@ Guidelines:
         return res.status(404).json({ error: "Time off request not found" });
       }
       
-      // CEO can approve/reject
-      if (req.body.status && user.role === 'CEO') {
+      // Admin can approve/reject
+      if (req.body.status && user.accessLevel === 'admin') {
         const updates = {
           status: req.body.status,
           approvedBy: user.id,
@@ -3162,7 +3162,7 @@ Guidelines:
       if (!request) {
         return res.status(404).json({ error: "Time off request not found" });
       }
-      if (request.userId !== user.id && user.role !== 'CEO') {
+      if (request.userId !== user.id && user.accessLevel !== 'admin') {
         return res.status(403).json({ error: "Not authorized to delete this request" });
       }
       
@@ -3193,8 +3193,8 @@ Guidelines:
         };
       });
       
-      // CEOs see all logs, employees see only their own activities
-      const filteredLogs = user.role === 'CEO' 
+      // Admins see all logs, others see only their own activities
+      const filteredLogs = user.accessLevel === 'admin' 
         ? enrichedLogs 
         : enrichedLogs.filter((log: any) => log.userId === user.id);
       
@@ -4250,9 +4250,9 @@ Guidelines:
   
   // OAuth callback from Google
   app.get("/api/google-calendar/callback", async (req, res) => {
-    // Helper to get redirect path based on user role
+    // Helper to get redirect path based on user access level
     const getCalendarPath = (user: any) => {
-      return user?.role === 'CEO' ? '/ceo/calendar' : '/employee/calendar';
+      return user?.accessLevel === 'admin' ? '/ceo/calendar' : '/employee/calendar';
     };
     
     try {

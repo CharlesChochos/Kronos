@@ -316,8 +316,8 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
         updates.phone = profileForm.phone;
       }
       
-      // Only include role if user is not CEO and role has changed
-      if (currentUser.role !== 'CEO' && profileForm.role && profileForm.role !== currentUser.role) {
+      // Only include role if user is not admin and role has changed
+      if (currentUser.accessLevel !== 'admin' && profileForm.role && profileForm.role !== currentUser.role) {
         updates.role = profileForm.role;
       }
       
@@ -504,8 +504,8 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     }
   };
   
-  // Get role-based route prefixes
-  const rolePrefix = role === 'CEO' ? '/ceo' : '/employee';
+  // Get access level based route prefixes
+  const rolePrefix = currentUser?.accessLevel === 'admin' ? '/ceo' : '/employee';
   
   // Close search results when clicking outside
   useEffect(() => {
@@ -567,11 +567,11 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
       task.description?.toLowerCase().includes(query)
     ).slice(0, 5);
     
-    // For employees, only show team members (not CEO search capability)
+    // For employees, only show team members (not admin search capability)
     let accessibleUsers = users as any[];
     if (role === 'Employee') {
       accessibleUsers = (users as any[]).filter((user: any) => 
-        user.role !== 'CEO'
+        user.accessLevel !== 'admin'
       );
     }
     
@@ -721,7 +721,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                             <button
                               key={user.id}
                               onClick={() => { 
-                                if (role === 'CEO') {
+                                if (currentUser?.accessLevel === 'admin') {
                                   setLocation(`/ceo/team?id=${user.id}`);
                                 } else {
                                   toast.info(`${user.name}`, {
@@ -840,7 +840,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                   <BookOpen className="w-4 h-4 mr-2" />
                   Resources
                 </DropdownMenuItem>
-                {role === 'CEO' && (
+                {currentUser?.accessLevel === 'admin' && (
                   <>
                     <DropdownMenuItem 
                       className="focus:bg-primary/10 focus:text-primary cursor-pointer"
@@ -975,7 +975,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                         />
                       </div>
                       
-                      {currentUser?.role !== 'CEO' && (
+                      {currentUser?.accessLevel !== 'admin' && (
                         <div className="space-y-2">
                           <Label htmlFor="profile-role">Role</Label>
                           <Select
@@ -1719,41 +1719,42 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                       setShowNotificationsSheet(false);
                       if (notification.link) {
                         let link = notification.link;
-                        const isCeo = role === 'CEO';
+                        const isAdmin = currentUser?.accessLevel === 'admin';
                         const linkMap: Record<string, string> = {
                           '/ceo/users': '/ceo/admin',
-                          '/mentorship': isCeo ? '/ceo/mentorship' : '/employee/home',
-                          '/chat': isCeo ? '/ceo/chat' : '/employee/chat',
-                          '/ceo/chat': isCeo ? '/ceo/chat' : '/employee/chat',
-                          '/ceo/dashboard': isCeo ? '/ceo/dashboard' : '/employee/home',
-                          '/ceo/calendar': isCeo ? '/ceo/calendar' : '/employee/calendar',
-                          '/ceo/mentorship': isCeo ? '/ceo/mentorship' : '/employee/home',
+                          '/mentorship': isAdmin ? '/ceo/mentorship' : '/employee/home',
+                          '/chat': isAdmin ? '/ceo/chat' : '/employee/chat',
+                          '/ceo/chat': isAdmin ? '/ceo/chat' : '/employee/chat',
+                          '/ceo/dashboard': isAdmin ? '/ceo/dashboard' : '/employee/home',
+                          '/ceo/calendar': isAdmin ? '/ceo/calendar' : '/employee/calendar',
+                          '/ceo/mentorship': isAdmin ? '/ceo/mentorship' : '/employee/home',
                         };
                         if (linkMap[link]) {
                           link = linkMap[link];
-                        } else if (!isCeo && link.startsWith('/ceo/')) {
+                        } else if (!isAdmin && link.startsWith('/ceo/')) {
                           link = link.replace('/ceo/', '/employee/');
                         }
                         setLocation(link);
                       } else {
                         const title = notification.title?.toLowerCase() || '';
                         const message = notification.message?.toLowerCase() || '';
+                        const isAdmin = currentUser?.accessLevel === 'admin';
                         if (title.includes('deal') || message.includes('deal')) {
-                          setLocation(role === 'CEO' ? '/ceo/deals' : '/employee/deals');
+                          setLocation(isAdmin ? '/ceo/deals' : '/employee/deals');
                         } else if (title.includes('task') || message.includes('task')) {
-                          setLocation(role === 'CEO' ? '/ceo/dashboard' : '/employee/tasks');
+                          setLocation(isAdmin ? '/ceo/dashboard' : '/employee/tasks');
                         } else if (title.includes('meeting') || message.includes('meeting') || title.includes('calendar')) {
-                          setLocation(role === 'CEO' ? '/ceo/calendar' : '/employee/calendar');
+                          setLocation(isAdmin ? '/ceo/calendar' : '/employee/calendar');
                         } else if (title.includes('document') || message.includes('document')) {
-                          setLocation(role === 'CEO' ? '/ceo/document-library' : '/employee/document-library');
+                          setLocation(isAdmin ? '/ceo/document-library' : '/employee/document-library');
                         } else if (title.includes('user') || message.includes('approved') || message.includes('pending')) {
                           setLocation('/ceo/team');
                         } else if (title.includes('investor') || message.includes('investor')) {
-                          setLocation(role === 'CEO' ? '/ceo/investors' : '/employee/investors');
+                          setLocation(isAdmin ? '/ceo/investors' : '/employee/investors');
                         } else if (title.includes('announcement')) {
-                          setLocation(role === 'CEO' ? '/ceo/announcements' : '/employee/announcements');
+                          setLocation(isAdmin ? '/ceo/announcements' : '/employee/announcements');
                         } else {
-                          setLocation(role === 'CEO' ? '/ceo/dashboard' : '/employee/home');
+                          setLocation(isAdmin ? '/ceo/dashboard' : '/employee/home');
                         }
                       }
                     }}
@@ -1872,7 +1873,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
               Close
             </Button>
             <Button onClick={() => {
-              setLocation(`${role === 'CEO' ? '/ceo/deals' : '/employee/tasks'}?id=${selectedSearchTask?.id}`);
+              setLocation(`${currentUser?.accessLevel === 'admin' ? '/ceo/deals' : '/employee/tasks'}?id=${selectedSearchTask?.id}`);
               setShowTaskDetailModal(false);
             }}>
               Go to Task

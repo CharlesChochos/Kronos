@@ -151,7 +151,7 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
             <h1 className="text-2xl font-display font-bold">Mentorship Pairing</h1>
             <p className="text-muted-foreground">Manage mentor-mentee relationships and track development goals</p>
           </div>
-          {role === 'CEO' && (
+          {currentUser?.accessLevel === 'admin' && (
             <Button onClick={() => setShowCreateModal(true)} data-testid="button-create-pairing">
               <Plus className="w-4 h-4 mr-2" /> New Pairing
             </Button>
@@ -265,7 +265,7 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
                         </div>
                         <div className="flex items-center gap-2">
                           {getStatusBadge(pairing.status)}
-                          {role === 'CEO' && (
+                          {currentUser?.accessLevel === 'admin' && (
                             <Button
                               variant="ghost"
                               size="icon"

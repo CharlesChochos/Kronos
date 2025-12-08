@@ -154,14 +154,14 @@ export default function EventCalendar({ role }: EventCalendarProps) {
   };
 
   const myTimeOffRequests = useMemo(() => {
-    if (role === 'CEO') return [];
+    if (currentUser?.accessLevel === 'admin') return [];
     return timeOffRequests.filter(r => r.userId === currentUser?.id);
-  }, [timeOffRequests, currentUser?.id, role]);
+  }, [timeOffRequests, currentUser?.id, currentUser?.accessLevel]);
 
   const pendingTimeOffRequests = useMemo(() => {
-    if (role !== 'CEO') return [];
+    if (currentUser?.accessLevel !== 'admin') return [];
     return timeOffRequests.filter(r => r.status === 'Pending');
-  }, [timeOffRequests, role]);
+  }, [timeOffRequests, currentUser?.accessLevel]);
 
   const approvedTimeOffRequests = useMemo(() => {
     return timeOffRequests.filter(r => r.status === 'Approved');
@@ -371,13 +371,13 @@ export default function EventCalendar({ role }: EventCalendarProps) {
           <div>
             <h1 className="text-2xl font-bold">Calendar</h1>
             <p className="text-muted-foreground">
-              {role === 'CEO' 
+              {currentUser?.accessLevel === 'admin' 
                 ? 'Manage events and review time off requests'
                 : 'Schedule events and request time off'}
             </p>
           </div>
           <div className="flex gap-2">
-            {role === 'Employee' && (
+            {currentUser?.accessLevel !== 'admin' && (
               <Button variant="outline" onClick={() => setShowTimeOffModal(true)} data-testid="button-request-time-off">
                 <CalendarOff className="w-4 h-4 mr-2" />
                 Request Time Off
@@ -393,7 +393,7 @@ export default function EventCalendar({ role }: EventCalendarProps) {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
-            {role === 'CEO' ? (
+            {currentUser?.accessLevel === 'admin' ? (
               <TabsTrigger value="requests" className="relative">
                 Time Off Requests
                 {pendingTimeOffRequests.length > 0 && (
@@ -677,7 +677,7 @@ export default function EventCalendar({ role }: EventCalendarProps) {
             </div>
           </TabsContent>
 
-          {role === 'CEO' ? (
+          {currentUser?.accessLevel === 'admin' ? (
             <TabsContent value="requests" className="mt-6">
               <Card className="bg-card border-border">
                 <CardHeader>

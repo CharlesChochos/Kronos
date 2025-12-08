@@ -679,9 +679,9 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const { data: allUsers = [] } = useUsers();
   const { data: allTasks = [] } = useTasks();
   
-  // Filter deals based on role - employees only see deals they're assigned to
+  // Filter deals based on access level - non-admin users only see deals they're assigned to
   const deals = useMemo(() => {
-    if (role === 'CEO') {
+    if (currentUser?.accessLevel === 'admin') {
       return allDeals;
     }
     // For employees, filter to only show deals where they are in the pod team
@@ -1354,7 +1354,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            {role === 'CEO' && (
+            {currentUser?.accessLevel === 'admin' && (
               <Button 
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
                 onClick={() => setShowNewDealModal(true)}

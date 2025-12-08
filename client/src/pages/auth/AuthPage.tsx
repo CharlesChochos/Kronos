@@ -123,7 +123,7 @@ export default function AuthPage() {
         const firstName = data.name?.split(' ')[0] || twoFactorEmail.split('@')[0];
         setWelcomeName(firstName);
         
-        if (data.role === 'CEO') {
+        if (data.accessLevel === 'admin') {
           setRedirectPath("/ceo/dashboard");
         } else {
           setRedirectPath("/employee/home");
@@ -191,7 +191,7 @@ export default function AuthPage() {
       const firstName = user?.name?.split(' ')[0] || values.email.split('@')[0];
       setWelcomeName(firstName);
       
-      if (user?.role === 'CEO') {
+      if (user?.accessLevel === 'admin') {
         setRedirectPath("/ceo/dashboard");
       } else {
         setRedirectPath("/employee/home");
@@ -217,7 +217,7 @@ export default function AuthPage() {
       const firstName = values.name.split(' ')[0];
       setWelcomeName(firstName);
       
-      if (result?.role === 'CEO') {
+      if (result?.accessLevel === 'admin') {
         setRedirectPath("/ceo/dashboard");
       } else {
         setRedirectPath("/employee/home");

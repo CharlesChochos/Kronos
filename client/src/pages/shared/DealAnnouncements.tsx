@@ -468,7 +468,7 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
                         </div>
                       </div>
                     </div>
-                    {role === 'CEO' && (
+                    {currentUser?.accessLevel === 'admin' && (
                       <Button variant="ghost" size="sm" onClick={() => togglePin(announcement.id)}>
                         <Pin className={cn("w-4 h-4", announcement.isPinned && "text-yellow-500 fill-yellow-500")} />
                       </Button>
@@ -641,7 +641,7 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
                                 )}
                               </div>
                             </div>
-                            {(role === 'CEO' || poll.creatorId === currentUser?.id) && (
+                            {(currentUser?.accessLevel === 'admin' || poll.creatorId === currentUser?.id) && (
                               <div className="flex gap-1">
                                 <Button variant="ghost" size="sm" onClick={() => closePoll(poll.id)}>
                                   <CheckCircle className="w-4 h-4" />

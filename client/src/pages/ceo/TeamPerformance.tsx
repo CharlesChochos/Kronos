@@ -53,7 +53,7 @@ export default function TeamPerformance() {
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
 
   const teamMembers = useMemo(() => {
-    return users.filter(u => u.role !== 'CEO').map(user => {
+    return users.filter(u => u.accessLevel !== 'admin').map(user => {
       const userTasks = tasks.filter(t => t.assignedTo === user.id);
       const completedTasks = userTasks.filter(t => t.status === 'Completed');
       const userDeals = deals.filter(d => d.lead === user.name || d.podTeam?.some(p => p.name === user.name));

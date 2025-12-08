@@ -333,7 +333,7 @@ export default function GoalSettingOKRs({ role }: { role: 'CEO' | 'Employee' }) 
                                 <p className="text-2xl font-bold">{okr.overallProgress}%</p>
                                 <Progress value={okr.overallProgress} className="w-24 h-2" />
                               </div>
-                              {(role === 'CEO' || okr.ownerId === currentUser?.id) && (
+                              {(currentUser?.accessLevel === 'admin' || okr.ownerId === currentUser?.id) && (
                                 <Button
                                   variant="ghost"
                                   size="icon"

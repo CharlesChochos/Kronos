@@ -94,7 +94,7 @@ function PortalProtectedRoute({ component: Component }: { component: React.Compo
 
   useEffect(() => {
     if (!isLoading && user && user.role !== 'External') {
-      if (user.role === 'CEO') {
+      if (user.accessLevel === 'admin') {
         setLocation("/ceo/dashboard");
       } else {
         setLocation("/employee/home");
@@ -129,8 +129,8 @@ function Router() {
     }
     
     if (user && location === "/") {
-      // Use actual role from database - CEO role goes to CEO dashboard, others to employee home
-      if (user.role === 'CEO') {
+      // Use accessLevel from database - admin goes to CEO dashboard, others to employee home
+      if (user.accessLevel === 'admin') {
         setLocation("/ceo/dashboard");
       } else {
         setLocation("/employee/home");
