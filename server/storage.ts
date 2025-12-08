@@ -1056,16 +1056,26 @@ export class DatabaseStorage implements IStorage {
   }
   
   async upsertUserPreferences(prefs: InsertUserPreferences): Promise<UserPreferences> {
-    const existing = await this.getUserPreferences(prefs.userId);
-    if (existing) {
-      const [updated] = await db.update(schema.userPreferences)
-        .set({ ...prefs, updatedAt: new Date() })
-        .where(eq(schema.userPreferences.userId, prefs.userId))
+    try {
+      const [result] = await db.insert(schema.userPreferences)
+        .values(prefs)
+        .onConflictDoUpdate({
+          target: schema.userPreferences.userId,
+          set: { ...prefs, updatedAt: new Date() }
+        })
         .returning();
-      return updated;
-    } else {
-      const [created] = await db.insert(schema.userPreferences).values(prefs).returning();
-      return created;
+      return result;
+    } catch (error) {
+      console.error('Upsert user preferences error:', error);
+      const existing = await this.getUserPreferences(prefs.userId);
+      if (existing) {
+        const [updated] = await db.update(schema.userPreferences)
+          .set({ ...prefs, updatedAt: new Date() })
+          .where(eq(schema.userPreferences.userId, prefs.userId))
+          .returning();
+        return updated;
+      }
+      throw error;
     }
   }
   
