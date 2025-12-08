@@ -638,24 +638,6 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
       <Sidebar role={effectiveRole} collapsed={sidebarCollapsed} />
       
       <div className={cn("flex flex-col min-h-screen transition-all duration-300", sidebarCollapsed ? "pl-20" : "pl-64")}>
-        {/* Preview Mode Banner */}
-        {isPreviewMode && currentUser?.accessLevel === 'admin' && (
-          <div className="bg-amber-500 text-amber-950 px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-2">
-            <Eye className="w-4 h-4" />
-            Preview Mode: Viewing as Employee
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="ml-4 h-6 text-xs bg-amber-600 border-amber-600 hover:bg-amber-700 text-white"
-              onClick={() => {
-                setIsPreviewMode(false);
-                setLocation('/ceo/dashboard');
-              }}
-            >
-              Exit Preview
-            </Button>
-          </div>
-        )}
         {/* Header */}
         <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-40 px-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
