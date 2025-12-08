@@ -10,7 +10,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import {
@@ -199,8 +198,7 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
   const [selectedDocument, setSelectedDocument] = useState<DocumentRecord | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<'templates' | 'library'>(defaultTab);
-  const [selectedTemplate, setSelectedTemplate] = useState<typeof ibTemplates[0] | null>(null);
+    const [selectedTemplate, setSelectedTemplate] = useState<typeof ibTemplates[0] | null>(null);
   const [selectedDealForGeneration, setSelectedDealForGeneration] = useState<string>("none");
   const [generatedContent, setGeneratedContent] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -431,7 +429,6 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
       });
       
       toast.success("Document saved to library!");
-      setActiveTab('library');
     } catch (error: any) {
       toast.error(error.message || "Failed to save document");
     }
@@ -622,19 +619,8 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'templates' | 'library')}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="templates" className="gap-2">
-              <Sparkles className="h-4 w-4" />
-              AI Document Generator
-            </TabsTrigger>
-            <TabsTrigger value="library" className="gap-2">
-              <FolderOpen className="h-4 w-4" />
-              Document Library
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="templates" className="space-y-0">
+        {defaultTab === 'templates' && (
+          <div className="space-y-0">
             <div className="grid grid-cols-12 gap-6 min-h-[600px]">
               <div className="col-span-3">
                 <Card className="h-full border-border">
@@ -858,9 +844,11 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
                 </Card>
               </div>
             </div>
-          </TabsContent>
-          
-          <TabsContent value="library" className="space-y-6">
+          </div>
+        )}
+
+        {defaultTab === 'library' && (
+          <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
               {documentsByCategory.map((cat) => (
                 <Card
@@ -1058,8 +1046,8 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </div>
 
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
