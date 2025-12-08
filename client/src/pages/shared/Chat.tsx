@@ -95,6 +95,7 @@ export default function Chat({ role }: ChatProps) {
     notifications: true,
     soundEnabled: true,
     showTimestamps: true,
+    chatTheme: "default" as "default" | "dark" | "light" | "gradient" | "ocean" | "forest",
   });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -495,7 +496,15 @@ export default function Chat({ role }: ChatProps) {
               </CardHeader>
 
               {/* Messages */}
-              <CardContent className="flex-1 overflow-hidden p-0">
+              <CardContent className={cn(
+                "flex-1 overflow-hidden p-0 transition-colors",
+                chatSettings.chatTheme === "default" && "bg-card",
+                chatSettings.chatTheme === "dark" && "bg-zinc-900",
+                chatSettings.chatTheme === "light" && "bg-slate-50",
+                chatSettings.chatTheme === "gradient" && "bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10",
+                chatSettings.chatTheme === "ocean" && "bg-gradient-to-br from-cyan-500/10 via-blue-500/10 to-teal-500/10",
+                chatSettings.chatTheme === "forest" && "bg-gradient-to-br from-green-500/10 via-emerald-500/10 to-lime-500/10"
+              )}>
                 <ScrollArea className="h-full p-4">
                   {messagesLoading ? (
                     <div className="flex items-center justify-center py-8">
@@ -837,6 +846,30 @@ export default function Chat({ role }: ChatProps) {
                     onCheckedChange={(checked) => setChatSettings({ ...chatSettings, showTimestamps: checked })}
                     data-testid="switch-timestamps"
                   />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="chatTheme" className="text-sm text-muted-foreground">
+                    Chat Background
+                  </Label>
+                  <Select 
+                    value={chatSettings.chatTheme} 
+                    onValueChange={(value: "default" | "dark" | "light" | "gradient" | "ocean" | "forest") => 
+                      setChatSettings({ ...chatSettings, chatTheme: value })
+                    }
+                  >
+                    <SelectTrigger className="w-32" data-testid="select-chat-theme">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">Default</SelectItem>
+                      <SelectItem value="dark">Dark</SelectItem>
+                      <SelectItem value="light">Light</SelectItem>
+                      <SelectItem value="gradient">Gradient</SelectItem>
+                      <SelectItem value="ocean">Ocean</SelectItem>
+                      <SelectItem value="forest">Forest</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>

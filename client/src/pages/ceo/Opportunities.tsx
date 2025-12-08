@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +23,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { 
   Search, Plus, Lightbulb, CheckCircle, XCircle, Eye, Clock, DollarSign,
-  Building2, Users, ArrowRight, Briefcase, TrendingUp, AlertTriangle
+  Building2, Users, ArrowRight, Briefcase, TrendingUp, AlertTriangle,
+  Upload, FileText, Paperclip, StickyNote, X, Download, Trash2
 } from "lucide-react";
 import { 
   useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers
@@ -35,6 +37,21 @@ import type { Deal, PodTeamMember } from "@shared/schema";
 const DEAL_TYPES = ['M&A', 'Capital Raising', 'Asset Management'];
 const SECTORS = ['Technology', 'Healthcare', 'Finance', 'Energy', 'Consumer', 'Industrial', 'Real Estate', 'Other'];
 
+type OpportunityAttachment = {
+  id: string;
+  filename: string;
+  url: string;
+  size: number;
+  uploadedAt: string;
+};
+
+type OpportunityNote = {
+  id: string;
+  content: string;
+  author: string;
+  createdAt: string;
+};
+
 export default function Opportunities() {
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [], isLoading } = useDeals();
@@ -42,6 +59,8 @@ export default function Opportunities() {
   const createDeal = useCreateDeal();
   const updateDeal = useUpdateDeal();
   const deleteDeal = useDeleteDeal();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const detailFileInputRef = useRef<HTMLInputElement>(null);
   
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewOpportunityDialog, setShowNewOpportunityDialog] = useState(false);
@@ -50,6 +69,8 @@ export default function Opportunities() {
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [approvalDealType, setApprovalDealType] = useState<string>('M&A');
+  const [detailTab, setDetailTab] = useState<'overview' | 'attachments' | 'notes'>('overview');
+  const [newNote, setNewNote] = useState("");
   
   const [newOpportunity, setNewOpportunity] = useState({
     name: "",
@@ -58,7 +79,13 @@ export default function Opportunities() {
     value: 0,
     description: "",
     lead: "",
+    notes: "" as string,
+    attachments: [] as OpportunityAttachment[],
   });
+  
+  // Local state for opportunity details (notes and attachments)
+  const [opportunityNotes, setOpportunityNotes] = useState<OpportunityNote[]>([]);
+  const [opportunityAttachments, setOpportunityAttachments] = useState<OpportunityAttachment[]>([]);
   
   // Filter for Opportunity deals only
   const opportunities = useMemo(() => {
@@ -83,6 +110,64 @@ export default function Opportunities() {
     return { total: opportunities.length, totalValue, pending };
   }, [opportunities]);
   
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, isDetail: boolean = false) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    const file = files[0];
+    const reader = new FileReader();
+    
+    reader.onload = () => {
+      const attachment: OpportunityAttachment = {
+        id: crypto.randomUUID(),
+        filename: file.name,
+        url: reader.result as string,
+        size: file.size,
+        uploadedAt: new Date().toISOString(),
+      };
+      
+      if (isDetail) {
+        setOpportunityAttachments(prev => [...prev, attachment]);
+        toast.success(`File "${file.name}" attached`);
+      } else {
+        setNewOpportunity(prev => ({
+          ...prev,
+          attachments: [...prev.attachments, attachment]
+        }));
+        toast.success(`File "${file.name}" attached`);
+      }
+    };
+    
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+  
+  const removeAttachment = (id: string, isDetail: boolean = false) => {
+    if (isDetail) {
+      setOpportunityAttachments(prev => prev.filter(a => a.id !== id));
+    } else {
+      setNewOpportunity(prev => ({
+        ...prev,
+        attachments: prev.attachments.filter(a => a.id !== id)
+      }));
+    }
+  };
+  
+  const handleAddNote = () => {
+    if (!newNote.trim()) return;
+    
+    const note: OpportunityNote = {
+      id: crypto.randomUUID(),
+      content: newNote,
+      author: currentUser?.name || 'Unknown',
+      createdAt: new Date().toISOString(),
+    };
+    
+    setOpportunityNotes(prev => [note, ...prev]);
+    setNewNote("");
+    toast.success("Note added");
+  };
+  
   const handleCreateOpportunity = async () => {
     if (!newOpportunity.name || !newOpportunity.client) {
       toast.error("Please fill in required fields");
@@ -99,7 +184,10 @@ export default function Opportunities() {
       } as any);
       toast.success("Opportunity created");
       setShowNewOpportunityDialog(false);
-      setNewOpportunity({ name: "", client: "", sector: "Technology", value: 0, description: "", lead: "" });
+      setNewOpportunity({ 
+        name: "", client: "", sector: "Technology", value: 0, 
+        description: "", lead: "", notes: "", attachments: [] 
+      });
     } catch (error) {
       toast.error("Failed to create opportunity");
     }
@@ -133,6 +221,22 @@ export default function Opportunities() {
     } catch (error) {
       toast.error("Failed to reject opportunity");
     }
+  };
+  
+  const openOpportunityDetail = (opportunity: Deal) => {
+    setSelectedOpportunity(opportunity);
+    setDetailTab('overview');
+    // Load any existing attachments/notes from the opportunity
+    const opp = opportunity as any;
+    setOpportunityAttachments(opp.attachments || []);
+    setOpportunityNotes(opp.opportunityNotes || []);
+    setShowOpportunityDetail(true);
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
   return (
@@ -206,7 +310,7 @@ export default function Opportunities() {
               <Card 
                 key={opportunity.id} 
                 className="bg-card border-border hover:border-primary/30 transition-colors cursor-pointer group"
-                onClick={() => { setSelectedOpportunity(opportunity); setShowOpportunityDetail(true); }}
+                onClick={() => openOpportunityDetail(opportunity)}
                 data-testid={`card-opportunity-${opportunity.id}`}
               >
                 <CardHeader className="pb-2">
@@ -236,20 +340,18 @@ export default function Opportunities() {
                         <span className="font-medium">{opportunity.lead}</span>
                       </div>
                     )}
-                    <div className="flex items-center gap-2 pt-2 border-t border-border">
-                      <Button size="sm" variant="outline" className="flex-1 text-green-500 hover:bg-green-500/10"
-                        onClick={(e) => { e.stopPropagation(); setSelectedOpportunity(opportunity); setShowApproveDialog(true); }}
-                        data-testid={`button-approve-${opportunity.id}`}
+                    {((opportunity as any).attachments?.length > 0) && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Paperclip className="w-3 h-3" />
+                        {(opportunity as any).attachments.length} attachment(s)
+                      </div>
+                    )}
+                    <div className="pt-2 border-t border-border">
+                      <Button size="sm" variant="outline" className="w-full"
+                        onClick={(e) => { e.stopPropagation(); openOpportunityDetail(opportunity); }}
                       >
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Approve
-                      </Button>
-                      <Button size="sm" variant="outline" className="flex-1 text-red-500 hover:bg-red-500/10"
-                        onClick={(e) => { e.stopPropagation(); setSelectedOpportunity(opportunity); setShowRejectDialog(true); }}
-                        data-testid={`button-reject-${opportunity.id}`}
-                      >
-                        <XCircle className="w-3 h-3 mr-1" />
-                        Reject
+                        <Eye className="w-3 h-3 mr-1" />
+                        View Details
                       </Button>
                     </div>
                   </div>
@@ -272,33 +374,35 @@ export default function Opportunities() {
         )}
       </div>
       
-      {/* New Opportunity Dialog */}
+      {/* New Opportunity Dialog - Enhanced */}
       <Dialog open={showNewOpportunityDialog} onOpenChange={setShowNewOpportunityDialog}>
-        <DialogContent className="bg-card border-border max-w-lg">
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>New Opportunity</DialogTitle>
-            <DialogDescription>Add a potential deal for review</DialogDescription>
+            <DialogDescription>Add a potential deal for review and approval</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <Label>Deal Name *</Label>
-              <Input
-                value={newOpportunity.name}
-                onChange={(e) => setNewOpportunity({ ...newOpportunity, name: e.target.value })}
-                placeholder="e.g., Acme Corp Acquisition"
-                data-testid="input-opportunity-name"
-              />
-            </div>
-            <div>
-              <Label>Client/Company *</Label>
-              <Input
-                value={newOpportunity.client}
-                onChange={(e) => setNewOpportunity({ ...newOpportunity, client: e.target.value })}
-                placeholder="Company name"
-                data-testid="input-opportunity-client"
-              />
-            </div>
             <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Deal Name *</Label>
+                <Input
+                  value={newOpportunity.name}
+                  onChange={(e) => setNewOpportunity({ ...newOpportunity, name: e.target.value })}
+                  placeholder="e.g., Acme Corp Acquisition"
+                  data-testid="input-opportunity-name"
+                />
+              </div>
+              <div>
+                <Label>Client/Company *</Label>
+                <Input
+                  value={newOpportunity.client}
+                  onChange={(e) => setNewOpportunity({ ...newOpportunity, client: e.target.value })}
+                  placeholder="Company name"
+                  data-testid="input-opportunity-client"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label>Sector</Label>
                 <Select value={newOpportunity.sector} onValueChange={(v) => setNewOpportunity({ ...newOpportunity, sector: v })}>
@@ -321,25 +425,88 @@ export default function Opportunities() {
                   data-testid="input-opportunity-value"
                 />
               </div>
-            </div>
-            <div>
-              <Label>Lead Contact</Label>
-              <Input
-                value={newOpportunity.lead}
-                onChange={(e) => setNewOpportunity({ ...newOpportunity, lead: e.target.value })}
-                placeholder="Who brought this in?"
-                data-testid="input-opportunity-lead"
-              />
+              <div>
+                <Label>Lead Contact</Label>
+                <Input
+                  value={newOpportunity.lead}
+                  onChange={(e) => setNewOpportunity({ ...newOpportunity, lead: e.target.value })}
+                  placeholder="Who brought this in?"
+                  data-testid="input-opportunity-lead"
+                />
+              </div>
             </div>
             <div>
               <Label>Description</Label>
               <Textarea
                 value={newOpportunity.description}
                 onChange={(e) => setNewOpportunity({ ...newOpportunity, description: e.target.value })}
-                placeholder="Brief description of the opportunity..."
-                rows={3}
+                placeholder="Brief description of the opportunity, including key details, strategic rationale, and potential value drivers..."
+                rows={4}
                 data-testid="textarea-opportunity-description"
               />
+            </div>
+            <div>
+              <Label>Initial Notes</Label>
+              <Textarea
+                value={newOpportunity.notes}
+                onChange={(e) => setNewOpportunity({ ...newOpportunity, notes: e.target.value })}
+                placeholder="Any additional notes, context, or considerations..."
+                rows={2}
+              />
+            </div>
+            
+            {/* File Attachments */}
+            <div>
+              <Label className="flex items-center gap-2">
+                <Paperclip className="w-4 h-4" />
+                Attachments
+              </Label>
+              <div className="mt-2 border border-dashed border-border rounded-lg p-4">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => handleFileUpload(e, false)}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png"
+                />
+                <div className="text-center">
+                  <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Upload File
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    PDF, Word, Excel, PowerPoint, or images
+                  </p>
+                </div>
+                
+                {newOpportunity.attachments.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {newOpportunity.attachments.map((file) => (
+                      <div key={file.id} className="flex items-center justify-between p-2 bg-secondary/50 rounded-lg">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText className="w-4 h-4 text-primary shrink-0" />
+                          <span className="text-sm truncate">{file.filename}</span>
+                          <span className="text-xs text-muted-foreground">({formatFileSize(file.size)})</span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0"
+                          onClick={() => removeAttachment(file.id, false)}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -351,9 +518,9 @@ export default function Opportunities() {
         </DialogContent>
       </Dialog>
       
-      {/* Opportunity Detail Sheet */}
+      {/* Opportunity Detail Sheet - Enhanced with Tabs */}
       <Sheet open={showOpportunityDetail} onOpenChange={setShowOpportunityDetail}>
-        <SheetContent className="bg-card border-border w-[500px] sm:max-w-[500px]">
+        <SheetContent className="bg-card border-border w-[600px] sm:max-w-[600px]">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <Lightbulb className="w-5 h-5 text-amber-500" />
@@ -363,54 +530,181 @@ export default function Opportunities() {
           </SheetHeader>
           
           {selectedOpportunity && (
-            <ScrollArea className="h-[calc(100vh-250px)] mt-6">
-              <div className="space-y-6 pr-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 rounded-lg bg-secondary/30">
-                    <p className="text-xs text-muted-foreground">Estimated Value</p>
-                    <p className="text-lg font-bold text-primary">${selectedOpportunity.value}M</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-secondary/30">
-                    <p className="text-xs text-muted-foreground">Sector</p>
-                    <p className="font-medium">{selectedOpportunity.sector}</p>
-                  </div>
-                </div>
+            <div className="mt-6">
+              <Tabs value={detailTab} onValueChange={(v) => setDetailTab(v as any)}>
+                <TabsList className="w-full">
+                  <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
+                  <TabsTrigger value="attachments" className="flex-1">
+                    Attachments
+                    {opportunityAttachments.length > 0 && (
+                      <Badge variant="secondary" className="ml-1 h-5 px-1.5">{opportunityAttachments.length}</Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="notes" className="flex-1">
+                    Notes
+                    {opportunityNotes.length > 0 && (
+                      <Badge variant="secondary" className="ml-1 h-5 px-1.5">{opportunityNotes.length}</Badge>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
                 
-                {selectedOpportunity.lead && (
-                  <div className="p-3 rounded-lg bg-secondary/30">
-                    <p className="text-xs text-muted-foreground">Lead Contact</p>
-                    <p className="font-medium">{selectedOpportunity.lead}</p>
-                  </div>
-                )}
-                
-                {selectedOpportunity.description && (
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Description</Label>
-                    <p className="text-sm mt-1">{selectedOpportunity.description}</p>
-                  </div>
-                )}
-                
-                <div className="pt-4 border-t border-border space-y-3">
-                  <h4 className="font-medium text-sm">Take Action</h4>
-                  <div className="flex gap-2">
-                    <Button className="flex-1 bg-green-600 hover:bg-green-700" 
-                      onClick={() => setShowApproveDialog(true)}
-                      data-testid="button-detail-approve"
+                <ScrollArea className="h-[calc(100vh-350px)] mt-4">
+                  <TabsContent value="overview" className="space-y-4 pr-4 mt-0">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 rounded-lg bg-secondary/30">
+                        <p className="text-xs text-muted-foreground">Estimated Value</p>
+                        <p className="text-lg font-bold text-primary">${selectedOpportunity.value}M</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-secondary/30">
+                        <p className="text-xs text-muted-foreground">Sector</p>
+                        <p className="font-medium">{selectedOpportunity.sector}</p>
+                      </div>
+                    </div>
+                    
+                    {selectedOpportunity.lead && (
+                      <div className="p-3 rounded-lg bg-secondary/30">
+                        <p className="text-xs text-muted-foreground">Lead Contact</p>
+                        <p className="font-medium">{selectedOpportunity.lead}</p>
+                      </div>
+                    )}
+                    
+                    {selectedOpportunity.description && (
+                      <div className="p-3 rounded-lg bg-secondary/30">
+                        <p className="text-xs text-muted-foreground mb-1">Description</p>
+                        <p className="text-sm whitespace-pre-wrap">{selectedOpportunity.description}</p>
+                      </div>
+                    )}
+                    
+                    <div className="p-3 rounded-lg bg-secondary/30">
+                      <p className="text-xs text-muted-foreground mb-1">Stage</p>
+                      <Badge>{selectedOpportunity.stage}</Badge>
+                    </div>
+                    
+                    {(selectedOpportunity as any).createdAt && (
+                      <div className="p-3 rounded-lg bg-secondary/30">
+                        <p className="text-xs text-muted-foreground">Created</p>
+                        <p className="text-sm">{format(new Date((selectedOpportunity as any).createdAt), 'PPp')}</p>
+                      </div>
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="attachments" className="space-y-4 pr-4 mt-0">
+                    <input
+                      ref={detailFileInputRef}
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(e, true)}
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png"
+                    />
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => detailFileInputRef.current?.click()}
                     >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Approve Deal
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Attachment
                     </Button>
-                    <Button variant="destructive" className="flex-1"
-                      onClick={() => setShowRejectDialog(true)}
-                      data-testid="button-detail-reject"
-                    >
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Reject
-                    </Button>
-                  </div>
+                    
+                    {opportunityAttachments.length > 0 ? (
+                      <div className="space-y-2">
+                        {opportunityAttachments.map((file) => (
+                          <div key={file.id} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <FileText className="w-5 h-5 text-primary shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{file.filename}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatFileSize(file.size)} • {format(new Date(file.uploadedAt), 'PP')}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8"
+                                onClick={() => {
+                                  const link = document.createElement('a');
+                                  link.href = file.url;
+                                  link.download = file.filename;
+                                  link.click();
+                                }}
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"
+                                onClick={() => removeAttachment(file.id, true)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Paperclip className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No attachments yet</p>
+                      </div>
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="notes" className="space-y-4 pr-4 mt-0">
+                    <div className="flex gap-2">
+                      <Textarea
+                        value={newNote}
+                        onChange={(e) => setNewNote(e.target.value)}
+                        placeholder="Add a note..."
+                        rows={2}
+                        className="flex-1"
+                      />
+                      <Button onClick={handleAddNote} disabled={!newNote.trim()}>
+                        Add
+                      </Button>
+                    </div>
+                    
+                    {opportunityNotes.length > 0 ? (
+                      <div className="space-y-3">
+                        {opportunityNotes.map((note) => (
+                          <div key={note.id} className="p-3 bg-secondary/30 rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium">{note.author}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {format(new Date(note.createdAt), 'PP p')}
+                              </span>
+                            </div>
+                            <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <StickyNote className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No notes yet</p>
+                      </div>
+                    )}
+                  </TabsContent>
+                </ScrollArea>
+              </Tabs>
+              
+              {/* Action Buttons */}
+              <div className="pt-4 border-t border-border space-y-3 mt-4">
+                <h4 className="font-medium text-sm">Take Action</h4>
+                <div className="flex gap-2">
+                  <Button className="flex-1 bg-green-600 hover:bg-green-700" 
+                    onClick={() => setShowApproveDialog(true)}
+                    data-testid="button-detail-approve"
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Approve Deal
+                  </Button>
+                  <Button variant="destructive" className="flex-1"
+                    onClick={() => setShowRejectDialog(true)}
+                    data-testid="button-detail-reject"
+                  >
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Reject
+                  </Button>
                 </div>
               </div>
-            </ScrollArea>
+            </div>
           )}
         </SheetContent>
       </Sheet>
@@ -440,7 +734,7 @@ export default function Opportunities() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleApprove} className="bg-green-600 hover:bg-green-700" data-testid="button-confirm-approve">
-              Approve & Move
+              Approve & Move to Deals
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

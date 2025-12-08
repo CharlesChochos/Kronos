@@ -219,6 +219,15 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
     }
   };
 
+  const handleDeleteAnnouncement = async (id: string) => {
+    try {
+      await deleteAnnouncementMutation.mutateAsync(id);
+      toast.success("Announcement deleted");
+    } catch (error) {
+      toast.error("Failed to delete announcement");
+    }
+  };
+
   const handleCreatePoll = async () => {
     const validOptions = newPoll.options.filter(o => o.trim());
     if (!newPoll.question || validOptions.length < 2) {
@@ -468,11 +477,22 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
                         </div>
                       </div>
                     </div>
-                    {currentUser?.accessLevel === 'admin' && (
-                      <Button variant="ghost" size="sm" onClick={() => togglePin(announcement.id)}>
-                        <Pin className={cn("w-4 h-4", announcement.isPinned && "text-yellow-500 fill-yellow-500")} />
+                    <div className="flex items-center gap-1">
+                      {currentUser?.accessLevel === 'admin' && (
+                        <Button variant="ghost" size="sm" onClick={() => togglePin(announcement.id)}>
+                          <Pin className={cn("w-4 h-4", announcement.isPinned && "text-yellow-500 fill-yellow-500")} />
+                        </Button>
+                      )}
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => handleDeleteAnnouncement(announcement.id)}
+                        data-testid={`delete-announcement-${announcement.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </Button>
-                    )}
+                    </div>
                   </div>
 
                   <p className="text-muted-foreground mb-4 whitespace-pre-wrap">{announcement.content}</p>
@@ -641,16 +661,21 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
                                 )}
                               </div>
                             </div>
-                            {(currentUser?.accessLevel === 'admin' || poll.creatorId === currentUser?.id) && (
-                              <div className="flex gap-1">
-                                <Button variant="ghost" size="sm" onClick={() => closePoll(poll.id)}>
-                                  <CheckCircle className="w-4 h-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => deletePoll(poll.id)} className="text-destructive">
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            )}
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="sm" onClick={() => closePoll(poll.id)} title="Close poll">
+                                <CheckCircle className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => deletePoll(poll.id)} 
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                title="Delete poll"
+                                data-testid={`delete-poll-${poll.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
 
                           <div className="space-y-2">
@@ -716,13 +741,25 @@ export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }
                                 <h3 className="font-medium">{poll.question}</h3>
                                 <Badge variant="secondary" className="mt-1">Closed</Badge>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => { setSelectedPoll(poll); setShowPollResultsModal(true); }}
-                              >
-                                <Eye className="w-4 h-4 mr-1" /> Results
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => { setSelectedPoll(poll); setShowPollResultsModal(true); }}
+                                >
+                                  <Eye className="w-4 h-4 mr-1" /> Results
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => deletePoll(poll.id)} 
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title="Delete poll"
+                                  data-testid={`delete-closed-poll-${poll.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </div>
 
                             <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/30">
