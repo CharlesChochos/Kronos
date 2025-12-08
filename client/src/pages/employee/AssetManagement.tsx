@@ -23,7 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import type { Deal, PodTeamMember } from "@shared/schema";
+import type { Deal } from "@shared/schema";
 
 const DEAL_STAGES = ['Origination', 'Execution', 'Negotiation', 'Due Diligence', 'Signing', 'Closed'];
 const AM_SECTORS = ['Real Estate', 'Infrastructure', 'Private Equity', 'Hedge Funds', 'Fixed Income', 'Equities', 'Commodities', 'Other'];
@@ -54,7 +54,7 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
     name: "",
     client: "",
     sector: "Real Estate",
-    value: 0,
+    value: "" as string,
     description: "",
     lead: currentUser?.name || "",
   });
@@ -110,20 +110,16 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
     try {
       await createDeal.mutateAsync({
         ...newDeal,
+        value: parseFloat(newDeal.value) || 0,
         dealType: 'Asset Management',
         stage: 'Origination',
         status: 'Active',
         progress: 0,
-        podTeam: currentUser ? [{
-          userId: currentUser.id,
-          name: currentUser.name,
-          role: 'Lead',
-          email: currentUser.email || '',
-        }] : [],
+        podTeam: [],
       } as any);
       toast.success("Asset management deal created");
       setShowNewDealDialog(false);
-      setNewDeal({ name: "", client: "", sector: "Real Estate", value: 0, description: "", lead: currentUser?.name || "" });
+      setNewDeal({ name: "", client: "", sector: "Real Estate", value: "", description: "", lead: currentUser?.name || "" });
     } catch (error) {
       toast.error("Failed to create deal");
     }
@@ -354,7 +350,8 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
                 <Input
                   type="number"
                   value={newDeal.value}
-                  onChange={(e) => setNewDeal({ ...newDeal, value: parseInt(e.target.value) || 0 })}
+                  placeholder="0"
+                  onChange={(e) => setNewDeal({ ...newDeal, value: e.target.value })}
                   data-testid="input-am-deal-value"
                 />
               </div>
@@ -418,26 +415,6 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
                     <p className="text-sm mt-1">{selectedDeal.description}</p>
                   </div>
                 )}
-                
-                {/* Team */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <Label className="text-xs text-muted-foreground">Pod Team</Label>
-                  </div>
-                  <div className="space-y-2">
-                    {(selectedDeal.podTeam as PodTeamMember[] || []).map((member, i) => (
-                      <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-secondary/30">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
-                          {member.name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{member.name}</p>
-                          <p className="text-xs text-muted-foreground">{member.role}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
                 
                 {/* Tasks Section */}
                 <div>

@@ -76,7 +76,7 @@ export default function Opportunities() {
     name: "",
     client: "",
     sector: "Technology",
-    value: 0,
+    value: "" as string,
     description: "",
     lead: "",
     notes: "" as string,
@@ -176,6 +176,7 @@ export default function Opportunities() {
     try {
       await createDeal.mutateAsync({
         ...newOpportunity,
+        value: parseFloat(newOpportunity.value) || 0,
         dealType: 'Opportunity',
         stage: 'Origination',
         status: 'Active',
@@ -185,7 +186,7 @@ export default function Opportunities() {
       toast.success("Opportunity created");
       setShowNewOpportunityDialog(false);
       setNewOpportunity({ 
-        name: "", client: "", sector: "Technology", value: 0, 
+        name: "", client: "", sector: "Technology", value: "", 
         description: "", lead: "", notes: "", attachments: [] 
       });
     } catch (error) {
@@ -427,7 +428,8 @@ export default function Opportunities() {
                 <Input
                   type="number"
                   value={newOpportunity.value}
-                  onChange={(e) => setNewOpportunity({ ...newOpportunity, value: parseInt(e.target.value) || 0 })}
+                  placeholder="0"
+                  onChange={(e) => setNewOpportunity({ ...newOpportunity, value: e.target.value })}
                   data-testid="input-opportunity-value"
                 />
               </div>

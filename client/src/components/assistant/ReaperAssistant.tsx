@@ -1,9 +1,12 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MessageCircle, X, Send, Plus, Trash2, ChevronLeft, Loader2, Bot, User, Sparkles, Paperclip, FileText, Download } from "lucide-react";
+import { MessageCircle, X, Send, Plus, Trash2, ChevronLeft, Loader2, Bot, User, Sparkles, Paperclip, FileText, Download, Settings, Mic, MicOff, Volume2, VolumeX, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -35,6 +38,14 @@ type AssistantMessage = {
   createdAt: string;
 };
 
+type WindowSize = 'compact' | 'normal' | 'expanded';
+
+const WINDOW_SIZES: Record<WindowSize, { width: string; height: string }> = {
+  compact: { width: '350px', height: '500px' },
+  normal: { width: '400px', height: '600px' },
+  expanded: { width: '550px', height: '80vh' },
+};
+
 export function ReaperAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [showConversations, setShowConversations] = useState(true);
@@ -43,10 +54,109 @@ export function ReaperAssistant() {
   const [isTyping, setIsTyping] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<AssistantAttachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Settings state
+  const [showSettings, setShowSettings] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [textToSpeechEnabled, setTextToSpeechEnabled] = useState(false);
+  const [windowSize, setWindowSize] = useState<WindowSize>('normal');
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
   const queryClient = useQueryClient();
+  
+  // Initialize speech recognition (supports both webkit and standard)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = false;
+    recognitionRef.current.interimResults = true;
+    recognitionRef.current.lang = 'en-US';
+    
+    recognitionRef.current.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((result: any) => result[0].transcript)
+        .join('');
+      setInputValue(transcript);
+    };
+    
+    recognitionRef.current.onend = () => {
+      setIsListening(false);
+    };
+    
+    recognitionRef.current.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+      if (event.error === 'not-allowed') {
+        toast.error('Microphone access denied. Please allow microphone access in your browser settings.');
+      }
+    };
+  }, []);
+  
+  const toggleListening = useCallback(() => {
+    if (!recognitionRef.current) {
+      toast.error('Speech recognition is not supported in your browser');
+      return;
+    }
+    
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      recognitionRef.current.start();
+      setIsListening(true);
+      toast.success('Listening... Speak now');
+    }
+  }, [isListening]);
+  
+  const stopSpeaking = useCallback(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  }, []);
+  
+  const speakText = useCallback((text: string) => {
+    if (typeof window === 'undefined') return;
+    if (!textToSpeechEnabled || !('speechSynthesis' in window)) return;
+    
+    // Stop any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    window.speechSynthesis.speak(utterance);
+  }, [textToSpeechEnabled]);
+  
+  // Cancel speech when TTS is disabled
+  useEffect(() => {
+    if (!textToSpeechEnabled && isSpeaking) {
+      stopSpeaking();
+    }
+  }, [textToSpeechEnabled, isSpeaking, stopSpeaking]);
+  
+  const cycleWindowSize = useCallback(() => {
+    setWindowSize(prev => {
+      if (prev === 'compact') return 'normal';
+      if (prev === 'normal') return 'expanded';
+      return 'compact';
+    });
+  }, []);
 
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<AssistantConversation[]>({
     queryKey: ["/api/assistant/conversations"],
@@ -101,11 +211,15 @@ export function ReaperAssistant() {
     onMutate: () => {
       setIsTyping(true);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/assistant/conversations/${activeConversationId}/messages`] });
       queryClient.invalidateQueries({ queryKey: ["/api/assistant/conversations"] });
       setInputValue("");
       setPendingFiles([]);
+      // Speak the assistant's response if text-to-speech is enabled
+      if (data?.assistantMessage?.content && textToSpeechEnabled) {
+        speakText(data.assistantMessage.content);
+      }
     },
     onSettled: () => {
       setIsTyping(false);
@@ -254,8 +368,63 @@ export function ReaperAssistant() {
     });
   };
 
+  const currentSize = WINDOW_SIZES[windowSize];
+  
   return (
     <>
+      {/* Settings Dialog */}
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Kronos Settings</DialogTitle>
+            <DialogDescription>Configure your AI assistant preferences</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="voice-input">Voice Input</Label>
+                <p className="text-xs text-muted-foreground">Use microphone to speak to Kronos</p>
+              </div>
+              <Switch
+                id="voice-input"
+                checked={voiceEnabled}
+                onCheckedChange={setVoiceEnabled}
+                data-testid="switch-voice-input"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="text-to-speech">Text-to-Speech</Label>
+                <p className="text-xs text-muted-foreground">Have Kronos read responses aloud</p>
+              </div>
+              <Switch
+                id="text-to-speech"
+                checked={textToSpeechEnabled}
+                onCheckedChange={setTextToSpeechEnabled}
+                data-testid="switch-text-to-speech"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Window Size</Label>
+              <div className="flex gap-2">
+                {(['compact', 'normal', 'expanded'] as WindowSize[]).map((size) => (
+                  <Button
+                    key={size}
+                    variant={windowSize === size ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setWindowSize(size)}
+                    className="flex-1 capitalize"
+                    data-testid={`button-size-${size}`}
+                  >
+                    {size}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -263,7 +432,8 @@ export function ReaperAssistant() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-20 right-6 w-[400px] h-[600px] bg-card border border-border rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden"
+            style={{ width: currentSize.width, height: currentSize.height }}
+            className="fixed bottom-20 right-6 bg-card border border-border rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden transition-all duration-200"
             data-testid="reaper-assistant-panel"
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-gradient-to-r from-primary/10 to-primary/5">
@@ -287,15 +457,47 @@ export function ReaperAssistant() {
                   <p className="text-[10px] text-muted-foreground">AI Assistant</p>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => setIsOpen(false)}
-                data-testid="button-close-assistant"
-              >
-                <X className="w-4 h-4" />
-              </Button>
+              <div className="flex items-center gap-1">
+                {isSpeaking && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={stopSpeaking}
+                    data-testid="button-stop-speaking"
+                  >
+                    <VolumeX className="w-4 h-4 text-primary animate-pulse" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={cycleWindowSize}
+                  title={`Current: ${windowSize}`}
+                  data-testid="button-resize-window"
+                >
+                  {windowSize === 'expanded' ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setShowSettings(true)}
+                  data-testid="button-open-settings"
+                >
+                  <Settings className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setIsOpen(false)}
+                  data-testid="button-close-assistant"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-hidden">
@@ -521,12 +723,28 @@ export function ReaperAssistant() {
                           <Paperclip className="w-4 h-4" />
                         )}
                       </Button>
+                      {voiceEnabled && (
+                        <Button
+                          variant={isListening ? "default" : "outline"}
+                          size="icon"
+                          className={cn("h-11 w-11 flex-shrink-0", isListening && "bg-red-500 hover:bg-red-600")}
+                          onClick={toggleListening}
+                          disabled={sendMessage.isPending}
+                          data-testid="button-voice-input"
+                        >
+                          {isListening ? (
+                            <MicOff className="w-4 h-4 animate-pulse" />
+                          ) : (
+                            <Mic className="w-4 h-4" />
+                          )}
+                        </Button>
+                      )}
                       <Textarea
                         ref={inputRef}
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Ask Kronos anything..."
+                        placeholder={isListening ? "Listening..." : "Ask Kronos anything..."}
                         className="resize-none min-h-[44px] max-h-[120px]"
                         disabled={sendMessage.isPending}
                         data-testid="input-assistant-message"
