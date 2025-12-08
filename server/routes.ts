@@ -4105,29 +4105,28 @@ Example: "Tell Michael the meeting is moved to 3pm" -> call send_message
     }
   });
   
-  // Scan document to extract stakeholder information using AI
+  // Scan document to extract ALL stakeholder information using AI and auto-create them
   app.post("/api/stakeholders/scan-document", aiLimiter, requireAuth, async (req, res) => {
     try {
-      const { documentContent, filename } = req.body;
+      const { documentContent, filename, autoCreate } = req.body;
       
       if (!documentContent) {
         return res.status(400).json({ error: "Document content is required" });
       }
       
-      // Use OpenAI to extract stakeholder information from the document
+      // Use OpenAI to extract ALL stakeholder information from the document
       const response = await openai.chat.completions.create({
-        // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
         model: "gpt-5",
         messages: [
           {
             role: "system",
-            content: `You are an expert at extracting stakeholder information from documents. 
-            Analyze the provided document content and extract contact/stakeholder information.
-            Return a JSON object with the following fields (leave empty string if not found):
-            - name: Full name of the person/stakeholder
-            - title: Job title or position
-            - company: Company or organization name
-            - type: One of: investor, advisor, legal, banker, consultant, client, other
+            content: `You are an expert at extracting stakeholder/contact information from documents.
+            Analyze the provided document content and extract ALL contacts/stakeholders found.
+            Return a JSON object with a "stakeholders" array containing objects with these fields:
+            - name: Full name of the person/stakeholder (REQUIRED - skip if not found)
+            - title: Job title or position (default to empty string)
+            - company: Company or organization name (REQUIRED - skip if not found)
+            - type: One of: investor, advisor, legal, banker, consultant, client, other (infer from context)
             - email: Email address
             - phone: Phone number
             - linkedin: LinkedIn URL
@@ -4136,16 +4135,17 @@ Example: "Tell Michael the meeting is moved to 3pm" -> call send_message
             - focus: Investment focus, sector expertise, or specialization areas (comma-separated)
             - notes: Any additional relevant notes or context
             
-            If the document contains multiple stakeholders, extract the primary/first one.
-            Always return valid JSON.`
+            Extract EVERY stakeholder/contact you can find in the document.
+            Only include entries where both name AND company are available.
+            Always return valid JSON with format: {"stakeholders": [...]}`
           },
           {
             role: "user",
-            content: `Please extract stakeholder information from this document${filename ? ` (${filename})` : ''}:\n\n${documentContent}`
+            content: `Please extract ALL stakeholder/contact information from this document${filename ? ` (${filename})` : ''}:\n\n${documentContent}`
           }
         ],
         response_format: { type: "json_object" },
-        max_completion_tokens: 2048
+        max_completion_tokens: 8192
       });
       
       const content = response.choices[0]?.message?.content;
@@ -4155,7 +4155,61 @@ Example: "Tell Michael the meeting is moved to 3pm" -> call send_message
       
       try {
         const extractedData = JSON.parse(content);
-        res.json(extractedData);
+        const stakeholders = extractedData.stakeholders || [];
+        
+        // If autoCreate is true, create all stakeholders in the database
+        if (autoCreate && stakeholders.length > 0) {
+          const validTypes = ['investor', 'advisor', 'legal', 'banker', 'consultant', 'client', 'other'];
+          let successCount = 0;
+          let failedCount = 0;
+          const createdStakeholders = [];
+          
+          for (const s of stakeholders) {
+            // Skip entries without required fields
+            if (!s.name || typeof s.name !== 'string' || s.name.trim() === '') continue;
+            if (!s.company || typeof s.company !== 'string' || s.company.trim() === '') continue;
+            
+            try {
+              const stakeholderType = validTypes.includes(s.type?.toLowerCase()) ? s.type.toLowerCase() : 'other';
+              
+              // Sanitize all optional fields - convert empty strings to null
+              const sanitizeOptional = (val: any): string | null => {
+                if (!val || typeof val !== 'string' || val.trim() === '') return null;
+                return val.trim();
+              };
+              
+              const created = await storage.createStakeholder({
+                name: s.name.trim(),
+                title: sanitizeOptional(s.title) || '',
+                company: s.company.trim(),
+                type: stakeholderType,
+                email: sanitizeOptional(s.email),
+                phone: sanitizeOptional(s.phone),
+                linkedin: sanitizeOptional(s.linkedin),
+                website: sanitizeOptional(s.website),
+                location: sanitizeOptional(s.location),
+                focus: sanitizeOptional(s.focus),
+                notes: sanitizeOptional(s.notes),
+                deals: [],
+                isFavorite: false
+              });
+              createdStakeholders.push(created);
+              successCount++;
+            } catch (err) {
+              console.error('Failed to create stakeholder:', s.name, err);
+              failedCount++;
+            }
+          }
+          
+          res.json({ 
+            stakeholders: createdStakeholders,
+            successCount,
+            failedCount,
+            totalFound: stakeholders.length
+          });
+        } else {
+          res.json({ stakeholders, totalFound: stakeholders.length });
+        }
       } catch (parseError) {
         console.error('Failed to parse AI response:', content);
         res.status(500).json({ error: "Failed to parse extracted information" });

@@ -51,6 +51,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { useDeals, useStakeholders, useCreateStakeholder, useUpdateStakeholder, useDeleteStakeholder } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -78,6 +79,7 @@ type LocalStakeholder = {
 };
 
 export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee' }) {
+  const queryClient = useQueryClient();
   const { data: deals = [] } = useDeals();
   const { data: dbStakeholders = [], isLoading } = useStakeholders();
   const createStakeholderMutation = useCreateStakeholder();
@@ -157,7 +159,8 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
         credentials: "include",
         body: JSON.stringify({
           documentContent: content.slice(0, 50000),
-          filename: file.name
+          filename: file.name,
+          autoCreate: true
         })
       });
       
@@ -165,26 +168,21 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
         throw new Error("Failed to scan document");
       }
       
-      const extractedData = await response.json();
+      const result = await response.json();
       
-      setNewStakeholder(prev => ({
-        ...prev,
-        name: extractedData.name || prev.name,
-        title: extractedData.title || prev.title,
-        company: extractedData.company || prev.company,
-        type: (extractedData.type && ['investor', 'advisor', 'legal', 'banker', 'consultant', 'client', 'other'].includes(extractedData.type)) 
-          ? extractedData.type 
-          : prev.type,
-        email: extractedData.email || prev.email,
-        phone: extractedData.phone || prev.phone,
-        linkedin: extractedData.linkedin || prev.linkedin,
-        website: extractedData.website || prev.website,
-        location: extractedData.location || prev.location,
-        focus: extractedData.focus || prev.focus,
-        notes: extractedData.notes || prev.notes
-      }));
+      if (result.successCount > 0) {
+        toast.success(`Successfully imported ${result.successCount} stakeholder${result.successCount > 1 ? 's' : ''} from document`);
+        // Refresh the stakeholder list to show newly created entries
+        queryClient.invalidateQueries({ queryKey: ['/api/stakeholders'] });
+      } else if (result.totalFound === 0) {
+        toast.info("No stakeholder contacts found in the document");
+      } else {
+        toast.error("Failed to create stakeholders from document");
+      }
       
-      toast.success("Document scanned! Fields have been auto-filled.");
+      if (result.failedCount > 0) {
+        toast.warning(`${result.failedCount} stakeholder${result.failedCount > 1 ? 's' : ''} could not be imported`);
+      }
     } catch (error) {
       console.error('Document scan error:', error);
       toast.error("Failed to extract information from document");
@@ -596,6 +594,32 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
             <p className="text-muted-foreground">Manage contacts for investors, advisors, legal counsel, and more</p>
           </div>
           <div className="flex items-center gap-2">
+            <input
+              type="file"
+              ref={docScanInputRef}
+              accept=".txt,.csv,.json,.md,.xlsx,.xls"
+              onChange={handleDocumentScan}
+              className="hidden"
+              data-testid="input-doc-scan"
+            />
+            <Button
+              variant="outline"
+              onClick={() => docScanInputRef.current?.click()}
+              disabled={isScanning}
+              data-testid="button-scan-document"
+            >
+              {isScanning ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Scanning...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  AI Import
+                </>
+              )}
+            </Button>
             <Button onClick={() => setShowCreateModal(true)} data-testid="button-add-stakeholder">
               <Plus className="w-4 h-4 mr-2" /> Add Stakeholder
             </Button>
@@ -968,50 +992,9 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
           <DialogHeader>
             <DialogTitle>Add Stakeholder</DialogTitle>
             <DialogDescription>
-              Upload a document to auto-fill fields, or enter details manually.
+              Enter stakeholder details manually.
             </DialogDescription>
           </DialogHeader>
-          
-          <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium">AI Document Scan</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="file"
-                  ref={docScanInputRef}
-                  accept=".txt,.csv,.json,.md,.xlsx,.xls"
-                  onChange={handleDocumentScan}
-                  className="hidden"
-                  data-testid="input-doc-scan"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => docScanInputRef.current?.click()}
-                  disabled={isScanning}
-                  data-testid="button-scan-document"
-                >
-                  {isScanning ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Scanning...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="w-4 h-4 mr-2" />
-                      Upload Document
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Upload a business card, email signature, or contact document to extract stakeholder information automatically.
-            </p>
-          </div>
           
           <ScrollArea className="max-h-[50vh]">
             <div className="space-y-4 pr-4">
