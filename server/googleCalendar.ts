@@ -7,9 +7,15 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
 function getRedirectUri(): string {
+  // In production, use the configured production URL
+  if (process.env.PRODUCTION_URL) {
+    return `${process.env.PRODUCTION_URL}/api/google-calendar/callback`;
+  }
+  // Fallback to Replit deployment URL if available
   if (process.env.REPLIT_DEPLOYMENT_URL) {
     return `${process.env.REPLIT_DEPLOYMENT_URL}/api/google-calendar/callback`;
   }
+  // In development, use the dev domain
   if (process.env.REPLIT_DEV_DOMAIN) {
     return `https://${process.env.REPLIT_DEV_DOMAIN}/api/google-calendar/callback`;
   }

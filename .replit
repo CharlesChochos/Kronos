@@ -23,7 +23,7 @@ localPort = 34777
 externalPort = 3001
 
 [[ports]]
-localPort = 40391
+localPort = 35481
 externalPort = 5000
 
 [[ports]]
@@ -65,3 +65,8 @@ waitForPort = 5000
 [agent]
 mockupState = "FULLSTACK"
 integrations = ["resend:1.0.0", "javascript_openai_ai_integrations:1.0.0", "google-calendar:1.0.0"]
+
+[userenv]
+
+[userenv.production]
+PRODUCTION_URL = "https://kronos--chochoscharles0.replit.app"
