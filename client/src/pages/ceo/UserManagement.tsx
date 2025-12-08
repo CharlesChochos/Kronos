@@ -44,6 +44,7 @@ type User = {
   name: string;
   email: string;
   role: string;
+  accessLevel: string;
   jobTitle?: string;
   status: string;
   createdAt: string;
@@ -64,17 +65,17 @@ type AuditLog = {
   createdAt: string;
 };
 
-const roleColors: Record<string, string> = {
-  CEO: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  Associate: "bg-green-500/20 text-green-400 border-green-500/30",
+const accessLevelColors: Record<string, string> = {
+  admin: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  standard: "bg-green-500/20 text-green-400 border-green-500/30",
 };
 
-const getRoleDisplay = (role: string) => {
-  return role === 'CEO' ? 'Admin' : 'Standard';
+const getAccessLevelDisplay = (accessLevel: string) => {
+  return accessLevel === 'admin' ? 'Admin' : 'Standard';
 };
 
-const getRoleColor = (role: string) => {
-  return role === 'CEO' ? roleColors.CEO : roleColors.Associate;
+const getAccessLevelColor = (accessLevel: string) => {
+  return accessLevel === 'admin' ? accessLevelColors.admin : accessLevelColors.standard;
 };
 
 const statusColors: Record<string, string> = {
@@ -219,12 +220,12 @@ export default function UserManagement() {
   });
 
   const changeRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      const response = await fetch(`/api/admin/users/${userId}/role`, {
+    mutationFn: async ({ userId, accessLevel }: { userId: string; accessLevel: string }) => {
+      const response = await fetch(`/api/admin/users/${userId}/access-level`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ role }),
+        body: JSON.stringify({ accessLevel }),
       });
       if (!response.ok) {
         const data = await response.json();
@@ -506,8 +507,8 @@ export default function UserManagement() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={getRoleColor(user.role)}>
-                            {getRoleDisplay(user.role)}
+                          <Badge variant="outline" className={getAccessLevelColor(user.accessLevel)}>
+                            {getAccessLevelDisplay(user.accessLevel)}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -529,7 +530,7 @@ export default function UserManagement() {
                               className="gap-1"
                               onClick={() => {
                                 setSelectedUser(user);
-                                setNewRole(user.role);
+                                setNewRole(user.accessLevel);
                                 setShowRoleDialog(true);
                               }}
                               data-testid={`button-change-role-${user.id}`}
@@ -615,8 +616,8 @@ export default function UserManagement() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={`${getRoleColor(user.role)} opacity-50`}>
-                            {getRoleDisplay(user.role)}
+                          <Badge variant="outline" className={`${getAccessLevelColor(user.accessLevel)} opacity-50`}>
+                            {getAccessLevelDisplay(user.accessLevel)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
@@ -717,8 +718,8 @@ export default function UserManagement() {
                 <SelectValue placeholder="Select access level" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="CEO">Admin (Full Access)</SelectItem>
-                <SelectItem value="Associate">Standard</SelectItem>
+                <SelectItem value="admin">Admin (Full Access)</SelectItem>
+                <SelectItem value="standard">Standard</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -729,7 +730,7 @@ export default function UserManagement() {
             <Button
               onClick={() => {
                 if (selectedUser && newRole) {
-                  changeRoleMutation.mutate({ userId: selectedUser.id, role: newRole });
+                  changeRoleMutation.mutate({ userId: selectedUser.id, accessLevel: newRole });
                 }
               }}
               disabled={changeRoleMutation.isPending || !newRole}

@@ -655,7 +655,7 @@ export async function registerRoutes(
     }
   });
   
-  // Change user role (CEO only)
+  // Change user role (CEO only) - Legacy endpoint
   app.patch("/api/admin/users/:id/role", requireCEO, async (req, res) => {
     try {
       const { role } = req.body;
@@ -685,6 +685,43 @@ export async function registerRoutes(
       res.json(sanitizeUser(updatedUser));
     } catch (error) {
       res.status(500).json({ error: "Failed to update user role" });
+    }
+  });
+  
+  // Change user access level (admin only)
+  app.patch("/api/admin/users/:id/access-level", requireCEO, async (req, res) => {
+    try {
+      const { accessLevel } = req.body;
+      const validLevels = ['admin', 'standard'];
+      if (!accessLevel || !validLevels.includes(accessLevel)) {
+        return res.status(400).json({ error: "Invalid access level. Must be 'admin' or 'standard'." });
+      }
+      
+      const currentUser = req.user as any;
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Prevent demoting the last admin
+      if (user.accessLevel === 'admin' && accessLevel === 'standard') {
+        const allUsers = await storage.getAllUsers();
+        const adminCount = allUsers.filter(u => u.accessLevel === 'admin' && u.status === 'active').length;
+        if (adminCount <= 1) {
+          return res.status(400).json({ error: "Cannot demote the only admin. Promote another user to admin first." });
+        }
+      }
+      
+      const updatedUser = await storage.updateUserProfile(req.params.id, { accessLevel });
+      await createAuditLog(req, 'access_level_changed', 'user', user.id, user.name, { 
+        previousAccessLevel: user.accessLevel, 
+        newAccessLevel: accessLevel, 
+        changedBy: currentUser.name 
+      });
+      
+      res.json(sanitizeUser(updatedUser));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user access level" });
     }
   });
   
