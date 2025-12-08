@@ -4114,39 +4114,49 @@ Guidelines:
   
   // OAuth callback from Google
   app.get("/api/google-calendar/callback", async (req, res) => {
+    // Helper to get redirect path based on user role
+    const getCalendarPath = (user: any) => {
+      return user?.role === 'CEO' ? '/ceo/calendar' : '/employee/calendar';
+    };
+    
     try {
       const { code, state, error: oauthError } = req.query;
       
-      if (oauthError) {
-        console.error('OAuth error from Google:', oauthError);
-        return res.redirect('/calendar?error=oauth_denied');
-      }
-      
-      if (!code || !state) {
-        return res.redirect('/calendar?error=invalid_callback');
-      }
-      
-      // Get the authenticated user from session
+      // Get the authenticated user from session first
       if (!req.isAuthenticated() || !req.user) {
         return res.redirect('/auth?error=not_authenticated');
       }
       
+      const user = req.user as any;
+      const calendarPath = getCalendarPath(user);
+      
+      if (oauthError) {
+        console.error('OAuth error from Google:', oauthError);
+        return res.redirect(`${calendarPath}?error=oauth_denied`);
+      }
+      
+      if (!code || !state) {
+        return res.redirect(`${calendarPath}?error=invalid_callback`);
+      }
+      
       const { validateOAuthState, handleOAuthCallback } = await import('./googleCalendar');
-      const userId = (req.user as any).id;
+      const userId = user.id;
       
       // Validate that the state matches the authenticated user
       if (!validateOAuthState(state as string, userId)) {
         console.error('OAuth state validation failed');
-        return res.redirect('/calendar?error=invalid_state');
+        return res.redirect(`${calendarPath}?error=invalid_state`);
       }
       
       // Exchange code for tokens
       await handleOAuthCallback(code as string, userId);
       
-      res.redirect('/calendar?connected=true');
+      res.redirect(`${calendarPath}?connected=true`);
     } catch (error: any) {
       console.error('Google Calendar callback error:', error);
-      res.redirect('/calendar?error=connection_failed');
+      const user = req.user as any;
+      const calendarPath = getCalendarPath(user);
+      res.redirect(`${calendarPath}?error=connection_failed`);
     }
   });
   
