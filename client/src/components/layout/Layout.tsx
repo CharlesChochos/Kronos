@@ -918,8 +918,8 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                         }}
                         data-testid="menu-item-preview-mode"
                       >
-                        {isPreviewMode ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
-                        {isPreviewMode ? "Exit Employee View" : "View as Employee"}
+                        {isPreviewMode ? <Eye className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
+                        {isPreviewMode ? "View as Admin" : "View as Employee"}
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator className="bg-border" />
