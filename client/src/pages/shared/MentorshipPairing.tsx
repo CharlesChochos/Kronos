@@ -25,12 +25,13 @@ import {
   Loader2,
   Trash2
 } from "lucide-react";
-import { useUsers, useMentorshipPairings, useCreateMentorshipPairing, useUpdateMentorshipPairing, useDeleteMentorshipPairing } from "@/lib/api";
+import { useUsers, useMentorshipPairings, useCreateMentorshipPairing, useUpdateMentorshipPairing, useDeleteMentorshipPairing, useCurrentUser } from "@/lib/api";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import type { MentorshipPairing } from "@shared/schema";
 
 export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }) {
+  const { data: currentUser } = useCurrentUser();
   const { data: users = [] } = useUsers();
   const { data: pairings = [], isLoading } = useMentorshipPairings();
   const createPairing = useCreateMentorshipPairing();

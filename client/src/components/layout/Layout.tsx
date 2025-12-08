@@ -325,8 +325,13 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
         updates.role = profileForm.role;
       }
       
-      // Include jobTitle if role is Custom
-      if (profileForm.role === 'Custom' && profileForm.jobTitle) {
+      // Include jobTitle for admins or if role is Custom
+      if (currentUser.accessLevel === 'admin') {
+        // Admins can always set their job title
+        if (profileForm.jobTitle !== ((currentUser as any)?.jobTitle || '')) {
+          updates.jobTitle = profileForm.jobTitle;
+        }
+      } else if (profileForm.role === 'Custom' && profileForm.jobTitle) {
         updates.jobTitle = profileForm.jobTitle;
       } else if (profileForm.role !== 'Custom' && (currentUser as any)?.jobTitle) {
         updates.jobTitle = '';
@@ -836,7 +841,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                   <div className="text-left hidden md:block">
                     <p className="text-sm font-medium leading-none">{currentUser?.name || userName}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {(currentUser as any)?.jobTitle || (currentUser?.accessLevel === 'admin' ? 'Administrator' : 'Team Member')}
+                      {(currentUser as any)?.jobTitle || currentUser?.role || 'Team Member'}
                     </p>
                   </div>
                 </div>
@@ -873,23 +878,26 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                       <Palette className="w-4 h-4 mr-2" />
                       Customize Dashboard
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      className="focus:bg-primary/10 focus:text-primary cursor-pointer"
-                      onClick={() => {
-                        setIsPreviewMode(!isPreviewMode);
-                        if (!isPreviewMode) {
-                          setLocation('/employee/home');
-                          toast.info("Preview mode enabled - viewing as employee");
-                        } else {
-                          setLocation('/ceo/dashboard');
-                          toast.info("Preview mode disabled - back to admin view");
-                        }
-                      }}
-                      data-testid="menu-item-preview-mode"
-                    >
-                      {isPreviewMode ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
-                      {isPreviewMode ? "Exit Employee View" : "View as Employee"}
-                    </DropdownMenuItem>
+                    {/* Preview mode only available to Charles (platform developer) */}
+                    {currentUser?.email === 'cchochos@equiturn.com' && (
+                      <DropdownMenuItem 
+                        className="focus:bg-primary/10 focus:text-primary cursor-pointer"
+                        onClick={() => {
+                          setIsPreviewMode(!isPreviewMode);
+                          if (!isPreviewMode) {
+                            setLocation('/employee/home');
+                            toast.info("Preview mode enabled - viewing as employee");
+                          } else {
+                            setLocation('/ceo/dashboard');
+                            toast.info("Preview mode disabled - back to admin view");
+                          }
+                        }}
+                        data-testid="menu-item-preview-mode"
+                      >
+                        {isPreviewMode ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
+                        {isPreviewMode ? "Exit Employee View" : "View as Employee"}
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator className="bg-border" />
                   </>
                 )}
@@ -969,7 +977,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                     <div>
                       <h3 className="font-semibold text-lg">{currentUser?.name || userName}</h3>
                       <Badge variant="outline" className="mt-1 text-primary border-primary/30">
-                        {(currentUser as any)?.jobTitle || (currentUser?.accessLevel === 'admin' ? 'Administrator' : 'Team Member')}
+                        {(currentUser as any)?.jobTitle || currentUser?.role || 'Team Member'}
                       </Badge>
                     </div>
                   </div>
@@ -1033,16 +1041,20 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                         </div>
                       )}
                       
-                      {profileForm.role === 'Custom' && (
+                      {/* Job title field for admins or when role is Custom */}
+                      {(currentUser?.accessLevel === 'admin' || profileForm.role === 'Custom') && (
                         <div className="space-y-2">
-                          <Label htmlFor="profile-job-title">Custom Job Title</Label>
+                          <Label htmlFor="profile-job-title">Job Title</Label>
                           <Input
                             id="profile-job-title"
                             value={profileForm.jobTitle}
                             onChange={(e) => setProfileForm({ ...profileForm, jobTitle: e.target.value })}
-                            placeholder="Enter your job title"
+                            placeholder={currentUser?.accessLevel === 'admin' ? "e.g., CEO, CFO, Partner" : "Enter your job title"}
                             data-testid="input-profile-job-title"
                           />
+                          {currentUser?.accessLevel === 'admin' && (
+                            <p className="text-xs text-muted-foreground">This title will be displayed under your name</p>
+                          )}
                         </div>
                       )}
                       
