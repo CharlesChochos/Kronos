@@ -848,14 +848,37 @@ export default function EventCalendar({ role }: EventCalendarProps) {
               </Select>
             </div>
             {newEvent.videoPlatform && (
-              <div>
+              <div className="space-y-2">
                 <Label>Meeting Link</Label>
-                <Input
-                  value={newEvent.videoLink}
-                  onChange={(e) => setNewEvent(prev => ({ ...prev, videoLink: e.target.value }))}
-                  placeholder="https://..."
-                  data-testid="input-event-meeting-link"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    value={newEvent.videoLink}
+                    onChange={(e) => setNewEvent(prev => ({ ...prev, videoLink: e.target.value }))}
+                    placeholder="Paste meeting link here..."
+                    className="flex-1"
+                    data-testid="input-event-meeting-link"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const urls: Record<string, string> = {
+                        zoom: 'https://zoom.us/meeting/schedule',
+                        google_meet: 'https://meet.google.com/new',
+                        teams: 'https://teams.microsoft.com/l/meeting/new'
+                      };
+                      const url = urls[newEvent.videoPlatform];
+                      if (url) window.open(url, '_blank');
+                    }}
+                    data-testid="button-create-meeting-link"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Create
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Click "Create" to open {newEvent.videoPlatform === 'google_meet' ? 'Google Meet' : newEvent.videoPlatform === 'teams' ? 'Microsoft Teams' : 'Zoom'}, then paste the link here
+                </p>
               </div>
             )}
             <div>
