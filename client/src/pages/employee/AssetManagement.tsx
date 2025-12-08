@@ -703,12 +703,9 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
   
   const { data: selectedDealFees = [] } = useDealFees(selectedDeal?.id || '');
   const [activeStageTab, setActiveStageTab] = useState("Origination");
-  const [viewMode, setViewMode] = useState<'grid' | 'calendar' | 'compare'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'calendar'>('grid');
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('week');
   const [calendarDate, setCalendarDate] = useState(new Date());
-  
-  const [selectedCompareDeals, setSelectedCompareDeals] = useState<string[]>([]);
-  const [compareSortBy, setCompareSortBy] = useState<string>("value");
   
   const [showDeleteDealDialog, setShowDeleteDealDialog] = useState(false);
   const [dealToDelete, setDealToDelete] = useState<string | null>(null);
@@ -1159,14 +1156,6 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
               >
                 <CalendarDays className="w-4 h-4" />
               </Button>
-              <Button 
-                variant={viewMode === 'compare' ? 'default' : 'ghost'} 
-                size="sm"
-                onClick={() => setViewMode('compare')}
-                className="rounded-none"
-              >
-                <GitCompare className="w-4 h-4" />
-              </Button>
             </div>
             <Button onClick={() => setShowNewDealModal(true)} data-testid="button-new-am-deal">
               <Plus className="w-4 h-4 mr-2" />
@@ -1177,62 +1166,61 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
         
         {/* Grid View */}
         {viewMode === 'grid' && (
-          <div className="grid grid-cols-6 gap-3">
-            {DEAL_STAGES.map((stage) => (
-              <div key={stage} className="space-y-2">
-                <div className="flex items-center justify-between px-2">
-                  <Badge variant="outline" className={cn("text-xs", getStageColor(stage))}>
-                    {stage}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">{dealsByStage[stage]?.length || 0}</span>
-                </div>
-                <div className="space-y-2 min-h-[200px]">
-                  {dealsByStage[stage]?.map((deal: Deal) => (
-                    <Card 
-                      key={deal.id} 
-                      className="bg-card border-border hover:border-primary/30 transition-colors cursor-pointer"
-                      onClick={() => { setSelectedDeal(deal); setActiveStageTab(deal.stage); }}
-                      data-testid={`card-am-deal-${deal.id}`}
-                    >
-                      <CardContent className="p-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-medium text-sm truncate flex-1">{deal.name}</h4>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" className="h-6 w-6">
-                                <MoreVertical className="w-3 h-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedDeal(deal); setActiveStageTab(deal.stage); }}>
-                                <Eye className="w-4 h-4 mr-2" /> View Details
-                              </DropdownMenuItem>
-                              {getStageIndex(deal.stage) < DEAL_STAGES.length - 1 && (
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStageChange(deal, DEAL_STAGES[getStageIndex(deal.stage) + 1]); }}>
-                                  <ArrowRight className="w-4 h-4 mr-2" /> Advance Stage
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-red-500" 
-                                onClick={(e) => { e.stopPropagation(); setDealToDelete(deal.id); setShowDeleteDealDialog(true); }}
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" /> Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">{deal.client}</p>
-                        <div className="flex items-center justify-between mt-2">
-                          <Badge variant="secondary" className="text-[10px]">{deal.sector}</Badge>
-                          <span className="text-xs font-medium text-primary">${deal.value}M</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+          <div className="grid grid-cols-3 gap-4">
+            {filteredDeals.length > 0 ? (
+              filteredDeals.map((deal: Deal) => (
+                <Card 
+                  key={deal.id} 
+                  className="bg-card border-border hover:border-primary/30 transition-colors cursor-pointer"
+                  onClick={() => { setSelectedDeal(deal); setActiveStageTab(deal.stage); }}
+                  data-testid={`card-am-deal-${deal.id}`}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-base truncate flex-1">{deal.name}</h4>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedDeal(deal); setActiveStageTab(deal.stage); }}>
+                            <Eye className="w-4 h-4 mr-2" /> View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingDeal(deal); setShowEditModal(true); }}>
+                            <Pencil className="w-4 h-4 mr-2" /> Edit Deal
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            className="text-red-500" 
+                            onClick={(e) => { e.stopPropagation(); setDealToDelete(deal.id); setShowDeleteDealDialog(true); }}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-3">{deal.client}</p>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Badge variant="secondary" className="text-xs">{deal.sector}</Badge>
+                      <Badge variant="outline" className={cn("text-xs", getStageColor(deal.stage))}>{deal.stage}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between pt-3 border-t border-border">
+                      <span className="text-lg font-bold text-primary">${deal.value}M</span>
+                      <div className="flex items-center gap-1">
+                        <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">{deal.progress}%</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="col-span-3 text-center py-12 text-muted-foreground">
+                No Asset Management deals to display
               </div>
-            ))}
+            )}
           </div>
         )}
         
@@ -1336,81 +1324,6 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
               </div>
             </CardContent>
           </Card>
-        )}
-        
-        {/* Compare View */}
-        {viewMode === 'compare' && (
-          <div className="grid grid-cols-3 gap-6">
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="text-lg">Select Deals to Compare</CardTitle>
-                <CardDescription>Choose up to 5 deals</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[400px]">
-                  <div className="space-y-2">
-                    {filteredDeals.map(deal => (
-                      <div 
-                        key={deal.id}
-                        className={cn(
-                          "p-3 rounded-lg border cursor-pointer transition-colors",
-                          selectedCompareDeals.includes(deal.id) ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
-                        )}
-                        onClick={() => toggleCompareSelect(deal.id)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Checkbox checked={selectedCompareDeals.includes(deal.id)} />
-                          <div className="flex-1">
-                            <p className="font-medium text-sm">{deal.name}</p>
-                            <p className="text-xs text-muted-foreground">{deal.client}</p>
-                          </div>
-                          <Badge variant="outline" className={cn("text-xs", getStageColor(deal.stage))}>{deal.stage}</Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-            
-            <Card className="col-span-2 bg-card border-border">
-              <CardHeader>
-                <CardTitle className="text-lg">Deal Comparison</CardTitle>
-                <CardDescription>
-                  {selectedCompareDeals.length === 0 ? "Select deals to compare" : `Comparing ${selectedCompareDeals.length} deals`}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {selectedCompareDeals.length > 0 ? (
-                  <div className="h-[400px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart data={comparisonData}>
-                        <PolarGrid />
-                        <PolarAngleAxis dataKey="metric" />
-                        <PolarRadiusAxis angle={30} domain={[0, 100]} />
-                        {deals.filter(d => selectedCompareDeals.includes(d.id)).map((deal, index) => (
-                          <Radar
-                            key={deal.id}
-                            name={deal.name}
-                            dataKey={deal.name}
-                            stroke={COMPARISON_COLORS[index % COMPARISON_COLORS.length]}
-                            fill={COMPARISON_COLORS[index % COMPARISON_COLORS.length]}
-                            fillOpacity={0.3}
-                          />
-                        ))}
-                        <Legend />
-                        <Tooltip />
-                      </RadarChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="h-[400px] flex items-center justify-center text-muted-foreground">
-                    Select deals from the left panel to compare
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
         )}
         
         {/* Empty State */}

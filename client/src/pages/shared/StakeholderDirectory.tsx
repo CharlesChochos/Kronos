@@ -116,10 +116,10 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     if (!file) return;
     
     const ext = file.name.toLowerCase().split('.').pop() || '';
-    const supportedFormats = ['txt', 'csv', 'json', 'md', 'pdf'];
+    const supportedFormats = ['txt', 'csv', 'json', 'md', 'xlsx', 'xls'];
     
-    if (!supportedFormats.includes(ext) && !file.type.includes('text')) {
-      toast.error("Please upload a text-based document (TXT, CSV, JSON, MD)");
+    if (!supportedFormats.includes(ext) && !file.type.includes('text') && !file.type.includes('spreadsheet')) {
+      toast.error("Please upload a document (TXT, CSV, JSON, MD, Excel)");
       if (docScanInputRef.current) docScanInputRef.current.value = '';
       return;
     }
@@ -127,71 +127,70 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     setIsScanning(true);
     
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const content = e.target?.result as string;
-        
-        if (!content || content.trim().length === 0) {
-          toast.error("Document appears to be empty");
-          setIsScanning(false);
-          return;
-        }
-        
-        try {
-          const response = await fetch("/api/stakeholders/scan-document", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              documentContent: content.slice(0, 50000),
-              filename: file.name
-            })
-          });
-          
-          if (!response.ok) {
-            throw new Error("Failed to scan document");
-          }
-          
-          const extractedData = await response.json();
-          
-          setNewStakeholder(prev => ({
-            ...prev,
-            name: extractedData.name || prev.name,
-            title: extractedData.title || prev.title,
-            company: extractedData.company || prev.company,
-            type: (extractedData.type && ['investor', 'advisor', 'legal', 'banker', 'consultant', 'client', 'other'].includes(extractedData.type)) 
-              ? extractedData.type 
-              : prev.type,
-            email: extractedData.email || prev.email,
-            phone: extractedData.phone || prev.phone,
-            linkedin: extractedData.linkedin || prev.linkedin,
-            website: extractedData.website || prev.website,
-            location: extractedData.location || prev.location,
-            focus: extractedData.focus || prev.focus,
-            notes: extractedData.notes || prev.notes
-          }));
-          
-          toast.success("Document scanned! Fields have been auto-filled.");
-        } catch (error) {
-          console.error('Scan error:', error);
-          toast.error("Failed to extract information from document");
-        }
-        
-        setIsScanning(false);
-      };
+      let content = '';
       
-      reader.onerror = () => {
-        toast.error("Failed to read document");
-        setIsScanning(false);
-      };
+      if (ext === 'xlsx' || ext === 'xls') {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        content = XLSX.utils.sheet_to_csv(worksheet);
+      } else {
+        content = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.onerror = () => reject(new Error("Failed to read file"));
+          reader.readAsText(file);
+        });
+      }
       
-      reader.readAsText(file);
+      if (!content || content.trim().length === 0) {
+        toast.error("Document appears to be empty");
+        setIsScanning(false);
+        if (docScanInputRef.current) docScanInputRef.current.value = '';
+        return;
+      }
+      
+      const response = await fetch("/api/stakeholders/scan-document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          documentContent: content.slice(0, 50000),
+          filename: file.name
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to scan document");
+      }
+      
+      const extractedData = await response.json();
+      
+      setNewStakeholder(prev => ({
+        ...prev,
+        name: extractedData.name || prev.name,
+        title: extractedData.title || prev.title,
+        company: extractedData.company || prev.company,
+        type: (extractedData.type && ['investor', 'advisor', 'legal', 'banker', 'consultant', 'client', 'other'].includes(extractedData.type)) 
+          ? extractedData.type 
+          : prev.type,
+        email: extractedData.email || prev.email,
+        phone: extractedData.phone || prev.phone,
+        linkedin: extractedData.linkedin || prev.linkedin,
+        website: extractedData.website || prev.website,
+        location: extractedData.location || prev.location,
+        focus: extractedData.focus || prev.focus,
+        notes: extractedData.notes || prev.notes
+      }));
+      
+      toast.success("Document scanned! Fields have been auto-filled.");
     } catch (error) {
       console.error('Document scan error:', error);
-      toast.error("Failed to process document");
-      setIsScanning(false);
+      toast.error("Failed to extract information from document");
     }
     
+    setIsScanning(false);
     if (docScanInputRef.current) docScanInputRef.current.value = '';
   };
 
@@ -597,20 +596,6 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
             <p className="text-muted-foreground">Manage contacts for investors, advisors, legal counsel, and more</p>
           </div>
           <div className="flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.tsv,.txt,.xlsx,.xls"
-              className="hidden"
-              onChange={handleFileUpload}
-            />
-            <Button 
-              variant="outline" 
-              onClick={() => fileInputRef.current?.click()}
-              data-testid="button-import-stakeholders"
-            >
-              <Upload className="w-4 h-4 mr-2" /> Import File
-            </Button>
             <Button onClick={() => setShowCreateModal(true)} data-testid="button-add-stakeholder">
               <Plus className="w-4 h-4 mr-2" /> Add Stakeholder
             </Button>
@@ -997,7 +982,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
                 <input
                   type="file"
                   ref={docScanInputRef}
-                  accept=".txt,.csv,.json,.md,.pdf"
+                  accept=".txt,.csv,.json,.md,.xlsx,.xls"
                   onChange={handleDocumentScan}
                   className="hidden"
                   data-testid="input-doc-scan"
