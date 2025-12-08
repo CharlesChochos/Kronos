@@ -196,7 +196,7 @@ function Router() {
         {() => <ProtectedRoute component={InvestorDatabase} />}
       </Route>
       <Route path="/ceo/audit-logs">
-        {() => <ProtectedRoute component={AuditLogs} />}
+        {() => <ProtectedRoute component={() => <AuditLogs role="CEO" />} />}
       </Route>
       <Route path="/ceo/deal-templates">
         {() => <ProtectedRoute component={CeoDealTemplates} />}
@@ -206,6 +206,9 @@ function Router() {
       </Route>
       <Route path="/ceo/opportunities">
         {() => <ProtectedRoute component={Opportunities} />}
+      </Route>
+      <Route path="/ceo/asset-management">
+        {() => <ProtectedRoute component={() => <AssetManagement role="CEO" />} />}
       </Route>
       
       {/* Employee Routes */}

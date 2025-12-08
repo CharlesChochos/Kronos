@@ -680,16 +680,20 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const { data: allTasks = [] } = useTasks();
   
   // Filter deals based on access level - non-admin users only see deals they're assigned to
+  // Also filter out Opportunities (deals with dealType === 'Opportunity') - those appear only in Opportunities page until approved
   const deals = useMemo(() => {
+    // First filter out opportunities - they should only appear in Deal Management when approved (promoted to a deal type)
+    const nonOpportunityDeals = allDeals.filter(deal => (deal as any).dealType !== 'Opportunity');
+    
     if (currentUser?.accessLevel === 'admin') {
-      return allDeals;
+      return nonOpportunityDeals;
     }
     // For employees, filter to only show deals where they are in the pod team
     // If user data is not yet available, show no deals until we can verify access
     if (!currentUser?.id && !currentUser?.email && !currentUser?.name) {
       return [];
     }
-    return allDeals.filter(deal => {
+    return nonOpportunityDeals.filter(deal => {
       const podTeam = deal.podTeam || [];
       return podTeam.some((member: PodTeamMember) => 
         (currentUser.id && member.userId === currentUser.id) || 
@@ -1004,6 +1008,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
         lead: newDeal.lead || currentUser?.name || 'Unassigned',
         status: newDeal.status,
         progress: getStageProgress(newDeal.stage),
+        dealType: 'M&A',
         description: null,
         attachments: [],
         podTeam: [],

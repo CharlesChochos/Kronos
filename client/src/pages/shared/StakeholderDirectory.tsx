@@ -103,8 +103,72 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     linkedin: '',
     website: '',
     location: '',
+    focus: '',
     notes: ''
   });
+
+  // Known sectors for extraction from long text
+  const KNOWN_SECTORS = [
+    'technology', 'tech', 'software', 'saas', 'fintech', 'biotech', 'medtech', 'edtech', 'proptech', 'insurtech', 'regtech', 'cleantech', 'agtech',
+    'healthcare', 'health', 'pharmaceuticals', 'pharma', 'medical devices', 'life sciences', 'biomedical', 'genomics', 'diagnostics',
+    'finance', 'financial services', 'banking', 'investment', 'asset management', 'private equity', 'venture capital', 'hedge fund', 'wealth management',
+    'energy', 'oil', 'gas', 'renewable', 'solar', 'wind', 'utilities', 'power', 'clean energy', 'green energy',
+    'consumer', 'retail', 'e-commerce', 'ecommerce', 'cpg', 'consumer goods', 'fmcg', 'food', 'beverage', 'apparel', 'fashion',
+    'industrial', 'manufacturing', 'aerospace', 'defense', 'automotive', 'machinery', 'chemicals', 'materials', 'logistics', 'transportation',
+    'real estate', 'property', 'reit', 'hospitality', 'hotels', 'commercial real estate', 'residential',
+    'telecommunications', 'telecom', 'media', 'entertainment', 'gaming', 'advertising', 'publishing', 'streaming',
+    'infrastructure', 'construction', 'engineering', 'mining', 'metals',
+    'agriculture', 'farming', 'agribusiness', 'food production',
+    'education', 'edtech', 'training', 'e-learning',
+    'government', 'public sector', 'non-profit', 'ngo',
+    'services', 'professional services', 'consulting', 'legal', 'accounting'
+  ];
+
+  // Extract sectors from long text by scanning for known sector terms
+  const extractSectorsFromText = (text: string): string => {
+    if (!text) return '';
+    const lowerText = text.toLowerCase();
+    const foundSectors: string[] = [];
+    
+    for (const sector of KNOWN_SECTORS) {
+      // Use word boundary matching to avoid partial matches
+      const regex = new RegExp(`\\b${sector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (regex.test(lowerText) && !foundSectors.some(s => s.toLowerCase() === sector.toLowerCase())) {
+        // Capitalize first letter of each word
+        const formatted = sector.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        foundSectors.push(formatted);
+      }
+    }
+    
+    return foundSectors.join(', ');
+  };
+
+  // Scan all columns in a row to find sector information
+  const extractSectorsFromRow = (row: Record<string, string>, focusColumn?: string): string => {
+    // First try the mapped focus column if available
+    if (focusColumn && row[focusColumn]) {
+      const extractedFromFocus = extractSectorsFromText(row[focusColumn]);
+      if (extractedFromFocus) return extractedFromFocus;
+    }
+    
+    // Scan ALL columns for sector-related terms
+    let allFoundSectors: string[] = [];
+    for (const [key, value] of Object.entries(row)) {
+      if (value && typeof value === 'string') {
+        const extracted = extractSectorsFromText(value);
+        if (extracted) {
+          const sectors = extracted.split(', ');
+          for (const s of sectors) {
+            if (!allFoundSectors.includes(s)) {
+              allFoundSectors.push(s);
+            }
+          }
+        }
+      }
+    }
+    
+    return allFoundSectors.join(', ');
+  };
 
   const stakeholders: LocalStakeholder[] = useMemo(() => dbStakeholders.map(s => ({
     id: s.id,
@@ -266,6 +330,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
         linkedin: ['linkedin', 'linked in', 'linkedin url', 'li'],
         website: ['website', 'web', 'url', 'site'],
         location: ['location', 'city', 'address', 'region', 'country'],
+        focus: ['focus', 'sector', 'sector focus', 'sectors', 'industry', 'industries', 'investment focus', 'specialization', 'expertise', 'vertical', 'verticals'],
         notes: ['notes', 'comments', 'description', 'remarks']
       };
       
@@ -393,6 +458,9 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
       const validTypes: StakeholderType[] = ['investor', 'advisor', 'legal', 'banker', 'consultant', 'client', 'other'];
       const type = validTypes.includes(typeValue as StakeholderType) ? typeValue as StakeholderType : 'other';
       
+      // Extract sector/focus from mapped column or scan all columns
+      const focusValue = extractSectorsFromRow(row, importColumnMap.focus);
+      
       try {
         await createStakeholderMutation.mutateAsync({
           name: row[importColumnMap.name] || '',
@@ -404,6 +472,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
           linkedin: row[importColumnMap.linkedin] || undefined,
           website: row[importColumnMap.website] || undefined,
           location: row[importColumnMap.location] || undefined,
+          focus: focusValue || undefined,
           notes: row[importColumnMap.notes] || undefined,
           deals: [],
           isFavorite: false

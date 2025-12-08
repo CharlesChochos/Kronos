@@ -148,7 +148,7 @@ export default function AuditLogs({ role }: { role?: 'CEO' | 'Employee' }) {
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
   const { data: auditLogs = [], isLoading, refetch } = useQuery<AuditLog[]>({
-    queryKey: ["/api/audit-logs"],
+    queryKey: ["/api/admin/audit-logs"],
   });
 
   const { data: users = [] } = useQuery<{ id: string; name: string }[]>({

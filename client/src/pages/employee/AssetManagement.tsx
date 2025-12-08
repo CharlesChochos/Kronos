@@ -28,8 +28,13 @@ import type { Deal, PodTeamMember } from "@shared/schema";
 const DEAL_STAGES = ['Origination', 'Execution', 'Negotiation', 'Due Diligence', 'Signing', 'Closed'];
 const AM_SECTORS = ['Real Estate', 'Infrastructure', 'Private Equity', 'Hedge Funds', 'Fixed Income', 'Equities', 'Commodities', 'Other'];
 
-export default function AssetManagement() {
+type AssetManagementProps = {
+  role?: 'CEO' | 'Employee';
+};
+
+export default function AssetManagement({ role = 'Employee' }: AssetManagementProps) {
   const { data: currentUser } = useCurrentUser();
+  const userRole = role || currentUser?.role || 'Employee';
   const { data: deals = [], isLoading } = useDeals();
   const { data: users = [] } = useUsers();
   const { data: tasks = [] } = useTasks();
@@ -165,7 +170,7 @@ export default function AssetManagement() {
   };
 
   return (
-    <Layout role="Employee" pageTitle="Asset Management">
+    <Layout role={userRole as 'CEO' | 'Employee'} pageTitle="Asset Management">
       <div className="space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

@@ -131,6 +131,9 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
     return links.some(link => isActive(link.path));
   };
 
+  // Check if user is an admin - for showing Asset Management in CEO view
+  const isAdmin = currentUser?.accessLevel === 'admin';
+
   // CEO grouped links
   const ceoGroups: CategoryGroup[] = [
     {
@@ -140,6 +143,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
         { icon: Briefcase, label: "Deal Management", path: "/ceo/deals" },
         { icon: Target, label: "Opportunities", path: "/ceo/opportunities" },
         { icon: FileText, label: "Documents", path: "/ceo/documents" },
+        ...(isAdmin ? [{ icon: BarChart3, label: "Asset Management", path: "/ceo/asset-management" }] : []),
       ]
     },
     {
