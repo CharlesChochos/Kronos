@@ -4104,6 +4104,67 @@ Example: "Tell Michael the meeting is moved to 3pm" -> call send_message
       res.status(500).json({ error: "Failed to delete stakeholder" });
     }
   });
+  
+  // Scan document to extract stakeholder information using AI
+  app.post("/api/stakeholders/scan-document", aiLimiter, requireAuth, async (req, res) => {
+    try {
+      const { documentContent, filename } = req.body;
+      
+      if (!documentContent) {
+        return res.status(400).json({ error: "Document content is required" });
+      }
+      
+      // Use OpenAI to extract stakeholder information from the document
+      const response = await openai.chat.completions.create({
+        // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+        model: "gpt-5",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert at extracting stakeholder information from documents. 
+            Analyze the provided document content and extract contact/stakeholder information.
+            Return a JSON object with the following fields (leave empty string if not found):
+            - name: Full name of the person/stakeholder
+            - title: Job title or position
+            - company: Company or organization name
+            - type: One of: investor, advisor, legal, banker, consultant, client, other
+            - email: Email address
+            - phone: Phone number
+            - linkedin: LinkedIn URL
+            - website: Website URL
+            - location: City, state, or country
+            - focus: Investment focus, sector expertise, or specialization areas (comma-separated)
+            - notes: Any additional relevant notes or context
+            
+            If the document contains multiple stakeholders, extract the primary/first one.
+            Always return valid JSON.`
+          },
+          {
+            role: "user",
+            content: `Please extract stakeholder information from this document${filename ? ` (${filename})` : ''}:\n\n${documentContent}`
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 2048
+      });
+      
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ error: "Failed to extract information from document" });
+      }
+      
+      try {
+        const extractedData = JSON.parse(content);
+        res.json(extractedData);
+      } catch (parseError) {
+        console.error('Failed to parse AI response:', content);
+        res.status(500).json({ error: "Failed to parse extracted information" });
+      }
+    } catch (error) {
+      console.error('Document scan error:', error);
+      res.status(500).json({ error: "Failed to scan document" });
+    }
+  });
 
   // ===== INVESTORS TABLE ROUTES =====
   

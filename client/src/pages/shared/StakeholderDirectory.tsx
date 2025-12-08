@@ -46,7 +46,9 @@ import {
   FileSpreadsheet,
   CheckCircle,
   AlertCircle,
-  Loader2
+  Loader2,
+  FileText,
+  Sparkles
 } from "lucide-react";
 import { useDeals, useStakeholders, useCreateStakeholder, useUpdateStakeholder, useDeleteStakeholder } from "@/lib/api";
 import { toast } from "sonner";
@@ -90,9 +92,11 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
   const [activeTab, setActiveTab] = useState("all");
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const docScanInputRef = useRef<HTMLInputElement>(null);
   const [importData, setImportData] = useState<Array<Record<string, string>>>([]);
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [isImporting, setIsImporting] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const [importColumnMap, setImportColumnMap] = useState<Record<string, string>>({
     name: '',
     title: '',
@@ -106,6 +110,90 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     focus: '',
     notes: ''
   });
+  
+  const handleDocumentScan = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const ext = file.name.toLowerCase().split('.').pop() || '';
+    const supportedFormats = ['txt', 'csv', 'json', 'md', 'pdf'];
+    
+    if (!supportedFormats.includes(ext) && !file.type.includes('text')) {
+      toast.error("Please upload a text-based document (TXT, CSV, JSON, MD)");
+      if (docScanInputRef.current) docScanInputRef.current.value = '';
+      return;
+    }
+    
+    setIsScanning(true);
+    
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const content = e.target?.result as string;
+        
+        if (!content || content.trim().length === 0) {
+          toast.error("Document appears to be empty");
+          setIsScanning(false);
+          return;
+        }
+        
+        try {
+          const response = await fetch("/api/stakeholders/scan-document", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              documentContent: content.slice(0, 50000),
+              filename: file.name
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error("Failed to scan document");
+          }
+          
+          const extractedData = await response.json();
+          
+          setNewStakeholder(prev => ({
+            ...prev,
+            name: extractedData.name || prev.name,
+            title: extractedData.title || prev.title,
+            company: extractedData.company || prev.company,
+            type: (extractedData.type && ['investor', 'advisor', 'legal', 'banker', 'consultant', 'client', 'other'].includes(extractedData.type)) 
+              ? extractedData.type 
+              : prev.type,
+            email: extractedData.email || prev.email,
+            phone: extractedData.phone || prev.phone,
+            linkedin: extractedData.linkedin || prev.linkedin,
+            website: extractedData.website || prev.website,
+            location: extractedData.location || prev.location,
+            focus: extractedData.focus || prev.focus,
+            notes: extractedData.notes || prev.notes
+          }));
+          
+          toast.success("Document scanned! Fields have been auto-filled.");
+        } catch (error) {
+          console.error('Scan error:', error);
+          toast.error("Failed to extract information from document");
+        }
+        
+        setIsScanning(false);
+      };
+      
+      reader.onerror = () => {
+        toast.error("Failed to read document");
+        setIsScanning(false);
+      };
+      
+      reader.readAsText(file);
+    } catch (error) {
+      console.error('Document scan error:', error);
+      toast.error("Failed to process document");
+      setIsScanning(false);
+    }
+    
+    if (docScanInputRef.current) docScanInputRef.current.value = '';
+  };
 
   // Known sectors for extraction from long text
   const KNOWN_SECTORS = [
@@ -894,8 +982,53 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Add Stakeholder</DialogTitle>
+            <DialogDescription>
+              Upload a document to auto-fill fields, or enter details manually.
+            </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[60vh]">
+          
+          <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium">AI Document Scan</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  ref={docScanInputRef}
+                  accept=".txt,.csv,.json,.md,.pdf"
+                  onChange={handleDocumentScan}
+                  className="hidden"
+                  data-testid="input-doc-scan"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => docScanInputRef.current?.click()}
+                  disabled={isScanning}
+                  data-testid="button-scan-document"
+                >
+                  {isScanning ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Scanning...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4 mr-2" />
+                      Upload Document
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Upload a business card, email signature, or contact document to extract stakeholder information automatically.
+            </p>
+          </div>
+          
+          <ScrollArea className="max-h-[50vh]">
             <div className="space-y-4 pr-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
