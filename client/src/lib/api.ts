@@ -1684,7 +1684,28 @@ export function useSaveUserPreferences() {
       }
       return res.json() as Promise<UserPreferencesType>;
     },
-    onSuccess: () => {
+    onMutate: async (newPrefs) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["user-preferences"] });
+      // Snapshot current value
+      const previousPrefs = queryClient.getQueryData<UserPreferencesType>(["user-preferences"]);
+      // Optimistically update cache
+      if (previousPrefs) {
+        queryClient.setQueryData<UserPreferencesType>(["user-preferences"], {
+          ...previousPrefs,
+          ...newPrefs,
+          settings: { ...(previousPrefs.settings || {}), ...(newPrefs.settings || {}) },
+        });
+      }
+      return { previousPrefs };
+    },
+    onError: (_err, _newPrefs, context) => {
+      // Rollback on error
+      if (context?.previousPrefs) {
+        queryClient.setQueryData(["user-preferences"], context.previousPrefs);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
     },
   });
@@ -1705,7 +1726,24 @@ export function useUpdateUserPreferences() {
       }
       return res.json() as Promise<UserPreferencesType>;
     },
-    onSuccess: () => {
+    onMutate: async (newPrefs) => {
+      await queryClient.cancelQueries({ queryKey: ["user-preferences"] });
+      const previousPrefs = queryClient.getQueryData<UserPreferencesType>(["user-preferences"]);
+      if (previousPrefs) {
+        queryClient.setQueryData<UserPreferencesType>(["user-preferences"], {
+          ...previousPrefs,
+          ...newPrefs,
+          settings: { ...(previousPrefs.settings || {}), ...(newPrefs.settings || {}) },
+        });
+      }
+      return { previousPrefs };
+    },
+    onError: (_err, _newPrefs, context) => {
+      if (context?.previousPrefs) {
+        queryClient.setQueryData(["user-preferences"], context.previousPrefs);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
     },
   });

@@ -57,6 +57,9 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     return false;
   });
   
+  // Track pending navigation for preview mode toggle
+  const [pendingPreviewNav, setPendingPreviewNav] = useState<'employee' | 'admin' | null>(null);
+  
   // Sync preview mode changes to sessionStorage
   useEffect(() => {
     if (isPreviewMode) {
@@ -65,6 +68,19 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
       sessionStorage.removeItem('kronos_preview_mode');
     }
   }, [isPreviewMode]);
+  
+  // Handle navigation after preview mode state has fully updated
+  useEffect(() => {
+    if (pendingPreviewNav === 'employee' && isPreviewMode) {
+      setLocation('/employee/home');
+      toast.info("Preview mode enabled - viewing as employee");
+      setPendingPreviewNav(null);
+    } else if (pendingPreviewNav === 'admin' && !isPreviewMode) {
+      setLocation('/ceo/dashboard');
+      toast.info("Preview mode disabled - back to admin view");
+      setPendingPreviewNav(null);
+    }
+  }, [isPreviewMode, pendingPreviewNav, setLocation]);
   
   // Clear preview mode if user is not Charles
   useEffect(() => {
@@ -889,14 +905,11 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                       <DropdownMenuItem 
                         className="focus:bg-primary/10 focus:text-primary cursor-pointer"
                         onClick={() => {
-                          setIsPreviewMode(!isPreviewMode);
-                          if (!isPreviewMode) {
-                            setLocation('/employee/home');
-                            toast.info("Preview mode enabled - viewing as employee");
-                          } else {
-                            setLocation('/ceo/dashboard');
-                            toast.info("Preview mode disabled - back to admin view");
-                          }
+                          const newPreviewMode = !isPreviewMode;
+                          // Set pending navigation first, then toggle state
+                          // The effect will navigate once state is fully updated
+                          setPendingPreviewNav(newPreviewMode ? 'employee' : 'admin');
+                          setIsPreviewMode(newPreviewMode);
                         }}
                         data-testid="menu-item-preview-mode"
                       >
