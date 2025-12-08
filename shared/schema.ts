@@ -11,7 +11,8 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   phone: text("phone"),
   avatar: text("avatar"),
-  role: text("role").notNull().default('Associate'), // CEO, Managing Director, Director, Associate, Analyst, External
+  role: text("role").notNull().default('Employee'), // Legacy field - kept for compatibility
+  accessLevel: text("access_level").notNull().default('standard'), // admin or standard
   jobTitle: text("job_title"),
   status: text("status").notNull().default('pending'), // pending, active, suspended
   score: integer("score").default(0),
