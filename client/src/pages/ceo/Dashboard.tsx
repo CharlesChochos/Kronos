@@ -77,9 +77,12 @@ import {
   GripVertical,
   LayoutDashboard,
   Video,
-  Link as LinkIcon
+  Link as LinkIcon,
+  ChevronsUpDown
 } from "lucide-react";
-import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews, useUserPreferences, useSaveUserPreferences, useCalendarEvents, useAllDealFees } from "@/lib/api";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews, useUserPreferences, useSaveUserPreferences, useCalendarEvents, useAllDealFees, useCustomSectors, useCreateCustomSector } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, subDays, startOfDay, isAfter, isSameDay } from "date-fns";
@@ -122,6 +125,8 @@ export default function Dashboard() {
   const updateUserPreferences = useUpdateUserPreferences();
   const { data: userPrefs, isLoading: prefsLoading } = useUserPreferences();
   const saveUserPrefs = useSaveUserPreferences();
+  const { data: customSectors = [] } = useCustomSectors();
+  const createCustomSector = useCreateCustomSector();
 
   // Use context for shared sheet states (only Customize is rendered here, others moved to Layout)
   const {
@@ -252,6 +257,7 @@ export default function Dashboard() {
     name: '',
     client: '',
     sector: 'Technology',
+    customSector: '',
     value: '',
     stage: 'Origination',
     lead: '',
@@ -260,6 +266,14 @@ export default function Dashboard() {
     description: '',
     attachments: [] as File[],
   });
+  const [sectorOpen, setSectorOpen] = useState(false);
+  
+  const BASE_SECTORS = ['Technology', 'Healthcare', 'Energy', 'Consumer', 'Industrials', 'Financial'];
+  const SECTORS = useMemo(() => {
+    const customNames = customSectors.map((s: any) => s.name);
+    const allSectors = [...BASE_SECTORS, ...customNames.filter((name: string) => !BASE_SECTORS.includes(name))];
+    return [...allSectors, 'Other'];
+  }, [customSectors]);
 
   // Meeting form
   const [newMeeting, setNewMeeting] = useState({
@@ -416,7 +430,24 @@ export default function Dashboard() {
       toast.error("Please enter a valid deal value");
       return;
     }
+    
+    const finalSector = newDeal.sector === 'Other' && newDeal.customSector ? newDeal.customSector : newDeal.sector;
+    
+    // Save custom sector if it's a new one not in the existing list
+    const isCustomSector = newDeal.sector === 'Other' && newDeal.customSector;
+    const existingCustomSectorNames = customSectors.map((s: any) => s.name.toLowerCase());
+    const isNewCustomSector = isCustomSector && !existingCustomSectorNames.includes(newDeal.customSector.toLowerCase()) && !BASE_SECTORS.includes(newDeal.customSector);
+    
     try {
+      // Save the custom sector first if it's new
+      if (isNewCustomSector) {
+        try {
+          await createCustomSector.mutateAsync(newDeal.customSector);
+        } catch (e) {
+          console.log("Custom sector may already exist:", e);
+        }
+      }
+      
       // Convert File objects to serializable metadata
       const attachmentMeta = newDeal.attachments.map(file => ({
         name: file.name,
@@ -428,7 +459,7 @@ export default function Dashboard() {
       await createDeal.mutateAsync({
         name: newDeal.name,
         client: newDeal.client,
-        sector: newDeal.sector,
+        sector: finalSector,
         value: parsedValue,
         stage: newDeal.stage,
         lead: newDeal.lead || currentUser?.name || 'Unassigned',
@@ -448,7 +479,7 @@ export default function Dashboard() {
       });
       toast.success("Deal created successfully!");
       setShowNewDealModal(false);
-      setNewDeal({ name: '', client: '', sector: 'Technology', value: '', stage: 'Origination', lead: '', status: 'Active', progress: 0, description: '', attachments: [] });
+      setNewDeal({ name: '', client: '', sector: 'Technology', customSector: '', value: '', stage: 'Origination', lead: '', status: 'Active', progress: 0, description: '', attachments: [] });
     } catch (error: any) {
       toast.error(error.message || "Failed to create deal");
     }
@@ -1672,21 +1703,63 @@ export default function Dashboard() {
               </div>
               <div className="space-y-2">
                 <Label>Sector</Label>
-                <Select value={newDeal.sector} onValueChange={(v) => setNewDeal({ ...newDeal, sector: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Technology">Technology</SelectItem>
-                    <SelectItem value="Healthcare">Healthcare</SelectItem>
-                    <SelectItem value="Energy">Energy</SelectItem>
-                    <SelectItem value="Consumer">Consumer</SelectItem>
-                    <SelectItem value="Industrials">Industrials</SelectItem>
-                    <SelectItem value="Financial">Financial</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Popover open={sectorOpen} onOpenChange={setSectorOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" aria-expanded={sectorOpen} className="w-full justify-between">
+                      {newDeal.sector === 'Other' && newDeal.customSector ? newDeal.customSector : newDeal.sector}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Search sector or type custom..." />
+                      <CommandList>
+                        <CommandEmpty>
+                          <div className="p-2">
+                            <Input 
+                              placeholder="Enter custom sector..."
+                              value={newDeal.customSector}
+                              onChange={(e) => setNewDeal({ ...newDeal, customSector: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && newDeal.customSector) {
+                                  setNewDeal({ ...newDeal, sector: 'Other' });
+                                  setSectorOpen(false);
+                                }
+                              }}
+                            />
+                          </div>
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {SECTORS.map((sector) => (
+                            <CommandItem
+                              key={sector}
+                              value={sector}
+                              onSelect={() => {
+                                setNewDeal({ ...newDeal, sector, customSector: sector === 'Other' ? newDeal.customSector : '' });
+                                setSectorOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", newDeal.sector === sector ? "opacity-100" : "opacity-0")} />
+                              {sector}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
+            {newDeal.sector === 'Other' && (
+              <div className="space-y-2">
+                <Label>Custom Sector Name</Label>
+                <Input 
+                  placeholder="Enter custom sector name..."
+                  value={newDeal.customSector}
+                  onChange={(e) => setNewDeal({ ...newDeal, customSector: e.target.value })}
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Stage</Label>
               <Select value={newDeal.stage} onValueChange={(v) => setNewDeal({ ...newDeal, stage: v })}>

@@ -3498,6 +3498,75 @@ Guidelines:
     }
   });
 
+  // ===== INVESTORS TABLE ROUTES =====
+  
+  // Get all investors from investors table
+  app.get("/api/investors-table", requireAuth, async (req, res) => {
+    try {
+      const investors = await storage.getAllInvestorsFromTable();
+      res.json(investors);
+    } catch (error) {
+      console.error('Get investors table error:', error);
+      res.status(500).json({ error: "Failed to fetch investors" });
+    }
+  });
+  
+  // Get single investor from investors table
+  app.get("/api/investors-table/:id", requireAuth, async (req, res) => {
+    try {
+      const investor = await storage.getInvestorFromTable(req.params.id);
+      if (!investor) {
+        return res.status(404).json({ error: "Investor not found" });
+      }
+      res.json(investor);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch investor" });
+    }
+  });
+  
+  // Create investor in investors table
+  app.post("/api/investors-table", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const investor = await storage.createInvestorInTable({
+        ...req.body,
+        createdBy: user.id,
+      });
+      res.status(201).json(investor);
+    } catch (error) {
+      console.error('Create investor error:', error);
+      res.status(500).json({ error: "Failed to create investor" });
+    }
+  });
+  
+  // Update investor in investors table
+  app.patch("/api/investors-table/:id", requireAuth, async (req, res) => {
+    try {
+      const investor = await storage.getInvestorFromTable(req.params.id);
+      if (!investor) {
+        return res.status(404).json({ error: "Investor not found" });
+      }
+      const updated = await storage.updateInvestorInTable(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update investor" });
+    }
+  });
+  
+  // Delete investor from investors table
+  app.delete("/api/investors-table/:id", requireAuth, async (req, res) => {
+    try {
+      const investor = await storage.getInvestorFromTable(req.params.id);
+      if (!investor) {
+        return res.status(404).json({ error: "Investor not found" });
+      }
+      await storage.deleteInvestorFromTable(req.params.id);
+      res.json({ message: "Investor deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete investor" });
+    }
+  });
+
   // ===== ANNOUNCEMENT ROUTES =====
   
   // Get all announcements

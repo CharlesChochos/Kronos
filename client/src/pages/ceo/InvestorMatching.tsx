@@ -15,7 +15,7 @@ import {
   Heart,
   Users
 } from "lucide-react";
-import { useCurrentUser, useDeals, useUpdateDeal, useInvestorMatches, useCreateInvestorMatch, useDeleteInvestorMatch, useStakeholders } from "@/lib/api";
+import { useCurrentUser, useDeals, useUpdateDeal, useInvestorMatches, useCreateInvestorMatch, useDeleteInvestorMatch, useInvestorsTable } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion";
@@ -39,7 +39,7 @@ type InvestorData = {
 export default function InvestorMatching() {
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [], isLoading } = useDeals();
-  const { data: stakeholders = [], isLoading: stakeholdersLoading } = useStakeholders();
+  const { data: investorsData = [], isLoading: investorsLoading } = useInvestorsTable();
   const updateDeal = useUpdateDeal();
   
   const [selectedDeal, setSelectedDeal] = useState<string>('');
@@ -52,25 +52,23 @@ export default function InvestorMatching() {
   
   const [rejectedInvestors, setRejectedInvestors] = useState<string[]>([]);
   
-  // Convert stakeholders (type='investor') to InvestorData format
-  // Use stakeholder's actual database ID for stable identification
+  // Convert investorsTable data to InvestorData format
+  // Uses the dedicated investors table with proper focus/sector field
   const INVESTORS: InvestorData[] = useMemo(() => {
-    return stakeholders
-      .filter(s => s.type === 'investor')
-      .map((s, index) => ({
-        id: s.id,
-        numericId: index + 1,
-        name: s.name,
-        type: s.title || 'Investor',
-        focus: s.location || 'Diversified',
-        checkSize: s.notes?.match(/Check size: ([^|,]+)/)?.[1] || 'Flexible',
-        matchScore: s.isFavorite ? 95 : 80,
-        tags: s.notes?.match(/Tags: (.+)/)?.[1]?.split(', ') || [],
-        email: s.email || '',
-        phone: s.phone || '',
-        website: s.website || '',
-      }));
-  }, [stakeholders]);
+    return investorsData.map((inv, index) => ({
+      id: inv.id,
+      numericId: index + 1,
+      name: inv.name,
+      type: inv.type || 'Investor',
+      focus: inv.focus || 'Multi-sector',
+      checkSize: inv.checkSize || 'Flexible',
+      matchScore: 85,
+      tags: inv.tags || [],
+      email: inv.email || '',
+      phone: inv.phone || '',
+      website: inv.website || '',
+    }));
+  }, [investorsData]);
   
   const matchedInvestors = useMemo(() => {
     const matchedIds = investorMatches

@@ -1020,6 +1020,96 @@ export function useDeleteStakeholder() {
   });
 }
 
+// ===== INVESTORS TABLE API =====
+export type InvestorTable = {
+  id: string;
+  name: string;
+  firm: string;
+  type: string;
+  focus: string | null;
+  aum: string | null;
+  checkSize: string | null;
+  preferredStage: string | null;
+  location: string | null;
+  website: string | null;
+  email: string | null;
+  phone: string | null;
+  linkedIn: string | null;
+  notes: string | null;
+  tags: string[] | null;
+  isActive: boolean | null;
+  createdBy: string | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+};
+
+export function useInvestorsTable() {
+  return useQuery({
+    queryKey: ["investors-table"],
+    queryFn: async () => {
+      const res = await fetch("/api/investors-table");
+      if (!res.ok) throw new Error("Failed to fetch investors");
+      return res.json() as Promise<InvestorTable[]>;
+    },
+  });
+}
+
+export function useCreateInvestorTable() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (investor: Partial<InvestorTable>) => {
+      const res = await fetch("/api/investors-table", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(investor),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create investor");
+      }
+      return res.json() as Promise<InvestorTable>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["investors-table"] });
+    },
+  });
+}
+
+export function useUpdateInvestorTable() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<InvestorTable> }) => {
+      const res = await fetch(`/api/investors-table/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update investor");
+      }
+      return res.json() as Promise<InvestorTable>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["investors-table"] });
+    },
+  });
+}
+
+export function useDeleteInvestorTable() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/investors-table/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete investor");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["investors-table"] });
+    },
+  });
+}
+
 // ===== ANNOUNCEMENT API =====
 export function useAnnouncements() {
   return useQuery({

@@ -39,7 +39,8 @@ import {
   useStageVoiceNotes, useCreateStageVoiceNote, useDeleteStageVoiceNote,
   useTaskComments, useCreateTaskComment,
   useCustomSectors, useCreateCustomSector,
-  useDealFees, type DealFeeType
+  useDealFees, type DealFeeType,
+  useCreateDocument
 } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -701,6 +702,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const updateDeal = useUpdateDeal();
   const deleteDeal = useDeleteDeal();
   const createDealFee = useCreateDealFee();
+  const createDocument = useCreateDocument();
   
   // Custom sectors
   const { data: customSectors = [] } = useCustomSectors();
@@ -2729,6 +2731,28 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                               id: selectedDeal.id,
                               attachments: [...existingAttachments, ...uploadedAttachments],
                             });
+                            
+                            // Also add documents to the Document Library
+                            for (const doc of uploadedAttachments) {
+                              try {
+                                await createDocument.mutateAsync({
+                                  title: doc.filename,
+                                  type: doc.type || 'application/octet-stream',
+                                  category: 'Other',
+                                  filename: doc.filename,
+                                  originalName: doc.filename,
+                                  mimeType: doc.type,
+                                  size: doc.size,
+                                  content: doc.url,
+                                  dealId: selectedDeal.id,
+                                  dealName: selectedDeal.name,
+                                  tags: ['deal-attachment'],
+                                });
+                              } catch (docError) {
+                                console.error('Failed to add to document library:', docError);
+                              }
+                            }
+                            
                             toast.success(`${uploadedAttachments.length} file(s) uploaded successfully`);
                           } catch (error) {
                             toast.error("Failed to save files to deal");
