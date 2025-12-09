@@ -158,7 +158,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          documentContent: content.slice(0, 50000),
+          documentContent: content.slice(0, 150000),
           filename: file.name,
           autoCreate: true
         })
@@ -171,17 +171,21 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
       const result = await response.json();
       
       if (result.successCount > 0) {
-        toast.success(`Successfully imported ${result.successCount} stakeholder${result.successCount > 1 ? 's' : ''} from document`);
+        toast.success(`Successfully imported ${result.successCount} of ${result.totalFound} stakeholder${result.successCount > 1 ? 's' : ''} from document`);
         // Refresh the stakeholder list to show newly created entries
         queryClient.invalidateQueries({ queryKey: ['/api/stakeholders'] });
       } else if (result.totalFound === 0) {
-        toast.info("No stakeholder contacts found in the document");
+        toast.info("No stakeholder contacts found in the document. Make sure entries have both name and company.");
       } else {
         toast.error("Failed to create stakeholders from document");
       }
       
+      if (result.skippedCount > 0) {
+        toast.warning(`${result.skippedCount} entr${result.skippedCount > 1 ? 'ies' : 'y'} skipped (missing name or company)`);
+      }
+      
       if (result.failedCount > 0) {
-        toast.warning(`${result.failedCount} stakeholder${result.failedCount > 1 ? 's' : ''} could not be imported`);
+        toast.warning(`${result.failedCount} stakeholder${result.failedCount > 1 ? 's' : ''} could not be imported due to errors`);
       }
     } catch (error) {
       console.error('Document scan error:', error);

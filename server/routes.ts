@@ -4441,40 +4441,69 @@ RECOMMENDATION: Start outreach with ${scoredInvestors[0]?.name} - highest match 
           {
             role: "system",
             content: `You are an expert at extracting stakeholder/contact information from documents, spreadsheets, and CSV files.
-            Analyze the provided document content and extract ALL contacts/stakeholders found.
             
-            IMPORTANT - For the "focus" field (Sector Focus):
-            - Carefully read ANY column that mentions sectors, industries, investment focus, specialization, or expertise
-            - These columns often contain LONG descriptive text - you MUST parse through the entire text
-            - Extract ALL sector/industry terms mentioned (e.g., Technology, Healthcare, FinTech, Real Estate, Consumer, Energy, SaaS, etc.)
-            - Convert long descriptions into a clean, comma-separated list of sector terms
-            - Examples of what to extract: "technology", "healthcare", "fintech", "biotech", "consumer goods", "real estate", "energy", "software", "B2B", "e-commerce", "infrastructure", "media", "telecommunications", "financial services", "manufacturing", "retail", etc.
-            - If a field says something like "Focus on early-stage technology companies in healthcare and fintech sectors with emphasis on B2B SaaS", extract: "Technology, Healthcare, FinTech, B2B, SaaS"
-            
-            Return a JSON object with a "stakeholders" array containing objects with these fields:
-            - name: Full name of the person/stakeholder (REQUIRED - skip if not found)
-            - title: Job title or position (default to empty string)
-            - company: Company or organization name (REQUIRED - skip if not found)
-            - type: One of: investor, advisor, legal, banker, consultant, client, other (infer from context)
-            - email: Email address
-            - phone: Phone number
-            - linkedin: LinkedIn URL
-            - website: Website URL
-            - location: City, state, or country
-            - focus: Extracted sector/industry terms as comma-separated list (MUST extract from long text descriptions)
-            - notes: Any additional relevant notes or context
-            
-            Extract EVERY stakeholder/contact you can find in the document.
-            Only include entries where both name AND company are available.
-            Always return valid JSON with format: {"stakeholders": [...]}`
+CRITICAL INSTRUCTIONS:
+1. Process EVERY SINGLE ROW in the document - do NOT skip any entries
+2. If this is a CSV/spreadsheet, each row represents a separate stakeholder entry
+3. Count the total rows and ensure you extract ALL of them
+4. Even if there are 50, 100, or 200+ rows, you MUST extract every single one
+
+FOR CSV/SPREADSHEET DATA:
+- First identify the header row that contains column names
+- Then process each subsequent data row as a separate stakeholder
+- Map column values to the appropriate stakeholder fields
+- Common column name variations:
+  * Name/Contact Name/Full Name/Person -> name
+  * Company/Firm/Organization/Fund -> company
+  * Title/Position/Role -> title
+  * Email/E-mail/Contact Email -> email
+  * Phone/Tel/Mobile/Contact -> phone
+  * Focus/Sector/Industry/Investment Focus/Specialization -> focus
+  * Location/City/Region/Geography -> location
+  * Type/Category -> type
+  * Website/URL/Web -> website
+  * LinkedIn/Social -> linkedin
+  * Notes/Comments/Description -> notes
+
+IMPORTANT - For the "focus" field (Sector Focus):
+- Carefully read ANY column that mentions sectors, industries, investment focus, specialization, or expertise
+- These columns often contain LONG descriptive text - you MUST parse through the entire text
+- Extract ALL sector/industry terms mentioned (e.g., Technology, Healthcare, FinTech, Real Estate, Consumer, Energy, SaaS, etc.)
+- Convert long descriptions into a clean, comma-separated list of sector terms
+- Examples of what to extract: "technology", "healthcare", "fintech", "biotech", "consumer goods", "real estate", "energy", "software", "B2B", "e-commerce", "infrastructure", "media", "telecommunications", "financial services", "manufacturing", "retail", etc.
+- If a field says something like "Focus on early-stage technology companies in healthcare and fintech sectors with emphasis on B2B SaaS", extract: "Technology, Healthcare, FinTech, B2B, SaaS"
+
+Return a JSON object with a "stakeholders" array containing objects with these fields:
+- name: Full name of the person/stakeholder (REQUIRED - skip if not found)
+- title: Job title or position (default to empty string)
+- company: Company or organization name (REQUIRED - skip if not found)
+- type: One of: investor, advisor, legal, banker, consultant, client, other (infer from context)
+- email: Email address
+- phone: Phone number
+- linkedin: LinkedIn URL
+- website: Website URL
+- location: City, state, or country
+- focus: Extracted sector/industry terms as comma-separated list (MUST extract from long text descriptions)
+- notes: Any additional relevant notes or context
+
+Extract EVERY stakeholder/contact you can find in the document.
+Only include entries where both name AND company are available.
+Always return valid JSON with format: {"stakeholders": [...]}`
           },
           {
             role: "user",
-            content: `Please extract ALL stakeholder/contact information from this document${filename ? ` (${filename})` : ''}. Pay special attention to any "Sector Focus", "Industry", or "Investment Focus" columns - extract ALL sector terms from the text:\n\n${documentContent}`
+            content: `IMPORTANT: Extract ALL stakeholder/contact information from this ENTIRE document${filename ? ` (${filename})` : ''}. 
+            
+If this is a CSV or spreadsheet, process EVERY ROW - do not skip any entries. Count the rows and ensure all are included.
+Pay special attention to any "Sector Focus", "Industry", or "Investment Focus" columns - extract ALL sector terms from the text.
+
+Document content:
+
+${documentContent}`
           }
         ],
         response_format: { type: "json_object" },
-        max_completion_tokens: 8192
+        max_completion_tokens: 16384
       });
       
       const content = response.choices[0]?.message?.content;
@@ -4491,12 +4520,22 @@ RECOMMENDATION: Start outreach with ${scoredInvestors[0]?.name} - highest match 
           const validTypes = ['investor', 'advisor', 'legal', 'banker', 'consultant', 'client', 'other'];
           let successCount = 0;
           let failedCount = 0;
+          let skippedCount = 0;
           const createdStakeholders = [];
+          const skippedReasons: string[] = [];
           
           for (const s of stakeholders) {
             // Skip entries without required fields
-            if (!s.name || typeof s.name !== 'string' || s.name.trim() === '') continue;
-            if (!s.company || typeof s.company !== 'string' || s.company.trim() === '') continue;
+            if (!s.name || typeof s.name !== 'string' || s.name.trim() === '') {
+              skippedCount++;
+              skippedReasons.push(`Missing name: ${JSON.stringify(s).slice(0, 50)}...`);
+              continue;
+            }
+            if (!s.company || typeof s.company !== 'string' || s.company.trim() === '') {
+              skippedCount++;
+              skippedReasons.push(`Missing company for "${s.name}"`);
+              continue;
+            }
             
             try {
               const stakeholderType = validTypes.includes(s.type?.toLowerCase()) ? s.type.toLowerCase() : 'other';
@@ -4530,11 +4569,19 @@ RECOMMENDATION: Start outreach with ${scoredInvestors[0]?.name} - highest match 
             }
           }
           
+          // Log extraction stats for debugging
+          console.log(`Document scan results: ${stakeholders.length} found, ${successCount} created, ${skippedCount} skipped, ${failedCount} failed`);
+          if (skippedReasons.length > 0) {
+            console.log('Skipped reasons (first 5):', skippedReasons.slice(0, 5));
+          }
+          
           res.json({ 
             stakeholders: createdStakeholders,
             successCount,
             failedCount,
-            totalFound: stakeholders.length
+            skippedCount,
+            totalFound: stakeholders.length,
+            message: `Found ${stakeholders.length} entries, created ${successCount}, skipped ${skippedCount} (missing required fields), ${failedCount} failed`
           });
         } else {
           res.json({ stakeholders, totalFound: stakeholders.length });
