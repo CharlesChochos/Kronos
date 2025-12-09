@@ -87,7 +87,7 @@ type StageWorkSectionProps = {
   createTask: any;
   createDocument: any;
   deleteTask: any;
-  onAuditEntry?: (action: string, details: string) => void;
+  onAuditEntry?: (action: string, details: string) => Promise<void>;
 };
 
 function StageWorkSection({
@@ -207,7 +207,7 @@ function StageWorkSection({
         });
         
         if (onAuditEntry) {
-          onAuditEntry('Document Uploaded', `${title} uploaded to ${activeStageTab} stage`);
+          await onAuditEntry('Document Uploaded', `${title} uploaded to ${activeStageTab} stage`);
         }
         
         toast.success("Document uploaded and archived");
@@ -244,7 +244,7 @@ function StageWorkSection({
         dueDate: nextWeek.toISOString().split('T')[0]
       });
       if (onAuditEntry) {
-        onAuditEntry('Task Created', `${newTaskTitle.trim()} created in ${activeStageTab} stage`);
+        await onAuditEntry('Task Created', `${newTaskTitle.trim()} created in ${activeStageTab} stage`);
       }
       toast.success("Task created");
       setNewTaskTitle("");
@@ -273,7 +273,7 @@ function StageWorkSection({
         }
       });
       if (onAuditEntry) {
-        onAuditEntry('Team Member Added', `${selectedMember.name} added to ${activeStageTab} stage`);
+        await onAuditEntry('Team Member Added', `${selectedMember.name} added to ${activeStageTab} stage`);
       }
       toast.success("Team member added to stage");
       setSelectedMember(null);
@@ -2724,10 +2724,21 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                           user: currentUser?.name || 'System',
                           details,
                         };
-                        // Get fresh deal data from cache to avoid stale auditTrail
-                        const freshDeals = queryClient.getQueryData<Deal[]>(['deals']) || [];
-                        const freshDeal = freshDeals.find((d: Deal) => d.id === selectedDeal.id);
-                        const currentAuditTrail = freshDeal?.auditTrail as AuditEntry[] || selectedDeal.auditTrail as AuditEntry[] || [];
+                        
+                        // Fetch fresh deal data from server to get authoritative auditTrail
+                        const freshDeal = await queryClient.fetchQuery<Deal>({
+                          queryKey: ['deals', selectedDeal.id],
+                          queryFn: async () => {
+                            const res = await fetch(`/api/deals/${selectedDeal.id}`);
+                            if (!res.ok) throw new Error('Failed to fetch deal');
+                            return res.json();
+                          },
+                          staleTime: 0, // Force fresh fetch
+                        });
+                        
+                        const currentAuditTrail = Array.isArray(freshDeal?.auditTrail) 
+                          ? [...(freshDeal.auditTrail as AuditEntry[])]
+                          : [];
                         const newAuditTrail = [...currentAuditTrail, auditEntry];
                         
                         await updateDeal.mutateAsync({
@@ -2735,13 +2746,13 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                           auditTrail: newAuditTrail,
                         });
                         
-                        // Update selectedDeal and query cache to keep UI in sync
+                        // Only update state after successful mutation
                         const updatedDeal = { ...selectedDeal, auditTrail: newAuditTrail };
                         setSelectedDeal(updatedDeal);
                         
-                        // Also update the cache so subsequent calls get fresh data
+                        // Also update the cache with a new array (immutable)
                         queryClient.setQueryData<Deal[]>(['deals'], (old) => 
-                          old?.map(d => d.id === selectedDeal.id ? updatedDeal : d) || []
+                          old ? old.map(d => d.id === selectedDeal.id ? { ...d, auditTrail: newAuditTrail } : d) : []
                         );
                       } catch (error: any) {
                         toast.error("Failed to log audit entry");
