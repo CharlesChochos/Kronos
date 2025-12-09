@@ -27,15 +27,19 @@ import {
   Upload, FileText, Paperclip, StickyNote, X, Download, Trash2
 } from "lucide-react";
 import { 
-  useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers
+  useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers,
+  useCustomSectors, useCreateCustomSector
 } from "@/lib/api";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ChevronsUpDown, Check as CheckIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import type { Deal, PodTeamMember } from "@shared/schema";
 
 const DIVISIONS = ['Investment Banking', 'Asset Management'];
-const SECTORS = ['Technology', 'Healthcare', 'Finance', 'Energy', 'Consumer', 'Industrial', 'Real Estate', 'Other'];
+const BASE_SECTORS = ['Technology', 'Healthcare', 'Finance', 'Energy', 'Consumer', 'Industrial', 'Real Estate', 'Other'];
 
 type OpportunityAttachment = {
   id: string;
@@ -56,11 +60,23 @@ export default function Opportunities() {
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [], isLoading } = useDeals();
   const { data: users = [] } = useUsers();
+  const { data: customSectors = [] } = useCustomSectors();
+  const createCustomSector = useCreateCustomSector();
   const createDeal = useCreateDeal();
   const updateDeal = useUpdateDeal();
   const deleteDeal = useDeleteDeal();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const detailFileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Sector selector state
+  const [sectorOpen, setSectorOpen] = useState(false);
+  
+  // Dynamic sectors list combining base + custom
+  const SECTORS = useMemo(() => {
+    const customNames = customSectors.map((s: any) => s.name);
+    const allSectors = [...BASE_SECTORS, ...customNames.filter((name: string) => !BASE_SECTORS.includes(name))];
+    return allSectors;
+  }, [customSectors]);
   
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewOpportunityDialog, setShowNewOpportunityDialog] = useState(false);
@@ -76,6 +92,7 @@ export default function Opportunities() {
     name: "",
     client: "",
     sector: "Technology",
+    customSector: "",
     value: "" as string,
     description: "",
     lead: "",
@@ -174,8 +191,25 @@ export default function Opportunities() {
       return;
     }
     try {
+      // Determine final sector value
+      const finalSector = newOpportunity.sector === 'Other' && newOpportunity.customSector ? newOpportunity.customSector : newOpportunity.sector;
+      
+      // Save custom sector if it's a new one
+      const isCustomSector = newOpportunity.sector === 'Other' && newOpportunity.customSector;
+      const existingCustomSectorNames = customSectors.map((s: any) => s.name.toLowerCase());
+      const isNewCustomSector = isCustomSector && !existingCustomSectorNames.includes(newOpportunity.customSector.toLowerCase()) && !BASE_SECTORS.includes(newOpportunity.customSector);
+      
+      if (isNewCustomSector) {
+        try {
+          await createCustomSector.mutateAsync(newOpportunity.customSector);
+        } catch (e) {
+          console.log("Custom sector may already exist:", e);
+        }
+      }
+      
       await createDeal.mutateAsync({
         ...newOpportunity,
+        sector: finalSector,
         value: parseFloat(newOpportunity.value) || 0,
         dealType: 'Opportunity',
         stage: 'Origination',
@@ -186,7 +220,7 @@ export default function Opportunities() {
       toast.success("Opportunity created");
       setShowNewOpportunityDialog(false);
       setNewOpportunity({ 
-        name: "", client: "", sector: "Technology", value: "", 
+        name: "", client: "", sector: "Technology", customSector: "", value: "", 
         description: "", lead: "", notes: "", attachments: [] 
       });
     } catch (error) {
@@ -412,16 +446,61 @@ export default function Opportunities() {
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label>Sector</Label>
-                <Select value={newOpportunity.sector} onValueChange={(v) => setNewOpportunity({ ...newOpportunity, sector: v })}>
-                  <SelectTrigger data-testid="select-opportunity-sector">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SECTORS.map(s => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={sectorOpen} onOpenChange={setSectorOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" aria-expanded={sectorOpen} className="w-full justify-between" data-testid="select-opportunity-sector">
+                      {newOpportunity.sector === 'Other' && newOpportunity.customSector ? newOpportunity.customSector : newOpportunity.sector}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Search sector or type custom..." />
+                      <CommandList>
+                        <CommandEmpty>
+                          <div className="p-2">
+                            <p className="text-sm text-muted-foreground mb-2">No sector found. Add custom:</p>
+                            <Input 
+                              placeholder="Enter custom sector"
+                              value={newOpportunity.customSector}
+                              onChange={(e) => setNewOpportunity({ ...newOpportunity, customSector: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && newOpportunity.customSector) {
+                                  setNewOpportunity({ ...newOpportunity, sector: 'Other' });
+                                  setSectorOpen(false);
+                                }
+                              }}
+                            />
+                          </div>
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {SECTORS.map((sector) => (
+                            <CommandItem
+                              key={sector}
+                              value={sector}
+                              onSelect={() => {
+                                setNewOpportunity({ ...newOpportunity, sector, customSector: sector === 'Other' ? newOpportunity.customSector : '' });
+                                setSectorOpen(false);
+                              }}
+                            >
+                              <CheckIcon className={cn("mr-2 h-4 w-4", newOpportunity.sector === sector ? "opacity-100" : "opacity-0")} />
+                              {sector}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {newOpportunity.sector === 'Other' && (
+                  <Input 
+                    placeholder="Enter custom sector name"
+                    value={newOpportunity.customSector}
+                    onChange={(e) => setNewOpportunity({ ...newOpportunity, customSector: e.target.value })}
+                    className="mt-2"
+                    data-testid="input-custom-sector"
+                  />
+                )}
               </div>
               <div>
                 <Label>Est. Value ($M)</Label>

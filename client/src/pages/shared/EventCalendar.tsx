@@ -295,7 +295,7 @@ export default function EventCalendar({ role }: EventCalendarProps) {
         }
       });
       toast.success("Time off approved!");
-      setShowTimeOffDetail(false);
+      setShowDayDetail(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to approve request");
     }
@@ -310,7 +310,7 @@ export default function EventCalendar({ role }: EventCalendarProps) {
         }
       });
       toast.success("Time off denied");
-      setShowTimeOffDetail(false);
+      setShowDayDetail(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to deny request");
     }
@@ -502,7 +502,17 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setCurrentMonth(new Date())}
+                          onClick={() => {
+                            const today = new Date();
+                            setCurrentMonth(today);
+                            setSelectedDate(today);
+                            // Show all events for today
+                            const todayEvents = getEventsForDate(today);
+                            const todayTimeOffs = getTimeOffForDate(today);
+                            const todayGoogleEvents = getGoogleEventsForDate(today);
+                            setSelectedDayItems({ meetings: todayEvents, timeOffs: todayTimeOffs, googleEvents: todayGoogleEvents });
+                            setShowDayDetail(true);
+                          }}
                           data-testid="button-today"
                         >
                           Today
@@ -1022,15 +1032,15 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                   <Badge variant="outline">{getDealName(selectedEvent.dealId)}</Badge>
                 </div>
               )}
-              {selectedEvent.participants && (selectedEvent.participants as string[]).length > 0 && (
+              {selectedEvent.participants && Array.isArray(selectedEvent.participants) && selectedEvent.participants.length > 0 && (
                 <div>
                   <Separator className="my-3" />
                   <div className="flex items-center gap-2 text-sm mb-2">
                     <User className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-medium">Invited ({(selectedEvent.participants as string[]).length})</span>
+                    <span className="font-medium">Invited ({selectedEvent.participants.length})</span>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {(selectedEvent.participants as string[]).map((participantId, idx) => {
+                    {selectedEvent.participants.map((participantId: string, idx: number) => {
                       const participant = users.find(u => u.id === participantId || u.email === participantId);
                       return (
                         <Badge key={idx} variant="secondary">

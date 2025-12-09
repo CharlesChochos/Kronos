@@ -239,7 +239,9 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
   return (
     <div className={cn(
       "h-screen bg-sidebar border-r border-sidebar-border flex flex-col text-sidebar-foreground fixed left-0 top-0 z-50 transition-all duration-300",
-      collapsed ? "w-20" : "w-64"
+      collapsed ? "w-20" : "w-64",
+      "w-20 lg:w-64", // Responsive: collapsed on medium screens, expanded on large
+      collapsed && "lg:w-20" // Override when explicitly collapsed
     )}>
       <div className={cn("p-6 flex items-center", collapsed ? "justify-center" : "gap-3")}>
         <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center overflow-hidden flex-shrink-0">

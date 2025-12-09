@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,14 @@ export default function Chat({ role }: ChatProps) {
     showTimestamps: true,
     chatTheme: "default" as "default" | "dark" | "light" | "gradient" | "ocean" | "forest",
   });
+  
+  // @ Mention functionality
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionStartIndex, setMentionStartIndex] = useState<number | null>(null);
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -134,11 +142,11 @@ export default function Chat({ role }: ChatProps) {
 
   // Send message mutation
   const sendMessageMutation = useMutation({
-    mutationFn: async ({ conversationId, content, attachments }: { conversationId: string; content: string; attachments?: any[] }) => {
+    mutationFn: async ({ conversationId, content, attachments, mentionedUserIds }: { conversationId: string; content: string; attachments?: any[]; mentionedUserIds?: string[] }) => {
       const res = await fetch(`/api/chat/conversations/${conversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, attachments }),
+        body: JSON.stringify({ content, attachments, mentionedUserIds }),
       });
       if (!res.ok) throw new Error("Failed to send message");
       return res.json();
@@ -206,6 +214,102 @@ export default function Chat({ role }: ChatProps) {
   // Filter users excluding current user
   const availableUsers = allUsers.filter(u => u.id !== currentUser?.id);
 
+  // Filtered users for @ mention dropdown
+  const mentionableUsers = useMemo(() => {
+    if (!mentionQuery) return availableUsers;
+    return availableUsers.filter(u => 
+      u.name.toLowerCase().includes(mentionQuery.toLowerCase())
+    );
+  }, [availableUsers, mentionQuery]);
+
+  // Handle message input change with @ mention detection
+  const handleMessageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const cursorPos = e.target.selectionStart || 0;
+    
+    setMessageInput(value);
+    
+    // Find the @ symbol before cursor
+    const textBeforeCursor = value.substring(0, cursorPos);
+    const atIndex = textBeforeCursor.lastIndexOf('@');
+    
+    if (atIndex !== -1) {
+      // Check if there's a space before @ or it's at the start
+      const charBeforeAt = atIndex > 0 ? value[atIndex - 1] : ' ';
+      if (charBeforeAt === ' ' || atIndex === 0) {
+        const query = textBeforeCursor.substring(atIndex + 1);
+        // Only show dropdown if query doesn't contain spaces (not complete mention)
+        if (!query.includes(' ')) {
+          setMentionQuery(query);
+          setMentionStartIndex(atIndex);
+          setShowMentionDropdown(true);
+          setSelectedMentionIndex(0);
+          return;
+        }
+      }
+    }
+    
+    setShowMentionDropdown(false);
+    setMentionQuery("");
+    setMentionStartIndex(null);
+  };
+
+  // Insert mention into message
+  const insertMention = (user: typeof availableUsers[0]) => {
+    if (mentionStartIndex === null) return;
+    
+    const beforeMention = messageInput.substring(0, mentionStartIndex);
+    const afterMention = messageInput.substring(mentionStartIndex + mentionQuery.length + 1);
+    const newMessage = `${beforeMention}@${user.name} ${afterMention}`;
+    
+    setMessageInput(newMessage);
+    setShowMentionDropdown(false);
+    setMentionQuery("");
+    setMentionStartIndex(null);
+    
+    // Focus back on input
+    inputRef.current?.focus();
+  };
+
+  // Handle keyboard navigation in mention dropdown
+  const handleMentionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showMentionDropdown) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSendMessage();
+      }
+      return;
+    }
+    
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedMentionIndex(prev => 
+        prev < mentionableUsers.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedMentionIndex(prev => prev > 0 ? prev - 1 : 0);
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      if (mentionableUsers[selectedMentionIndex]) {
+        insertMention(mentionableUsers[selectedMentionIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setShowMentionDropdown(false);
+    }
+  };
+
+  // Extract mentioned user IDs from message
+  const extractMentions = (content: string): string[] => {
+    const mentionedIds: string[] = [];
+    allUsers.forEach(user => {
+      if (content.includes(`@${user.name}`)) {
+        mentionedIds.push(user.id);
+      }
+    });
+    return mentionedIds;
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -229,10 +333,22 @@ export default function Chat({ role }: ChatProps) {
     if (!messageInput.trim() || !selectedConversationId) return;
 
     try {
+      // Extract mentioned users before sending
+      const mentionedUserIds = extractMentions(messageInput);
+      
       await sendMessageMutation.mutateAsync({
         conversationId: selectedConversationId,
         content: messageInput.trim(),
+        mentionedUserIds,
       });
+      
+      // Show notification if users were mentioned
+      if (mentionedUserIds.length > 0) {
+        const mentionedNames = mentionedUserIds
+          .map(id => allUsers.find(u => u.id === id)?.name)
+          .filter(Boolean);
+        toast.success(`Notified ${mentionedNames.join(', ')}`);
+      }
     } catch (error) {
       toast.error("Failed to send message");
     }
@@ -621,14 +737,49 @@ export default function Chat({ role }: ChatProps) {
                   >
                     <Paperclip className="w-4 h-4" />
                   </Button>
-                  <Input
-                    placeholder="Type a message..."
-                    value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                    className="flex-1"
-                    data-testid="input-message"
-                  />
+                  <div className="flex-1 relative">
+                    <Input
+                      ref={inputRef}
+                      placeholder="Type a message... Use @ to mention someone"
+                      value={messageInput}
+                      onChange={handleMessageInputChange}
+                      onKeyDown={handleMentionKeyDown}
+                      className="w-full"
+                      data-testid="input-message"
+                    />
+                    
+                    {/* @ Mention Dropdown */}
+                    {showMentionDropdown && mentionableUsers.length > 0 && (
+                      <div className="absolute bottom-full left-0 mb-1 w-64 bg-card border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                        <div className="p-1">
+                          <div className="px-2 py-1 text-xs text-muted-foreground">
+                            Mention a team member
+                          </div>
+                          {mentionableUsers.map((user, index) => (
+                            <button
+                              key={user.id}
+                              className={cn(
+                                "w-full flex items-center gap-2 p-2 rounded-md text-left transition-colors",
+                                index === selectedMentionIndex ? "bg-primary/10" : "hover:bg-secondary"
+                              )}
+                              onClick={() => insertMention(user)}
+                              data-testid={`mention-user-${user.id}`}
+                            >
+                              <Avatar className="w-6 h-6">
+                                <AvatarFallback className="bg-blue-500/20 text-blue-500 text-xs">
+                                  {user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{user.name}</p>
+                                <p className="text-xs text-muted-foreground">{user.role}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <Button 
                     onClick={handleSendMessage}
                     disabled={!messageInput.trim() || sendMessageMutation.isPending}

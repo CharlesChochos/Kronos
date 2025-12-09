@@ -3471,7 +3471,7 @@ RECOMMENDATION: Start outreach with ${scoredInvestors[0]?.name} - highest match 
   app.post("/api/chat/conversations/:id/messages", requireAuth, async (req, res) => {
     try {
       const currentUser = req.user as any;
-      const { content, attachments } = req.body;
+      const { content, attachments, mentionedUserIds } = req.body;
       
       if (!content || typeof content !== 'string' || content.trim().length === 0) {
         return res.status(400).json({ error: "Message content is required" });
@@ -3496,9 +3496,27 @@ RECOMMENDATION: Start outreach with ${scoredInvestors[0]?.name} - highest match 
         attachments: attachments || [],
       });
       
-      // Create notifications for other members
+      // Create notifications for mentioned users first (higher priority)
+      // Validate mentioned users are actual conversation members for security
+      const memberIds = new Set(members.map(m => m.userId));
+      const validMentionedIds = (mentionedUserIds || []).filter((id: string) => memberIds.has(id));
+      const mentionedSet = new Set(validMentionedIds);
+      
+      for (const mentionedUserId of mentionedSet) {
+        if (mentionedUserId !== currentUser.id) {
+          await storage.createNotification({
+            userId: mentionedUserId,
+            title: 'You were mentioned',
+            message: `${currentUser.name} mentioned you: ${content.slice(0, 50)}${content.length > 50 ? '...' : ''}`,
+            type: 'alert',
+            link: '/ceo/chat',
+          });
+        }
+      }
+      
+      // Create regular notifications for other non-mentioned members
       for (const member of members) {
-        if (member.userId !== currentUser.id) {
+        if (member.userId !== currentUser.id && !mentionedSet.has(member.userId)) {
           await storage.createNotification({
             userId: member.userId,
             title: 'New Message',

@@ -643,9 +643,14 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     <div className="min-h-screen bg-background text-foreground font-sans">
       <Sidebar role={effectiveRole} collapsed={sidebarCollapsed} />
       
-      <div className={cn("flex flex-col min-h-screen transition-all duration-300", sidebarCollapsed ? "pl-20" : "pl-64")}>
+      <div className={cn(
+        "flex flex-col min-h-screen transition-all duration-300",
+        sidebarCollapsed ? "pl-20" : "pl-64",
+        "md:pl-20 lg:pl-64", // Responsive padding based on screen size when sidebar is expanded
+        sidebarCollapsed && "md:pl-20 lg:pl-20" // Override when explicitly collapsed
+      )}>
         {/* Header */}
-        <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-40 px-6 flex items-center justify-between">
+        <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-40 px-3 sm:px-4 md:px-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -671,7 +676,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                   setShowSearchResults(e.target.value.length > 0);
                 }}
                 onFocus={() => searchQuery && setShowSearchResults(true)}
-                className="bg-secondary/50 border border-border rounded-full pl-9 pr-8 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary w-72 transition-all hover:bg-secondary"
+                className="bg-secondary/50 border border-border rounded-full pl-9 pr-8 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary w-40 sm:w-48 md:w-56 lg:w-72 transition-all hover:bg-secondary"
                 data-testid="input-search"
               />
               {searchQuery && (
@@ -924,7 +929,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
         </header>
 
         {/* Content */}
-        <main className="flex-1 p-6 overflow-y-auto bg-background relative">
+        <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-y-auto bg-background relative">
           {/* Background Grid Pattern */}
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none z-0"></div>
           <div className="relative z-10">
