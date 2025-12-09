@@ -734,7 +734,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
   
   // Fetch fees for the selected deal
   const { data: selectedDealFees = [] } = useDealFees(selectedDeal?.id || '');
-  const [activeStageTab, setActiveStageTab] = useState("Origination");
+  const [activeStageTab, setActiveStageTab] = useState("Reception");
   const [viewMode, setViewMode] = useState<'grid' | 'calendar' | 'compare'>('grid');
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('week');
   const [calendarDate, setCalendarDate] = useState(new Date());
@@ -1778,10 +1778,12 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                 <div className="flex justify-between items-start">
                   <Badge variant="outline" className={cn(
                     "border-0 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider",
-                    deal.stage === 'Origination' ? "bg-blue-500/20 text-blue-400" :
-                    deal.stage === 'Structuring' ? "bg-indigo-500/20 text-indigo-400" :
-                    deal.stage === 'Diligence' ? "bg-orange-500/20 text-orange-400" :
-                    deal.stage === 'Legal' ? "bg-purple-500/20 text-purple-400" :
+                    deal.stage === 'Reception' ? "bg-blue-500/20 text-blue-400" :
+                    deal.stage === 'Initial Review' ? "bg-purple-500/20 text-purple-400" :
+                    deal.stage === 'Hard Diligence' ? "bg-orange-500/20 text-orange-400" :
+                    deal.stage === 'Structure' ? "bg-cyan-500/20 text-cyan-400" :
+                    deal.stage === 'Negotiation' ? "bg-yellow-500/20 text-yellow-400" :
+                    deal.stage === 'Closing' ? "bg-pink-500/20 text-pink-400" :
                     "bg-green-500/20 text-green-400"
                   )}>
                     {deal.stage}
@@ -3210,12 +3212,13 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Technology">Technology</SelectItem>
-                      <SelectItem value="Healthcare">Healthcare</SelectItem>
-                      <SelectItem value="Energy">Energy</SelectItem>
-                      <SelectItem value="Consumer">Consumer</SelectItem>
-                      <SelectItem value="Industrials">Industrials</SelectItem>
-                      <SelectItem value="Financial">Financial</SelectItem>
+                      <SelectItem value="Real Estate">Real Estate</SelectItem>
+                      <SelectItem value="Infrastructure">Infrastructure</SelectItem>
+                      <SelectItem value="Private Equity">Private Equity</SelectItem>
+                      <SelectItem value="Hedge Funds">Hedge Funds</SelectItem>
+                      <SelectItem value="Fixed Income">Fixed Income</SelectItem>
+                      <SelectItem value="Equities">Equities</SelectItem>
+                      <SelectItem value="Commodities">Commodities</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
