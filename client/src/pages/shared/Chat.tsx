@@ -876,7 +876,7 @@ export default function Chat({ role }: ChatProps) {
                               </Avatar>
                               <div className="min-w-0">
                                 <p className="text-sm font-medium truncate">{user.name}</p>
-                                <p className="text-xs text-muted-foreground">{user.role}</p>
+                                <p className="text-xs text-muted-foreground">{user.jobTitle || user.role}</p>
                               </div>
                             </button>
                           ))}
@@ -958,7 +958,7 @@ export default function Chat({ role }: ChatProps) {
                     </Avatar>
                     <div className="text-left">
                       <p className="font-medium text-sm">{user.name}</p>
-                      <p className="text-xs text-muted-foreground">{user.role}</p>
+                      <p className="text-xs text-muted-foreground">{user.jobTitle || user.role}</p>
                     </div>
                   </button>
                 ))}

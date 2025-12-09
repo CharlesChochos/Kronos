@@ -397,7 +397,7 @@ function StageWorkSection({
                           key={user.id}
                           onSelect={() => {
                             setSelectedMember(user);
-                            setMemberRole(user.role || '');
+                            setMemberRole(user.jobTitle || user.role || '');
                             setMemberOpen(false);
                           }}
                         >
@@ -1641,7 +1641,7 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
                                         ...newTeamMember,
                                         name: user.name,
                                         email: user.email,
-                                        role: user.role || '',
+                                        role: user.jobTitle || user.role || '',
                                         userId: user.id,
                                       });
                                       setTeamMemberOpen(false);

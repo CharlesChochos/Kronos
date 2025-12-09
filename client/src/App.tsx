@@ -66,6 +66,7 @@ const CeoDocumentGenerator = () => <DocumentManagement role="CEO" defaultTab="te
 const EmployeeDocumentGenerator = () => <DocumentManagement role="Employee" defaultTab="templates" />;
 const CeoDocumentLibrary = () => <DocumentManagement role="CEO" defaultTab="library" />;
 const EmployeeDocumentLibrary = () => <DocumentManagement role="Employee" defaultTab="library" />;
+const CeoMyTasks = () => <MyTasks role="CEO" />;
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { data: user, isLoading } = useCurrentUser();
@@ -208,6 +209,9 @@ function Router() {
         </Route>
         <Route path="/ceo/asset-management">
           {() => <ProtectedRoute component={() => <AssetManagement role="CEO" />} />}
+        </Route>
+        <Route path="/ceo/tasks">
+          {() => <ProtectedRoute component={CeoMyTasks} />}
         </Route>
         
         {/* Employee Routes */}

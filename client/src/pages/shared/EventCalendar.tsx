@@ -1256,7 +1256,7 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                   {users
                     .filter(u => u.id !== currentUser?.id && !newEvent.invitees.includes(u.id))
                     .map(user => (
-                      <SelectItem key={user.id} value={user.id}>{user.name} ({user.role})</SelectItem>
+                      <SelectItem key={user.id} value={user.id}>{user.name} ({user.jobTitle || user.role})</SelectItem>
                     ))}
                 </SelectContent>
               </Select>

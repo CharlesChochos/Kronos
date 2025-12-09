@@ -381,7 +381,7 @@ export default function TeamAssignment() {
                                   </div>
                                   <div>
                                     <h4 className="font-medium">{user.name}</h4>
-                                    <p className="text-xs text-muted-foreground">{user.role}</p>
+                                    <p className="text-xs text-muted-foreground">{user.jobTitle || user.role}</p>
                                   </div>
                                 </div>
                                 <Badge className={cn(

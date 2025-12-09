@@ -403,7 +403,7 @@ function StageWorkSection({
                           key={user.id}
                           onSelect={() => {
                             setSelectedMember(user);
-                            setMemberRole(user.role || '');
+                            setMemberRole(user.jobTitle || user.role || '');
                             setMemberOpen(false);
                           }}
                         >
@@ -680,20 +680,23 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const { data: allTasks = [] } = useTasks();
   
   // Filter deals based on access level - non-admin users only see deals they're assigned to
-  // Also filter out Opportunities (deals with dealType === 'Opportunity') - those appear only in Opportunities page until approved
+  // Filter out Opportunities and Asset Management deals - those appear in their own respective pages
   const deals = useMemo(() => {
-    // First filter out opportunities - they should only appear in Deal Management when approved (promoted to a deal type)
-    const nonOpportunityDeals = allDeals.filter(deal => (deal as any).dealType !== 'Opportunity');
+    // Filter out opportunities and asset management deals - they have their own pages
+    const investmentBankingDeals = allDeals.filter(deal => {
+      const dealType = (deal as any).dealType;
+      return dealType !== 'Opportunity' && dealType !== 'Asset Management';
+    });
     
     if (currentUser?.accessLevel === 'admin') {
-      return nonOpportunityDeals;
+      return investmentBankingDeals;
     }
     // For employees, filter to only show deals where they are in the pod team
     // If user data is not yet available, show no deals until we can verify access
     if (!currentUser?.id && !currentUser?.email && !currentUser?.name) {
       return [];
     }
-    return nonOpportunityDeals.filter(deal => {
+    return investmentBankingDeals.filter(deal => {
       const podTeam = deal.podTeam || [];
       return podTeam.some((member: PodTeamMember) => 
         (currentUser.id && member.userId === currentUser.id) || 
@@ -2509,7 +2512,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                                     </div>
                                     <div className="flex-1">
                                       <div className="font-medium">{user.name}</div>
-                                      <div className="text-xs text-muted-foreground">{user.email} • {user.role}</div>
+                                      <div className="text-xs text-muted-foreground">{user.email} • {user.jobTitle || user.role}</div>
                                     </div>
                                     {newTeamMember.name === user.name && (
                                       <Check className="w-4 h-4 text-primary" />

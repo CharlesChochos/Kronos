@@ -47,7 +47,11 @@ import type { Task, Deal } from "@shared/schema";
 
 type SwipeDirection = 'left' | 'right' | 'up' | null;
 
-export default function MyTasks() {
+type MyTasksProps = {
+  role?: 'CEO' | 'Employee';
+};
+
+export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
   const [, setLocation] = useLocation();
   const searchString = useSearch();
   const { data: currentUser } = useCurrentUser();
@@ -406,7 +410,7 @@ export default function MyTasks() {
 
   if (isLoading) {
     return (
-      <Layout role="Employee" pageTitle="My Tasks" userName={currentUser?.name || ""}>
+      <Layout role={role} pageTitle="My Tasks" userName={currentUser?.name || ""}>
         <div className="flex items-center justify-center h-96">
           <div className="text-muted-foreground">Loading tasks...</div>
         </div>
@@ -417,7 +421,7 @@ export default function MyTasks() {
   const currentTask = swipeableTasks[currentSwipeIndex];
 
   return (
-    <Layout role="Employee" pageTitle="My Tasks" userName={currentUser?.name || ""}>
+    <Layout role={role} pageTitle="My Tasks" userName={currentUser?.name || ""}>
       <div className="space-y-6">
         
         {/* Search Bar */}
@@ -849,7 +853,7 @@ export default function MyTasks() {
                       <div className="flex items-center gap-2">
                         <User className="w-4 h-4" />
                         <span>{user.name}</span>
-                        <span className="text-muted-foreground">({user.role})</span>
+                        <span className="text-muted-foreground">({user.jobTitle || user.role})</span>
                       </div>
                     </SelectItem>
                   ))}

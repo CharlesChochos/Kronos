@@ -769,7 +769,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                                   setLocation(`/ceo/team?id=${user.id}`);
                                 } else {
                                   toast.info(`${user.name}`, {
-                                    description: `${user.role} • ${user.email}`,
+                                    description: `${user.jobTitle || user.role} • ${user.email}`,
                                     duration: 3000,
                                   });
                                 }
@@ -786,7 +786,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                               </Avatar>
                               <div>
                                 <p className="text-sm font-medium">{user.name}</p>
-                                <p className="text-xs text-muted-foreground">{user.role} • {user.email}</p>
+                                <p className="text-xs text-muted-foreground">{user.jobTitle || user.role} • {user.email}</p>
                               </div>
                             </button>
                           ))}

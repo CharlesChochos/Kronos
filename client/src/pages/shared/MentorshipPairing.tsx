@@ -353,7 +353,7 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
                 </SelectTrigger>
                 <SelectContent>
                   {mentors.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>{user.name} ({user.role})</SelectItem>
+                    <SelectItem key={user.id} value={user.id}>{user.name} ({user.jobTitle || user.role})</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -366,7 +366,7 @@ export default function MentorshipPairing({ role }: { role: 'CEO' | 'Employee' }
                 </SelectTrigger>
                 <SelectContent>
                   {mentees.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>{user.name} ({user.role})</SelectItem>
+                    <SelectItem key={user.id} value={user.id}>{user.name} ({user.jobTitle || user.role})</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
