@@ -103,7 +103,7 @@ export default function InvestorMatching() {
     } else if (deals.length === 0 && selectedDeal) {
       setSelectedDeal('');
     }
-  }, [deals]);
+  }, [deals.length, selectedDeal]);
 
   const currentDeal = deals.find(d => d.id === selectedDeal);
   

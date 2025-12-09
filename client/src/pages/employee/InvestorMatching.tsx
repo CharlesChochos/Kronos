@@ -113,7 +113,7 @@ export default function InvestorMatching() {
     } else if (deals.length === 0 && selectedDeal) {
       setSelectedDeal('');
     }
-  }, [deals]);
+  }, [deals.length, selectedDeal]);
 
   const availableInvestors = INVESTORS.filter(inv => 
     !matchedInvestors.some(m => m.id === inv.id) && 
