@@ -201,12 +201,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     saveSidebarTimeoutRef.current = setTimeout(async () => {
       if (!isMountedRef.current) return;
       try {
-        // Merge with existing preferences (stripped of readonly fields)
-        const mutablePrefs = getMutablePrefs(userPrefs);
-        await saveUserPrefs.mutateAsync({
-          ...mutablePrefs,
-          sidebarCollapsed,
-        });
+        await saveUserPrefs.mutateAsync({ sidebarCollapsed });
         lastSavedSidebarRef.current = sidebarCollapsed;
       } catch (error) {
         console.error('Failed to save sidebar state:', error);
@@ -233,12 +228,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     saveSettingsTimeoutRef.current = setTimeout(async () => {
       if (!isMountedRef.current) return;
       try {
-        // Merge with existing preferences (stripped of readonly fields)
-        const mutablePrefs = getMutablePrefs(userPrefs);
-        await saveUserPrefs.mutateAsync({
-          ...mutablePrefs,
-          settings,
-        });
+        await saveUserPrefs.mutateAsync({ settings });
         lastSavedSettingsRef.current = settings;
       } catch (error) {
         console.error('Failed to save settings:', error);

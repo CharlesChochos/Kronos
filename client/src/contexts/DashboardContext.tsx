@@ -56,22 +56,21 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }
   }, [prefsLoading, userPrefs, countInitialized]);
   
-  // Save unread count to database (debounced)
+  // Save unread count to database (debounced) - only save when count actually changes
   useEffect(() => {
     if (!countInitialized || prefsLoading) return;
-    if (prevCountRef.current === unreadMessageCount) return;
     
-    // Skip initial save if values match server state
+    // Skip if we haven't initialized the previous count yet
     if (prevCountRef.current === null) {
-      const serverCount = (userPrefs?.settings as any)?.unreadMessageCount;
-      if (serverCount === unreadMessageCount) {
-        prevCountRef.current = unreadMessageCount;
-        return;
-      }
+      prevCountRef.current = unreadMessageCount;
+      return;
     }
     
+    // Skip if count hasn't changed
+    if (prevCountRef.current === unreadMessageCount) return;
+    
     const timeout = setTimeout(() => {
-      const freshPrefs = queryClient.getQueryData<UserPreferences>(['userPreferences']) || userPrefs;
+      const freshPrefs = queryClient.getQueryData<UserPreferences>(['user-preferences']) || userPrefs;
       const { id, userId, updatedAt, ...mutablePrefs } = (freshPrefs || {}) as any;
       const existingSettings = (freshPrefs?.settings as any) || {};
       saveUserPrefs.mutate({
@@ -85,7 +84,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }, 2000);
     
     return () => clearTimeout(timeout);
-  }, [unreadMessageCount, countInitialized, prefsLoading, userPrefs]);
+  }, [unreadMessageCount, countInitialized, prefsLoading]);
 
   const addMessageNotification = useCallback((notification: MessageNotification) => {
     setUnreadMessageCount(prev => prev + 1);
