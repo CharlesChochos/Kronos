@@ -31,8 +31,11 @@ import {
   Settings,
   Pencil,
   Type,
-  Bell
+  Bell,
+  Smile,
+  AtSign
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCurrentUser, useUsers } from "@/lib/api";
 import { useDashboardContext } from "@/contexts/DashboardContext";
 import { cn } from "@/lib/utils";
@@ -783,10 +786,65 @@ export default function Chat({ role }: ChatProps) {
                   >
                     <Paperclip className="w-4 h-4" />
                   </Button>
+                  
+                  {/* Emoji Picker */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        data-testid="button-emoji-picker"
+                      >
+                        <Smile className="w-4 h-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-2" align="start">
+                      <div className="grid grid-cols-8 gap-1">
+                        {['😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', 
+                          '😇', '🙂', '😉', '😌', '😍', '🥰', '😘', '😗',
+                          '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭',
+                          '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏',
+                          '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤',
+                          '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵',
+                          '👍', '👎', '👏', '🙌', '🤝', '👊', '✊', '🤞',
+                          '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍',
+                          '🔥', '⭐', '✨', '💯', '✅', '❌', '⚠️', '💡'].map((emoji) => (
+                          <button
+                            key={emoji}
+                            className="p-1.5 hover:bg-secondary rounded text-xl transition-colors"
+                            onClick={() => {
+                              setMessageInput(prev => prev + emoji);
+                              inputRef.current?.focus();
+                            }}
+                            data-testid={`emoji-${emoji}`}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  
+                  {/* @ Mention Button */}
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => {
+                      setMessageInput(prev => prev + '@');
+                      setShowMentionDropdown(true);
+                      setMentionQuery("");
+                      setMentionStartIndex(messageInput.length);
+                      inputRef.current?.focus();
+                    }}
+                    data-testid="button-mention"
+                  >
+                    <AtSign className="w-4 h-4" />
+                  </Button>
+                  
                   <div className="flex-1 relative">
                     <Input
                       ref={inputRef}
-                      placeholder="Type a message... Use @ to mention someone"
+                      placeholder="Type a message..."
                       value={messageInput}
                       onChange={handleMessageInputChange}
                       onKeyDown={handleMentionKeyDown}

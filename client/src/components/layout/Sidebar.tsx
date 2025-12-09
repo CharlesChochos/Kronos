@@ -166,7 +166,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
       links: [
         { icon: Megaphone, label: "Communications", path: "/ceo/announcements" },
         { icon: MessageCircle, label: "Messages", path: "/ceo/chat" },
-        { icon: Building, label: "Stakeholders", path: "/ceo/stakeholders" },
+        { icon: Building, label: "CRM", path: "/ceo/stakeholders" },
       ]
     },
     {
@@ -174,8 +174,6 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
       links: [
         { icon: UserCheck, label: "Client Portal", path: "/ceo/client-portal" },
         { icon: PieChart, label: "Investor Match", path: "/ceo/investors" },
-        { icon: Users, label: "Investor CRM", path: "/ceo/investor-crm" },
-        { icon: Database, label: "Investor Database", path: "/ceo/investor-database" },
       ]
     },
     {
@@ -183,7 +181,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
       links: [
         { icon: Shield, label: "User Management", path: "/ceo/admin" },
         { icon: ClipboardList, label: "Audit Logs", path: "/ceo/audit-logs" },
-        { icon: FileStack, label: "Deal Templates", path: "/ceo/deal-templates" },
+        { icon: FileStack, label: "Templates", path: "/ceo/deal-templates" },
         { icon: FolderOpen, label: "Document Library", path: "/ceo/document-library" },
       ]
     }
@@ -215,7 +213,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
       links: [
         { icon: Megaphone, label: "Communications", path: "/employee/announcements" },
         { icon: MessageCircle, label: "Messages", path: "/employee/chat" },
-        { icon: Building, label: "Stakeholders", path: "/employee/stakeholders" },
+        { icon: Building, label: "CRM", path: "/employee/stakeholders" },
       ]
     },
     {
