@@ -5348,161 +5348,159 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
       
       console.log(`Scanning document: ${filename}, content length: ${documentContent.length} chars`);
       
-      // Use OpenAI to extract ALL stakeholder information from the document
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert at extracting stakeholder/contact information from documents, spreadsheets, and CSV files.
-            
-CRITICAL INSTRUCTIONS:
-1. Process EVERY SINGLE ROW in the document - do NOT skip any entries
-2. If this is a CSV/spreadsheet, each row represents a separate stakeholder entry
-3. Count the total rows and ensure you extract ALL of them
-4. Even if there are 50, 100, or 200+ rows, you MUST extract every single one
-
-FOR CSV/SPREADSHEET DATA:
-- First identify the header row that contains column names
-- Then process each subsequent data row as a separate stakeholder
-- Map column values to the appropriate stakeholder fields
-- Common column name variations:
-  * Name/Contact Name/Full Name/Person -> name
-  * Company/Firm/Organization/Fund -> company
-  * Title/Position/Role -> title
-  * Email/E-mail/Contact Email -> email
-  * Phone/Tel/Mobile/Contact -> phone
-  * Focus/Sector/Industry/Investment Focus/Specialization -> focus
-  * Location/City/Region/Geography -> location
-  * Type/Category -> type
-  * Website/URL/Web -> website
-  * LinkedIn/Social -> linkedin
-  * Notes/Comments/Description -> notes
-
-IMPORTANT - For the "focus" field (Sector Focus):
-- Carefully read ANY column that mentions sectors, industries, investment focus, specialization, or expertise
-- These columns often contain LONG descriptive text - you MUST parse through the entire text
-- Extract ALL sector/industry terms mentioned (e.g., Technology, Healthcare, FinTech, Real Estate, Consumer, Energy, SaaS, etc.)
-- Convert long descriptions into a clean, comma-separated list of sector terms
-- Examples of what to extract: "technology", "healthcare", "fintech", "biotech", "consumer goods", "real estate", "energy", "software", "B2B", "e-commerce", "infrastructure", "media", "telecommunications", "financial services", "manufacturing", "retail", etc.
-- If a field says something like "Focus on early-stage technology companies in healthcare and fintech sectors with emphasis on B2B SaaS", extract: "Technology, Healthcare, FinTech, B2B, SaaS"
-
-Return a JSON object with a "stakeholders" array containing objects with these fields:
-- name: Full name of the person/stakeholder (REQUIRED - skip if not found)
-- title: Job title or position (default to empty string)
-- company: Company or organization name (REQUIRED - skip if not found)
-- type: One of: investor, advisor, legal, banker, consultant, client, other (infer from context)
-- email: Email address
-- phone: Phone number
-- linkedin: LinkedIn URL
-- website: Website URL
-- location: City, state, or country
-- focus: Extracted sector/industry terms as comma-separated list (MUST extract from long text descriptions)
-- notes: Any additional relevant notes or context
-
-Extract EVERY stakeholder/contact you can find in the document.
-Only include entries where both name AND company are available.
-Always return valid JSON with format: {"stakeholders": [...]}`
-          },
-          {
-            role: "user",
-            content: `IMPORTANT: Extract ALL stakeholder/contact information from this ENTIRE document${filename ? ` (${filename})` : ''}. 
-            
-If this is a CSV or spreadsheet, process EVERY ROW - do not skip any entries. Count the rows and ensure all are included.
-Pay special attention to any "Sector Focus", "Industry", or "Investment Focus" columns - extract ALL sector terms from the text.
-
-Document content:
-
-${documentContent}`
-          }
-        ],
-        response_format: { type: "json_object" },
-        max_completion_tokens: 16384
-      });
+      // Split CSV content into chunks to handle large files
+      const lines = documentContent.split('\n');
+      const headerLine = lines[0];
+      const dataLines = lines.slice(1).filter((line: string) => line.trim());
+      const CHUNK_SIZE = 75; // Process 75 rows at a time for reliability
       
-      const content = response.choices[0]?.message?.content;
-      if (!content) {
-        return res.status(500).json({ error: "Failed to extract information from document" });
+      console.log(`Document has ${dataLines.length} data rows, processing in chunks of ${CHUNK_SIZE}`);
+      
+      const allStakeholders: any[] = [];
+      const chunks = [];
+      
+      // Create chunks with header included
+      for (let i = 0; i < dataLines.length; i += CHUNK_SIZE) {
+        const chunkLines = dataLines.slice(i, i + CHUNK_SIZE);
+        chunks.push(headerLine + '\n' + chunkLines.join('\n'));
       }
       
-      try {
-        const extractedData = JSON.parse(content);
-        const stakeholders = extractedData.stakeholders || [];
+      console.log(`Processing ${chunks.length} chunks...`);
+      
+      // Process each chunk
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+        const chunk = chunks[chunkIndex];
+        console.log(`Processing chunk ${chunkIndex + 1}/${chunks.length}...`);
         
-        // If autoCreate is true, create all stakeholders in the database
-        if (autoCreate && stakeholders.length > 0) {
-          const validTypes = ['investor', 'advisor', 'legal', 'banker', 'consultant', 'client', 'other'];
-          let successCount = 0;
-          let failedCount = 0;
-          let skippedCount = 0;
-          const createdStakeholders = [];
-          const skippedReasons: string[] = [];
-          
-          for (const s of stakeholders) {
-            // Skip entries without required fields
-            if (!s.name || typeof s.name !== 'string' || s.name.trim() === '') {
-              skippedCount++;
-              skippedReasons.push(`Missing name: ${JSON.stringify(s).slice(0, 50)}...`);
-              continue;
-            }
-            if (!s.company || typeof s.company !== 'string' || s.company.trim() === '') {
-              skippedCount++;
-              skippedReasons.push(`Missing company for "${s.name}"`);
-              continue;
-            }
-            
-            try {
-              const stakeholderType = validTypes.includes(s.type?.toLowerCase()) ? s.type.toLowerCase() : 'other';
-              
-              // Sanitize all optional fields - convert empty strings to null
-              const sanitizeOptional = (val: any): string | null => {
-                if (!val || typeof val !== 'string' || val.trim() === '') return null;
-                return val.trim();
-              };
-              
-              const created = await storage.createStakeholder({
-                name: s.name.trim(),
-                title: sanitizeOptional(s.title) || '',
-                company: s.company.trim(),
-                type: stakeholderType,
-                email: sanitizeOptional(s.email),
-                phone: sanitizeOptional(s.phone),
-                linkedin: sanitizeOptional(s.linkedin),
-                website: sanitizeOptional(s.website),
-                location: sanitizeOptional(s.location),
-                focus: sanitizeOptional(s.focus),
-                notes: sanitizeOptional(s.notes),
-                deals: [],
-                isFavorite: false
-              });
-              createdStakeholders.push(created);
-              successCount++;
-            } catch (err) {
-              console.error('Failed to create stakeholder:', s.name, err);
-              failedCount++;
-            }
-          }
-          
-          // Log extraction stats for debugging
-          console.log(`Document scan results: ${stakeholders.length} found, ${successCount} created, ${skippedCount} skipped, ${failedCount} failed`);
-          if (skippedReasons.length > 0) {
-            console.log('Skipped reasons (first 5):', skippedReasons.slice(0, 5));
-          }
-          
-          res.json({ 
-            stakeholders: createdStakeholders,
-            successCount,
-            failedCount,
-            skippedCount,
-            totalFound: stakeholders.length,
-            message: `Found ${stakeholders.length} entries, created ${successCount}, skipped ${skippedCount} (missing required fields), ${failedCount} failed`
+        try {
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+              {
+                role: "system",
+                content: `You are an expert at extracting stakeholder/contact information from CSV/spreadsheet data.
+
+INSTRUCTIONS:
+1. Process EVERY ROW in this CSV chunk
+2. Each row is a separate stakeholder entry
+3. Map column values to stakeholder fields
+
+Column mapping:
+- Name/Contact Name/Full Name/Person -> name
+- Company/Firm/Organization/Fund -> company
+- Title/Position/Role -> title
+- Email/E-mail -> email
+- Phone/Tel/Mobile -> phone
+- Focus/Sector/Industry -> focus (extract as comma-separated list)
+- Location/City/Region -> location
+- Type/Category -> type (investor/advisor/legal/banker/consultant/client/other)
+- Website/URL -> website
+- LinkedIn -> linkedin
+- Notes/Comments -> notes
+
+Return JSON: {"stakeholders": [{name, title, company, type, email, phone, linkedin, website, location, focus, notes}, ...]}
+Only include entries with both name AND company. Extract ALL rows.`
+              },
+              {
+                role: "user",
+                content: `Extract ALL contacts from this CSV chunk (chunk ${chunkIndex + 1} of ${chunks.length}):\n\n${chunk}`
+              }
+            ],
+            response_format: { type: "json_object" },
+            max_completion_tokens: 8192
           });
-        } else {
-          res.json({ stakeholders, totalFound: stakeholders.length });
+          
+          const content = response.choices[0]?.message?.content;
+          if (content) {
+            try {
+              const extracted = JSON.parse(content);
+              if (extracted.stakeholders && Array.isArray(extracted.stakeholders)) {
+                allStakeholders.push(...extracted.stakeholders);
+                console.log(`Chunk ${chunkIndex + 1}: extracted ${extracted.stakeholders.length} stakeholders`);
+              }
+            } catch (parseErr) {
+              console.error(`Failed to parse chunk ${chunkIndex + 1}:`, parseErr);
+            }
+          }
+        } catch (chunkError: any) {
+          console.error(`Error processing chunk ${chunkIndex + 1}:`, chunkError?.message);
         }
-      } catch (parseError) {
-        console.error('Failed to parse AI response:', content);
-        res.status(500).json({ error: "Failed to parse extracted information" });
+      }
+      
+      console.log(`Total extracted: ${allStakeholders.length} stakeholders from ${chunks.length} chunks`);
+      
+      const stakeholders = allStakeholders;
+      
+      // If autoCreate is true, create all stakeholders in the database
+      if (autoCreate && stakeholders.length > 0) {
+        const validTypes = ['investor', 'advisor', 'legal', 'banker', 'consultant', 'client', 'other'];
+        let successCount = 0;
+        let failedCount = 0;
+        let skippedCount = 0;
+        const createdStakeholders = [];
+        const skippedReasons: string[] = [];
+        
+        for (const s of stakeholders) {
+          // Skip entries without required fields
+          if (!s.name || typeof s.name !== 'string' || s.name.trim() === '') {
+            skippedCount++;
+            skippedReasons.push(`Missing name: ${JSON.stringify(s).slice(0, 50)}...`);
+            continue;
+          }
+          if (!s.company || typeof s.company !== 'string' || s.company.trim() === '') {
+            skippedCount++;
+            skippedReasons.push(`Missing company for "${s.name}"`);
+            continue;
+          }
+          
+          try {
+            const stakeholderType = validTypes.includes(s.type?.toLowerCase()) ? s.type.toLowerCase() : 'other';
+            
+            // Sanitize all optional fields - convert empty strings to null
+            const sanitizeOptional = (val: any): string | null => {
+              if (!val || typeof val !== 'string' || val.trim() === '') return null;
+              return val.trim();
+            };
+            
+            const created = await storage.createStakeholder({
+              name: s.name.trim(),
+              title: sanitizeOptional(s.title) || '',
+              company: s.company.trim(),
+              type: stakeholderType,
+              email: sanitizeOptional(s.email),
+              phone: sanitizeOptional(s.phone),
+              linkedin: sanitizeOptional(s.linkedin),
+              website: sanitizeOptional(s.website),
+              location: sanitizeOptional(s.location),
+              focus: sanitizeOptional(s.focus),
+              notes: sanitizeOptional(s.notes),
+              deals: [],
+              isFavorite: false
+            });
+            createdStakeholders.push(created);
+            successCount++;
+          } catch (err) {
+            console.error('Failed to create stakeholder:', s.name, err);
+            failedCount++;
+          }
+        }
+        
+        // Log extraction stats for debugging
+        console.log(`Document scan results: ${stakeholders.length} found, ${successCount} created, ${skippedCount} skipped, ${failedCount} failed`);
+        if (skippedReasons.length > 0) {
+          console.log('Skipped reasons (first 5):', skippedReasons.slice(0, 5));
+        }
+        
+        res.json({ 
+          stakeholders: createdStakeholders,
+          successCount,
+          failedCount,
+          skippedCount,
+          totalFound: stakeholders.length,
+          message: `Found ${stakeholders.length} entries, created ${successCount}, skipped ${skippedCount} (missing required fields), ${failedCount} failed`
+        });
+      } else {
+        res.json({ stakeholders, totalFound: stakeholders.length });
       }
     } catch (error: any) {
       console.error('Document scan error:', error);
