@@ -631,12 +631,28 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
           <div className="flex items-center gap-2">
             <input
               type="file"
+              ref={fileInputRef}
+              accept=".csv,.xlsx,.xls,.txt,.tsv"
+              onChange={handleFileUpload}
+              className="hidden"
+              data-testid="input-file-upload"
+            />
+            <input
+              type="file"
               ref={docScanInputRef}
               accept=".txt,.csv,.json,.md,.xlsx,.xls"
               onChange={handleDocumentScan}
               className="hidden"
               data-testid="input-doc-scan"
             />
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              data-testid="button-import"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Import
+            </Button>
             <Button
               variant="outline"
               onClick={() => docScanInputRef.current?.click()}
