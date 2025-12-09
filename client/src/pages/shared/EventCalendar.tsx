@@ -94,6 +94,8 @@ export default function EventCalendar({ role }: EventCalendarProps) {
   const [selectedGoogleEvent, setSelectedGoogleEvent] = useState<GoogleCalendarEvent | null>(null);
   const [selectedDayItems, setSelectedDayItems] = useState<{meetings: Meeting[], timeOffs: TimeOffRequest[], googleEvents: GoogleCalendarEvent[]}>({ meetings: [], timeOffs: [], googleEvents: [] });
   const [activeTab, setActiveTab] = useState("calendar");
+  const [calendarView, setCalendarView] = useState<'month' | 'day'>('month');
+  const [dayViewDate, setDayViewDate] = useState<Date>(new Date());
   
   const [newEvent, setNewEvent] = useState({
     title: "",
@@ -504,19 +506,23 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                           size="sm"
                           onClick={() => {
                             const today = new Date();
-                            setCurrentMonth(today);
-                            setSelectedDate(today);
-                            // Show all events for today
-                            const todayEvents = getEventsForDate(today);
-                            const todayTimeOffs = getTimeOffForDate(today);
-                            const todayGoogleEvents = getGoogleEventsForDate(today);
-                            setSelectedDayItems({ meetings: todayEvents, timeOffs: todayTimeOffs, googleEvents: todayGoogleEvents });
-                            setShowDayDetail(true);
+                            setDayViewDate(today);
+                            setCalendarView('day');
                           }}
                           data-testid="button-today"
                         >
                           Today
                         </Button>
+                        {calendarView === 'day' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCalendarView('month')}
+                            data-testid="button-month-view"
+                          >
+                            Month
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="icon"
@@ -529,6 +535,130 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                     </div>
                   </CardHeader>
                   <CardContent>
+                    {calendarView === 'day' ? (
+                      // Day View with hourly timeline
+                      <div className="relative">
+                        <div className="text-center mb-4">
+                          <div className="text-4xl font-bold text-foreground">{format(dayViewDate, 'd')}</div>
+                          <div className="text-sm text-muted-foreground">{format(dayViewDate, 'EEEE, MMMM yyyy')}</div>
+                          <div className="flex items-center justify-center gap-2 mt-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => setDayViewDate(addDays(dayViewDate, -1))}
+                              data-testid="button-prev-day"
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => setDayViewDate(addDays(dayViewDate, 1))}
+                              data-testid="button-next-day"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <ScrollArea className="h-[600px]">
+                          <div className="relative" style={{ minHeight: '1440px' }}>
+                            {/* Hour grid lines */}
+                            {Array.from({ length: 24 }, (_, hour) => (
+                              <div
+                                key={hour}
+                                className="absolute w-full border-t border-border flex"
+                                style={{ top: `${hour * 60}px`, height: '60px' }}
+                              >
+                                <div className="w-16 flex-shrink-0 text-xs text-muted-foreground pr-2 text-right -translate-y-2">
+                                  {format(new Date().setHours(hour, 0, 0, 0), 'h a')}
+                                </div>
+                                <div className="flex-1 border-l border-border/50" />
+                              </div>
+                            ))}
+                            
+                            {/* Events positioned by time */}
+                            <div className="absolute left-16 right-0 top-0">
+                              {getEventsForDate(dayViewDate).map(event => {
+                                const eventDate = new Date(event.scheduledFor);
+                                const startHour = eventDate.getHours();
+                                const startMinute = eventDate.getMinutes();
+                                const startPos = startHour * 60 + startMinute;
+                                const duration = event.duration || 60;
+                                
+                                return (
+                                  <div
+                                    key={event.id}
+                                    className="absolute left-1 right-1 bg-blue-500 text-white rounded-md p-2 cursor-pointer hover:bg-blue-600 transition-colors overflow-hidden"
+                                    style={{
+                                      top: `${startPos}px`,
+                                      height: `${Math.max(duration, 30)}px`,
+                                      minHeight: '30px'
+                                    }}
+                                    onClick={() => {
+                                      setSelectedEvent(event);
+                                      setShowEventDetail(true);
+                                    }}
+                                    data-testid={`day-event-${event.id}`}
+                                  >
+                                    <div className="text-sm font-medium truncate">{event.title}</div>
+                                    <div className="text-xs opacity-80">
+                                      {format(eventDate, 'h:mm a')} - {format(addHours(eventDate, duration / 60), 'h:mm a')}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              
+                              {/* Google Calendar events */}
+                              {getGoogleEventsForDate(dayViewDate).map(gEvent => {
+                                const eventDate = new Date(gEvent.start);
+                                const startHour = eventDate.getHours();
+                                const startMinute = eventDate.getMinutes();
+                                const startPos = startHour * 60 + startMinute;
+                                const endDate = new Date(gEvent.end);
+                                const duration = Math.max((endDate.getTime() - eventDate.getTime()) / 60000, 30);
+                                
+                                return (
+                                  <div
+                                    key={gEvent.id}
+                                    className="absolute left-1 right-1 bg-green-600 text-white rounded-md p-2 cursor-pointer hover:bg-green-700 transition-colors overflow-hidden flex items-start gap-1"
+                                    style={{
+                                      top: `${startPos}px`,
+                                      height: `${Math.max(duration, 30)}px`,
+                                      minHeight: '30px'
+                                    }}
+                                    onClick={() => setSelectedGoogleEvent(gEvent)}
+                                    data-testid={`day-google-event-${gEvent.id}`}
+                                  >
+                                    <Calendar className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-sm font-medium truncate">{gEvent.title}</div>
+                                      <div className="text-xs opacity-80">
+                                        {format(eventDate, 'h:mm a')} - {format(endDate, 'h:mm a')}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              
+                              {/* Time off indicators */}
+                              {getTimeOffForDate(dayViewDate).length > 0 && (
+                                <div className="absolute left-1 right-1 top-0 bg-orange-500/20 border border-orange-500/50 rounded-md p-2">
+                                  <div className="text-sm font-medium text-orange-600">Time Off</div>
+                                  {getTimeOffForDate(dayViewDate).map(timeOff => (
+                                    <div key={timeOff.id} className="text-xs text-orange-600">
+                                      {getUserName(timeOff.userId)} - {timeOff.type}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </ScrollArea>
+                      </div>
+                    ) : (
+                    // Month View (existing grid)
                     <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
                       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                         <div key={day} className="bg-secondary/50 p-2 text-center text-xs font-medium text-muted-foreground">
@@ -609,6 +739,7 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                         );
                       })}
                     </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>

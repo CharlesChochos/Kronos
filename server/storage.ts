@@ -80,7 +80,9 @@ export interface IStorage {
   
   // Chat message operations
   getMessages(conversationId: string): Promise<Message[]>;
+  getMessage(id: string): Promise<Message | undefined>;
   createMessage(message: InsertMessage): Promise<Message>;
+  deleteMessage(id: string): Promise<void>;
   getUnreadMessageCount(userId: string): Promise<number>;
   markMessagesAsRead(conversationId: string, userId: string): Promise<void>;
   deleteConversation(id: string): Promise<void>;
@@ -655,6 +657,11 @@ export class DatabaseStorage implements IStorage {
       .orderBy(schema.messages.createdAt);
   }
   
+  async getMessage(id: string): Promise<Message | undefined> {
+    const [message] = await db.select().from(schema.messages).where(eq(schema.messages.id, id));
+    return message;
+  }
+  
   async createMessage(message: InsertMessage): Promise<Message> {
     const [created] = await db.insert(schema.messages)
       .values(message)
@@ -663,6 +670,10 @@ export class DatabaseStorage implements IStorage {
       .set({ updatedAt: new Date() })
       .where(eq(schema.conversations.id, message.conversationId));
     return created;
+  }
+  
+  async deleteMessage(id: string): Promise<void> {
+    await db.delete(schema.messages).where(eq(schema.messages.id, id));
   }
   
   async getUnreadMessageCount(userId: string): Promise<number> {

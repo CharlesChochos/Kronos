@@ -3537,6 +3537,46 @@ RECOMMENDATION: Start outreach with ${scoredInvestors[0]?.name} - highest match 
       res.status(500).json({ error: "Failed to send message" });
     }
   });
+
+  // Delete (unsend) a message - only the sender can delete their own messages
+  app.delete("/api/chat/conversations/:conversationId/messages/:messageId", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { conversationId, messageId } = req.params;
+      
+      // Verify conversation exists and user is a member
+      const conversation = await storage.getConversation(conversationId);
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      
+      const members = await storage.getConversationMembers(conversationId);
+      if (!members.some(m => m.userId === currentUser.id)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Verify message exists and belongs to this conversation
+      const message = await storage.getMessage(messageId);
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      if (message.conversationId !== conversationId) {
+        return res.status(400).json({ error: "Message does not belong to this conversation" });
+      }
+      
+      // Only the sender can delete their own message
+      if (message.senderId !== currentUser.id) {
+        return res.status(403).json({ error: "You can only unsend your own messages" });
+      }
+      
+      await storage.deleteMessage(messageId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      res.status(500).json({ error: "Failed to delete message" });
+    }
+  });
   
   // Update chat conversation (name)
   app.patch("/api/chat/conversations/:id", requireAuth, async (req, res) => {

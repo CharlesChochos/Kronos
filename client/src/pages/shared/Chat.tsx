@@ -90,6 +90,7 @@ export default function Chat({ role }: ChatProps) {
   const [showSettingsSheet, setShowSettingsSheet] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [newConversationName, setNewConversationName] = useState("");
+  const [newChatSearch, setNewChatSearch] = useState("");
   const [chatSettings, setChatSettings] = useState({
     fontSize: "medium",
     notifications: true,
@@ -189,6 +190,37 @@ export default function Chat({ role }: ChatProps) {
       toast.success("Conversation updated");
     },
   });
+
+  // Delete message mutation (unsend)
+  const deleteMessageMutation = useMutation({
+    mutationFn: async ({ conversationId, messageId }: { conversationId: string; messageId: string }) => {
+      const res = await fetch(`/api/chat/conversations/${conversationId}/messages/${messageId}`, { 
+        method: "DELETE" 
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to unsend message");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/chat/conversations/${selectedConversationId}/messages`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      toast.success("Message unsent");
+    },
+  });
+
+  const handleUnsendMessage = async (messageId: string) => {
+    if (!selectedConversationId) return;
+    try {
+      await deleteMessageMutation.mutateAsync({ 
+        conversationId: selectedConversationId, 
+        messageId 
+      });
+    } catch (error: any) {
+      toast.error(error.message || "Failed to unsend message");
+    }
+  };
 
   const handleUpdateConversationName = async () => {
     if (!selectedConversationId || !newConversationName.trim()) return;
@@ -640,21 +672,22 @@ export default function Chat({ role }: ChatProps) {
                                 {message.senderName?.split(' ').map(n => n[0]).join('').slice(0, 2) || '??'}
                               </AvatarFallback>
                             </Avatar>
-                            <div className={cn("max-w-[70%]", isOwnMessage && "text-right")}>
-                              <div className={cn(
-                                "rounded-lg p-3",
-                                isOwnMessage 
-                                  ? "bg-primary text-primary-foreground" 
-                                  : "bg-secondary"
-                              )}>
-                                {!isOwnMessage && (
-                                  <p className="text-xs font-medium mb-1 opacity-70">{message.senderName}</p>
-                                )}
-                                <p className={cn(
-                                  chatSettings.fontSize === "small" && "text-xs",
-                                  chatSettings.fontSize === "medium" && "text-sm",
-                                  chatSettings.fontSize === "large" && "text-base"
-                                )}>{message.content}</p>
+                            <div className={cn("max-w-[70%] group", isOwnMessage && "text-right")}>
+                              <div className="relative">
+                                <div className={cn(
+                                  "rounded-lg p-3",
+                                  isOwnMessage 
+                                    ? "bg-primary text-primary-foreground" 
+                                    : "bg-secondary"
+                                )}>
+                                  {!isOwnMessage && (
+                                    <p className="text-xs font-medium mb-1 opacity-70">{message.senderName}</p>
+                                  )}
+                                  <p className={cn(
+                                    chatSettings.fontSize === "small" && "text-xs",
+                                    chatSettings.fontSize === "medium" && "text-sm",
+                                    chatSettings.fontSize === "large" && "text-base"
+                                  )}>{message.content}</p>
                                 {message.attachments && message.attachments.length > 0 && (
                                   <div className="mt-2 space-y-1.5">
                                     {message.attachments.map((att, idx) => (
@@ -693,6 +726,19 @@ export default function Chat({ role }: ChatProps) {
                                       </div>
                                     ))}
                                   </div>
+                                )}
+                                </div>
+                                {isOwnMessage && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute -left-8 top-1/2 -translate-y-1/2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                                    onClick={() => handleUnsendMessage(message.id)}
+                                    disabled={deleteMessageMutation.isPending}
+                                    data-testid={`button-unsend-${message.id}`}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
                                 )}
                               </div>
                               {chatSettings.showTimestamps && (
@@ -813,16 +859,34 @@ export default function Chat({ role }: ChatProps) {
       </div>
 
       {/* New Chat Modal */}
-      <Dialog open={showNewChatModal} onOpenChange={setShowNewChatModal}>
+      <Dialog open={showNewChatModal} onOpenChange={(open) => { 
+        setShowNewChatModal(open); 
+        if (!open) setNewChatSearch(""); 
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New Conversation</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">Select a team member to start chatting</p>
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search for a team member..."
+                value={newChatSearch}
+                onChange={(e) => setNewChatSearch(e.target.value)}
+                className="pl-9 bg-secondary/50"
+                data-testid="input-search-new-chat"
+              />
+            </div>
             <ScrollArea className="h-60">
               <div className="space-y-2">
-                {availableUsers.map(user => (
+                {availableUsers
+                  .filter(user => 
+                    user.name.toLowerCase().includes(newChatSearch.toLowerCase()) ||
+                    user.email?.toLowerCase().includes(newChatSearch.toLowerCase()) ||
+                    user.role?.toLowerCase().includes(newChatSearch.toLowerCase())
+                  )
+                  .map(user => (
                   <button
                     key={user.id}
                     onClick={() => handleCreateChat(user.id)}
@@ -840,6 +904,13 @@ export default function Chat({ role }: ChatProps) {
                     </div>
                   </button>
                 ))}
+                {availableUsers.filter(user => 
+                  user.name.toLowerCase().includes(newChatSearch.toLowerCase()) ||
+                  user.email?.toLowerCase().includes(newChatSearch.toLowerCase()) ||
+                  user.role?.toLowerCase().includes(newChatSearch.toLowerCase())
+                ).length === 0 && (
+                  <p className="text-center text-sm text-muted-foreground py-4">No users found</p>
+                )}
               </div>
             </ScrollArea>
           </div>
