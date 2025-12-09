@@ -42,6 +42,7 @@ export default function InvestorMatching() {
   const { data: stakeholders = [], isLoading: stakeholdersLoading } = useStakeholders();
   const updateDeal = useUpdateDeal();
   
+  const [dealCategory, setDealCategory] = useState<'Investment Banking' | 'Asset Management'>('Investment Banking');
   const [selectedDeal, setSelectedDeal] = useState<string>('');
   const [showContactModal, setShowContactModal] = useState<InvestorData | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -96,14 +97,19 @@ export default function InvestorMatching() {
   const likeOpacity = useTransform(x, [0, 100], [0, 1]);
   const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
   
-  // Set initial deal once data loads or when deals change
+  // Filter deals by category
+  const filteredDeals = useMemo(() => {
+    return deals.filter(deal => (deal as any).dealType === dealCategory);
+  }, [deals, dealCategory]);
+
+  // Set initial deal once data loads or when deals/category changes
   useEffect(() => {
-    if (deals.length > 0 && !selectedDeal) {
-      setSelectedDeal(deals[0].id);
-    } else if (deals.length === 0 && selectedDeal) {
+    if (filteredDeals.length > 0) {
+      setSelectedDeal(filteredDeals[0].id);
+    } else {
       setSelectedDeal('');
     }
-  }, [deals.length, selectedDeal]);
+  }, [filteredDeals.length, dealCategory]);
 
   const currentDeal = deals.find(d => d.id === selectedDeal);
   
@@ -306,9 +312,22 @@ export default function InvestorMatching() {
   return (
     <Layout role="CEO" pageTitle="Investor Match Deck" userName={currentUser?.name || ""}>
       <div className="space-y-6">
-        {/* Deal Selector */}
-        <div className="flex items-center justify-between">
-          <div className="w-full max-w-md">
+        {/* Category and Deal Selector */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex gap-4 flex-1">
+            <div className="w-48">
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Deal Type</label>
+              <select 
+                  className="w-full bg-card border border-border rounded-md p-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+                  value={dealCategory}
+                  onChange={(e) => setDealCategory(e.target.value as 'Investment Banking' | 'Asset Management')}
+                  data-testid="select-deal-category"
+              >
+                  <option value="Investment Banking">Investment Banking</option>
+                  <option value="Asset Management">Asset Management</option>
+              </select>
+            </div>
+            <div className="flex-1 max-w-md">
               <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Select Deal to Match</label>
               <select 
                   className="w-full bg-card border border-border rounded-md p-2 text-sm focus:ring-1 focus:ring-primary outline-none"
@@ -316,13 +335,14 @@ export default function InvestorMatching() {
                   onChange={(e) => setSelectedDeal(e.target.value)}
                   data-testid="select-deal"
               >
-                  {deals.length === 0 && (
-                    <option value="">No deals available</option>
+                  {filteredDeals.length === 0 && (
+                    <option value="">No {dealCategory} deals available</option>
                   )}
-                  {deals.map(deal => (
+                  {filteredDeals.map(deal => (
                       <option key={deal.id} value={deal.id}>{deal.name} - ${deal.value}M ({deal.sector})</option>
                   ))}
               </select>
+            </div>
           </div>
           <Button variant="outline" size="sm" onClick={resetMatches}>
             Reset All

@@ -37,7 +37,7 @@ import {
   useStageDocuments, useCreateStageDocument, useDeleteStageDocument,
   useStagePodMembers, useCreateStagePodMember, useDeleteStagePodMember,
   useStageVoiceNotes, useCreateStageVoiceNote, useDeleteStageVoiceNote,
-  useTaskComments, useCreateTaskComment, useCreateTask,
+  useTaskComments, useCreateTaskComment, useCreateTask, useDeleteTask,
   useCustomSectors, useCreateCustomSector,
   useDealFees, type DealFeeType,
   useCreateDocument
@@ -83,6 +83,7 @@ type StageWorkSectionProps = {
   deleteStageVoiceNote: any;
   createTaskComment: any;
   createTask: any;
+  deleteTask: any;
   createDocument: any;
 };
 
@@ -103,6 +104,7 @@ function StageWorkSection({
   deleteStageVoiceNote,
   createTaskComment,
   createTask,
+  deleteTask,
   createDocument
 }: StageWorkSectionProps) {
   const { data: stageDocuments = [] } = useStageDocuments(dealId, activeStageTab);
@@ -692,7 +694,7 @@ function StageWorkSection({
           ) : (
             <div className="space-y-2">
               {stageTasks.map((task: any) => (
-                <div key={task.id} className="bg-secondary/20 rounded-lg overflow-hidden">
+                <div key={task.id} className="bg-secondary/20 rounded-lg overflow-hidden group">
                   <div 
                     className="flex items-center justify-between p-2 cursor-pointer hover:bg-secondary/30"
                     onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
@@ -710,6 +712,17 @@ function StageWorkSection({
                       <Badge variant="outline" className="text-xs">
                         {task.priority}
                       </Badge>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteTask.mutate(task.id);
+                        }}
+                      >
+                        <X className="w-3 h-3 text-red-400" />
+                      </Button>
                       <ChevronRight className={cn(
                         "w-4 h-4 transition-transform",
                         expandedTask === task.id && "rotate-90"
@@ -865,6 +878,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
   const deleteStageVoiceNote = useDeleteStageVoiceNote();
   const createTaskComment = useCreateTaskComment();
   const createTask = useCreateTask();
+  const deleteTask = useDeleteTask();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<string | null>(null);
@@ -945,6 +959,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
     lead: '',
     status: 'Active',
     progress: 0,
+    description: '',
   });
   
   const [newDealFees, setNewDealFees] = useState<{
@@ -1154,7 +1169,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
         status: newDeal.status,
         progress: getStageProgress(newDeal.stage),
         dealType: 'Asset Management',
-        description: null,
+        description: newDeal.description || null,
         attachments: [],
         podTeam: [],
         taggedInvestors: [],
@@ -1205,7 +1220,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
       
       toast.success("Deal created successfully!");
       setShowNewDealModal(false);
-      setNewDeal({ name: '', client: '', sector: 'Real Estate', customSector: '', value: '', stage: 'Reception', lead: '', status: 'Active', progress: 0 });
+      setNewDeal({ name: '', client: '', sector: 'Real Estate', customSector: '', value: '', stage: 'Reception', lead: '', status: 'Active', progress: 0, description: '' });
       setNewDealFees({ engagement: '', monthly: '', success: '', transaction: '', spread: '' });
     } catch (error: any) {
       toast.error(error.message || "Failed to create deal");
@@ -2520,6 +2535,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                     deleteStageVoiceNote={deleteStageVoiceNote}
                     createTaskComment={createTaskComment}
                     createTask={createTask}
+                    deleteTask={deleteTask}
                     createDocument={createDocument}
                   />
                 </TabsContent>
@@ -3059,63 +3075,14 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
               </div>
             </div>
             
-            <div className="border-t border-border pt-4 mt-4">
-              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                <DollarSign className="w-4 h-4" />
-                Fee Structure (Optional)
-              </h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Engagement Fee ($)</Label>
-                  <Input 
-                    type="number" 
-                    placeholder="0" 
-                    value={newDealFees.engagement}
-                    onChange={(e) => setNewDealFees({ ...newDealFees, engagement: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Monthly Retainer ($)</Label>
-                  <Input 
-                    type="number" 
-                    placeholder="0" 
-                    value={newDealFees.monthly}
-                    onChange={(e) => setNewDealFees({ ...newDealFees, monthly: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3 mt-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Success Fee (%)</Label>
-                  <Input 
-                    type="number" 
-                    placeholder="0" 
-                    step="0.1"
-                    value={newDealFees.success}
-                    onChange={(e) => setNewDealFees({ ...newDealFees, success: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Transaction Fee (%)</Label>
-                  <Input 
-                    type="number" 
-                    placeholder="0" 
-                    step="0.1"
-                    value={newDealFees.transaction}
-                    onChange={(e) => setNewDealFees({ ...newDealFees, transaction: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Spread (%)</Label>
-                  <Input 
-                    type="number" 
-                    placeholder="0" 
-                    step="0.1"
-                    value={newDealFees.spread}
-                    onChange={(e) => setNewDealFees({ ...newDealFees, spread: e.target.value })}
-                  />
-                </div>
-              </div>
+            <div className="space-y-2">
+              <Label>Description / Notes</Label>
+              <Textarea 
+                placeholder="Enter deal description, notes, or any additional details..."
+                value={newDeal.description || ''}
+                onChange={(e) => setNewDeal({ ...newDeal, description: e.target.value })}
+                rows={4}
+              />
             </div>
           </div>
           <DialogFooter>
@@ -3203,6 +3170,14 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Lead</Label>
+                <Input 
+                  placeholder="Deal Lead Name"
+                  value={editingDeal.lead}
+                  onChange={(e) => setEditingDeal({ ...editingDeal, lead: e.target.value })}
+                />
               </div>
             </div>
           )}
