@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MessageCircle, X, Send, Plus, Trash2, ChevronLeft, Loader2, Bot, User, Sparkles, Paperclip, FileText, Download, Settings, Mic, MicOff, Volume2, VolumeX, Maximize2, Minimize2 } from "lucide-react";
+import { MessageCircle, X, Send, Plus, Trash2, ChevronLeft, Loader2, Bot, User, Sparkles, Paperclip, FileText, Download, Settings, Mic, MicOff, Volume2, VolumeX, Maximize2, Minimize2, Share2, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
@@ -62,6 +62,8 @@ export function ReaperAssistant() {
   const [windowSize, setWindowSize] = useState<WindowSize>('normal');
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -177,6 +179,32 @@ export function ReaperAssistant() {
     queryKey: [`/api/assistant/conversations/${activeConversationId}/messages`],
     enabled: !!activeConversationId,
   });
+
+  const generateConversationSummary = useCallback(() => {
+    if (messages.length === 0) return '';
+    
+    const summary = messages.map(msg => {
+      const role = msg.role === 'user' ? 'You' : 'Kronos';
+      return `**${role}:** ${msg.content}`;
+    }).join('\n\n---\n\n');
+    
+    const activeConv = conversations.find(c => c.id === activeConversationId);
+    const header = `# Kronos AI Assistant - Conversation Summary\n\n**Topic:** ${activeConv?.title || 'Conversation'}\n**Date:** ${new Date().toLocaleDateString()}\n\n---\n\n`;
+    
+    return header + summary;
+  }, [messages, conversations, activeConversationId]);
+  
+  const copyConversationToClipboard = useCallback(async () => {
+    const summary = generateConversationSummary();
+    try {
+      await navigator.clipboard.writeText(summary);
+      setCopiedToClipboard(true);
+      toast.success('Conversation copied to clipboard');
+      setTimeout(() => setCopiedToClipboard(false), 2000);
+    } catch (err) {
+      toast.error('Failed to copy to clipboard');
+    }
+  }, [generateConversationSummary]);
 
   const createConversation = useMutation({
     mutationFn: async () => {
@@ -372,6 +400,45 @@ export function ReaperAssistant() {
   
   return (
     <>
+      {/* Share Dialog */}
+      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Share Conversation</DialogTitle>
+            <DialogDescription>Copy or share this conversation summary with your team</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-secondary/30 rounded-lg p-3 max-h-[300px] overflow-y-auto">
+              <pre className="text-xs whitespace-pre-wrap font-mono">
+                {generateConversationSummary()}
+              </pre>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={copyConversationToClipboard}
+                className="flex-1 gap-2"
+                data-testid="button-copy-conversation"
+              >
+                {copiedToClipboard ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    Copy to Clipboard
+                  </>
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              You can paste this summary in chat, email, or any document.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
       {/* Settings Dialog */}
       <Dialog open={showSettings} onOpenChange={setShowSettings}>
         <DialogContent className="sm:max-w-[400px]">
@@ -467,6 +534,18 @@ export function ReaperAssistant() {
                     data-testid="button-stop-speaking"
                   >
                     <VolumeX className="w-4 h-4 text-primary animate-pulse" />
+                  </Button>
+                )}
+                {messages.length > 0 && !showConversations && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setShowShareDialog(true)}
+                    title="Share conversation"
+                    data-testid="button-share-conversation"
+                  >
+                    <Share2 className="w-4 h-4" />
                   </Button>
                 )}
                 <Button
@@ -575,30 +654,108 @@ export function ReaperAssistant() {
                         <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                       </div>
                     ) : messages.length === 0 ? (
-                      <div className="text-center py-8 px-4">
+                      <div className="text-center py-4 px-4">
                         <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mx-auto mb-4">
                           <Bot className="w-8 h-8 text-primary" />
                         </div>
                         <h4 className="font-semibold mb-1">How can I help you?</h4>
-                        <p className="text-xs text-muted-foreground">Ask me about deals, tasks, team activities, or platform features.</p>
-                        <div className="mt-4 grid gap-2">
-                          {[
-                            "What deals are in progress?",
-                            "Show my pending tasks",
-                            "Team workload summary"
-                          ].map((suggestion) => (
-                            <button
-                              key={suggestion}
-                              onClick={() => {
-                                setInputValue(suggestion);
-                                inputRef.current?.focus();
-                              }}
-                              className="text-xs px-3 py-2 rounded-lg bg-secondary/50 hover:bg-secondary text-left transition-colors"
-                              data-testid={`suggestion-${suggestion.slice(0, 10)}`}
-                            >
-                              {suggestion}
-                            </button>
-                          ))}
+                        <p className="text-xs text-muted-foreground mb-4">Ask about deals, tasks, or let me take actions for you.</p>
+                        
+                        <div className="text-left space-y-3">
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Quick Actions</p>
+                            <div className="grid gap-1.5">
+                              {[
+                                { text: "Create a task for...", icon: "📋" },
+                                { text: "Schedule a meeting with...", icon: "📅" },
+                                { text: "Draft an NDA for...", icon: "📄" },
+                              ].map((suggestion) => (
+                                <button
+                                  key={suggestion.text}
+                                  onClick={() => {
+                                    setInputValue(suggestion.text);
+                                    inputRef.current?.focus();
+                                  }}
+                                  className="text-xs px-3 py-2 rounded-lg bg-primary/5 hover:bg-primary/10 text-left transition-colors flex items-center gap-2 border border-primary/10"
+                                  data-testid={`action-${suggestion.text.slice(0, 10)}`}
+                                >
+                                  <span>{suggestion.icon}</span>
+                                  <span>{suggestion.text}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Insights</p>
+                            <div className="grid gap-1.5">
+                              {[
+                                { text: "Pipeline overview", icon: "📊" },
+                                { text: "What's overdue?", icon: "⏰" },
+                                { text: "Team workload summary", icon: "👥" },
+                              ].map((suggestion) => (
+                                <button
+                                  key={suggestion.text}
+                                  onClick={() => {
+                                    setInputValue(suggestion.text);
+                                    inputRef.current?.focus();
+                                  }}
+                                  className="text-xs px-3 py-2 rounded-lg bg-secondary/50 hover:bg-secondary text-left transition-colors flex items-center gap-2"
+                                  data-testid={`insight-${suggestion.text.slice(0, 10)}`}
+                                >
+                                  <span>{suggestion.icon}</span>
+                                  <span>{suggestion.text}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Documents</p>
+                            <div className="grid gap-1.5">
+                              {[
+                                { text: "Generate a term sheet for...", icon: "📝" },
+                                { text: "Create a due diligence checklist", icon: "✅" },
+                                { text: "Draft investor update for...", icon: "✉️" },
+                              ].map((suggestion) => (
+                                <button
+                                  key={suggestion.text}
+                                  onClick={() => {
+                                    setInputValue(suggestion.text);
+                                    inputRef.current?.focus();
+                                  }}
+                                  className="text-xs px-3 py-2 rounded-lg bg-secondary/50 hover:bg-secondary text-left transition-colors flex items-center gap-2"
+                                  data-testid={`doc-${suggestion.text.slice(0, 10)}`}
+                                >
+                                  <span>{suggestion.icon}</span>
+                                  <span>{suggestion.text}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Deal Intelligence</p>
+                            <div className="grid gap-1.5">
+                              {[
+                                { text: "Recommend next steps for...", icon: "💡" },
+                                { text: "Find matching investors for...", icon: "🎯" },
+                              ].map((suggestion) => (
+                                <button
+                                  key={suggestion.text}
+                                  onClick={() => {
+                                    setInputValue(suggestion.text);
+                                    inputRef.current?.focus();
+                                  }}
+                                  className="text-xs px-3 py-2 rounded-lg bg-secondary/50 hover:bg-secondary text-left transition-colors flex items-center gap-2"
+                                  data-testid={`intel-${suggestion.text.slice(0, 10)}`}
+                                >
+                                  <span>{suggestion.icon}</span>
+                                  <span>{suggestion.text}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ) : (

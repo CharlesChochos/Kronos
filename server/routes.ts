@@ -2254,32 +2254,60 @@ Consider common investment banking tasks like:
         }));
       
       // Build the enhanced system prompt
-      const systemPrompt = `You are Kronos, an advanced AI assistant for the Kronos investment banking operations platform. You help ${currentUser.accessLevel === 'admin' ? 'executives' : 'team members'} manage deals, tasks, and collaborate with their team.
+      const systemPrompt = `You are Kronos, an advanced AI assistant for the Kronos investment banking operations platform at Equiturn. You help ${currentUser.accessLevel === 'admin' ? 'executives and Managing Directors' : 'investment banking professionals'} manage transactions, execute deals, and optimize team productivity.
+
+## YOUR EXPERTISE - INVESTMENT BANKING KNOWLEDGE:
+
+### Transaction Lifecycle:
+- **Origination**: Client sourcing, mandate pitching, engagement letters, fee negotiations
+- **Due Diligence**: VDR management, information requests, management presentations, Q&A coordination
+- **Execution**: Transaction documentation, deal structuring, regulatory filings, closing mechanics
+- **Deal Types**: M&A (buy-side/sell-side), capital raises, IPOs, debt financing, restructuring
+
+### Key IB Terminology:
+- **LOI/IOI**: Letter of Intent / Indication of Interest
+- **SPA/APA**: Stock/Asset Purchase Agreement
+- **VDR**: Virtual Data Room
+- **CIM/IM**: Confidential Information Memorandum
+- **DCF/LBO**: Discounted Cash Flow / Leveraged Buyout analysis
+- **EBITDA multiples**: Enterprise value metrics
+- **Term Sheet**: Non-binding summary of key transaction terms
+- **Closing conditions**: Conditions precedent to transaction completion
+
+### Stage-Based Best Practices:
+- Origination: Focus on relationship building and deal qualification
+- Due Diligence: Maintain momentum, respond to requests within 24-48 hours
+- Negotiation: Balance commercial terms with closing certainty
+- Documentation: Track open items, coordinate with legal counsel
+- Closing: Ensure all conditions satisfied, coordinate funds flow
 
 ## YOUR CAPABILITIES:
 
 ### Query & Analysis:
-- Answer questions about deals, tasks, investors, meetings, and team activities
-- Provide insights on deal progress, pipeline status, and velocity
-- Analyze team workload distribution and identify bottlenecks
-- Calculate metrics like deal conversion rates, time in stage, completion rates
-- Recommend investors based on deal sector and investment requirements
-- Summarize documents and their categories
+- Answer questions about deals, pipeline status, tasks, investors, and team activities
+- Provide insights on deal velocity, conversion rates, and stage progression
+- Analyze team workload distribution and identify capacity constraints
+- Calculate metrics like average time-in-stage, completion rates, and fee projections
+- Match investors based on sector focus, check size, and investment criteria
+- Summarize documents by category and deal association
 
 ### Actions You Can Take:
-- CREATE TASKS and assign them to team members (use create_task function)
-- SCHEDULE MEETINGS with attendees (use schedule_meeting function)
-- UPDATE DEAL status, progress, or stage (use update_deal function)
-- UPDATE TASK status or priority (use update_task function)
-- SEND IN-APP MESSAGES to team members (use send_message function)
-- SHARE FILES with team members (use share_file function)
+- CREATE TASKS: Assign work to team members with priorities and deadlines
+- SCHEDULE MEETINGS: Book calls and meetings with internal or external attendees
+- UPDATE DEALS: Modify stage, status, or progress for transactions
+- UPDATE TASKS: Mark complete, change priority, or update status
+- SEND MESSAGES: Communicate with team members via in-app chat
+- SHARE FILES: Send documents to colleagues with context
+- GENERATE DOCUMENTS: Draft term sheets, NDAs, deal memos, LOIs, checklists
+- ANALYZE INVESTOR FIT: Find matching investors for specific deals
+- GET DEAL RECOMMENDATIONS: Receive AI-powered next steps based on deal stage
 
 ### Proactive Intelligence:
-- Flag stalled deals that haven't been updated recently
-- Identify overdue tasks that need attention
-- Alert about upcoming deadlines in the next 7 days
-- Highlight team members with high workload
-- Suggest next steps for deals based on their stage
+- Flag stalled deals that haven't been updated recently (deal velocity alerts)
+- Identify overdue tasks requiring immediate attention
+- Alert about upcoming deadlines within the next week
+- Highlight team members with high workload for capacity planning
+- Suggest stage-appropriate next steps for active transactions
 
 ## CURRENT PLATFORM CONTEXT:
 ${JSON.stringify(platformContext, null, 2)}
@@ -2307,16 +2335,28 @@ Example: "Mark the compliance review task as completed" -> call update_task
 **Sending Messages:** When asked to message someone, use send_message.
 Example: "Tell Michael the meeting is moved to 3pm" -> call send_message
 
+**Generating Documents:** When asked to draft, create, or generate a document, use generate_document.
+Example: "Draft a term sheet for the TechCo deal" -> call generate_document with documentType: "term_sheet"
+Available document types: term_sheet, nda, deal_memo, investor_update, email_draft, loi, due_diligence_checklist, closing_checklist, pitch_deck_outline
+
+**Deal Recommendations:** When asked for advice or next steps on a deal, use get_deal_recommendation.
+Example: "What should we focus on next for the Alpha Corp deal?" -> call get_deal_recommendation
+
+**Investor Analysis:** When asked to find or match investors for a deal, use analyze_investor_fit.
+Example: "Which investors would be good for the healthcare deal?" -> call analyze_investor_fit
+
 ## GUIDELINES:
-- Be concise but thorough in responses
-- Use specific data from the context when relevant
-- Format responses with clear structure (use markdown)
-- Proactively mention relevant alerts when appropriate
-- When discussing values, note they are in millions (e.g., $50M)
-- For investor matching, consider sector alignment and investment range
-- Reference team members by name when relevant
-- Provide actionable insights and next step recommendations
-- When asked to perform an action, ALWAYS use the appropriate function`;
+- Be concise but thorough - investment bankers are busy
+- Use specific data from the platform context when relevant
+- Format responses with clear structure using markdown headers and bullets
+- Proactively mention relevant alerts when they impact the user's work
+- Always express transaction values in millions (e.g., $50M, $150M)
+- For investor matching, prioritize sector alignment, then check size compatibility
+- Reference team members by name for accountability
+- Provide actionable insights with specific next steps
+- When asked to perform an action, ALWAYS use the appropriate function
+- Use professional IB terminology appropriately (DCF, EBITDA, VDR, etc.)
+- When generating documents, auto-populate with deal data when available`;
       
       // Define tools for the assistant
       const tools: any[] = [
@@ -2500,6 +2540,74 @@ Example: "Tell Michael the meeting is moved to 3pm" -> call send_message
                 }
               },
               required: ["taskTitle"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "generate_document",
+            description: "Generate a document draft such as a term sheet, NDA, deal memo, investor update, or email draft. Use when user asks to create, draft, write, or generate any document.",
+            parameters: {
+              type: "object",
+              properties: {
+                documentType: {
+                  type: "string",
+                  enum: ["term_sheet", "nda", "deal_memo", "investor_update", "email_draft", "loi", "due_diligence_checklist", "closing_checklist", "pitch_deck_outline"],
+                  description: "Type of document to generate"
+                },
+                dealName: {
+                  type: "string",
+                  description: "The deal this document relates to (optional)"
+                },
+                recipientName: {
+                  type: "string",
+                  description: "For emails/letters, the intended recipient"
+                },
+                additionalContext: {
+                  type: "string",
+                  description: "Any additional details or requirements for the document"
+                }
+              },
+              required: ["documentType"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "get_deal_recommendation",
+            description: "Get AI-powered recommendations for next steps on a deal based on its current stage, progress, and historical patterns. Use when user asks for advice, recommendations, or next steps on a deal.",
+            parameters: {
+              type: "object",
+              properties: {
+                dealName: {
+                  type: "string",
+                  description: "The name of the deal to get recommendations for"
+                }
+              },
+              required: ["dealName"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "analyze_investor_fit",
+            description: "Analyze and recommend investors that would be a good fit for a specific deal based on sector, investment size, and preferences. Use when user asks about investor matching, finding investors, or investor recommendations.",
+            parameters: {
+              type: "object",
+              properties: {
+                dealName: {
+                  type: "string",
+                  description: "The name of the deal to find investors for"
+                },
+                limit: {
+                  type: "number",
+                  description: "Maximum number of investors to recommend (default 5)"
+                }
+              },
+              required: ["dealName"]
             }
           }
         }
@@ -2889,6 +2997,218 @@ Example: "Tell Michael the meeting is moved to 3pm" -> call send_message
                 toolResults.push({
                   tool_call_id: toolCall.id,
                   result: "Failed to update task"
+                });
+              }
+            } else if (functionCall?.name === "generate_document") {
+              try {
+                const args = JSON.parse(functionCall.arguments);
+                const deal = args.dealName ? deals.find(d => d.name.toLowerCase().includes(args.dealName.toLowerCase())) : null;
+                
+                const documentTemplates: Record<string, string> = {
+                  term_sheet: `# TERM SHEET\n\n**Transaction:** ${deal?.name || '[Deal Name]'}\n**Date:** ${new Date().toLocaleDateString()}\n\n## 1. PARTIES\n- **Company:** ${deal?.client || '[Client Name]'}\n- **Investor(s):** [Investor Names]\n\n## 2. INVESTMENT AMOUNT\n- **Total Investment:** $${deal?.value || '[Amount]'}M\n- **Type:** ${deal?.dealType || 'Equity'}\n\n## 3. VALUATION\n- **Pre-money Valuation:** $[X]M\n- **Post-money Valuation:** $[X]M\n\n## 4. KEY TERMS\n- **Board Seats:** [X] investor directors\n- **Protective Provisions:** Standard\n- **Information Rights:** Monthly financials, annual audit\n- **Anti-dilution:** Broad-based weighted average\n\n## 5. CONDITIONS PRECEDENT\n- Satisfactory due diligence\n- Definitive documentation\n- Regulatory approvals\n\n*This term sheet is non-binding except for confidentiality and exclusivity provisions.*`,
+                  
+                  nda: `# NON-DISCLOSURE AGREEMENT\n\n**Date:** ${new Date().toLocaleDateString()}\n\n**Between:**\n1. ${deal?.client || '[Disclosing Party]'} ("Disclosing Party")\n2. [Recipient Party] ("Receiving Party")\n\n## 1. DEFINITION OF CONFIDENTIAL INFORMATION\nAll information disclosed by the Disclosing Party relating to ${deal?.name || 'the Transaction'}, including but not limited to financial data, business plans, customer lists, and proprietary technology.\n\n## 2. OBLIGATIONS\nThe Receiving Party agrees to:\n- Maintain strict confidentiality\n- Use information solely for evaluating the Transaction\n- Limit disclosure to necessary personnel\n- Return or destroy materials upon request\n\n## 3. EXCLUSIONS\nInformation that is:\n- Publicly available\n- Previously known\n- Independently developed\n- Disclosed by authorized third parties\n\n## 4. TERM\nThis Agreement remains in effect for [2] years from the date above.\n\n**SIGNATURES:**\n\n_________________________\nDisclosing Party\n\n_________________________\nReceiving Party`,
+                  
+                  deal_memo: `# DEAL MEMORANDUM\n\n**Deal:** ${deal?.name || '[Deal Name]'}\n**Client:** ${deal?.client || '[Client]'}\n**Sector:** ${deal?.sector || '[Sector]'}\n**Date:** ${new Date().toLocaleDateString()}\n**Deal Lead:** ${deal?.lead || '[Lead Banker]'}\n\n## EXECUTIVE SUMMARY\n${deal?.description || '[Brief description of the transaction and its strategic rationale]'}\n\n## TRANSACTION OVERVIEW\n- **Deal Type:** ${deal?.dealType || 'M&A Advisory'}\n- **Transaction Value:** $${deal?.value || '[X]'}M\n- **Current Stage:** ${deal?.stage || 'Origination'}\n- **Expected Close:** [Date]\n\n## KEY CONSIDERATIONS\n1. **Strategic Fit:** [Analysis]\n2. **Market Conditions:** [Analysis]\n3. **Valuation:** [Analysis]\n4. **Risk Factors:** [Analysis]\n\n## NEXT STEPS\n1. [Action item 1]\n2. [Action item 2]\n3. [Action item 3]\n\n## TEAM\n- Deal Lead: ${deal?.lead || '[Name]'}\n- Associates: [Names]\n- Analysts: [Names]`,
+                  
+                  investor_update: `# INVESTOR UPDATE\n\n**Deal:** ${deal?.name || '[Deal Name]'}\n**Date:** ${new Date().toLocaleDateString()}\n**Update Period:** [Month/Quarter]\n\n## TRANSACTION STATUS\n**Current Stage:** ${deal?.stage || '[Stage]'}\n**Progress:** ${deal?.progress || 0}%\n\n## KEY DEVELOPMENTS\n1. [Development 1]\n2. [Development 2]\n3. [Development 3]\n\n## UPCOMING MILESTONES\n- [Milestone 1] - [Target Date]\n- [Milestone 2] - [Target Date]\n\n## ACTION ITEMS\n- [Item requiring investor attention]\n\n## NEXT COMMUNICATION\nWe will provide the next update on [Date].\n\nPlease reach out with any questions.`,
+                  
+                  email_draft: `Subject: ${deal?.name || '[Deal Name]'} - [Subject]\n\nDear ${args.recipientName || '[Recipient]'},\n\nI hope this email finds you well.\n\n[Body of email regarding ${deal?.name || 'the transaction'}]\n\nPlease let me know if you have any questions or would like to schedule a call to discuss further.\n\nBest regards,\n${currentUser.name}\nKronos Investment Banking`,
+                  
+                  loi: `# LETTER OF INTENT\n\n**Date:** ${new Date().toLocaleDateString()}\n\n**To:** ${deal?.client || '[Target Company]'}\n**From:** [Acquiring Party]\n**Re:** Proposed Transaction\n\nDear [Name],\n\nWe are pleased to submit this non-binding Letter of Intent to acquire ${deal?.client || '[Target]'}.\n\n## PROPOSED TERMS\n- **Purchase Price:** $${deal?.value || '[X]'}M\n- **Structure:** [Asset/Stock Purchase]\n- **Financing:** [Cash/Stock/Debt]\n\n## DUE DILIGENCE\nSubject to satisfactory completion of [30-60] day due diligence period.\n\n## EXCLUSIVITY\nWe request a [60] day exclusivity period.\n\n## CONFIDENTIALITY\nThis LOI and all discussions shall remain confidential.\n\n*This letter is non-binding except for exclusivity and confidentiality provisions.*\n\nSincerely,\n[Signature]`,
+                  
+                  due_diligence_checklist: `# DUE DILIGENCE CHECKLIST\n\n**Deal:** ${deal?.name || '[Deal Name]'}\n**Client:** ${deal?.client || '[Client]'}\n**Date:** ${new Date().toLocaleDateString()}\n\n## FINANCIAL\n- [ ] Audited financial statements (3 years)\n- [ ] Monthly financials (trailing 12 months)\n- [ ] Budget and projections\n- [ ] Accounts receivable aging\n- [ ] Accounts payable aging\n- [ ] Debt schedule and agreements\n\n## LEGAL\n- [ ] Corporate documents (charter, bylaws)\n- [ ] Shareholder agreements\n- [ ] Material contracts\n- [ ] Litigation history\n- [ ] Intellectual property\n- [ ] Regulatory compliance\n\n## OPERATIONS\n- [ ] Key customer list\n- [ ] Key supplier contracts\n- [ ] Employee roster and compensation\n- [ ] Real estate leases\n- [ ] Equipment list\n\n## TAX\n- [ ] Tax returns (3 years)\n- [ ] Tax notices and audits\n- [ ] Transfer pricing documentation\n\n## TECHNOLOGY\n- [ ] IT systems overview\n- [ ] Cybersecurity assessment\n- [ ] Data privacy compliance`,
+                  
+                  closing_checklist: `# CLOSING CHECKLIST\n\n**Deal:** ${deal?.name || '[Deal Name]'}\n**Target Close Date:** [Date]\n\n## PRE-CLOSING\n- [ ] Final due diligence complete\n- [ ] Purchase agreement negotiated and executed\n- [ ] Disclosure schedules finalized\n- [ ] Regulatory approvals obtained\n- [ ] Third-party consents received\n- [ ] Financing confirmed\n\n## CLOSING DAY\n- [ ] Bring-down of representations\n- [ ] Funds transfer verification\n- [ ] Signature pages collected\n- [ ] Certificate of closing\n- [ ] Press release approval\n\n## POST-CLOSING\n- [ ] File necessary documents\n- [ ] Transfer ownership records\n- [ ] Update corporate books\n- [ ] Integration kickoff\n- [ ] Stakeholder notifications`,
+                  
+                  pitch_deck_outline: `# PITCH DECK OUTLINE\n\n**Company:** ${deal?.client || '[Client Name]'}\n**Prepared for:** ${deal?.name || '[Transaction]'}\n\n## SLIDE 1: COVER\n- Company name and logo\n- Tagline/value proposition\n- Date and confidentiality notice\n\n## SLIDE 2: EXECUTIVE SUMMARY\n- Company overview\n- Transaction rationale\n- Key investment highlights\n\n## SLIDE 3: COMPANY OVERVIEW\n- Business description\n- History and milestones\n- Mission and vision\n\n## SLIDE 4: MARKET OPPORTUNITY\n- Total addressable market\n- Market trends\n- Competitive landscape\n\n## SLIDE 5: PRODUCTS/SERVICES\n- Product portfolio\n- Competitive advantages\n- Technology/IP\n\n## SLIDE 6: BUSINESS MODEL\n- Revenue streams\n- Customer segments\n- Go-to-market strategy\n\n## SLIDE 7: FINANCIAL HIGHLIGHTS\n- Historical performance\n- Key metrics and KPIs\n- Projections\n\n## SLIDE 8: MANAGEMENT TEAM\n- Key executives\n- Board of directors\n- Advisory board\n\n## SLIDE 9: INVESTMENT HIGHLIGHTS\n- Key strengths\n- Growth opportunities\n- Transaction value: $${deal?.value || '[X]'}M\n\n## SLIDE 10: APPENDIX\n- Detailed financials\n- Customer case studies\n- Additional data`
+                };
+                
+                const docContent = documentTemplates[args.documentType] || "Document template not found";
+                
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: `GENERATED_DOCUMENT_START\n${docContent}\nGENERATED_DOCUMENT_END\n\nDocument type: ${args.documentType.replace(/_/g, ' ').toUpperCase()}`
+                });
+              } catch (parseError) {
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: "Failed to generate document"
+                });
+              }
+            } else if (functionCall?.name === "get_deal_recommendation") {
+              try {
+                const args = JSON.parse(functionCall.arguments);
+                const deal = deals.find(d => d.name.toLowerCase().includes(args.dealName.toLowerCase()));
+                
+                if (!deal) {
+                  toolResults.push({
+                    tool_call_id: toolCall.id,
+                    result: `Deal "${args.dealName}" not found.`
+                  });
+                  continue;
+                }
+                
+                const stageRecommendations: Record<string, string[]> = {
+                  'Origination': [
+                    'Schedule initial client meeting to understand objectives',
+                    'Prepare preliminary valuation analysis',
+                    'Identify potential buyers/investors based on sector',
+                    'Draft engagement letter and fee proposal',
+                    'Conduct initial market assessment'
+                  ],
+                  'Qualification': [
+                    'Complete preliminary due diligence',
+                    'Validate deal economics and feasibility',
+                    'Assess client financials and documentation',
+                    'Identify key risk factors',
+                    'Prepare internal deal committee memo'
+                  ],
+                  'Due Diligence': [
+                    'Organize virtual data room',
+                    'Coordinate management presentations',
+                    'Address buyer/investor questions promptly',
+                    'Track due diligence request list completion',
+                    'Prepare for potential issues discovered'
+                  ],
+                  'Negotiation': [
+                    'Review and markup transaction documents',
+                    'Negotiate key commercial terms',
+                    'Address open due diligence items',
+                    'Prepare closing conditions checklist',
+                    'Coordinate with legal counsel on documentation'
+                  ],
+                  'Documentation': [
+                    'Finalize purchase agreement',
+                    'Complete disclosure schedules',
+                    'Obtain necessary third-party consents',
+                    'Coordinate regulatory filings',
+                    'Prepare closing mechanics'
+                  ],
+                  'Closing': [
+                    'Confirm all closing conditions satisfied',
+                    'Coordinate funds flow',
+                    'Execute signature pages',
+                    'Prepare announcement materials',
+                    'Plan post-closing integration'
+                  ]
+                };
+                
+                const recommendations = stageRecommendations[deal.stage] || stageRecommendations['Origination'];
+                const dealTasks = allTasks.filter(t => t.dealId === deal.id);
+                const openTasks = dealTasks.filter(t => t.status !== 'Completed');
+                const overdueTasks = dealTasks.filter(t => new Date(t.dueDate) < new Date() && t.status !== 'Completed');
+                
+                const recommendation = `
+DEAL ANALYSIS: ${deal.name}
+Current Stage: ${deal.stage}
+Progress: ${deal.progress}%
+Value: $${deal.value}M
+
+CURRENT STATUS:
+- Open Tasks: ${openTasks.length}
+- Overdue Tasks: ${overdueTasks.length}
+${overdueTasks.length > 0 ? `- ⚠️ Overdue: ${overdueTasks.map(t => t.title).join(', ')}` : ''}
+
+RECOMMENDED NEXT STEPS FOR ${deal.stage.toUpperCase()} STAGE:
+${recommendations.map((r, i) => `${i + 1}. ${r}`).join('\n')}
+
+PRIORITY ACTIONS:
+${deal.progress < 25 ? '🔴 Deal is early stage - focus on building momentum' : deal.progress < 50 ? '🟡 Mid-process - maintain timeline discipline' : deal.progress < 75 ? '🟢 Good progress - push toward completion' : '🎯 Final stretch - ensure all conditions are met'}
+                `;
+                
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: recommendation
+                });
+              } catch (parseError) {
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: "Failed to analyze deal"
+                });
+              }
+            } else if (functionCall?.name === "analyze_investor_fit") {
+              try {
+                const args = JSON.parse(functionCall.arguments);
+                const deal = deals.find(d => d.name.toLowerCase().includes(args.dealName.toLowerCase()));
+                
+                if (!deal) {
+                  toolResults.push({
+                    tool_call_id: toolCall.id,
+                    result: `Deal "${args.dealName}" not found.`
+                  });
+                  continue;
+                }
+                
+                const limit = args.limit || 5;
+                const dealSector = deal.sector?.toLowerCase() || '';
+                
+                // Score investors based on sector match
+                const scoredInvestors = investors
+                  .filter(inv => inv.status === 'Active')
+                  .map(inv => {
+                    let score = 0;
+                    const invSectors = (inv.preferredSectors || []).map(s => s.toLowerCase());
+                    const invFocus = inv.focus?.toLowerCase() || '';
+                    
+                    // Exact sector match
+                    if (invSectors.includes(dealSector) || invFocus.includes(dealSector)) {
+                      score += 50;
+                    }
+                    // Partial match
+                    if (invSectors.some(s => dealSector.includes(s) || s.includes(dealSector))) {
+                      score += 30;
+                    }
+                    // Check size fit
+                    if (inv.minInvestment && inv.maxInvestment) {
+                      if (deal.value >= inv.minInvestment && deal.value <= inv.maxInvestment) {
+                        score += 40;
+                      } else if (deal.value >= inv.minInvestment * 0.5 && deal.value <= inv.maxInvestment * 1.5) {
+                        score += 20;
+                      }
+                    }
+                    // Favorite bonus
+                    if (inv.isFavorite) score += 10;
+                    
+                    return { ...inv, score };
+                  })
+                  .filter(inv => inv.score > 0)
+                  .sort((a, b) => b.score - a.score)
+                  .slice(0, limit);
+                
+                if (scoredInvestors.length === 0) {
+                  toolResults.push({
+                    tool_call_id: toolCall.id,
+                    result: `No matching investors found for ${deal.name} (${deal.sector} sector). Consider expanding your investor database.`
+                  });
+                  continue;
+                }
+                
+                const analysis = `
+INVESTOR ANALYSIS FOR: ${deal.name}
+Sector: ${deal.sector}
+Deal Size: $${deal.value}M
+
+TOP ${scoredInvestors.length} RECOMMENDED INVESTORS:
+${scoredInvestors.map((inv, i) => `
+${i + 1}. ${inv.name} (Match Score: ${inv.score}%)
+   Type: ${inv.type}
+   Focus: ${inv.focus || 'Multi-sector'}
+   Investment Range: $${inv.minInvestment || 0}M - $${inv.maxInvestment || '∞'}M
+   AUM: ${inv.aum ? `$${inv.aum}B` : 'N/A'}
+`).join('')}
+
+RECOMMENDATION: Start outreach with ${scoredInvestors[0]?.name} - highest match score based on sector alignment and investment criteria.
+                `;
+                
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: analysis
+                });
+              } catch (parseError) {
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: "Failed to analyze investor fit"
                 });
               }
             }
