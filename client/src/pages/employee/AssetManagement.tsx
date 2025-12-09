@@ -1055,6 +1055,8 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
     return [...allSectors, 'Other'];
   }, [customSectors]);
   const [sectorOpen, setSectorOpen] = useState(false);
+  const [editSectorOpen, setEditSectorOpen] = useState(false);
+  const [editCustomSector, setEditCustomSector] = useState('');
 
   const [newTeamMember, setNewTeamMember] = useState<PodTeamMember>({
     name: '',
@@ -1537,12 +1539,30 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
 
   const handleEditDeal = async () => {
     if (!editingDeal) return;
+    
+    // Handle custom sector
+    const finalSector = editingDeal.sector === 'Other' && editCustomSector ? editCustomSector : editingDeal.sector;
+    
+    // Save custom sector if it's a new one
+    const isCustomSector = editingDeal.sector === 'Other' && editCustomSector;
+    const existingCustomSectorNames = customSectors.map(s => s.name.toLowerCase());
+    const isNewCustomSector = isCustomSector && !existingCustomSectorNames.includes(editCustomSector.toLowerCase()) && !BASE_SECTORS.includes(editCustomSector);
+    
     try {
+      // Save the custom sector first if it's new
+      if (isNewCustomSector) {
+        try {
+          await createCustomSector.mutateAsync(editCustomSector);
+        } catch (e) {
+          console.log("Custom sector may already exist:", e);
+        }
+      }
+      
       await updateDeal.mutateAsync({
         id: editingDeal.id,
         name: editingDeal.name,
         client: editingDeal.client,
-        sector: editingDeal.sector,
+        sector: finalSector,
         value: editingDeal.value,
         stage: editingDeal.stage,
         lead: editingDeal.lead,
@@ -1552,6 +1572,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
       toast.success("Deal updated successfully!");
       setShowEditModal(false);
       setEditingDeal(null);
+      setEditCustomSector('');
     } catch (error: any) {
       toast.error(error.message || "Failed to update deal");
     }
@@ -1571,6 +1592,14 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
 
   const openEditModal = (deal: Deal) => {
     setEditingDeal(deal);
+    // If the current sector is not in the SECTORS list, it's a custom sector
+    const isCustom = !BASE_SECTORS.includes(deal.sector) && deal.sector !== 'Other';
+    if (isCustom) {
+      setEditCustomSector(deal.sector);
+      setEditingDeal({ ...deal, sector: 'Other' });
+    } else {
+      setEditCustomSector('');
+    }
     setShowEditModal(true);
   };
 
@@ -3420,20 +3449,61 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Sector</Label>
-                  <Select value={editingDeal.sector} onValueChange={(v) => setEditingDeal({ ...editingDeal, sector: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Real Estate">Real Estate</SelectItem>
-                      <SelectItem value="Infrastructure">Infrastructure</SelectItem>
-                      <SelectItem value="Private Equity">Private Equity</SelectItem>
-                      <SelectItem value="Hedge Funds">Hedge Funds</SelectItem>
-                      <SelectItem value="Fixed Income">Fixed Income</SelectItem>
-                      <SelectItem value="Equities">Equities</SelectItem>
-                      <SelectItem value="Commodities">Commodities</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Popover open={editSectorOpen} onOpenChange={setEditSectorOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" aria-expanded={editSectorOpen} className="w-full justify-between">
+                        {editingDeal.sector === 'Other' && editCustomSector ? editCustomSector : editingDeal.sector}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput placeholder="Search sector or type custom..." />
+                        <CommandList>
+                          <CommandEmpty>
+                            <div className="p-2">
+                              <p className="text-sm text-muted-foreground mb-2">No sector found. Add custom:</p>
+                              <Input 
+                                placeholder="Enter custom sector"
+                                value={editCustomSector}
+                                onChange={(e) => setEditCustomSector(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && editCustomSector) {
+                                    setEditingDeal({ ...editingDeal, sector: 'Other' });
+                                    setEditSectorOpen(false);
+                                  }
+                                }}
+                              />
+                            </div>
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {SECTORS.map((sector) => (
+                              <CommandItem
+                                key={sector}
+                                value={sector}
+                                onSelect={() => {
+                                  setEditingDeal({ ...editingDeal, sector });
+                                  if (sector !== 'Other') setEditCustomSector('');
+                                  setEditSectorOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", editingDeal.sector === sector ? "opacity-100" : "opacity-0")} />
+                                {sector}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {editingDeal.sector === 'Other' && (
+                    <Input 
+                      placeholder="Enter custom sector name"
+                      value={editCustomSector}
+                      onChange={(e) => setEditCustomSector(e.target.value)}
+                      className="mt-2"
+                    />
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Status</Label>
