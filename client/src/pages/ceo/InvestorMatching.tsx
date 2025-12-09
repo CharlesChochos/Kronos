@@ -385,14 +385,16 @@ export default function InvestorMatching() {
                       <h2 className="text-3xl font-display font-bold mb-2">{currentInvestor.name}</h2>
                       <Badge variant="secondary" className="mb-4">{currentInvestor.type}</Badge>
                       
-                      <div className="grid grid-cols-2 gap-8 w-full max-w-xs mb-8">
+                      <div className="grid grid-cols-2 gap-4 w-full max-w-xs mb-6">
                           <div className="text-center">
-                              <div className="text-xs text-muted-foreground uppercase tracking-wider">Focus</div>
-                              <div className="font-medium text-lg">{currentInvestor.focus}</div>
+                              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Focus</div>
+                              <div className="font-medium text-sm line-clamp-2 max-h-10 overflow-hidden" title={currentInvestor.focus}>
+                                {currentInvestor.focus.split(',').slice(0, 3).join(', ')}{currentInvestor.focus.split(',').length > 3 ? '...' : ''}
+                              </div>
                           </div>
                           <div className="text-center">
-                              <div className="text-xs text-muted-foreground uppercase tracking-wider">Check Size</div>
-                              <div className="font-medium text-lg">{currentInvestor.checkSize}</div>
+                              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Check Size</div>
+                              <div className="font-medium text-sm">{currentInvestor.checkSize}</div>
                           </div>
                       </div>
 
@@ -482,11 +484,6 @@ export default function InvestorMatching() {
                     <p className="text-muted-foreground mb-4">
                       Add investors to your Stakeholder Directory to start matching them with deals.
                     </p>
-                    <Link href="/ceo/stakeholders">
-                      <Button>
-                        <Users className="w-4 h-4 mr-2" /> Go to Stakeholder Directory
-                      </Button>
-                    </Link>
                   </>
                 ) : (
                   <>
