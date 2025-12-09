@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MessageCircle, X, Send, Plus, Trash2, ChevronLeft, Loader2, Bot, User, Sparkles, Paperclip, FileText, Download, Settings, Mic, MicOff, Volume2, VolumeX, Maximize2, Minimize2, Share2, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { useCurrentUser } from "@/lib/api";
 
 type AssistantConversation = {
   id: string;
@@ -64,6 +65,41 @@ export function ReaperAssistant() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
+  
+  // Get current user for role-based prompts
+  const { data: currentUser } = useCurrentUser();
+  const isAdmin = currentUser?.accessLevel === 'admin';
+  
+  // Role-based quick prompts
+  const quickPrompts = useMemo(() => ({
+    actions: isAdmin ? [
+      { text: "What deals need attention?", icon: "📊" },
+      { text: "Recommend next steps for...", icon: "🎯" },
+      { text: "Find investors for...", icon: "🤝" },
+    ] : [
+      { text: "Create a task for...", icon: "📋" },
+      { text: "Schedule a meeting with...", icon: "📅" },
+      { text: "What are my priorities today?", icon: "🎯" },
+    ],
+    insights: isAdmin ? [
+      { text: "Pipeline overview", icon: "📈" },
+      { text: "Team workload summary", icon: "👥" },
+      { text: "Which deals are stalled?", icon: "⚠️" },
+    ] : [
+      { text: "What's overdue?", icon: "⏰" },
+      { text: "My upcoming meetings", icon: "📅" },
+      { text: "My task summary", icon: "📋" },
+    ],
+    documents: isAdmin ? [
+      { text: "Generate a term sheet for...", icon: "📝" },
+      { text: "Draft an investor update for...", icon: "✉️" },
+      { text: "Create a deal memo for...", icon: "📄" },
+    ] : [
+      { text: "Draft an NDA for...", icon: "📄" },
+      { text: "Create a due diligence checklist", icon: "✅" },
+      { text: "Draft an email for...", icon: "✉️" },
+    ],
+  }), [isAdmin]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -663,13 +699,11 @@ export function ReaperAssistant() {
                         
                         <div className="text-left space-y-3">
                           <div>
-                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Quick Actions</p>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">
+                              {isAdmin ? 'Executive Actions' : 'Quick Actions'}
+                            </p>
                             <div className="grid gap-1.5">
-                              {[
-                                { text: "Create a task for...", icon: "📋" },
-                                { text: "Schedule a meeting with...", icon: "📅" },
-                                { text: "Draft an NDA for...", icon: "📄" },
-                              ].map((suggestion) => (
+                              {quickPrompts.actions.map((suggestion) => (
                                 <button
                                   key={suggestion.text}
                                   onClick={() => {
@@ -687,13 +721,11 @@ export function ReaperAssistant() {
                           </div>
                           
                           <div>
-                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Insights</p>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">
+                              {isAdmin ? 'Portfolio Insights' : 'My Insights'}
+                            </p>
                             <div className="grid gap-1.5">
-                              {[
-                                { text: "Pipeline overview", icon: "📊" },
-                                { text: "What's overdue?", icon: "⏰" },
-                                { text: "Team workload summary", icon: "👥" },
-                              ].map((suggestion) => (
+                              {quickPrompts.insights.map((suggestion) => (
                                 <button
                                   key={suggestion.text}
                                   onClick={() => {
@@ -713,11 +745,7 @@ export function ReaperAssistant() {
                           <div>
                             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Documents</p>
                             <div className="grid gap-1.5">
-                              {[
-                                { text: "Generate a term sheet for...", icon: "📝" },
-                                { text: "Create a due diligence checklist", icon: "✅" },
-                                { text: "Draft investor update for...", icon: "✉️" },
-                              ].map((suggestion) => (
+                              {quickPrompts.documents.map((suggestion) => (
                                 <button
                                   key={suggestion.text}
                                   onClick={() => {
