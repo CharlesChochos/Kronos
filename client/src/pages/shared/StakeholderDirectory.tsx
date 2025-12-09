@@ -741,6 +741,17 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
                             )}
                           </div>
 
+                          {stakeholder.focus && (
+                            <div className="flex flex-wrap gap-1 mb-3">
+                              <span className="text-xs text-muted-foreground font-medium mr-1">Sectors:</span>
+                              {stakeholder.focus.split(',').map((sector, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-[10px] bg-primary/10 text-primary">
+                                  {sector.trim()}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+
                           {stakeholder.notes && (
                             <p className="text-xs text-muted-foreground p-2 bg-secondary/30 rounded mb-3 line-clamp-2">
                               {stakeholder.notes}
