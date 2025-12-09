@@ -1374,7 +1374,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
         auditTrail: [...(selectedDeal.auditTrail as AuditEntry[] || []), auditEntry],
       });
       setSelectedDeal({ ...selectedDeal, taggedInvestors: updatedInvestors, auditTrail: [...(selectedDeal.auditTrail as AuditEntry[] || []), auditEntry] });
-      setNewInvestor({ name: '', firm: '', type: 'PE', status: 'Contacted', notes: '' });
+      setNewInvestor({ name: '', firm: '', type: 'PE', status: 'Contacted', notes: '', email: '', phone: '', website: '' });
       toast.success("Investor tagged!");
     } catch (error: any) {
       toast.error(error.message || "Failed to add investor");

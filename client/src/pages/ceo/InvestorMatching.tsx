@@ -97,9 +97,12 @@ export default function InvestorMatching() {
   const likeOpacity = useTransform(x, [0, 100], [0, 1]);
   const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
   
-  // Filter deals by category
+  // Filter deals by category (with fallback for missing dealType)
   const filteredDeals = useMemo(() => {
-    return deals.filter(deal => (deal as any).dealType === dealCategory);
+    return deals.filter(deal => {
+      const dealType = (deal as any).dealType || 'Investment Banking';
+      return dealType === dealCategory;
+    });
   }, [deals, dealCategory]);
 
   // Set initial deal once data loads or when deals/category changes
