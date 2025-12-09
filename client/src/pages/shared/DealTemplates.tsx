@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,8 +38,15 @@ export default function DealTemplates({ role }: { role: 'CEO' | 'Employee' }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<DealTemplate | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   const { data: templates = [], isLoading } = useDealTemplates();
+  
+  // Use actual template types from the data, or predefined categories
+  const TEMPLATE_CATEGORIES = useMemo(() => {
+    const types = new Set(templates.map(t => t.dealType));
+    return ["all", ...Array.from(types).sort()];
+  }, [templates]);
   const createTemplate = useCreateDealTemplate();
   const updateTemplate = useUpdateDealTemplate();
   const deleteTemplateMutation = useDeleteDealTemplate();
@@ -54,11 +61,14 @@ export default function DealTemplates({ role }: { role: 'CEO' | 'Employee' }) {
     checklistItems: ""
   });
 
-  const filteredTemplates = templates.filter(t =>
-    t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (t.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.sector.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredTemplates = templates.filter(t => {
+    const matchesSearch = 
+      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.sector.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = categoryFilter === "all" || t.dealType === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
 
   const handleCreateTemplate = async () => {
     if (!newTemplate.name || !newTemplate.description) {
@@ -157,12 +167,27 @@ export default function DealTemplates({ role }: { role: 'CEO' | 'Employee' }) {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-display font-bold">Deal Templates</h1>
-            <p className="text-muted-foreground">Create and manage reusable deal configurations</p>
+            <h1 className="text-2xl font-display font-bold">Templates</h1>
+            <p className="text-muted-foreground">Create and manage reusable configurations</p>
           </div>
           <Button onClick={() => setShowCreateModal(true)} data-testid="button-create-template">
             <Plus className="w-4 h-4 mr-2" /> New Template
           </Button>
+        </div>
+
+        {/* Category Filters */}
+        <div className="flex gap-2 flex-wrap">
+          {TEMPLATE_CATEGORIES.map((category) => (
+            <Button
+              key={category}
+              variant={categoryFilter === category ? "default" : "outline"}
+              size="sm"
+              onClick={() => setCategoryFilter(category)}
+              data-testid={`filter-category-${category}`}
+            >
+              {category === "all" ? "All" : category}
+            </Button>
+          ))}
         </div>
 
         <div className="grid grid-cols-4 gap-4">
@@ -199,7 +224,7 @@ export default function DealTemplates({ role }: { role: 'CEO' | 'Employee' }) {
                   <CheckCircle className="w-5 h-5 text-green-500" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{templates.reduce((sum, t) => sum + t.usageCount, 0)}</p>
+                  <p className="text-2xl font-bold">{templates.reduce((sum, t) => sum + (t.usageCount || 0), 0)}</p>
                   <p className="text-xs text-muted-foreground">Times Used</p>
                 </div>
               </div>

@@ -1105,12 +1105,47 @@ export async function registerRoutes(
   app.post("/api/deals/:dealId/stage-documents", requireAuth, requireInternal, async (req, res) => {
     try {
       const user = req.user as any;
+      const dealId = req.params.dealId;
+      
+      // Create stage document
       const doc = await storage.createStageDocument({
         ...req.body,
-        dealId: req.params.dealId,
+        dealId,
         uploadedBy: user.id,
         uploaderName: user.name,
       });
+      
+      // Also archive to document library for Asset Management deals
+      const deal = await storage.getDeal(dealId);
+      if (deal && deal.dealType === 'Asset Management') {
+        try {
+          // Map stage document category to document library category
+          const categoryMap: Record<string, string> = {
+            'General': 'Other',
+            'Financial': 'Financial Documents',
+            'Legal': 'Legal',
+            'Compliance': 'Other',
+            'Due Diligence': 'Other',
+            'Term Sheet': 'Contracts',
+            'NDA': 'Legal',
+            'Pitch': 'Presentations',
+          };
+          const docCategory = categoryMap[req.body.category] || req.body.category || 'Other';
+          
+          await storage.createDocument({
+            title: `${deal.name} - ${doc.title}`,
+            type: 'stage_document',
+            filename: `${doc.title.replace(/[^a-zA-Z0-9\s]/g, '_').replace(/\s+/g, '_')}_${Date.now()}.pdf`,
+            category: docCategory,
+            dealId,
+            tags: [deal.stage || 'Reception', 'Asset Management', 'Stage Document'],
+            uploadedBy: user.id,
+          });
+        } catch (archiveError) {
+          console.error('Failed to archive document to library (non-critical):', archiveError);
+        }
+      }
+      
       res.json(doc);
     } catch (error) {
       res.status(500).json({ error: "Failed to create stage document" });
@@ -6378,11 +6413,38 @@ ${documentContent}`
 
   // ===== CALENDAR EVENT ROUTES =====
   
-  // Get all calendar events
+  // Get all calendar events (filtered to user's own events)
   app.get("/api/calendar-events", requireAuth, async (req, res) => {
     try {
-      const events = await storage.getAllCalendarEvents();
-      res.json(events);
+      const user = req.user as any;
+      const userEmail = (user.email || '').toLowerCase().trim();
+      const allEvents = await storage.getAllCalendarEvents();
+      
+      // Filter to only show events created by the current user or where they are a participant
+      const userEvents = allEvents.filter(event => {
+        // Check if user created this event (must be valid createdBy)
+        if (event.createdBy && event.createdBy === user.id) return true;
+        
+        // Check if user is in participants list (handle both string arrays and object arrays)
+        if (event.participants && Array.isArray(event.participants) && userEmail) {
+          return event.participants.some((p: any) => {
+            // Handle string entries
+            if (typeof p === 'string' && p.trim()) {
+              return p.toLowerCase().trim() === userEmail;
+            }
+            // Handle object entries with email property
+            if (p && typeof p === 'object' && typeof p.email === 'string' && p.email.trim()) {
+              return p.email.toLowerCase().trim() === userEmail;
+            }
+            // Skip invalid entries
+            return false;
+          });
+        }
+        
+        // Don't include events without createdBy and without matching participant
+        return false;
+      });
+      res.json(userEvents);
     } catch (error) {
       console.error('Get calendar events error:', error);
       res.status(500).json({ error: "Failed to fetch calendar events" });

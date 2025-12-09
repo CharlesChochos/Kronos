@@ -22,6 +22,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Building,
   Search,
@@ -37,9 +38,13 @@ import {
   Users,
   Briefcase,
   Loader2,
-  Trash2
+  Trash2,
+  CheckSquare,
+  Square,
+  X
 } from "lucide-react";
 import { useCurrentUser, useInvestors, useInvestor, useCreateInvestor, useCreateInvestorInteraction, useDeleteInvestor } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { toast } from "sonner";
@@ -54,6 +59,7 @@ const statusColors: Record<string, string> = {
 export default function InvestorCRM() {
   const { data: currentUser } = useCurrentUser();
   const { data: investors = [], isLoading } = useInvestors();
+  const queryClient = useQueryClient();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
@@ -61,6 +67,8 @@ export default function InvestorCRM() {
   const [selectedInvestorId, setSelectedInvestorId] = useState<string | null>(null);
   const [showAddInvestor, setShowAddInvestor] = useState(false);
   const [showAddInteraction, setShowAddInteraction] = useState(false);
+  const [selectedInvestorIds, setSelectedInvestorIds] = useState<Set<string>>(new Set());
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   
   const { data: selectedInvestorData } = useInvestor(selectedInvestorId || '');
   const createInvestor = useCreateInvestor();
@@ -181,6 +189,66 @@ export default function InvestorCRM() {
     }
   };
 
+  const toggleInvestorSelection = (investorId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newSet = new Set(selectedInvestorIds);
+    if (newSet.has(investorId)) {
+      newSet.delete(investorId);
+    } else {
+      newSet.add(investorId);
+    }
+    setSelectedInvestorIds(newSet);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedInvestorIds.size === filteredInvestors.length) {
+      setSelectedInvestorIds(new Set());
+    } else {
+      setSelectedInvestorIds(new Set(filteredInvestors.map(i => i.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedInvestorIds.size === 0) return;
+    
+    const idsToDelete = Array.from(selectedInvestorIds);
+    const results = await Promise.allSettled(
+      idsToDelete.map(id => deleteInvestor.mutateAsync(id))
+    );
+    
+    const successful = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected').length;
+    
+    if (failed === 0) {
+      toast.success(`${successful} investor(s) deleted`);
+    } else if (successful > 0) {
+      toast.warning(`${successful} deleted, ${failed} failed`);
+    } else {
+      toast.error('Failed to delete investors');
+    }
+    
+    // Force refresh the investors list
+    await queryClient.invalidateQueries({ queryKey: ["investors"] });
+    
+    setSelectedInvestorIds(new Set());
+    setShowBulkDeleteDialog(false);
+    if (selectedInvestorId && idsToDelete.includes(selectedInvestorId)) {
+      setSelectedInvestorId(null);
+    }
+  };
+
+  const handleBulkEmail = () => {
+    const selectedEmails = investors
+      .filter(i => selectedInvestorIds.has(i.id) && i.email)
+      .map(i => i.email)
+      .join(',');
+    if (selectedEmails) {
+      window.location.href = `mailto:${selectedEmails}`;
+    } else {
+      toast.error('No email addresses found for selected investors');
+    }
+  };
+
   const selectedInvestor = selectedInvestorData || investors.find(i => i.id === selectedInvestorId);
 
   return (
@@ -262,6 +330,45 @@ export default function InvestorCRM() {
                   />
                 </div>
               </div>
+              
+              {/* Bulk Actions Bar */}
+              {selectedInvestorIds.size > 0 && (
+                <div className="flex items-center justify-between p-2 mt-2 bg-primary/10 rounded-lg border border-primary/20">
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedInvestorIds(new Set())} className="h-7 px-2">
+                      <X className="w-3 h-3" />
+                    </Button>
+                    <span className="text-sm font-medium">{selectedInvestorIds.size} selected</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" onClick={handleBulkEmail} className="h-7 text-xs" data-testid="button-bulk-email">
+                      <Mail className="w-3 h-3 mr-1" /> Email
+                    </Button>
+                    <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-red-500 hover:text-red-600" data-testid="button-bulk-delete">
+                          <Trash2 className="w-3 h-3 mr-1" /> Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete {selectedInvestorIds.size} investor(s)?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete the selected investors. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleBulkDelete} className="bg-red-500 hover:bg-red-600">
+                            Delete All
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              )}
+              
               <div className="flex gap-2 mt-2">
                 <Select value={filterType} onValueChange={setFilterType}>
                   <SelectTrigger className="flex-1" data-testid="select-filter-type">
@@ -298,6 +405,20 @@ export default function InvestorCRM() {
               ) : (
                 <ScrollArea className="h-[600px]">
                   <div className="p-2 space-y-2">
+                    {filteredInvestors.length > 0 && (
+                      <button
+                        onClick={toggleSelectAll}
+                        className="w-full p-2 rounded-lg border border-dashed border-border hover:bg-secondary/50 flex items-center gap-2 text-sm text-muted-foreground"
+                        data-testid="button-select-all"
+                      >
+                        {selectedInvestorIds.size === filteredInvestors.length ? (
+                          <CheckSquare className="w-4 h-4 text-primary" />
+                        ) : (
+                          <Square className="w-4 h-4" />
+                        )}
+                        {selectedInvestorIds.size === filteredInvestors.length ? 'Deselect all' : 'Select all'}
+                      </button>
+                    )}
                     {filteredInvestors.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -306,36 +427,52 @@ export default function InvestorCRM() {
                       </div>
                     ) : (
                       filteredInvestors.map(investor => (
-                        <button
+                        <div
                           key={investor.id}
-                          onClick={() => setSelectedInvestorId(investor.id)}
                           className={cn(
-                            "w-full p-3 rounded-lg border text-left transition-colors",
+                            "w-full p-3 rounded-lg border text-left transition-colors flex items-start gap-2",
                             selectedInvestorId === investor.id 
                               ? "border-primary bg-primary/10" 
-                              : "border-border hover:bg-secondary/50"
+                              : "border-border hover:bg-secondary/50",
+                            selectedInvestorIds.has(investor.id) && "bg-primary/5 border-primary/50"
                           )}
                           data-testid={`investor-card-${investor.id}`}
                         >
-                          <div className="flex items-center gap-3">
-                            <Avatar className="w-10 h-10">
-                              <AvatarFallback className="bg-primary/20 text-primary">
-                                {investor.name.split(' ').map(n => n[0]).join('')}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium truncate">{investor.name}</p>
-                              <p className="text-sm text-muted-foreground truncate">{investor.firm}</p>
+                          <button
+                            onClick={(e) => toggleInvestorSelection(investor.id, e)}
+                            className="mt-1 flex-shrink-0"
+                            data-testid={`checkbox-investor-${investor.id}`}
+                          >
+                            {selectedInvestorIds.has(investor.id) ? (
+                              <CheckSquare className="w-5 h-5 text-primary" />
+                            ) : (
+                              <Square className="w-5 h-5 text-muted-foreground hover:text-primary" />
+                            )}
+                          </button>
+                          <button 
+                            onClick={() => setSelectedInvestorId(investor.id)}
+                            className="flex-1 text-left"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Avatar className="w-10 h-10">
+                                <AvatarFallback className="bg-primary/20 text-primary">
+                                  {investor.name.split(' ').map(n => n[0]).join('')}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">{investor.name}</p>
+                                <p className="text-sm text-muted-foreground truncate">{investor.firm}</p>
+                              </div>
+                              <div className={cn("w-2 h-2 rounded-full", statusColors[investor.status] || 'bg-gray-500')} />
                             </div>
-                            <div className={cn("w-2 h-2 rounded-full", statusColors[investor.status] || 'bg-gray-500')} />
-                          </div>
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge variant="secondary" className="text-xs">{investor.type}</Badge>
-                            <span className="text-xs text-muted-foreground">
-                              Score: {investor.relationshipScore || 0}
-                            </span>
-                          </div>
-                        </button>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Badge variant="secondary" className="text-xs">{investor.type}</Badge>
+                              <span className="text-xs text-muted-foreground">
+                                Score: {investor.relationshipScore || 0}
+                              </span>
+                            </div>
+                          </button>
+                        </div>
                       ))
                     )}
                   </div>
