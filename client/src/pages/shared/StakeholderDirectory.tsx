@@ -1201,7 +1201,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
           </DialogHeader>
           
           <div className="space-y-4">
-            <div className="grid grid-cols-5 gap-2 p-3 bg-secondary/30 rounded-lg">
+            <div className="grid grid-cols-6 gap-2 p-3 bg-secondary/30 rounded-lg">
               <div className="space-y-1">
                 <Label className="text-xs">Name *</Label>
                 <Select value={importColumnMap.name} onValueChange={(v) => setImportColumnMap({ ...importColumnMap, name: v })}>
@@ -1257,6 +1257,86 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
               <div className="space-y-1">
                 <Label className="text-xs">Email</Label>
                 <Select value={importColumnMap.email} onValueChange={(v) => setImportColumnMap({ ...importColumnMap, email: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Select column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {importHeaders.map(h => (
+                      <SelectItem key={h} value={h}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Phone</Label>
+                <Select value={importColumnMap.phone} onValueChange={(v) => setImportColumnMap({ ...importColumnMap, phone: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Select column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {importHeaders.map(h => (
+                      <SelectItem key={h} value={h}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-5 gap-2 p-3 bg-secondary/30 rounded-lg">
+              <div className="space-y-1">
+                <Label className="text-xs">Location</Label>
+                <Select value={importColumnMap.location} onValueChange={(v) => setImportColumnMap({ ...importColumnMap, location: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Select column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {importHeaders.map(h => (
+                      <SelectItem key={h} value={h}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-amber-500 font-medium">Sector Focus</Label>
+                <Select value={importColumnMap.focus} onValueChange={(v) => setImportColumnMap({ ...importColumnMap, focus: v })}>
+                  <SelectTrigger className="h-8 text-xs border-amber-500/50">
+                    <SelectValue placeholder="Select column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {importHeaders.map(h => (
+                      <SelectItem key={h} value={h}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Website</Label>
+                <Select value={importColumnMap.website} onValueChange={(v) => setImportColumnMap({ ...importColumnMap, website: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Select column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {importHeaders.map(h => (
+                      <SelectItem key={h} value={h}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">LinkedIn</Label>
+                <Select value={importColumnMap.linkedin} onValueChange={(v) => setImportColumnMap({ ...importColumnMap, linkedin: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Select column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {importHeaders.map(h => (
+                      <SelectItem key={h} value={h}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Notes</Label>
+                <Select value={importColumnMap.notes} onValueChange={(v) => setImportColumnMap({ ...importColumnMap, notes: v })}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue placeholder="Select column" />
                   </SelectTrigger>
