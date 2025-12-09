@@ -40,7 +40,8 @@ import {
   useTaskComments, useCreateTaskComment, useCreateTask,
   useCustomSectors, useCreateCustomSector,
   useDealFees, type DealFeeType,
-  useCreateDocument
+  useCreateDocument,
+  useStakeholders
 } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -816,6 +817,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const { data: allDeals = [], isLoading } = useDeals();
   const { data: allUsers = [] } = useUsers();
   const { data: allTasks = [] } = useTasks();
+  const { data: stakeholders = [] } = useStakeholders();
   
   // Filter deals based on access level - non-admin users only see deals they're assigned to
   // Filter out Opportunities and Asset Management deals - those appear in their own respective pages
@@ -992,7 +994,51 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
     type: 'PE',
     status: 'Contacted',
     notes: '',
+    email: '',
+    phone: '',
+    website: '',
   });
+  const [investorSearchOpen, setInvestorSearchOpen] = useState(false);
+  const [investorSearchQuery, setInvestorSearchQuery] = useState('');
+
+  const crmInvestors = useMemo(() => {
+    return stakeholders
+      .filter(s => s.type === 'investor')
+      .map(s => ({
+        id: s.id,
+        name: s.name,
+        firm: s.title || s.company || s.name,
+        type: (s.notes?.match(/Type: ([^|,]+)/)?.[1]) || 'PE',
+        email: s.email || '',
+        phone: s.phone || '',
+        website: s.website || '',
+        focus: s.focus || '',
+      }));
+  }, [stakeholders]);
+
+  const filteredCrmInvestors = useMemo(() => {
+    if (!investorSearchQuery) return crmInvestors;
+    const query = investorSearchQuery.toLowerCase();
+    return crmInvestors.filter(inv => 
+      inv.name.toLowerCase().includes(query) || 
+      inv.firm.toLowerCase().includes(query)
+    );
+  }, [crmInvestors, investorSearchQuery]);
+
+  const handleSelectCrmInvestor = (investor: typeof crmInvestors[0]) => {
+    setNewInvestor({
+      name: investor.name,
+      firm: investor.firm,
+      type: investor.type,
+      status: 'Contacted',
+      notes: investor.focus ? `Focus: ${investor.focus}` : '',
+      email: investor.email,
+      phone: investor.phone,
+      website: investor.website,
+    });
+    setInvestorSearchOpen(false);
+    setInvestorSearchQuery('');
+  };
 
   // Handle URL query parameter for selecting a specific deal
   useEffect(() => {
@@ -2777,6 +2823,58 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <Building2 className="w-4 h-4" /> Tag Investor
                     </div>
+                    
+                    {/* CRM Investor Search */}
+                    <Popover open={investorSearchOpen} onOpenChange={setInvestorSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={investorSearchOpen}
+                          className="w-full justify-between text-muted-foreground font-normal"
+                          data-testid="investor-search-trigger"
+                        >
+                          {newInvestor.name ? `${newInvestor.name} - ${newInvestor.firm}` : "Search CRM investors..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[400px] p-0" align="start">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Search investors by name or firm..." 
+                            value={investorSearchQuery}
+                            onValueChange={setInvestorSearchQuery}
+                          />
+                          <CommandList>
+                            <CommandEmpty>No investors found. Enter manually below.</CommandEmpty>
+                            <CommandGroup heading="CRM Investors">
+                              {filteredCrmInvestors.slice(0, 10).map((investor) => (
+                                <CommandItem
+                                  key={investor.id}
+                                  value={`${investor.name} ${investor.firm}`}
+                                  onSelect={() => handleSelectCrmInvestor(investor)}
+                                  data-testid={`investor-option-${investor.id}`}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      newInvestor.name === investor.name ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{investor.name}</span>
+                                    <span className="text-xs text-muted-foreground">{investor.firm}</span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    
+                    <div className="text-xs text-muted-foreground text-center">- or enter manually -</div>
+                    
                     <div className="grid grid-cols-2 gap-2">
                       <Input 
                         placeholder="Contact Name *" 
