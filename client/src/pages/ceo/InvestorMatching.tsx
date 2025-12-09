@@ -107,21 +107,70 @@ export default function InvestorMatching() {
 
   const currentDeal = deals.find(d => d.id === selectedDeal);
   
-  // Get deal sector for exact matching
+  // Get deal sector for matching
   const dealSector = currentDeal?.sector?.toLowerCase().trim() || '';
   
-  // Filter investors: must not be matched/rejected AND must have exact sector match
+  // Helper function to check if investor's focus matches or is similar to deal sector
+  const calculateSectorMatchScore = (investorFocus: string, dealSector: string): number => {
+    if (!investorFocus || !dealSector) return 0;
+    
+    const investorSectors = investorFocus.toLowerCase().split(',').map(s => s.trim());
+    const dealSectorLower = dealSector.toLowerCase().trim();
+    
+    // Check for exact match
+    if (investorSectors.some(s => s === dealSectorLower)) return 100;
+    
+    // Check for partial/similar matches
+    for (const sector of investorSectors) {
+      // Check if one contains the other
+      if (sector.includes(dealSectorLower) || dealSectorLower.includes(sector)) return 90;
+      
+      // Common sector aliases and related terms
+      const sectorMappings: Record<string, string[]> = {
+        'technology': ['tech', 'software', 'saas', 'it', 'digital', 'ai', 'ml', 'fintech', 'edtech', 'healthtech', 'proptech'],
+        'healthcare': ['health', 'medical', 'pharma', 'biotech', 'medtech', 'life sciences', 'healthtech'],
+        'financial services': ['finance', 'fintech', 'banking', 'insurance', 'insurtech', 'wealth management', 'asset management'],
+        'consumer': ['retail', 'e-commerce', 'ecommerce', 'cpg', 'consumer goods', 'fmcg', 'd2c', 'dtc'],
+        'real estate': ['property', 'proptech', 'reit', 'commercial real estate', 'residential'],
+        'energy': ['cleantech', 'clean energy', 'renewable', 'oil', 'gas', 'utilities', 'power'],
+        'industrials': ['industrial', 'manufacturing', 'logistics', 'supply chain', 'aerospace', 'defense'],
+        'media': ['entertainment', 'gaming', 'streaming', 'advertising', 'publishing', 'content'],
+        'telecommunications': ['telecom', 'communications', 'infrastructure'],
+        'education': ['edtech', 'e-learning', 'training'],
+      };
+      
+      // Find related sectors
+      for (const [key, aliases] of Object.entries(sectorMappings)) {
+        const allTerms = [key, ...aliases];
+        const sectorMatchesGroup = allTerms.some(term => sector.includes(term) || term.includes(sector));
+        const dealMatchesGroup = allTerms.some(term => dealSectorLower.includes(term) || term.includes(dealSectorLower));
+        
+        if (sectorMatchesGroup && dealMatchesGroup) return 80;
+      }
+    }
+    
+    return 0; // No match
+  };
+  
+  // Filter investors: must not be matched/rejected AND must have sector match (exact or similar)
   const availableInvestors = useMemo(() => {
     if (!dealSector) return [];
     
-    return INVESTORS.filter(inv => {
-      const investorFocus = inv.focus.toLowerCase().trim();
-      const isNotMatched = !matchedInvestors.some(m => m.id === inv.id);
-      const isNotRejected = !rejectedInvestors.includes(inv.id);
-      const sectorMatches = investorFocus === dealSector;
-      
-      return isNotMatched && isNotRejected && sectorMatches;
-    });
+    return INVESTORS
+      .map(inv => ({
+        ...inv,
+        sectorScore: calculateSectorMatchScore(inv.focus, dealSector),
+        matchScore: calculateSectorMatchScore(inv.focus, dealSector) >= 90 ? 95 : 
+                    calculateSectorMatchScore(inv.focus, dealSector) >= 80 ? 85 : 70
+      }))
+      .filter(inv => {
+        const isNotMatched = !matchedInvestors.some(m => m.id === inv.id);
+        const isNotRejected = !rejectedInvestors.includes(inv.id);
+        const sectorMatches = inv.sectorScore >= 80; // 80+ means at least similar
+        
+        return isNotMatched && isNotRejected && sectorMatches;
+      })
+      .sort((a, b) => b.sectorScore - a.sectorScore); // Best matches first
   }, [dealSector, matchedInvestors, rejectedInvestors, INVESTORS]);
     
   const currentInvestor = availableInvestors[0];
@@ -415,7 +464,7 @@ export default function InvestorMatching() {
             ) : (
               <Card className="w-full max-w-lg p-12 text-center">
                 {/* Check if there are ANY investors with matching sector (before filtering by matched/rejected) */}
-                {dealSector && INVESTORS.some(inv => inv.focus.toLowerCase().trim() === dealSector) ? (
+                {dealSector && INVESTORS.some(inv => calculateSectorMatchScore(inv.focus, dealSector) >= 80) ? (
                   <>
                     <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
                       <Check className="w-8 h-8 text-green-500" />
@@ -442,18 +491,15 @@ export default function InvestorMatching() {
                 ) : (
                   <>
                     <div className="w-16 h-16 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-4">
-                      <X className="w-8 h-8 text-orange-500" />
+                      <Target className="w-8 h-8 text-orange-500" />
                     </div>
-                    <h3 className="text-xl font-bold mb-2">No Matching Investors</h3>
+                    <h3 className="text-xl font-bold mb-2">No Matching Investors Found</h3>
                     <p className="text-muted-foreground mb-4">
-                      No investors in your directory focus on the <span className="font-medium text-foreground">{currentDeal?.sector}</span> sector.
+                      No investors in your Stakeholder Directory match or are similar to the <span className="font-medium text-foreground">{currentDeal?.sector}</span> sector.
                     </p>
-                    <p className="text-sm text-muted-foreground mb-4">Try selecting a different deal or add investors with this sector focus.</p>
-                    <Link href="/ceo/stakeholders">
-                      <Button variant="outline">
-                        <Users className="w-4 h-4 mr-2" /> Add Investors
-                      </Button>
-                    </Link>
+                    <p className="text-sm text-muted-foreground">
+                      Try selecting a different deal, or ensure investors in your directory have relevant sector focus defined.
+                    </p>
                   </>
                 )}
               </Card>
