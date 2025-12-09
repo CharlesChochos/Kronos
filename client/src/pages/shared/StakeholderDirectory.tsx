@@ -132,11 +132,22 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
       let content = '';
       
       if (ext === 'xlsx' || ext === 'xls') {
-        const arrayBuffer = await file.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        content = XLSX.utils.sheet_to_csv(worksheet);
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          if (!firstSheetName) {
+            throw new Error("Excel file has no sheets");
+          }
+          const worksheet = workbook.Sheets[firstSheetName];
+          content = XLSX.utils.sheet_to_csv(worksheet);
+        } catch (xlsxError) {
+          console.error("Error reading Excel file:", xlsxError);
+          toast.error("Failed to read Excel file. Please ensure it's a valid .xlsx or .xls file.");
+          setIsScanning(false);
+          if (docScanInputRef.current) docScanInputRef.current.value = '';
+          return;
+        }
       } else {
         content = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
@@ -164,7 +175,13 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
         })
       });
       
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (jsonError) {
+        console.error("Failed to parse response:", jsonError);
+        throw new Error("Server returned an invalid response. Please try again.");
+      }
       
       if (!response.ok) {
         throw new Error(result.error || "Failed to scan document");
