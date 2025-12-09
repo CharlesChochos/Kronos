@@ -1439,14 +1439,20 @@ export async function registerRoutes(
     }
   });
 
-  // Delete task (CEO only)
-  app.delete("/api/tasks/:id", requireCEO, async (req, res) => {
+  // Delete task (CEO or task owner)
+  app.delete("/api/tasks/:id", requireAuth, requireInternal, async (req, res) => {
     try {
+      const currentUser = req.user as User;
       const task = await storage.getTask(req.params.id);
-      await storage.deleteTask(req.params.id);
-      if (task) {
-        await createAuditLog(req, 'task_deleted', 'task', req.params.id, task.title, { assignedTo: task.assignedTo });
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
       }
+      // Allow deletion if user is admin OR if they are assigned to the task
+      if (currentUser.accessLevel !== 'admin' && task.assignedTo !== currentUser.id) {
+        return res.status(403).json({ error: "You can only delete tasks assigned to you" });
+      }
+      await storage.deleteTask(req.params.id);
+      await createAuditLog(req, 'task_deleted', 'task', req.params.id, task.title, { assignedTo: task.assignedTo, deletedBy: currentUser.id });
       res.json({ message: "Task deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete task" });

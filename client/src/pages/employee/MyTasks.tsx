@@ -35,9 +35,10 @@ import {
   Loader2,
   Brain,
   Flag,
-  Plus
+  Plus,
+  Trash2
 } from "lucide-react";
-import { useCurrentUser, useTasks, useDeals, useUpdateTask, useCreateTask, useUsers, apiRequest, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
+import { useCurrentUser, useTasks, useDeals, useUpdateTask, useCreateTask, useDeleteTask, useUsers, apiRequest, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import type { UserPreferences } from "@shared/schema";
 import { cn } from "@/lib/utils";
