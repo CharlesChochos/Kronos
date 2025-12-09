@@ -47,6 +47,13 @@ type ChatProps = {
   role: 'CEO' | 'Employee';
 };
 
+type MessageReaction = {
+  emoji: string;
+  userId: string;
+  userName: string;
+  createdAt: string;
+};
+
 type Message = {
   id: string;
   senderId: string;
@@ -55,6 +62,8 @@ type Message = {
   content: string;
   createdAt: string;
   attachments?: { id: string; filename: string; url: string; size: number; type: string }[];
+  reactions?: MessageReaction[];
+  replyToMessageId?: string | null;
 };
 
 type ConversationMember = {
@@ -109,6 +118,13 @@ export default function Chat({ role }: ChatProps) {
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   
+  // Reply functionality
+  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
+  
+  // Emoji picker for reactions
+  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+  const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -146,11 +162,11 @@ export default function Chat({ role }: ChatProps) {
 
   // Send message mutation
   const sendMessageMutation = useMutation({
-    mutationFn: async ({ conversationId, content, attachments, mentionedUserIds }: { conversationId: string; content: string; attachments?: any[]; mentionedUserIds?: string[] }) => {
+    mutationFn: async ({ conversationId, content, attachments, mentionedUserIds, replyToMessageId }: { conversationId: string; content: string; attachments?: any[]; mentionedUserIds?: string[]; replyToMessageId?: string }) => {
       const res = await fetch(`/api/chat/conversations/${conversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, attachments, mentionedUserIds }),
+        body: JSON.stringify({ content, attachments, mentionedUserIds, replyToMessageId }),
       });
       if (!res.ok) throw new Error("Failed to send message");
       return res.json();
@@ -213,6 +229,25 @@ export default function Chat({ role }: ChatProps) {
     },
   });
 
+  // Reaction mutation
+  const reactionMutation = useMutation({
+    mutationFn: async ({ conversationId, messageId, emoji }: { conversationId: string; messageId: string; emoji: string }) => {
+      const res = await fetch(`/api/chat/conversations/${conversationId}/messages/${messageId}/reactions`, { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to add reaction");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/chat/conversations/${selectedConversationId}/messages`] });
+    },
+  });
+
   const handleUnsendMessage = async (messageId: string) => {
     if (!selectedConversationId) return;
     try {
@@ -244,6 +279,44 @@ export default function Chat({ role }: ChatProps) {
     } catch (error) {
       toast.error("Failed to delete conversation");
     }
+  };
+
+  // Handle adding/removing reaction
+  const handleReaction = async (messageId: string, emoji: string) => {
+    if (!selectedConversationId) return;
+    try {
+      await reactionMutation.mutateAsync({
+        conversationId: selectedConversationId,
+        messageId,
+        emoji,
+      });
+      setShowEmojiPicker(null);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add reaction");
+    }
+  };
+
+  // Group reactions by emoji for display
+  const groupReactions = (reactions: MessageReaction[] | undefined) => {
+    if (!reactions || reactions.length === 0) return [];
+    const grouped: Record<string, { emoji: string; users: string[]; count: number; hasCurrentUser: boolean }> = {};
+    for (const r of reactions) {
+      if (!grouped[r.emoji]) {
+        grouped[r.emoji] = { emoji: r.emoji, users: [], count: 0, hasCurrentUser: false };
+      }
+      grouped[r.emoji].users.push(r.userName);
+      grouped[r.emoji].count++;
+      if (r.userId === currentUser?.id) {
+        grouped[r.emoji].hasCurrentUser = true;
+      }
+    }
+    return Object.values(grouped);
+  };
+
+  // Get replied message content
+  const getReplyMessage = (replyToMessageId: string | null | undefined) => {
+    if (!replyToMessageId) return null;
+    return messages.find(m => m.id === replyToMessageId);
   };
 
   // Filter users excluding current user
@@ -375,7 +448,11 @@ export default function Chat({ role }: ChatProps) {
         conversationId: selectedConversationId,
         content: messageInput.trim(),
         mentionedUserIds,
+        replyToMessageId: replyToMessage?.id || undefined,
       });
+      
+      // Clear reply state after sending
+      setReplyToMessage(null);
       
       // Show notification if users were mentioned
       if (mentionedUserIds.length > 0) {
@@ -665,6 +742,8 @@ export default function Chat({ role }: ChatProps) {
                     <div className="space-y-4">
                       {messages.map(message => {
                         const isOwnMessage = message.senderId === currentUser?.id;
+                        const replyMessage = getReplyMessage(message.replyToMessageId);
+                        const groupedReactions = groupReactions(message.reactions);
                         return (
                           <div 
                             key={message.id} 
@@ -683,6 +762,16 @@ export default function Chat({ role }: ChatProps) {
                                     ? "bg-primary text-primary-foreground" 
                                     : "bg-secondary"
                                 )}>
+                                  {/* Reply indicator */}
+                                  {replyMessage && (
+                                    <div className={cn(
+                                      "text-xs mb-2 pb-2 border-b border-border/50 opacity-70",
+                                      isOwnMessage ? "border-primary-foreground/30" : "border-border"
+                                    )}>
+                                      <span className="font-medium">↩ Reply to {replyMessage.senderName}:</span>
+                                      <p className="truncate">{replyMessage.content.slice(0, 50)}{replyMessage.content.length > 50 ? '...' : ''}</p>
+                                    </div>
+                                  )}
                                   {!isOwnMessage && (
                                     <p className="text-xs font-medium mb-1 opacity-70">{message.senderName}</p>
                                   )}
@@ -731,19 +820,92 @@ export default function Chat({ role }: ChatProps) {
                                   </div>
                                 )}
                                 </div>
-                                {isOwnMessage && (
+                                
+                                {/* Message actions (reply, react, unsend) */}
+                                <div className={cn(
+                                  "absolute top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity",
+                                  isOwnMessage ? "-left-20" : "-right-20"
+                                )}>
+                                  {/* Reply button */}
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="absolute -left-8 top-1/2 -translate-y-1/2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                                    onClick={() => handleUnsendMessage(message.id)}
-                                    disabled={deleteMessageMutation.isPending}
-                                    data-testid={`button-unsend-${message.id}`}
+                                    className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                    onClick={() => setReplyToMessage(message)}
+                                    data-testid={`button-reply-${message.id}`}
                                   >
-                                    <X className="w-3 h-3" />
+                                    <MessageCircle className="w-3 h-3" />
                                   </Button>
-                                )}
+                                  
+                                  {/* Reaction button */}
+                                  <Popover open={showEmojiPicker === message.id} onOpenChange={(open) => setShowEmojiPicker(open ? message.id : null)}>
+                                    <PopoverTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                        data-testid={`button-react-${message.id}`}
+                                      >
+                                        <Smile className="w-3 h-3" />
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-2" side="top">
+                                      <div className="flex gap-1">
+                                        {QUICK_EMOJIS.map(emoji => (
+                                          <Button
+                                            key={emoji}
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-lg hover:bg-secondary"
+                                            onClick={() => handleReaction(message.id, emoji)}
+                                            data-testid={`button-emoji-${emoji}`}
+                                          >
+                                            {emoji}
+                                          </Button>
+                                        ))}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                  
+                                  {/* Unsend button (own messages only) */}
+                                  {isOwnMessage && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                      onClick={() => handleUnsendMessage(message.id)}
+                                      disabled={deleteMessageMutation.isPending}
+                                      data-testid={`button-unsend-${message.id}`}
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
+                              
+                              {/* Reactions display */}
+                              {groupedReactions.length > 0 && (
+                                <div className={cn("flex flex-wrap gap-1 mt-1", isOwnMessage && "justify-end")}>
+                                  {groupedReactions.map(({ emoji, count, hasCurrentUser, users }) => (
+                                    <button
+                                      key={emoji}
+                                      onClick={() => handleReaction(message.id, emoji)}
+                                      title={users.join(', ')}
+                                      className={cn(
+                                        "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs transition-colors",
+                                        hasCurrentUser 
+                                          ? "bg-primary/20 text-primary border border-primary/30" 
+                                          : "bg-secondary hover:bg-secondary/80"
+                                      )}
+                                      data-testid={`reaction-${emoji}-${message.id}`}
+                                    >
+                                      <span>{emoji}</span>
+                                      {count > 1 && <span className="text-[10px]">{count}</span>}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              
                               {chatSettings.showTimestamps && (
                                 <p className={cn(
                                   "text-xs text-muted-foreground mt-1",
@@ -770,6 +932,28 @@ export default function Chat({ role }: ChatProps) {
 
               {/* Message Input */}
               <div className="p-4 border-t border-border">
+                {/* Reply indicator */}
+                {replyToMessage && (
+                  <div className="flex items-center justify-between bg-secondary/50 rounded-lg px-3 py-2 mb-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <MessageCircle className="w-4 h-4 text-primary" />
+                      <span className="text-muted-foreground">Replying to</span>
+                      <span className="font-medium">{replyToMessage.senderName}</span>
+                      <span className="text-muted-foreground truncate max-w-[200px]">
+                        {replyToMessage.content.slice(0, 40)}{replyToMessage.content.length > 40 ? '...' : ''}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => setReplyToMessage(null)}
+                      data-testid="button-cancel-reply"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <input
                     ref={fileInputRef}

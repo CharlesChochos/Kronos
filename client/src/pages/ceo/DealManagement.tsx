@@ -37,7 +37,7 @@ import {
   useStageDocuments, useCreateStageDocument, useDeleteStageDocument,
   useStagePodMembers, useCreateStagePodMember, useDeleteStagePodMember,
   useStageVoiceNotes, useCreateStageVoiceNote, useDeleteStageVoiceNote,
-  useTaskComments, useCreateTaskComment,
+  useTaskComments, useCreateTaskComment, useCreateTask,
   useCustomSectors, useCreateCustomSector,
   useDealFees, type DealFeeType,
   useCreateDocument
@@ -68,6 +68,7 @@ const INVESTOR_STATUSES = ['Contacted', 'Interested', 'In DD', 'Term Sheet', 'Pa
 
 type StageWorkSectionProps = {
   dealId: string;
+  dealName: string;
   dealStage: string;
   allUsers: any[];
   currentUser: any;
@@ -81,10 +82,13 @@ type StageWorkSectionProps = {
   createStageVoiceNote: any;
   deleteStageVoiceNote: any;
   createTaskComment: any;
+  createTask: any;
+  createDocument: any;
 };
 
 function StageWorkSection({
   dealId,
+  dealName,
   dealStage,
   allUsers,
   currentUser,
@@ -97,7 +101,9 @@ function StageWorkSection({
   deleteStagePodMember,
   createStageVoiceNote,
   deleteStageVoiceNote,
-  createTaskComment
+  createTaskComment,
+  createTask,
+  createDocument
 }: StageWorkSectionProps) {
   const { data: stageDocuments = [] } = useStageDocuments(dealId, activeStageTab);
   const { data: stagePodMembers = [] } = useStagePodMembers(dealId, activeStageTab);
@@ -105,12 +111,16 @@ function StageWorkSection({
   
   const [showAddDocument, setShowAddDocument] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
+  const [showAddTask, setShowAddTask] = useState(false);
   const [documentTitle, setDocumentTitle] = useState("");
   const [documentCategory, setDocumentCategory] = useState("General");
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [memberSearch, setMemberSearch] = useState("");
-  const [memberOpen, setMemberOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [memberRole, setMemberRole] = useState("");
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState("Medium");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -144,26 +154,86 @@ function StageWorkSection({
   }, [allUsers, memberSearch]);
   
   const handleAddDocument = async () => {
-    if (!documentTitle) {
-      toast.error("Please enter a document title");
+    if (!documentFile) {
+      toast.error("Please select a file to upload");
+      return;
+    }
+    
+    const reader = new FileReader();
+    
+    reader.onerror = () => {
+      toast.error("Failed to read file");
+    };
+    
+    reader.onload = async (e) => {
+      try {
+        const base64Data = e.target?.result as string;
+        const title = documentTitle || documentFile.name;
+        
+        const categoryMap: Record<string, string> = {
+          'General': 'Other',
+          'Financial': 'Financial Documents',
+          'Legal': 'Legal',
+          'Technical': 'Reports',
+          'Presentation': 'Presentations'
+        };
+        
+        await createStageDocument.mutateAsync({
+          dealId,
+          stage: activeStageTab,
+          document: {
+            title: title,
+            category: documentCategory,
+            uploadedBy: currentUser?.id || ''
+          }
+        });
+        
+        await createDocument.mutateAsync({
+          filename: `[${dealName}] ${title}`,
+          fileData: base64Data,
+          category: categoryMap[documentCategory] || 'Other',
+          dealId: dealId,
+          tags: [activeStageTab, 'Stage Work'],
+          type: 'stage_document',
+          uploadedBy: currentUser?.id
+        });
+        
+        toast.success("Document uploaded and archived");
+        setDocumentTitle("");
+        setDocumentCategory("General");
+        setDocumentFile(null);
+        setShowAddDocument(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      } catch (error) {
+        toast.error("Failed to upload document");
+      }
+    };
+    
+    reader.readAsDataURL(documentFile);
+  };
+  
+  const handleAddTask = async () => {
+    if (!newTaskTitle.trim()) {
+      toast.error("Please enter a task title");
       return;
     }
     try {
-      await createStageDocument.mutateAsync({
-        dealId,
-        stage: activeStageTab,
-        document: {
-          title: documentTitle,
-          category: documentCategory,
-          uploadedBy: currentUser?.id || ''
-        }
+      await createTask.mutateAsync({
+        title: newTaskTitle.trim(),
+        description: '',
+        status: 'To Do',
+        priority: newTaskPriority,
+        dealId: dealId,
+        dealStage: activeStageTab,
+        assigneeId: currentUser?.id || null,
+        dueDate: null
       });
-      toast.success("Document added to stage");
-      setDocumentTitle("");
-      setDocumentCategory("General");
-      setShowAddDocument(false);
+      toast.success("Task created");
+      setNewTaskTitle("");
+      setNewTaskPriority("Medium");
+      setShowAddTask(false);
     } catch (error) {
-      toast.error("Failed to add document");
+      toast.error("Failed to create task");
     }
   };
   
@@ -315,14 +385,33 @@ function StageWorkSection({
         
         {showAddDocument && (
           <div className="p-3 bg-secondary/30 rounded-lg space-y-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setDocumentFile(file);
+                  if (!documentTitle) setDocumentTitle(file.name);
+                }
+              }}
+              className="w-full text-sm file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+              data-testid="input-file-upload"
+            />
+            {documentFile && (
+              <div className="text-xs text-muted-foreground">
+                Selected: {documentFile.name} ({(documentFile.size / 1024).toFixed(1)} KB)
+              </div>
+            )}
             <Input
-              placeholder="Document title"
+              placeholder="Document title (optional)"
               value={documentTitle}
               onChange={(e) => setDocumentTitle(e.target.value)}
               className="h-8 text-sm"
+              data-testid="input-document-title"
             />
             <Select value={documentCategory} onValueChange={setDocumentCategory}>
-              <SelectTrigger className="h-8 text-sm">
+              <SelectTrigger className="h-8 text-sm" data-testid="select-document-category">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -334,8 +423,10 @@ function StageWorkSection({
               </SelectContent>
             </Select>
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleAddDocument} className="flex-1">Add</Button>
-              <Button size="sm" variant="outline" onClick={() => setShowAddDocument(false)}>Cancel</Button>
+              <Button size="sm" onClick={handleAddDocument} className="flex-1" disabled={!documentFile} data-testid="button-upload-document">
+                Upload
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setShowAddDocument(false); setDocumentFile(null); setDocumentTitle(''); }}>Cancel</Button>
             </div>
           </div>
         )}
@@ -381,53 +472,66 @@ function StageWorkSection({
         
         {showAddMember && (
           <div className="p-3 bg-secondary/30 rounded-lg space-y-2">
-            <Popover open={memberOpen} onOpenChange={setMemberOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-between h-8 text-sm">
-                  {selectedMember ? selectedMember.name : "Search team member..."}
-                  <ChevronsUpDown className="ml-2 h-3 w-3" />
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or email..."
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                className="h-8 text-sm pl-7"
+                data-testid="input-team-search"
+              />
+            </div>
+            {memberSearch.length >= 2 && (
+              <div className="max-h-[120px] overflow-y-auto border rounded-md bg-background">
+                {filteredMembers.length === 0 ? (
+                  <div className="p-2 text-sm text-muted-foreground text-center">No users found</div>
+                ) : (
+                  filteredMembers.map((user: any) => (
+                    <button
+                      key={user.id}
+                      onClick={() => {
+                        setSelectedMember(user);
+                        setMemberRole(user.jobTitle || user.role || 'Team Member');
+                        setMemberSearch('');
+                      }}
+                      className={cn(
+                        "w-full p-2 text-left hover:bg-secondary/50 flex items-center gap-2 text-sm",
+                        selectedMember?.id === user.id && "bg-primary/10"
+                      )}
+                      data-testid={`team-member-${user.id}`}
+                    >
+                      <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xs">
+                        {user.name?.charAt(0) || '?'}
+                      </div>
+                      <div>
+                        <div className="font-medium">{user.name}</div>
+                        <div className="text-xs text-muted-foreground">{user.email}</div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+            {selectedMember && (
+              <div className="flex items-center gap-2 p-2 bg-primary/10 rounded text-sm">
+                <Check className="w-4 h-4 text-primary" />
+                <span>Selected: {selectedMember.name}</span>
+                <Button variant="ghost" size="icon" className="h-5 w-5 ml-auto" onClick={() => setSelectedMember(null)}>
+                  <X className="w-3 h-3" />
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command>
-                  <CommandInput 
-                    placeholder="Type name..." 
-                    value={memberSearch}
-                    onValueChange={setMemberSearch}
-                  />
-                  <CommandList>
-                    <CommandEmpty>No users found</CommandEmpty>
-                    <CommandGroup>
-                      {filteredMembers.map((user: any) => (
-                        <CommandItem
-                          key={user.id}
-                          onSelect={() => {
-                            setSelectedMember(user);
-                            setMemberRole(user.jobTitle || user.role || '');
-                            setMemberOpen(false);
-                          }}
-                        >
-                          <Check className={cn("mr-2 h-4 w-4", selectedMember?.id === user.id ? "opacity-100" : "opacity-0")} />
-                          <div>
-                            <div>{user.name}</div>
-                            <div className="text-xs text-muted-foreground">{user.email}</div>
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+              </div>
+            )}
             <Input
               placeholder="Role for this stage"
               value={memberRole}
               onChange={(e) => setMemberRole(e.target.value)}
               className="h-8 text-sm"
+              data-testid="input-member-role"
             />
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleAddMember} className="flex-1">Add</Button>
-              <Button size="sm" variant="outline" onClick={() => setShowAddMember(false)}>Cancel</Button>
+              <Button size="sm" onClick={handleAddMember} className="flex-1" disabled={!selectedMember} data-testid="button-add-member">Add Member</Button>
+              <Button size="sm" variant="outline" onClick={() => { setShowAddMember(false); setSelectedMember(null); setMemberSearch(''); }}>Cancel</Button>
             </div>
           </div>
         )}
@@ -540,8 +644,42 @@ function StageWorkSection({
           <h5 className="text-sm font-medium flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-orange-400" /> Deal Tasks
           </h5>
-          <Badge variant="secondary" className="text-xs">{stageTasks.length} tasks</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">{stageTasks.length} tasks</Badge>
+            <Button size="sm" variant="ghost" onClick={() => setShowAddTask(!showAddTask)} data-testid="button-add-task-toggle">
+              <Plus className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
+        
+        {showAddTask && (
+          <div className="p-3 bg-secondary/30 rounded-lg space-y-2">
+            <Input
+              placeholder="Task title"
+              value={newTaskTitle}
+              onChange={(e) => setNewTaskTitle(e.target.value)}
+              className="h-8 text-sm"
+              data-testid="input-task-title"
+            />
+            <Select value={newTaskPriority} onValueChange={setNewTaskPriority}>
+              <SelectTrigger className="h-8 text-sm" data-testid="select-task-priority">
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Low">Low Priority</SelectItem>
+                <SelectItem value="Medium">Medium Priority</SelectItem>
+                <SelectItem value="High">High Priority</SelectItem>
+                <SelectItem value="Critical">Critical</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleAddTask} className="flex-1" disabled={!newTaskTitle.trim()} data-testid="button-create-task">
+                Create Task
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setShowAddTask(false); setNewTaskTitle(''); }}>Cancel</Button>
+            </div>
+          </div>
+        )}
         
         <ScrollArea className="h-[150px]">
           {stageTasks.length === 0 ? (
@@ -723,6 +861,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const createStageVoiceNote = useCreateStageVoiceNote();
   const deleteStageVoiceNote = useDeleteStageVoiceNote();
   const createTaskComment = useCreateTaskComment();
+  const createTask = useCreateTask();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<string | null>(null);
@@ -2362,6 +2501,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                 <TabsContent value="stages" className="mt-4 space-y-4">
                   <StageWorkSection 
                     dealId={selectedDeal.id}
+                    dealName={selectedDeal.name}
                     dealStage={selectedDeal.stage}
                     allUsers={allUsers}
                     currentUser={currentUser}
@@ -2375,6 +2515,8 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     createStageVoiceNote={createStageVoiceNote}
                     deleteStageVoiceNote={deleteStageVoiceNote}
                     createTaskComment={createTaskComment}
+                    createTask={createTask}
+                    createDocument={createDocument}
                   />
                 </TabsContent>
 

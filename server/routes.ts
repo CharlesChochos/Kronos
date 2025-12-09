@@ -4259,7 +4259,7 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
   app.post("/api/chat/conversations/:id/messages", requireAuth, async (req, res) => {
     try {
       const currentUser = req.user as any;
-      const { content, attachments, mentionedUserIds } = req.body;
+      const { content, attachments, mentionedUserIds, replyToMessageId } = req.body;
       
       if (!content || typeof content !== 'string' || content.trim().length === 0) {
         return res.status(400).json({ error: "Message content is required" });
@@ -4282,6 +4282,7 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
         senderId: currentUser.id,
         content: content.trim(),
         attachments: attachments || [],
+        replyToMessageId: replyToMessageId || null,
       });
       
       // Create notifications for mentioned users first (higher priority)
@@ -4363,6 +4364,59 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
     } catch (error) {
       console.error('Error deleting message:', error);
       res.status(500).json({ error: "Failed to delete message" });
+    }
+  });
+  
+  // Add reaction to a message
+  app.post("/api/chat/conversations/:conversationId/messages/:messageId/reactions", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { conversationId, messageId } = req.params;
+      const { emoji } = req.body;
+      
+      if (!emoji || typeof emoji !== 'string') {
+        return res.status(400).json({ error: "Emoji is required" });
+      }
+      
+      // Verify conversation exists and user is a member
+      const conversation = await storage.getConversation(conversationId);
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      
+      const members = await storage.getConversationMembers(conversationId);
+      if (!members.some(m => m.userId === currentUser.id)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Verify message exists
+      const message = await storage.getMessage(messageId);
+      if (!message || message.conversationId !== conversationId) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      // Add reaction
+      const reactions = (message.reactions || []) as any[];
+      const existingIndex = reactions.findIndex(r => r.userId === currentUser.id && r.emoji === emoji);
+      
+      if (existingIndex >= 0) {
+        // Remove reaction if already exists (toggle)
+        reactions.splice(existingIndex, 1);
+      } else {
+        // Add new reaction
+        reactions.push({
+          emoji,
+          userId: currentUser.id,
+          userName: currentUser.name,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      
+      const updated = await storage.updateMessage(messageId, { reactions });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error adding reaction:', error);
+      res.status(500).json({ error: "Failed to add reaction" });
     }
   });
   

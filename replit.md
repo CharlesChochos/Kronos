@@ -79,6 +79,9 @@ Preferred communication style: Simple, everyday language.
 - **calendar_events table**: Capital raising events with investor, deal, status, location, and notes
 - **task_attachments table**: File metadata for task attachments (filename, URL, size, type)
 - **documents table**: Document storage with file data (base64), filename, category, deal association, tags, uploadedBy, isArchived
+- **messages table**: Chat messages with content, attachments (jsonb), reactions (jsonb with emoji, userId, userName, createdAt), replyToMessageId for threaded replies
+- **conversations table**: Chat conversations with name, isGroup flag, createdBy
+- **conversation_members table**: Tracks conversation membership with lastReadAt for unread counts
 
 **Type Safety**
 - Zod schemas generated from Drizzle table definitions

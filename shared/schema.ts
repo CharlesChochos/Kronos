@@ -236,6 +236,14 @@ export type MessageAttachment = {
   type: string;
 };
 
+// Message Reaction type
+export type MessageReaction = {
+  emoji: string;
+  userId: string;
+  userName: string;
+  createdAt: string;
+};
+
 // Messages table
 export const messages = pgTable("messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -243,6 +251,8 @@ export const messages = pgTable("messages", {
   senderId: varchar("sender_id").references(() => users.id).notNull(),
   content: text("content").notNull(),
   attachments: jsonb("attachments").default([]).$type<MessageAttachment[]>(),
+  reactions: jsonb("reactions").default([]).$type<MessageReaction[]>(),
+  replyToMessageId: varchar("reply_to_message_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

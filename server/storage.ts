@@ -82,6 +82,7 @@ export interface IStorage {
   getMessages(conversationId: string): Promise<Message[]>;
   getMessage(id: string): Promise<Message | undefined>;
   createMessage(message: InsertMessage): Promise<Message>;
+  updateMessage(id: string, updates: Partial<Message>): Promise<Message | undefined>;
   deleteMessage(id: string): Promise<void>;
   getUnreadMessageCount(userId: string): Promise<number>;
   markMessagesAsRead(conversationId: string, userId: string): Promise<void>;
@@ -675,6 +676,14 @@ export class DatabaseStorage implements IStorage {
   
   async deleteMessage(id: string): Promise<void> {
     await db.delete(schema.messages).where(eq(schema.messages.id, id));
+  }
+  
+  async updateMessage(id: string, updates: Partial<Message>): Promise<Message | undefined> {
+    const [updated] = await db.update(schema.messages)
+      .set(updates as any)
+      .where(eq(schema.messages.id, id))
+      .returning();
+    return updated;
   }
   
   async getUnreadMessageCount(userId: string): Promise<number> {
