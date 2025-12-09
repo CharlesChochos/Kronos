@@ -185,11 +185,12 @@ function StageWorkSection({
         // Save to stage documents
         await createStageDocument.mutateAsync({
           dealId,
-          stage: activeStageTab,
-          document: {
+          doc: {
+            stage: activeStageTab,
             title: title,
-            category: documentCategory,
-            uploadedBy: currentUser?.id || ''
+            filename: documentFile.name,
+            mimeType: documentFile.type,
+            size: documentFile.size,
           }
         });
         
@@ -224,15 +225,18 @@ function StageWorkSection({
       return;
     }
     try {
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
       await createTask.mutateAsync({
         title: newTaskTitle.trim(),
         description: '',
-        status: 'To Do',
+        status: 'Pending',
         priority: newTaskPriority,
         dealId: dealId,
         dealStage: activeStageTab,
-        assigneeId: currentUser?.id || null,
-        dueDate: null
+        assignedTo: currentUser?.id || undefined,
+        type: 'Deal Task',
+        dueDate: nextWeek.toISOString().split('T')[0]
       });
       toast.success("Task created");
       setNewTaskTitle("");
@@ -251,10 +255,13 @@ function StageWorkSection({
     try {
       await createStagePodMember.mutateAsync({
         dealId,
-        stage: activeStageTab,
         member: {
+          stage: activeStageTab,
           userId: selectedMember.id,
-          role: memberRole || selectedMember.role || 'Team Member'
+          userName: selectedMember.name,
+          role: memberRole || selectedMember.role || 'Team Member',
+          email: selectedMember.email || '',
+          phone: selectedMember.phone || '',
         }
       });
       toast.success("Team member added to stage");
@@ -286,12 +293,11 @@ function StageWorkSection({
       try {
         await createStageVoiceNote.mutateAsync({
           dealId,
-          stage: activeStageTab,
-          voiceNote: {
+          note: {
+            stage: activeStageTab,
             title: voiceTitle || `Note ${format(new Date(), 'MMM d, h:mm a')}`,
+            filename: `voice_note_${Date.now()}.webm`,
             duration: recordingTime,
-            authorId: currentUser?.id || '',
-            authorName: currentUser?.name || 'Unknown'
           }
         });
         toast.success("Voice note saved!");
