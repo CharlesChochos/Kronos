@@ -62,7 +62,7 @@ import {
 
 const COMPARISON_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-const DEAL_STAGES = ['Reception', 'Initial Review', 'Hard Diligence', 'Structure', 'Negotiation', 'Closing', 'Invested'];
+const DEAL_STAGES = ['Origination', 'Execution', 'Negotiation', 'Due Diligence', 'Signing', 'Closed'];
 const INVESTOR_TYPES = ['PE', 'VC', 'Strategic', 'Family Office', 'Hedge Fund', 'Sovereign Wealth'];
 const INVESTOR_STATUSES = ['Contacted', 'Interested', 'In DD', 'Term Sheet', 'Passed', 'Closed'];
 
@@ -672,7 +672,7 @@ type DealManagementProps = {
   role?: 'CEO' | 'Employee';
 };
 
-export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
+export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const searchString = useSearch();
   const { data: currentUser } = useCurrentUser();
   const { data: allDeals = [], isLoading } = useDeals();
@@ -685,7 +685,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
     // Filter out opportunities and asset management deals - they have their own pages
     const investmentBankingDeals = allDeals.filter(deal => {
       const dealType = (deal as any).dealType;
-      return dealType === 'Asset Management';
+      return dealType !== 'Opportunity' && dealType !== 'Asset Management';
     });
     
     if (currentUser?.accessLevel === 'admin') {
@@ -796,10 +796,10 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
   const [newDeal, setNewDeal] = useState({
     name: '',
     client: '',
-    sector: 'Real Estate',
+    sector: 'Technology',
     customSector: '',
     value: '',
-    stage: 'Reception',
+    stage: 'Origination',
     lead: '',
     status: 'Active',
     progress: 0,
@@ -819,7 +819,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
     spread: '',
   });
   
-  const BASE_SECTORS = ['Real Estate', 'Infrastructure', 'Private Equity', 'Hedge Funds', 'Fixed Income', 'Equities', 'Commodities'];
+  const BASE_SECTORS = ['Technology', 'Healthcare', 'Energy', 'Consumer', 'Industrials', 'Financial'];
   const SECTORS = useMemo(() => {
     const customNames = customSectors.map(s => s.name);
     // Combine base sectors with custom sectors, avoiding duplicates
@@ -1011,7 +1011,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
         lead: newDeal.lead || currentUser?.name || 'Unassigned',
         status: newDeal.status,
         progress: getStageProgress(newDeal.stage),
-        dealType: 'Asset Management',
+        dealType: 'M&A',
         description: null,
         attachments: [],
         podTeam: [],
@@ -1063,7 +1063,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
       
       toast.success("Deal created successfully!");
       setShowNewDealModal(false);
-      setNewDeal({ name: '', client: '', sector: 'Real Estate', customSector: '', value: '', stage: 'Reception', lead: '', status: 'Active', progress: 0 });
+      setNewDeal({ name: '', client: '', sector: 'Technology', customSector: '', value: '', stage: 'Origination', lead: '', status: 'Active', progress: 0 });
       setNewDealFees({ engagement: '', monthly: '', success: '', transaction: '', spread: '' });
     } catch (error: any) {
       toast.error(error.message || "Failed to create deal");
@@ -1294,7 +1294,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
 
   if (isLoading) {
     return (
-      <Layout role={role} pageTitle="Asset Management" userName={currentUser?.name || ""}>
+      <Layout role={role} pageTitle="Deal Management" userName={currentUser?.name || ""}>
         <div className="flex items-center justify-center h-96">
           <div className="text-muted-foreground">Loading deals...</div>
         </div>
@@ -1303,14 +1303,14 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
   }
 
   return (
-    <Layout role={role} pageTitle="Asset Management" userName={currentUser?.name || ""}>
+    <Layout role={role} pageTitle="Deal Management" userName={currentUser?.name || ""}>
       <div className="space-y-6">
         {/* Header & Filters */}
         <div className="flex flex-col md:flex-row justify-between gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
-              placeholder="Search AM deals by name, client, or sector..." 
+              placeholder="Search deals by name, client, or sector..." 
               className="pl-9 bg-card border-border"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -2977,7 +2977,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
       <Dialog open={showNewDealModal} onOpenChange={setShowNewDealModal}>
         <DialogContent className="bg-card border-border">
           <DialogHeader>
-            <DialogTitle>Create New AM Deal</DialogTitle>
+            <DialogTitle>Create New Deal</DialogTitle>
             <DialogDescription>Enter the details for the new deal below.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
