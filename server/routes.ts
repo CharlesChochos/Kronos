@@ -5346,9 +5346,11 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
         return res.status(400).json({ error: "Document content is required" });
       }
       
+      console.log(`Scanning document: ${filename}, content length: ${documentContent.length} chars`);
+      
       // Use OpenAI to extract ALL stakeholder information from the document
       const response = await openai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
