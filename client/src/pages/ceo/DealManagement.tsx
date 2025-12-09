@@ -30,14 +30,14 @@ import {
   Pencil, Trash2, Eye, Users, Phone, Mail, MessageSquare, Plus, X, 
   Building2, TrendingUp, FileText, Clock, CheckCircle2, ChevronRight,
   UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload, GitCompare, ArrowUpDown, BarChart3,
-  Mic, MicOff, Play, Pause, Square, Volume2
+  Mic, MicOff, Play, Pause, Square, Volume2, Download
 } from "lucide-react";
 import { 
   useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks, useCreateDealFee,
   useStageDocuments, useCreateStageDocument, useDeleteStageDocument,
   useStagePodMembers, useCreateStagePodMember, useDeleteStagePodMember,
   useStageVoiceNotes, useCreateStageVoiceNote, useDeleteStageVoiceNote,
-  useTaskComments, useCreateTaskComment, useCreateTask,
+  useTaskComments, useCreateTaskComment, useCreateTask, useDeleteTask,
   useCustomSectors, useCreateCustomSector,
   useDealFees, type DealFeeType,
   useCreateDocument,
@@ -85,6 +85,7 @@ type StageWorkSectionProps = {
   createTaskComment: any;
   createTask: any;
   createDocument: any;
+  deleteTask: any;
 };
 
 function StageWorkSection({
@@ -104,7 +105,8 @@ function StageWorkSection({
   deleteStageVoiceNote,
   createTaskComment,
   createTask,
-  createDocument
+  createDocument,
+  deleteTask
 }: StageWorkSectionProps) {
   const { data: stageDocuments = [] } = useStageDocuments(dealId, activeStageTab);
   const { data: stagePodMembers = [] } = useStagePodMembers(dealId, activeStageTab);
@@ -450,16 +452,29 @@ function StageWorkSection({
                   <div className="flex items-center gap-2">
                     <FileText className="w-3 h-3 text-blue-400" />
                     <span className="truncate">{doc.title}</span>
-                    <Badge variant="secondary" className="text-xs">{doc.category}</Badge>
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                    onClick={() => deleteStageDocument.mutate({ dealId, documentId: doc.id })}
-                  >
-                    <X className="w-3 h-3 text-red-400" />
-                  </Button>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                    {doc.url && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6"
+                        onClick={() => window.open(doc.url, '_blank')}
+                        data-testid={`download-doc-${doc.id}`}
+                      >
+                        <Download className="w-3 h-3 text-blue-400" />
+                      </Button>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6"
+                      onClick={() => deleteStageDocument.mutate({ dealId, documentId: doc.id })}
+                      data-testid={`delete-doc-${doc.id}`}
+                    >
+                      <X className="w-3 h-3 text-red-400" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -627,13 +642,25 @@ function StageWorkSection({
                       <span className="text-xs text-muted-foreground ml-2">{formatDuration(note.duration)}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{note.authorName}</span>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                    <span className="text-xs text-muted-foreground mr-1">{note.recorderName || note.authorName}</span>
+                    {note.url && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6"
+                        onClick={() => window.open(note.url, '_blank')}
+                        data-testid={`download-note-${note.id}`}
+                      >
+                        <Download className="w-3 h-3 text-purple-400" />
+                      </Button>
+                    )}
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                      className="h-6 w-6"
                       onClick={() => deleteStageVoiceNote.mutate({ dealId, voiceNoteId: note.id })}
+                      data-testid={`delete-note-${note.id}`}
                     >
                       <X className="w-3 h-3 text-red-400" />
                     </Button>
@@ -696,7 +723,7 @@ function StageWorkSection({
           ) : (
             <div className="space-y-2">
               {stageTasks.map((task: any) => (
-                <div key={task.id} className="bg-secondary/20 rounded-lg overflow-hidden">
+                <div key={task.id} className="bg-secondary/20 rounded-lg overflow-hidden group">
                   <div 
                     className="flex items-center justify-between p-2 cursor-pointer hover:bg-secondary/30"
                     onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
@@ -714,6 +741,38 @@ function StageWorkSection({
                       <Badge variant="outline" className="text-xs">
                         {task.priority}
                       </Badge>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`delete-task-${task.id}`}
+                          >
+                            <X className="w-3 h-3 text-red-400" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete "{task.title}"? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => {
+                                deleteTask.mutate(task.id);
+                                toast.success("Task deleted");
+                              }}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                       <ChevronRight className={cn(
                         "w-4 h-4 transition-transform",
                         expandedTask === task.id && "rotate-90"
@@ -870,6 +929,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const deleteStageVoiceNote = useDeleteStageVoiceNote();
   const createTaskComment = useCreateTaskComment();
   const createTask = useCreateTask();
+  const deleteTask = useDeleteTask();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<string | null>(null);
@@ -878,6 +938,8 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [editingLeadDealId, setEditingLeadDealId] = useState<string | null>(null);
+  const [editingLeadValue, setEditingLeadValue] = useState("");
   
   // Fetch fees for the selected deal
   const { data: selectedDealFees = [] } = useDealFees(selectedDeal?.id || '');
@@ -2504,9 +2566,67 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       <span className="text-muted-foreground">Sector:</span>
                       <span className="ml-2 font-medium">{selectedDeal.sector}</span>
                     </div>
-                    <div className="p-3 bg-secondary/30 rounded-lg">
+                    <div className="p-3 bg-secondary/30 rounded-lg group relative">
                       <span className="text-muted-foreground">Lead:</span>
-                      <span className="ml-2 font-medium">{selectedDeal.lead}</span>
+                      {editingLeadDealId === selectedDeal.id ? (
+                        <div className="mt-1">
+                          <Select 
+                            value={editingLeadValue} 
+                            onValueChange={(value) => setEditingLeadValue(value)}
+                          >
+                            <SelectTrigger className="h-8 text-sm" data-testid="select-edit-lead">
+                              <SelectValue placeholder="Select lead" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allUsers.map(user => (
+                                <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <div className="flex gap-1 mt-1">
+                            <Button 
+                              size="sm" 
+                              className="h-6 text-xs px-2"
+                              onClick={async () => {
+                                try {
+                                  await updateDeal.mutateAsync({ id: selectedDeal.id, lead: editingLeadValue });
+                                  toast.success("Lead updated");
+                                  setEditingLeadDealId(null);
+                                } catch {
+                                  toast.error("Failed to update lead");
+                                }
+                              }}
+                              data-testid="button-save-lead"
+                            >
+                              Save
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="h-6 text-xs px-2"
+                              onClick={() => setEditingLeadDealId(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="ml-2 font-medium">{selectedDeal.lead}</span>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-5 w-5 absolute top-2 right-2 opacity-0 group-hover:opacity-100"
+                            onClick={() => {
+                              setEditingLeadDealId(selectedDeal.id);
+                              setEditingLeadValue(selectedDeal.lead);
+                            }}
+                            data-testid="button-edit-lead"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -2569,6 +2689,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     createTaskComment={createTaskComment}
                     createTask={createTask}
                     createDocument={createDocument}
+                    deleteTask={deleteTask}
                   />
                 </TabsContent>
 
