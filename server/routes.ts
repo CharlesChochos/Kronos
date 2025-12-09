@@ -2187,18 +2187,45 @@ Consider common investment banking tasks like:
         return res.status(403).json({ error: "Access denied" });
       }
       
-      const { content, attachments } = req.body;
+      const { content, attachments, mentions } = req.body;
       if (!content || typeof content !== 'string') {
         return res.status(400).json({ error: "Message content is required" });
       }
       
-      // Save user message with attachments
+      // Save user message with attachments and mentions
       const userMessage = await storage.createAssistantMessage({
         conversationId: req.params.id,
         role: 'user',
         content,
         attachments: attachments || [],
+        mentions: mentions || [],
       });
+      
+      // Create notifications for mentioned users (with validation and deduplication)
+      if (mentions && Array.isArray(mentions) && mentions.length > 0) {
+        const notifiedUserIds = new Set<string>();
+        for (const mention of mentions) {
+          // Skip self-mentions and duplicates
+          if (!mention.userId || mention.userId === currentUser.id || notifiedUserIds.has(mention.userId)) {
+            continue;
+          }
+          // Validate that the mentioned user exists
+          const mentionedUser = await storage.getUser(mention.userId);
+          if (!mentionedUser) {
+            console.warn(`Mentioned user not found: ${mention.userId}`);
+            continue;
+          }
+          // Create notification and track to avoid duplicates
+          await storage.createNotification({
+            userId: mention.userId,
+            title: 'Mentioned in Kronos',
+            message: `${currentUser.name} mentioned you in a conversation with Kronos AI`,
+            type: 'info',
+            link: '/ceo/assistant',
+          });
+          notifiedUserIds.add(mention.userId);
+        }
+      }
       
       // Gather expanded context for the AI
       const [deals, tasks, users, allTasks, investors, meetings, timeEntries, documents] = await Promise.all([
@@ -2493,6 +2520,24 @@ Example: "What should we focus on next for the Alpha Corp deal?" -> call get_dea
 **Investor Analysis:** When asked to find or match investors for a deal, use analyze_investor_fit.
 Example: "Which investors would be good for the healthcare deal?" -> call analyze_investor_fit
 
+**Market Data:** When asked about stock prices, market data, or company news, use get_market_data.
+Example: "What's Apple's stock price?" -> call get_market_data with symbol: "AAPL"
+
+**Document Summary:** When asked to summarize a document, use summarize_document.
+Example: "Summarize the Alpha Corp NDA" -> call summarize_document
+
+**Meeting Prep:** When asked to prepare for a meeting, use generate_meeting_prep.
+Example: "Help me prepare for the investor call tomorrow" -> call generate_meeting_prep
+
+**Pipeline Analytics:** When asked for pipeline metrics, performance data, or analytics, use get_pipeline_analytics.
+Example: "What's our win rate this quarter?" -> call get_pipeline_analytics
+
+**Team Performance:** When asked about team performance, productivity, or individual contributions, use get_team_performance.
+Example: "How is Sarah performing this month?" -> call get_team_performance
+
+**Reports:** When asked for a report or data summary, use generate_report.
+Example: "Generate a pipeline report" -> call generate_report
+
 ## GUIDELINES:
 - Be concise but thorough - investment bankers are busy
 - Use specific data from the platform context when relevant
@@ -2756,6 +2801,163 @@ Example: "Which investors would be good for the healthcare deal?" -> call analyz
                 }
               },
               required: ["dealName"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "get_market_data",
+            description: "Get real-time stock market data including price, change, and company news. Use when user asks about stock prices, market data, or company financial news.",
+            parameters: {
+              type: "object",
+              properties: {
+                symbol: {
+                  type: "string",
+                  description: "Stock ticker symbol (e.g., AAPL, GOOGL, MSFT)"
+                },
+                includeNews: {
+                  type: "boolean",
+                  description: "Whether to include recent company news (default: false)"
+                }
+              },
+              required: ["symbol"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "summarize_document",
+            description: "Summarize a document from the platform. Use when user asks for a summary, overview, or key points from a document.",
+            parameters: {
+              type: "object",
+              properties: {
+                documentId: {
+                  type: "string",
+                  description: "The ID of the document to summarize"
+                },
+                documentName: {
+                  type: "string",
+                  description: "The name of the document to summarize (alternative to documentId)"
+                },
+                summaryType: {
+                  type: "string",
+                  enum: ["brief", "detailed", "executive", "bullet_points"],
+                  description: "Type of summary to generate (default: brief)"
+                }
+              }
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "generate_meeting_prep",
+            description: "Generate meeting preparation materials including agenda, talking points, and relevant context. Use when user asks to prepare for a meeting.",
+            parameters: {
+              type: "object",
+              properties: {
+                meetingId: {
+                  type: "string",
+                  description: "The ID of the meeting to prepare for"
+                },
+                meetingTitle: {
+                  type: "string",
+                  description: "The title of the meeting (alternative to meetingId)"
+                },
+                includeContext: {
+                  type: "boolean",
+                  description: "Include related deal context (default: true)"
+                }
+              }
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "get_pipeline_analytics",
+            description: "Get detailed pipeline analytics including conversion rates, stage velocity, sector performance, and deal trends. Use when user asks for pipeline analysis, metrics, or performance data.",
+            parameters: {
+              type: "object",
+              properties: {
+                timeframe: {
+                  type: "string",
+                  enum: ["week", "month", "quarter", "year", "all"],
+                  description: "Time period for analytics (default: quarter)"
+                },
+                sector: {
+                  type: "string",
+                  description: "Filter by specific sector (optional)"
+                },
+                metric: {
+                  type: "string",
+                  enum: ["conversion", "velocity", "value", "stage_distribution", "all"],
+                  description: "Specific metric to analyze (default: all)"
+                }
+              }
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "get_team_performance",
+            description: "Get team performance insights including workload distribution, task completion rates, deal contributions, and productivity trends. Use when user asks about team performance, productivity, or individual contributions.",
+            parameters: {
+              type: "object",
+              properties: {
+                userId: {
+                  type: "string",
+                  description: "Specific team member ID to analyze (optional)"
+                },
+                userName: {
+                  type: "string",
+                  description: "Specific team member name to analyze (optional)"
+                },
+                timeframe: {
+                  type: "string",
+                  enum: ["week", "month", "quarter", "year"],
+                  description: "Time period for analysis (default: month)"
+                },
+                metric: {
+                  type: "string",
+                  enum: ["tasks", "deals", "workload", "efficiency", "all"],
+                  description: "Specific metric to analyze (default: all)"
+                }
+              }
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "generate_report",
+            description: "Generate a custom report based on natural language request. Use when user asks for a report, summary, or data export.",
+            parameters: {
+              type: "object",
+              properties: {
+                reportType: {
+                  type: "string",
+                  enum: ["pipeline", "team", "deals", "tasks", "investors", "custom"],
+                  description: "Type of report to generate"
+                },
+                title: {
+                  type: "string",
+                  description: "Title for the report"
+                },
+                requirements: {
+                  type: "string",
+                  description: "Natural language description of what the report should contain"
+                },
+                format: {
+                  type: "string",
+                  enum: ["summary", "detailed", "table"],
+                  description: "Report format (default: summary)"
+                }
+              },
+              required: ["reportType", "requirements"]
             }
           }
         }
@@ -3357,6 +3559,409 @@ RECOMMENDATION: Start outreach with ${scoredInvestors[0]?.name} - highest match 
                 toolResults.push({
                   tool_call_id: toolCall.id,
                   result: "Failed to analyze investor fit"
+                });
+              }
+            } else if (functionCall?.name === "get_market_data") {
+              try {
+                const args = JSON.parse(functionCall.arguments);
+                const symbol = args.symbol.toUpperCase();
+                const includeNews = args.includeNews ?? false;
+                
+                const finnhubKey = process.env.FINNHUB_API_KEY;
+                if (!finnhubKey) {
+                  toolResults.push({
+                    tool_call_id: toolCall.id,
+                    result: "Market data service is not configured. Please add FINNHUB_API_KEY."
+                  });
+                  continue;
+                }
+                
+                // Fetch quote data
+                const quoteResponse = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${finnhubKey}`);
+                const quoteData = await quoteResponse.json() as any;
+                
+                let result = `
+MARKET DATA FOR: ${symbol}
+Current Price: $${quoteData.c?.toFixed(2) || 'N/A'}
+Change: ${quoteData.d >= 0 ? '+' : ''}${quoteData.d?.toFixed(2) || 'N/A'} (${quoteData.dp >= 0 ? '+' : ''}${quoteData.dp?.toFixed(2) || 'N/A'}%)
+High: $${quoteData.h?.toFixed(2) || 'N/A'}
+Low: $${quoteData.l?.toFixed(2) || 'N/A'}
+Open: $${quoteData.o?.toFixed(2) || 'N/A'}
+Previous Close: $${quoteData.pc?.toFixed(2) || 'N/A'}
+`;
+                
+                // Fetch news if requested
+                if (includeNews) {
+                  const today = new Date().toISOString().split('T')[0];
+                  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                  const newsResponse = await fetch(`https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=${weekAgo}&to=${today}&token=${finnhubKey}`);
+                  const newsData = await newsResponse.json() as any[];
+                  
+                  if (newsData && newsData.length > 0) {
+                    result += `
+RECENT NEWS:
+${newsData.slice(0, 5).map((n, i) => `${i + 1}. ${n.headline} (${new Date(n.datetime * 1000).toLocaleDateString()})`).join('\n')}
+`;
+                  }
+                }
+                
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result
+                });
+              } catch (parseError) {
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: "Failed to fetch market data"
+                });
+              }
+            } else if (functionCall?.name === "summarize_document") {
+              try {
+                const args = JSON.parse(functionCall.arguments);
+                let document: any;
+                
+                if (args.documentId) {
+                  document = await storage.getDocument(args.documentId);
+                } else if (args.documentName) {
+                  const allDocs = await storage.getAllDocuments();
+                  document = allDocs.find(d => d.filename.toLowerCase().includes(args.documentName.toLowerCase()));
+                }
+                
+                if (!document) {
+                  toolResults.push({
+                    tool_call_id: toolCall.id,
+                    result: "Document not found. Please specify a valid document ID or name."
+                  });
+                  continue;
+                }
+                
+                const summaryType = args.summaryType || 'brief';
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: `
+DOCUMENT SUMMARY: ${document.filename}
+Category: ${document.category || 'Uncategorized'}
+Deal: ${document.dealId ? deals.find(d => d.id === document.dealId)?.name || 'Unknown' : 'N/A'}
+Tags: ${document.tags?.join(', ') || 'None'}
+Uploaded: ${document.uploadedAt ? new Date(document.uploadedAt).toLocaleDateString() : 'Unknown'}
+
+This is a ${document.category || 'general'} document. To get a full content summary, the document text would need to be processed by the AI. Currently showing metadata summary.
+`
+                });
+              } catch (parseError) {
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: "Failed to summarize document"
+                });
+              }
+            } else if (functionCall?.name === "generate_meeting_prep") {
+              try {
+                const args = JSON.parse(functionCall.arguments);
+                let meeting: any;
+                
+                if (args.meetingId) {
+                  meeting = meetings.find(m => m.id === args.meetingId);
+                } else if (args.meetingTitle) {
+                  meeting = meetings.find(m => m.title.toLowerCase().includes(args.meetingTitle.toLowerCase()));
+                }
+                
+                if (!meeting) {
+                  const upcomingList = meetings
+                    .filter(m => new Date(m.date) >= now)
+                    .slice(0, 5)
+                    .map(m => `- ${m.title} (${new Date(m.date).toLocaleDateString()})`)
+                    .join('\n');
+                  toolResults.push({
+                    tool_call_id: toolCall.id,
+                    result: `Meeting not found. Upcoming meetings:\n${upcomingList}`
+                  });
+                  continue;
+                }
+                
+                // Get related deal if any
+                const relatedDeal = meeting.dealId ? deals.find(d => d.id === meeting.dealId) : null;
+                const dealTasks = relatedDeal ? allTasks.filter(t => t.dealId === relatedDeal.id) : [];
+                const dealDocs = relatedDeal ? documents.filter(d => d.dealId === relatedDeal.id) : [];
+                
+                const prep = `
+MEETING PREPARATION: ${meeting.title}
+Date: ${new Date(meeting.date).toLocaleDateString()} at ${meeting.time}
+Location: ${meeting.location || 'TBD'}
+Attendees: ${meeting.attendees?.join(', ') || 'TBD'}
+
+SUGGESTED AGENDA:
+1. Opening and introductions (5 min)
+2. Review of key topics and objectives (10 min)
+3. Main discussion points (30 min)
+4. Action items and next steps (10 min)
+5. Q&A and closing (5 min)
+
+${relatedDeal ? `
+DEAL CONTEXT: ${relatedDeal.name}
+Stage: ${relatedDeal.stage}
+Progress: ${relatedDeal.progress}%
+Value: $${relatedDeal.value}M
+Open Tasks: ${dealTasks.filter(t => t.status !== 'Completed').length}
+Documents: ${dealDocs.length}
+` : ''}
+
+TALKING POINTS:
+• Review progress since last meeting
+• Discuss any blockers or concerns
+• Align on priorities and timelines
+• Confirm next steps and responsibilities
+
+PREPARATION CHECKLIST:
+☐ Review relevant documents
+☐ Prepare status update
+☐ List questions/concerns to address
+☐ Have data/metrics ready to share
+`;
+                
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: prep
+                });
+              } catch (parseError) {
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: "Failed to generate meeting prep"
+                });
+              }
+            } else if (functionCall?.name === "get_pipeline_analytics") {
+              try {
+                const args = JSON.parse(functionCall.arguments);
+                const timeframe = args.timeframe || 'quarter';
+                const sectorFilter = args.sector?.toLowerCase();
+                
+                // Calculate timeframe dates
+                const timeframes: Record<string, number> = {
+                  week: 7,
+                  month: 30,
+                  quarter: 90,
+                  year: 365,
+                  all: 10000
+                };
+                const daysBack = timeframes[timeframe] || 90;
+                const cutoffDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+                
+                // Filter deals by timeframe
+                let filteredDeals = deals.filter(d => {
+                  const created = d.createdAt ? new Date(d.createdAt) : now;
+                  return created >= cutoffDate;
+                });
+                
+                if (sectorFilter) {
+                  filteredDeals = filteredDeals.filter(d => d.sector?.toLowerCase().includes(sectorFilter));
+                }
+                
+                // Calculate metrics
+                const totalValue = filteredDeals.reduce((sum, d) => sum + d.value, 0);
+                const avgValue = filteredDeals.length > 0 ? totalValue / filteredDeals.length : 0;
+                const wonDeals = filteredDeals.filter(d => d.status === 'Won' || d.status === 'Closed');
+                const winRate = filteredDeals.length > 0 ? (wonDeals.length / filteredDeals.length * 100) : 0;
+                
+                // Stage distribution
+                const stageDistribution = filteredDeals.reduce((acc, d) => {
+                  acc[d.stage] = (acc[d.stage] || 0) + 1;
+                  return acc;
+                }, {} as Record<string, number>);
+                
+                // Sector breakdown
+                const sectorBreakdown = filteredDeals.reduce((acc, d) => {
+                  const sector = d.sector || 'Other';
+                  acc[sector] = (acc[sector] || { count: 0, value: 0 });
+                  acc[sector].count++;
+                  acc[sector].value += d.value;
+                  return acc;
+                }, {} as Record<string, { count: number; value: number }>);
+                
+                const analytics = `
+PIPELINE ANALYTICS (${timeframe.toUpperCase()})
+${sectorFilter ? `Sector: ${sectorFilter}\n` : ''}
+OVERVIEW:
+Total Deals: ${filteredDeals.length}
+Total Pipeline Value: $${totalValue.toFixed(1)}M
+Average Deal Size: $${avgValue.toFixed(1)}M
+Win Rate: ${winRate.toFixed(1)}%
+
+STAGE DISTRIBUTION:
+${Object.entries(stageDistribution).map(([stage, count]) => `• ${stage}: ${count} deals (${(count/filteredDeals.length*100).toFixed(0)}%)`).join('\n')}
+
+SECTOR BREAKDOWN:
+${Object.entries(sectorBreakdown).map(([sector, data]) => `• ${sector}: ${data.count} deals, $${data.value.toFixed(1)}M`).join('\n')}
+
+KEY INSIGHTS:
+${filteredDeals.filter(d => d.progress >= 75).length > 0 ? `🎯 ${filteredDeals.filter(d => d.progress >= 75).length} deals near completion (75%+ progress)` : ''}
+${stalledDeals.length > 0 ? `⚠️ ${stalledDeals.length} stalled deals need attention` : '✅ No stalled deals'}
+`;
+                
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: analytics
+                });
+              } catch (parseError) {
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: "Failed to generate pipeline analytics"
+                });
+              }
+            } else if (functionCall?.name === "get_team_performance") {
+              try {
+                const args = JSON.parse(functionCall.arguments);
+                const timeframe = args.timeframe || 'month';
+                
+                const timeframes: Record<string, number> = {
+                  week: 7,
+                  month: 30,
+                  quarter: 90,
+                  year: 365
+                };
+                const daysBack = timeframes[timeframe] || 30;
+                const cutoffDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+                
+                // Filter to specific user if requested
+                let targetUsers = users;
+                if (args.userName) {
+                  targetUsers = users.filter(u => u.name.toLowerCase().includes(args.userName.toLowerCase()));
+                } else if (args.userId) {
+                  targetUsers = users.filter(u => u.id === args.userId);
+                }
+                
+                const performanceData = targetUsers.map(u => {
+                  const userTasks = allTasks.filter(t => t.assignedTo === u.id);
+                  const completedTasks = userTasks.filter(t => t.status === 'Completed' && t.updatedAt && new Date(t.updatedAt) >= cutoffDate);
+                  const activeTasks = userTasks.filter(t => t.status !== 'Completed');
+                  const overdueTasks = userTasks.filter(t => new Date(t.dueDate) < now && t.status !== 'Completed');
+                  const userDeals = deals.filter(d => d.lead === u.name);
+                  
+                  return {
+                    name: u.name,
+                    role: u.role,
+                    completedTasks: completedTasks.length,
+                    activeTasks: activeTasks.length,
+                    overdueTasks: overdueTasks.length,
+                    activeDeals: userDeals.filter(d => d.status === 'Active').length,
+                    efficiency: userTasks.length > 0 ? (completedTasks.length / userTasks.length * 100) : 0,
+                    workloadScore: activeTasks.length + (overdueTasks.length * 2),
+                  };
+                }).sort((a, b) => b.efficiency - a.efficiency);
+                
+                const performance = `
+TEAM PERFORMANCE (${timeframe.toUpperCase()})
+
+${performanceData.map(p => `
+${p.name} (${p.role})
+  ✅ Completed: ${p.completedTasks} tasks
+  📋 Active: ${p.activeTasks} tasks
+  ${p.overdueTasks > 0 ? `⚠️ Overdue: ${p.overdueTasks} tasks` : '✔️ No overdue tasks'}
+  💼 Active Deals: ${p.activeDeals}
+  📊 Efficiency: ${p.efficiency.toFixed(0)}%
+  🔥 Workload Score: ${p.workloadScore} ${p.workloadScore > 10 ? '(HIGH)' : p.workloadScore > 5 ? '(MODERATE)' : '(LOW)'}
+`).join('\n')}
+
+SUMMARY:
+• Highest Performer: ${performanceData[0]?.name || 'N/A'} (${performanceData[0]?.efficiency.toFixed(0) || 0}% efficiency)
+• Total Completed Tasks: ${performanceData.reduce((sum, p) => sum + p.completedTasks, 0)}
+• Team Capacity: ${performanceData.filter(p => p.workloadScore <= 5).length} members with available capacity
+`;
+                
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: performance
+                });
+              } catch (parseError) {
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: "Failed to generate team performance"
+                });
+              }
+            } else if (functionCall?.name === "generate_report") {
+              try {
+                const args = JSON.parse(functionCall.arguments);
+                const reportType = args.reportType;
+                const format = args.format || 'summary';
+                const title = args.title || `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`;
+                
+                let reportContent = `
+# ${title}
+Generated: ${new Date().toLocaleString()}
+Report Type: ${reportType}
+
+`;
+                
+                switch (reportType) {
+                  case 'pipeline':
+                    reportContent += `
+## Pipeline Overview
+- Total Deals: ${deals.length}
+- Active: ${deals.filter(d => d.status === 'Active').length}
+- Won/Closed: ${deals.filter(d => d.status === 'Won' || d.status === 'Closed').length}
+- Total Value: $${deals.reduce((sum, d) => sum + d.value, 0).toFixed(1)}M
+
+## Stage Distribution
+${Object.entries(dealsByStage).map(([stage, count]) => `- ${stage}: ${count}`).join('\n')}
+`;
+                    break;
+                  case 'team':
+                    reportContent += `
+## Team Summary
+- Total Members: ${users.length}
+- Active Tasks: ${allTasks.filter(t => t.status !== 'Completed').length}
+- Overdue Tasks: ${allOverdueTasks.length}
+
+## Workload Distribution
+${teamWorkload.slice(0, 10).map(m => `- ${m.name}: ${m.activeTasks} active, ${m.overdueTasks} overdue`).join('\n')}
+`;
+                    break;
+                  case 'deals':
+                    reportContent += `
+## Deals Summary
+${deals.slice(0, 10).map(d => `
+### ${d.name}
+- Client: ${d.client}
+- Sector: ${d.sector}
+- Stage: ${d.stage}
+- Value: $${d.value}M
+- Progress: ${d.progress}%
+`).join('\n')}
+`;
+                    break;
+                  case 'tasks':
+                    reportContent += `
+## Tasks Summary
+- Total Tasks: ${allTasks.length}
+- Pending: ${allTasks.filter(t => t.status === 'Pending').length}
+- In Progress: ${allTasks.filter(t => t.status === 'In Progress').length}
+- Completed: ${allTasks.filter(t => t.status === 'Completed').length}
+- Overdue: ${allOverdueTasks.length}
+
+## Upcoming Deadlines
+${upcomingDeadlines.slice(0, 10).map(t => `- ${t.title} (Due: ${new Date(t.dueDate).toLocaleDateString()})`).join('\n')}
+`;
+                    break;
+                  case 'investors':
+                    reportContent += `
+## Investor Summary
+- Total Investors: ${investors.length}
+- Active: ${investors.filter(i => i.status === 'Active').length}
+
+## By Type
+${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0) + 1; return acc; }, {} as Record<string, number>)).map(([type, count]) => `- ${type}: ${count}`).join('\n')}
+`;
+                    break;
+                  default:
+                    reportContent += `Custom report based on: ${args.requirements}\n\nNote: For custom reports, please be more specific about what data you need.`;
+                }
+                
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: reportContent
+                });
+              } catch (parseError) {
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  result: "Failed to generate report"
                 });
               }
             }

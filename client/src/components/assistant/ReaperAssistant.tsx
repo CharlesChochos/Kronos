@@ -65,6 +65,9 @@ export function ReaperAssistant() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionIndex, setMentionIndex] = useState(0);
   
   // Get current user for role-based prompts
   const { data: currentUser } = useCurrentUser();
@@ -201,6 +204,93 @@ export function ReaperAssistant() {
     enabled: isOpen,
   });
 
+  // Query team members for @ mentions
+  const { data: teamMembers = [] } = useQuery<{ id: string; name: string; role: string }[]>({
+    queryKey: ["/api/users"],
+    enabled: isOpen,
+    select: (data: any[]) => data.filter((u: any) => u.id !== currentUser?.id).map((u: any) => ({
+      id: u.id,
+      name: u.name,
+      role: u.role || 'Team Member',
+    })),
+  });
+
+  // Filter team members based on mention query
+  const filteredMentions = useMemo(() => {
+    if (!mentionQuery) return teamMembers.slice(0, 5);
+    return teamMembers
+      .filter(m => m.name.toLowerCase().includes(mentionQuery.toLowerCase()))
+      .slice(0, 5);
+  }, [teamMembers, mentionQuery]);
+
+  // Handle input change for @ mentions
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+    
+    // Check for @ mentions
+    const cursorPos = e.target.selectionStart || 0;
+    const textBeforeCursor = value.slice(0, cursorPos);
+    const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+    
+    if (mentionMatch) {
+      setShowMentions(true);
+      setMentionQuery(mentionMatch[1]);
+      setMentionIndex(0);
+    } else {
+      setShowMentions(false);
+      setMentionQuery("");
+    }
+  }, []);
+
+  // Track pending mentions with their user IDs - keyed by unique mention token
+  const [pendingMentions, setPendingMentions] = useState<Map<string, { userId: string; userName: string }>>(new Map());
+
+  // Insert mention into input
+  const insertMention = useCallback((member: { id: string; name: string }) => {
+    const cursorPos = inputRef.current?.selectionStart || inputValue.length;
+    const textBeforeCursor = inputValue.slice(0, cursorPos);
+    const textAfterCursor = inputValue.slice(cursorPos);
+    
+    // Replace the @query with @[name:id] (embed ID to ensure uniqueness)
+    const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+    if (mentionMatch) {
+      const newTextBefore = textBeforeCursor.slice(0, -mentionMatch[0].length);
+      const mentionToken = `@[${member.name}:${member.id}]`;
+      const newValue = `${newTextBefore}${mentionToken} ${textAfterCursor}`;
+      setInputValue(newValue);
+      
+      // Track this mention with its user ID - key by ID for uniqueness
+      setPendingMentions(prev => {
+        const updated = new Map(prev);
+        updated.set(member.id, { userId: member.id, userName: member.name });
+        return updated;
+      });
+    }
+    
+    setShowMentions(false);
+    setMentionQuery("");
+    inputRef.current?.focus();
+  }, [inputValue]);
+
+  // Handle keyboard navigation for mentions
+  const handleMentionKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!showMentions || filteredMentions.length === 0) return;
+    
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setMentionIndex(prev => (prev + 1) % filteredMentions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setMentionIndex(prev => (prev - 1 + filteredMentions.length) % filteredMentions.length);
+    } else if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      insertMention(filteredMentions[mentionIndex]);
+    } else if (e.key === 'Escape') {
+      setShowMentions(false);
+    }
+  }, [showMentions, filteredMentions, mentionIndex, insertMention]);
+
   // Auto-select most recent conversation or create new one when opening
   useEffect(() => {
     if (isOpen && !conversationsLoading && !activeConversationId) {
@@ -242,6 +332,94 @@ export function ReaperAssistant() {
     }
   }, [generateConversationSummary]);
 
+  const exportToPDF = useCallback(async () => {
+    try {
+      const jsPDF = (await import('jspdf')).default;
+      const doc = new jsPDF();
+      
+      const activeConv = conversations.find(c => c.id === activeConversationId);
+      const title = activeConv?.title || 'Kronos Conversation';
+      
+      // Set up document
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Kronos AI Assistant', 20, 20);
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Topic: ${title}`, 20, 30);
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 38);
+      doc.text(`Exported by: ${currentUser?.name || 'User'}`, 20, 46);
+      
+      // Draw separator line
+      doc.setDrawColor(200);
+      doc.line(20, 52, 190, 52);
+      
+      let yPosition = 62;
+      const pageHeight = 280;
+      const lineHeight = 6;
+      const maxWidth = 170;
+      
+      for (const msg of messages) {
+        const role = msg.role === 'user' ? 'You' : 'Kronos';
+        
+        // Check if we need a new page
+        if (yPosition > pageHeight - 30) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        
+        // Role header
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(msg.role === 'user' ? 70 : 30, 100, 170);
+        doc.text(`${role}:`, 20, yPosition);
+        yPosition += lineHeight;
+        
+        // Message content
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(60, 60, 60);
+        
+        // Clean up markdown formatting for PDF
+        const cleanContent = msg.content
+          .replace(/\*\*/g, '')
+          .replace(/\*/g, '')
+          .replace(/#{1,6}\s/g, '')
+          .replace(/```[\s\S]*?```/g, '[Code Block]');
+        
+        const lines = doc.splitTextToSize(cleanContent, maxWidth);
+        for (const line of lines) {
+          if (yPosition > pageHeight - 20) {
+            doc.addPage();
+            yPosition = 20;
+          }
+          doc.text(line, 20, yPosition);
+          yPosition += lineHeight;
+        }
+        
+        yPosition += lineHeight; // Space between messages
+      }
+      
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Page ${i} of ${pageCount}`, 105, 290, { align: 'center' });
+        doc.text('Equiturn - Kronos Platform', 105, 295, { align: 'center' });
+      }
+      
+      // Download the PDF
+      doc.save(`kronos-conversation-${new Date().toISOString().slice(0, 10)}.pdf`);
+      toast.success('PDF exported successfully');
+    } catch (err) {
+      console.error('PDF export error:', err);
+      toast.error('Failed to export PDF');
+    }
+  }, [messages, conversations, activeConversationId, currentUser]);
+
   const createConversation = useMutation({
     mutationFn: async () => {
       const response = await fetch("/api/assistant/conversations", {
@@ -261,13 +439,17 @@ export function ReaperAssistant() {
   });
 
   const sendMessage = useMutation({
-    mutationFn: async ({ content, attachments }: { content: string; attachments?: AssistantAttachment[] }) => {
+    mutationFn: async ({ content, attachments, mentions }: { 
+      content: string; 
+      attachments?: AssistantAttachment[];
+      mentions?: { userId: string; userName: string; notified: boolean }[];
+    }) => {
       if (!activeConversationId) throw new Error("No active conversation");
       const response = await fetch(`/api/assistant/conversations/${activeConversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ content, attachments }),
+        body: JSON.stringify({ content, attachments, mentions }),
       });
       if (!response.ok) throw new Error("Failed to send message");
       return response.json();
@@ -382,10 +564,31 @@ export function ReaperAssistant() {
       messageContent = messageContent ? `${messageContent}\n\n${fileInfo}` : fileInfo;
     }
     
+    // Extract @ mentions from the message - pattern: @[Name:userId]
+    const mentionMatches = messageContent.match(/@\[([^:\]]+):([^\]]+)\]/g) || [];
+    const mentions = mentionMatches
+      .map(match => {
+        // Parse @[Name:userId] format
+        const innerMatch = match.match(/@\[([^:\]]+):([^\]]+)\]/);
+        if (innerMatch) {
+          const [, name, userId] = innerMatch;
+          return { userId, userName: name, notified: false };
+        }
+        return null;
+      })
+      .filter((m): m is { userId: string; userName: string; notified: boolean } => m !== null);
+    
+    // Clean up the message content: replace @[Name:id] with @Name for display
+    const cleanedContent = messageContent.replace(/@\[([^:\]]+):[^\]]+\]/g, '@$1');
+    
     sendMessage.mutate({ 
-      content: messageContent,
+      content: cleanedContent,
       attachments: pendingFiles.length > 0 ? pendingFiles : undefined,
+      mentions: mentions.length > 0 ? mentions : undefined,
     });
+    
+    // Clear pending mentions after sending
+    setPendingMentions(new Map());
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -453,6 +656,7 @@ export function ReaperAssistant() {
               <Button
                 onClick={copyConversationToClipboard}
                 className="flex-1 gap-2"
+                variant="outline"
                 data-testid="button-copy-conversation"
               >
                 {copiedToClipboard ? (
@@ -463,13 +667,21 @@ export function ReaperAssistant() {
                 ) : (
                   <>
                     <Copy className="w-4 h-4" />
-                    Copy to Clipboard
+                    Copy
                   </>
                 )}
               </Button>
+              <Button
+                onClick={exportToPDF}
+                className="flex-1 gap-2"
+                data-testid="button-export-pdf"
+              >
+                <Download className="w-4 h-4" />
+                Export PDF
+              </Button>
             </div>
             <p className="text-xs text-muted-foreground text-center">
-              You can paste this summary in chat, email, or any document.
+              Copy to clipboard or download as a formatted PDF document.
             </p>
           </div>
         </DialogContent>
@@ -893,7 +1105,7 @@ export function ReaperAssistant() {
                       </div>
                     )}
                     
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 relative">
                       <Button
                         variant="outline"
                         size="icon"
@@ -927,13 +1139,46 @@ export function ReaperAssistant() {
                       <Textarea
                         ref={inputRef}
                         value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder={isListening ? "Listening..." : "Ask Kronos anything..."}
+                        onChange={handleInputChange}
+                        onKeyDown={(e) => {
+                          if (showMentions) {
+                            handleMentionKeyDown(e);
+                            if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) return;
+                          }
+                          handleKeyDown(e);
+                        }}
+                        placeholder={isListening ? "Listening..." : "Ask Kronos anything... (@ to mention)"}
                         className="resize-none min-h-[44px] max-h-[120px]"
                         disabled={sendMessage.isPending}
                         data-testid="input-assistant-message"
                       />
+                      {/* @ Mentions popup */}
+                      {showMentions && filteredMentions.length > 0 && (
+                        <div className="absolute bottom-full left-0 mb-1 w-64 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50">
+                          <div className="p-1 text-xs text-muted-foreground border-b border-border px-2 py-1">
+                            Tag a team member
+                          </div>
+                          {filteredMentions.map((member, idx) => (
+                            <button
+                              key={member.id}
+                              onClick={() => insertMention(member)}
+                              className={cn(
+                                "w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-accent transition-colors",
+                                idx === mentionIndex && "bg-accent"
+                              )}
+                              data-testid={`mention-${member.id}`}
+                            >
+                              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium">
+                                {member.name.charAt(0)}
+                              </div>
+                              <div>
+                                <div className="font-medium">{member.name}</div>
+                                <div className="text-xs text-muted-foreground">{member.role}</div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       <Button
                         onClick={handleSend}
                         disabled={(!inputValue.trim() && pendingFiles.length === 0) || sendMessage.isPending}

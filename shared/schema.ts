@@ -259,6 +259,8 @@ export const assistantConversations = pgTable("assistant_conversations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
   title: text("title").default('New Conversation'),
+  isShared: boolean("is_shared").default(false),
+  sharedWith: text("shared_with").array(), // Array of user IDs who can access
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -282,6 +284,13 @@ export type AssistantAttachment = {
   uploadedAt: string;
 };
 
+// Assistant Message Mention type
+export type AssistantMention = {
+  userId: string;
+  userName: string;
+  notified: boolean;
+};
+
 // Reaper Assistant Messages table
 export const assistantMessages = pgTable("assistant_messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -289,6 +298,7 @@ export const assistantMessages = pgTable("assistant_messages", {
   role: text("role").notNull(), // 'user' or 'assistant'
   content: text("content").notNull(),
   attachments: jsonb("attachments").default([]).$type<AssistantAttachment[]>(),
+  mentions: jsonb("mentions").default([]).$type<AssistantMention[]>(), // @ mentions in the message
   context: jsonb("context").default({}), // stores any context used for the response
   createdAt: timestamp("created_at").defaultNow(),
 });
