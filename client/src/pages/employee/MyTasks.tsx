@@ -371,6 +371,10 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
       toast.error("Please enter a task title");
       return;
     }
+    if (!newTaskForm.dueDate) {
+      toast.error("Please select a due date");
+      return;
+    }
     
     try {
       const taskData: any = {
@@ -380,10 +384,8 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
         status: 'Pending',
         type: newTaskForm.type,
         assignedTo: currentUser?.id || '',
+        dueDate: newTaskForm.dueDate,
       };
-      if (newTaskForm.dueDate) {
-        taskData.dueDate = newTaskForm.dueDate;
-      }
       if (newTaskForm.dealId && newTaskForm.dealId !== 'none') {
         taskData.dealId = newTaskForm.dealId;
         const selectedDeal = deals.find(d => d.id === newTaskForm.dealId);

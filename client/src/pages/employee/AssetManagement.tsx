@@ -1127,6 +1127,16 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
     }
   }, [searchString, deals]);
 
+  // Keep selectedDeal in sync with fresh data from deals query
+  useEffect(() => {
+    if (selectedDeal && deals.length > 0) {
+      const freshDeal = deals.find(d => d.id === selectedDeal.id);
+      if (freshDeal) {
+        setSelectedDeal(freshDeal);
+      }
+    }
+  }, [deals]);
+
   const filteredDeals = useMemo(() => {
     return deals.filter(deal => {
       const matchesSearch = !searchQuery || 

@@ -928,10 +928,6 @@ export async function registerRoutes(
   app.get("/api/deals", requireAuth, requireInternal, async (req, res) => {
     try {
       const deals = await storage.getAllDeals();
-      // Debug: Log first deal's auditTrail to verify it's being returned
-      if (deals.length > 0) {
-        console.log('First deal auditTrail:', JSON.stringify(deals[0].auditTrail));
-      }
       res.json(deals);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch deals" });
