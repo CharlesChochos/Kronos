@@ -42,10 +42,13 @@ export default function DealTemplates({ role }: { role: 'CEO' | 'Employee' }) {
 
   const { data: templates = [], isLoading } = useDealTemplates();
   
-  // Use actual template types from the data, or predefined categories
+  // Predefined categories that always show, plus any additional types from templates
+  const PREDEFINED_CATEGORIES = ["Deal", "HR", "Compliance", "Operations", "Finance", "Legal"];
   const TEMPLATE_CATEGORIES = useMemo(() => {
-    const types = new Set(templates.map(t => t.dealType));
-    return ["all", ...Array.from(types).sort()];
+    const templateTypes = new Set(templates.map(t => t.dealType));
+    // Combine predefined with any custom types from templates
+    const allCategories = new Set([...PREDEFINED_CATEGORIES, ...templateTypes]);
+    return ["all", ...Array.from(allCategories).sort()];
   }, [templates]);
   const createTemplate = useCreateDealTemplate();
   const updateTemplate = useUpdateDealTemplate();
@@ -55,7 +58,7 @@ export default function DealTemplates({ role }: { role: 'CEO' | 'Employee' }) {
     name: "",
     description: "",
     sector: "Technology",
-    dealType: "M&A",
+    dealType: "Deal",
     estimatedDuration: 90,
     stages: "",
     checklistItems: ""
@@ -90,7 +93,7 @@ export default function DealTemplates({ role }: { role: 'CEO' | 'Employee' }) {
         usageCount: 0,
       });
       setShowCreateModal(false);
-      setNewTemplate({ name: "", description: "", sector: "Technology", dealType: "M&A", estimatedDuration: 90, stages: "", checklistItems: "" });
+      setNewTemplate({ name: "", description: "", sector: "Technology", dealType: "Deal", estimatedDuration: 90, stages: "", checklistItems: "" });
       toast.success("Template created successfully");
     } catch (error) {
       toast.error("Failed to create template");
@@ -379,17 +382,15 @@ export default function DealTemplates({ role }: { role: 'CEO' | 'Employee' }) {
                 </Select>
               </div>
               <div>
-                <Label>Deal Type</Label>
+                <Label>Category</Label>
                 <Select value={newTemplate.dealType} onValueChange={(v) => setNewTemplate({ ...newTemplate, dealType: v })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="M&A">M&A</SelectItem>
-                    <SelectItem value="Capital Raising">Capital Raising</SelectItem>
-                    <SelectItem value="Divestiture">Divestiture</SelectItem>
-                    <SelectItem value="Restructuring">Restructuring</SelectItem>
-                    <SelectItem value="IPO">IPO</SelectItem>
+                    {PREDEFINED_CATEGORIES.map((category) => (
+                      <SelectItem key={category} value={category}>{category}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
