@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSearch } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -86,6 +87,7 @@ type StageWorkSectionProps = {
   createTask: any;
   createDocument: any;
   deleteTask: any;
+  onAuditEntry?: (action: string, details: string) => void;
 };
 
 function StageWorkSection({
@@ -106,7 +108,8 @@ function StageWorkSection({
   createTaskComment,
   createTask,
   createDocument,
-  deleteTask
+  deleteTask,
+  onAuditEntry
 }: StageWorkSectionProps) {
   const { data: stageDocuments = [] } = useStageDocuments(dealId, activeStageTab);
   const { data: stagePodMembers = [] } = useStagePodMembers(dealId, activeStageTab);
@@ -203,6 +206,10 @@ function StageWorkSection({
           uploadedBy: currentUser?.id
         });
         
+        if (onAuditEntry) {
+          onAuditEntry('Document Uploaded', `${title} uploaded to ${activeStageTab} stage`);
+        }
+        
         toast.success("Document uploaded and archived");
         setDocumentTitle("");
         setDocumentCategory("General");
@@ -236,6 +243,9 @@ function StageWorkSection({
         type: 'Deal Task',
         dueDate: nextWeek.toISOString().split('T')[0]
       });
+      if (onAuditEntry) {
+        onAuditEntry('Task Created', `${newTaskTitle.trim()} created in ${activeStageTab} stage`);
+      }
       toast.success("Task created");
       setNewTaskTitle("");
       setNewTaskPriority("Medium");
@@ -262,6 +272,9 @@ function StageWorkSection({
           phone: selectedMember.phone || '',
         }
       });
+      if (onAuditEntry) {
+        onAuditEntry('Team Member Added', `${selectedMember.name} added to ${activeStageTab} stage`);
+      }
       toast.success("Team member added to stage");
       setSelectedMember(null);
       setMemberSearch("");
@@ -879,6 +892,7 @@ type DealManagementProps = {
 
 export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const searchString = useSearch();
+  const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const { data: allDeals = [], isLoading } = useDeals();
   const { data: allUsers = [] } = useUsers();
@@ -2701,6 +2715,38 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     createTask={createTask}
                     createDocument={createDocument}
                     deleteTask={deleteTask}
+                    onAuditEntry={async (action, details) => {
+                      try {
+                        const auditEntry: AuditEntry = {
+                          id: crypto.randomUUID(),
+                          timestamp: new Date().toISOString(),
+                          action,
+                          user: currentUser?.name || 'System',
+                          details,
+                        };
+                        // Get fresh deal data from cache to avoid stale auditTrail
+                        const freshDeals = queryClient.getQueryData<Deal[]>(['deals']) || [];
+                        const freshDeal = freshDeals.find((d: Deal) => d.id === selectedDeal.id);
+                        const currentAuditTrail = freshDeal?.auditTrail as AuditEntry[] || selectedDeal.auditTrail as AuditEntry[] || [];
+                        const newAuditTrail = [...currentAuditTrail, auditEntry];
+                        
+                        await updateDeal.mutateAsync({
+                          id: selectedDeal.id,
+                          auditTrail: newAuditTrail,
+                        });
+                        
+                        // Update selectedDeal and query cache to keep UI in sync
+                        const updatedDeal = { ...selectedDeal, auditTrail: newAuditTrail };
+                        setSelectedDeal(updatedDeal);
+                        
+                        // Also update the cache so subsequent calls get fresh data
+                        queryClient.setQueryData<Deal[]>(['deals'], (old) => 
+                          old?.map(d => d.id === selectedDeal.id ? updatedDeal : d) || []
+                        );
+                      } catch (error: any) {
+                        toast.error("Failed to log audit entry");
+                      }
+                    }}
                   />
                 </TabsContent>
 

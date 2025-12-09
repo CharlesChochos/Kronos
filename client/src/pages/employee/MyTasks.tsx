@@ -61,6 +61,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
   const { data: users = [] } = useUsers();
   const updateTask = useUpdateTask();
   const createTask = useCreateTask();
+  const deleteTask = useDeleteTask();
   const queryClient = useQueryClient();
   const { data: userPrefs, isLoading: prefsLoading } = useUserPreferences();
   const saveUserPrefs = useSaveUserPreferences();
@@ -286,6 +287,17 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
       setShowTaskDetailModal(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to update task");
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      await deleteTask.mutateAsync(taskId);
+      toast.success("Task deleted successfully!");
+      setShowTaskDetailModal(false);
+      setSelectedTask(null);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete task");
     }
   };
 
@@ -822,6 +834,13 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
             </div>
           )}
           <DialogFooter className="gap-2">
+            <Button 
+              variant="destructive" 
+              onClick={() => selectedTask && handleDeleteTask(selectedTask.id)}
+              data-testid="button-delete-task"
+            >
+              <Trash2 className="w-4 h-4 mr-2" /> Delete
+            </Button>
             <Button variant="outline" onClick={() => setShowTaskDetailModal(false)}>
               Close
             </Button>
