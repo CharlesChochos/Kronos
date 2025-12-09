@@ -430,7 +430,7 @@ export default function InvestorCRM() {
                         <div
                           key={investor.id}
                           className={cn(
-                            "w-full p-3 rounded-lg border text-left transition-colors flex items-start gap-2",
+                            "w-full p-3 rounded-lg border text-left transition-colors flex items-start gap-3",
                             selectedInvestorId === investor.id 
                               ? "border-primary bg-primary/10" 
                               : "border-border hover:bg-secondary/50",
@@ -438,17 +438,22 @@ export default function InvestorCRM() {
                           )}
                           data-testid={`investor-card-${investor.id}`}
                         >
-                          <button
-                            onClick={(e) => toggleInvestorSelection(investor.id, e)}
-                            className="mt-1 flex-shrink-0"
-                            data-testid={`checkbox-investor-${investor.id}`}
-                          >
-                            {selectedInvestorIds.has(investor.id) ? (
-                              <CheckSquare className="w-5 h-5 text-primary" />
-                            ) : (
-                              <Square className="w-5 h-5 text-muted-foreground hover:text-primary" />
-                            )}
-                          </button>
+                          <div className="flex items-center pt-1">
+                            <Checkbox
+                              checked={selectedInvestorIds.has(investor.id)}
+                              onCheckedChange={() => {
+                                const newSet = new Set(selectedInvestorIds);
+                                if (newSet.has(investor.id)) {
+                                  newSet.delete(investor.id);
+                                } else {
+                                  newSet.add(investor.id);
+                                }
+                                setSelectedInvestorIds(newSet);
+                              }}
+                              data-testid={`checkbox-investor-${investor.id}`}
+                              className="h-5 w-5 border-2"
+                            />
+                          </div>
                           <button 
                             onClick={() => setSelectedInvestorId(investor.id)}
                             className="flex-1 text-left"
