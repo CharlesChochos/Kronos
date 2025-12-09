@@ -153,6 +153,8 @@ export function useCreateDeal() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
@@ -174,6 +176,8 @@ export function useUpdateDeal() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
@@ -190,6 +194,8 @@ export function useDeleteDeal() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
@@ -276,6 +282,8 @@ export function useCreateTask() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
     },
   });
 }
@@ -294,6 +302,8 @@ export function useUpdateTask() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
     },
   });
 }
@@ -310,6 +320,8 @@ export function useDeleteTask() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
     },
   });
 }
@@ -340,8 +352,8 @@ export function useCreateMeeting() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
-      // Also invalidate notifications since meeting creation creates notifications
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
     },
   });
 }
@@ -360,6 +372,8 @@ export function useUpdateMeeting() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
     },
   });
 }
@@ -376,6 +390,8 @@ export function useDeleteMeeting() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
     },
   });
 }
@@ -627,6 +643,7 @@ export function useCreateTimeOffRequest() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["time-off-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
@@ -648,6 +665,7 @@ export function useUpdateTimeOffRequest() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["time-off-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
@@ -843,6 +861,7 @@ export function useCreateInvestor() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["investors"] });
+      queryClient.invalidateQueries({ queryKey: ["investor-matches"] });
     },
   });
 }
@@ -864,6 +883,7 @@ export function useUpdateInvestor() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["investors"] });
+      queryClient.invalidateQueries({ queryKey: ["investor-matches"] });
     },
   });
 }
@@ -878,6 +898,7 @@ export function useDeleteInvestor() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["investors"] });
+      queryClient.invalidateQueries({ queryKey: ["investor-matches"] });
     },
   });
 }
