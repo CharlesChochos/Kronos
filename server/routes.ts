@@ -5309,6 +5309,68 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
     }
   });
   
+  // Bulk import stakeholders
+  app.post("/api/stakeholders/bulk-import", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const { stakeholders } = req.body;
+      
+      if (!Array.isArray(stakeholders) || stakeholders.length === 0) {
+        return res.status(400).json({ error: "stakeholders array is required" });
+      }
+      
+      console.log(`Bulk importing ${stakeholders.length} stakeholders...`);
+      
+      const validTypes = ['investor', 'advisor', 'legal', 'banker', 'consultant', 'client', 'other'];
+      let successCount = 0;
+      let errorCount = 0;
+      const created = [];
+      
+      for (const s of stakeholders) {
+        if (!s.name || !s.company) {
+          errorCount++;
+          continue;
+        }
+        
+        try {
+          const stakeholderType = validTypes.includes(s.type?.toLowerCase()) ? s.type.toLowerCase() : 'other';
+          
+          const result = await storage.createStakeholder({
+            name: s.name,
+            title: s.title || '',
+            company: s.company,
+            type: stakeholderType,
+            email: s.email || null,
+            phone: s.phone || null,
+            linkedin: s.linkedin || null,
+            website: s.website || null,
+            location: s.location || null,
+            focus: s.focus || null,
+            notes: s.notes || null,
+            deals: [],
+            isFavorite: false
+          });
+          created.push(result);
+          successCount++;
+        } catch (err) {
+          console.error('Failed to create stakeholder:', s.name, err);
+          errorCount++;
+        }
+      }
+      
+      console.log(`Bulk import complete: ${successCount} created, ${errorCount} failed`);
+      
+      res.status(201).json({
+        successCount,
+        errorCount,
+        totalProcessed: stakeholders.length,
+        created
+      });
+    } catch (error) {
+      console.error('Bulk import error:', error);
+      res.status(500).json({ error: "Failed to bulk import stakeholders" });
+    }
+  });
+  
   // Update stakeholder
   app.patch("/api/stakeholders/:id", requireAuth, async (req, res) => {
     try {

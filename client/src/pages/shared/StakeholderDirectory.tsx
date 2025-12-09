@@ -424,26 +424,28 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
       setSelectedRows(new Set(dataRows.map((_, i) => i)));
       
       const autoMap: Record<string, string> = { ...importColumnMap };
-      const lowerHeaders = headers.map(h => h.toLowerCase());
+      const lowerHeaders = headers.map(h => h.toLowerCase().trim());
       
+      // Extended mappings to catch more header variations
       const fieldMappings: Record<string, string[]> = {
-        name: ['name', 'full name', 'contact name', 'stakeholder', 'person'],
-        title: ['title', 'job title', 'position', 'role'],
-        company: ['company', 'organization', 'firm', 'employer', 'org'],
-        type: ['type', 'category', 'stakeholder type'],
-        email: ['email', 'e-mail', 'email address', 'mail'],
-        phone: ['phone', 'telephone', 'mobile', 'cell', 'phone number'],
-        linkedin: ['linkedin', 'linked in', 'linkedin url', 'li'],
-        website: ['website', 'web', 'url', 'site'],
-        location: ['location', 'city', 'address', 'region', 'country'],
-        focus: ['focus', 'sector', 'sector focus', 'sectors', 'industry', 'industries', 'investment focus', 'specialization', 'expertise', 'vertical', 'verticals'],
-        notes: ['notes', 'comments', 'description', 'remarks']
+        name: ['name', 'full name', 'contact name', 'stakeholder', 'person', 'contact', 'investor name', 'fund manager', 'manager', 'first name', 'firstname', 'last name', 'lastname', 'investor', 'principal'],
+        title: ['title', 'job title', 'position', 'role', 'designation', 'job'],
+        company: ['company', 'organization', 'firm', 'employer', 'org', 'fund', 'fund name', 'institution', 'entity', 'business', 'investor', 'lp', 'gp', 'group', 'family office', 'endowment', 'pension', 'foundation'],
+        type: ['type', 'category', 'stakeholder type', 'investor type', 'classification', 'class'],
+        email: ['email', 'e-mail', 'email address', 'mail', 'contact email', 'work email', 'primary email'],
+        phone: ['phone', 'telephone', 'mobile', 'cell', 'phone number', 'tel', 'contact number', 'work phone', 'direct'],
+        linkedin: ['linkedin', 'linked in', 'linkedin url', 'li', 'linkedin profile', 'social'],
+        website: ['website', 'web', 'url', 'site', 'homepage', 'domain', 'company website', 'fund website'],
+        location: ['location', 'city', 'address', 'region', 'country', 'state', 'hq', 'headquarters', 'geography', 'geo', 'based in', 'office'],
+        focus: ['focus', 'sector', 'sector focus', 'sectors', 'industry', 'industries', 'investment focus', 'specialization', 'expertise', 'vertical', 'verticals', 'strategy', 'investment strategy', 'mandate', 'target sectors', 'preferred sectors', 'investment thesis', 'asset class'],
+        notes: ['notes', 'comments', 'description', 'remarks', 'additional info', 'other', 'memo', 'details']
       };
       
       Object.entries(fieldMappings).forEach(([field, aliases]) => {
         const match = headers.find((h, i) => {
           const lowerH = lowerHeaders[i];
-          // Check both directions: alias in header OR header in alias (for exact matches like "Email")
+          // Check for exact match first, then partial matches
+          if (aliases.includes(lowerH)) return true;
           return aliases.some(alias => lowerH.includes(alias) || alias.includes(lowerH));
         });
         if (match) autoMap[field] = match;
@@ -451,6 +453,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
       
       setImportColumnMap(autoMap);
       setShowImportModal(true);
+      toast.success(`Loaded ${dataRows.length} rows from file. Review the column mapping and click Import.`);
     };
     
     // Sanitize string values for database storage
@@ -555,52 +558,63 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     }
     
     setIsImporting(true);
-    let successCount = 0;
-    let errorCount = 0;
     
-    for (const index of Array.from(selectedRows)) {
+    // Build array of stakeholders for bulk import
+    const validTypes: StakeholderType[] = ['investor', 'advisor', 'legal', 'banker', 'consultant', 'client', 'other'];
+    const stakeholdersToImport = Array.from(selectedRows).map(index => {
       const row = importData[index];
-      if (!row) continue;
+      if (!row) return null;
       
       const typeValue = row[importColumnMap.type]?.toLowerCase() || 'other';
-      const validTypes: StakeholderType[] = ['investor', 'advisor', 'legal', 'banker', 'consultant', 'client', 'other'];
       const type = validTypes.includes(typeValue as StakeholderType) ? typeValue as StakeholderType : 'other';
-      
-      // Extract sector/focus from mapped column or scan all columns
       const focusValue = extractSectorsFromRow(row, importColumnMap.focus);
       
-      try {
-        await createStakeholderMutation.mutateAsync({
-          name: row[importColumnMap.name] || '',
-          title: row[importColumnMap.title] || '',
-          company: row[importColumnMap.company] || '',
-          type,
-          email: row[importColumnMap.email] || undefined,
-          phone: row[importColumnMap.phone] || undefined,
-          linkedin: row[importColumnMap.linkedin] || undefined,
-          website: row[importColumnMap.website] || undefined,
-          location: row[importColumnMap.location] || undefined,
-          focus: focusValue || undefined,
-          notes: row[importColumnMap.notes] || undefined,
-          deals: [],
-          isFavorite: false
-        });
-        successCount++;
-      } catch (error) {
-        errorCount++;
+      return {
+        name: row[importColumnMap.name] || '',
+        title: row[importColumnMap.title] || '',
+        company: row[importColumnMap.company] || '',
+        type,
+        email: row[importColumnMap.email] || null,
+        phone: row[importColumnMap.phone] || null,
+        linkedin: row[importColumnMap.linkedin] || null,
+        website: row[importColumnMap.website] || null,
+        location: row[importColumnMap.location] || null,
+        focus: focusValue || null,
+        notes: row[importColumnMap.notes] || null,
+      };
+    }).filter(s => s !== null && s.name && s.company);
+    
+    try {
+      const response = await fetch('/api/stakeholders/bulk-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ stakeholders: stakeholdersToImport })
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to import');
       }
-    }
-    
-    setIsImporting(false);
-    setShowImportModal(false);
-    setImportData([]);
-    setSelectedRows(new Set());
-    
-    if (successCount > 0) {
-      toast.success(`Successfully imported ${successCount} stakeholder${successCount > 1 ? 's' : ''}`);
-    }
-    if (errorCount > 0) {
-      toast.error(`Failed to import ${errorCount} stakeholder${errorCount > 1 ? 's' : ''}`);
+      
+      setIsImporting(false);
+      setShowImportModal(false);
+      setImportData([]);
+      setSelectedRows(new Set());
+      
+      // Refresh the stakeholder list
+      queryClient.invalidateQueries({ queryKey: ['/api/stakeholders'] });
+      
+      if (result.successCount > 0) {
+        toast.success(`Successfully imported ${result.successCount} stakeholder${result.successCount > 1 ? 's' : ''}`);
+      }
+      if (result.errorCount > 0) {
+        toast.warning(`${result.errorCount} row${result.errorCount > 1 ? 's' : ''} could not be imported (missing name or company)`);
+      }
+    } catch (error: any) {
+      setIsImporting(false);
+      toast.error(error.message || "Failed to import stakeholders");
     }
   };
   
