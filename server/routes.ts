@@ -4120,8 +4120,17 @@ Example: "Tell Michael the meeting is moved to 3pm" -> call send_message
         messages: [
           {
             role: "system",
-            content: `You are an expert at extracting stakeholder/contact information from documents.
+            content: `You are an expert at extracting stakeholder/contact information from documents, spreadsheets, and CSV files.
             Analyze the provided document content and extract ALL contacts/stakeholders found.
+            
+            IMPORTANT - For the "focus" field (Sector Focus):
+            - Carefully read ANY column that mentions sectors, industries, investment focus, specialization, or expertise
+            - These columns often contain LONG descriptive text - you MUST parse through the entire text
+            - Extract ALL sector/industry terms mentioned (e.g., Technology, Healthcare, FinTech, Real Estate, Consumer, Energy, SaaS, etc.)
+            - Convert long descriptions into a clean, comma-separated list of sector terms
+            - Examples of what to extract: "technology", "healthcare", "fintech", "biotech", "consumer goods", "real estate", "energy", "software", "B2B", "e-commerce", "infrastructure", "media", "telecommunications", "financial services", "manufacturing", "retail", etc.
+            - If a field says something like "Focus on early-stage technology companies in healthcare and fintech sectors with emphasis on B2B SaaS", extract: "Technology, Healthcare, FinTech, B2B, SaaS"
+            
             Return a JSON object with a "stakeholders" array containing objects with these fields:
             - name: Full name of the person/stakeholder (REQUIRED - skip if not found)
             - title: Job title or position (default to empty string)
@@ -4132,7 +4141,7 @@ Example: "Tell Michael the meeting is moved to 3pm" -> call send_message
             - linkedin: LinkedIn URL
             - website: Website URL
             - location: City, state, or country
-            - focus: Investment focus, sector expertise, or specialization areas (comma-separated)
+            - focus: Extracted sector/industry terms as comma-separated list (MUST extract from long text descriptions)
             - notes: Any additional relevant notes or context
             
             Extract EVERY stakeholder/contact you can find in the document.
@@ -4141,7 +4150,7 @@ Example: "Tell Michael the meeting is moved to 3pm" -> call send_message
           },
           {
             role: "user",
-            content: `Please extract ALL stakeholder/contact information from this document${filename ? ` (${filename})` : ''}:\n\n${documentContent}`
+            content: `Please extract ALL stakeholder/contact information from this document${filename ? ` (${filename})` : ''}. Pay special attention to any "Sector Focus", "Industry", or "Investment Focus" columns - extract ALL sector terms from the text:\n\n${documentContent}`
           }
         ],
         response_format: { type: "json_object" },
