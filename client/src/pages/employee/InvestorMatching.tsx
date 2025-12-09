@@ -111,6 +111,10 @@ export default function InvestorMatching() {
   const filteredDeals = useMemo(() => {
     return deals.filter(deal => {
       const dealType = (deal as any).dealType || 'Investment Banking';
+      if (dealCategory === 'Investment Banking') {
+        // Investment Banking includes M&A, Capital Raising, Debt Financing, IPO, etc.
+        return ['Investment Banking', 'M&A', 'Capital Raising', 'Debt Financing', 'IPO', 'Restructuring', 'Advisory'].includes(dealType);
+      }
       return dealType === dealCategory;
     });
   }, [deals, dealCategory]);

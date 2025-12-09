@@ -5496,9 +5496,25 @@ ${documentContent}`
         console.error('Failed to parse AI response:', content);
         res.status(500).json({ error: "Failed to parse extracted information" });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Document scan error:', error);
-      res.status(500).json({ error: "Failed to scan document" });
+      // Provide more specific error messages based on the error type
+      if (error?.code === 'context_length_exceeded' || error?.message?.includes('context') || error?.message?.includes('token')) {
+        return res.status(400).json({ 
+          error: "Document is too large to process. Please try splitting it into smaller files (max ~500 rows at a time) or removing unnecessary content." 
+        });
+      }
+      if (error?.code === 'rate_limit_exceeded') {
+        return res.status(429).json({ 
+          error: "AI processing rate limit reached. Please wait a moment and try again." 
+        });
+      }
+      if (error?.message?.includes('timeout') || error?.code === 'ETIMEDOUT') {
+        return res.status(408).json({ 
+          error: "Processing took too long. Please try with a smaller document." 
+        });
+      }
+      res.status(500).json({ error: "Failed to scan document. Please try again or contact support if the issue persists." });
     }
   });
 

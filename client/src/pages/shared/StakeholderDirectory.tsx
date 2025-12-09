@@ -164,11 +164,11 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
         })
       });
       
-      if (!response.ok) {
-        throw new Error("Failed to scan document");
-      }
-      
       const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to scan document");
+      }
       
       if (result.successCount > 0) {
         toast.success(`Successfully imported ${result.successCount} of ${result.totalFound} stakeholder${result.successCount > 1 ? 's' : ''} from document`);
@@ -187,9 +187,9 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
       if (result.failedCount > 0) {
         toast.warning(`${result.failedCount} stakeholder${result.failedCount > 1 ? 's' : ''} could not be imported due to errors`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Document scan error:', error);
-      toast.error("Failed to extract information from document");
+      toast.error(error?.message || "Failed to extract information from document");
     }
     
     setIsScanning(false);
