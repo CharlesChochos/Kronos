@@ -57,7 +57,7 @@ import {
   Tooltip
 } from "recharts";
 
-const DEAL_STAGES = ['Origination', 'Execution', 'Negotiation', 'Due Diligence', 'Signing', 'Closed'];
+const DEAL_STAGES = ['Reception', 'Initial Review', 'Hard Diligence', 'Structure', 'Negotiation', 'Closing', 'Invested'];
 const AM_SECTORS = ['Real Estate', 'Infrastructure', 'Private Equity', 'Hedge Funds', 'Fixed Income', 'Equities', 'Commodities', 'Other'];
 
 type StageWorkSectionProps = {
@@ -700,7 +700,7 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
   const [activeTab, setActiveTab] = useState("overview");
   
   const { data: selectedDealFees = [] } = useDealFees(selectedDeal?.id || '');
-  const [activeStageTab, setActiveStageTab] = useState("Origination");
+  const [activeStageTab, setActiveStageTab] = useState("Reception");
   const [viewMode, setViewMode] = useState<'grid' | 'calendar'>('grid');
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('week');
   const [calendarDate, setCalendarDate] = useState(new Date());
@@ -714,7 +714,7 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
     client: '',
     sector: 'Real Estate',
     value: '',
-    stage: 'Origination',
+    stage: 'Reception',
     lead: '',
     status: 'Active',
     progress: 0,
@@ -792,8 +792,8 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
   const stats = useMemo(() => {
     const totalValue = deals.reduce((sum, deal: Deal) => sum + deal.value, 0);
     const activeDeals = deals.filter((deal: Deal) => deal.status === 'Active').length;
-    const closedDeals = deals.filter((deal: Deal) => deal.stage === 'Closed').length;
-    return { totalValue, activeDeals, closedDeals, totalDeals: deals.length };
+    const investedDeals = deals.filter((deal: Deal) => deal.stage === 'Invested').length;
+    return { totalValue, activeDeals, investedDeals, totalDeals: deals.length };
   }, [deals]);
 
   const getStageIndex = (stage: string) => DEAL_STAGES.indexOf(stage);
@@ -801,12 +801,13 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
 
   const getStageColor = (stage: string) => {
     const colors: Record<string, string> = {
-      'Origination': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-      'Execution': 'bg-purple-500/10 text-purple-500 border-purple-500/20',
+      'Reception': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+      'Initial Review': 'bg-purple-500/10 text-purple-500 border-purple-500/20',
+      'Hard Diligence': 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+      'Structure': 'bg-cyan-500/10 text-cyan-500 border-cyan-500/20',
       'Negotiation': 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
-      'Due Diligence': 'bg-orange-500/10 text-orange-500 border-orange-500/20',
-      'Signing': 'bg-cyan-500/10 text-cyan-500 border-cyan-500/20',
-      'Closed': 'bg-green-500/10 text-green-500 border-green-500/20',
+      'Closing': 'bg-pink-500/10 text-pink-500 border-pink-500/20',
+      'Invested': 'bg-green-500/10 text-green-500 border-green-500/20',
     };
     return colors[stage] || 'bg-gray-500/10 text-gray-500 border-gray-500/20';
   };
@@ -884,7 +885,7 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
       
       toast.success("Asset Management deal created!");
       setShowNewDealModal(false);
-      setNewDeal({ name: '', client: '', sector: 'Real Estate', value: '', stage: 'Origination', lead: '', status: 'Active', progress: 0, description: '' });
+      setNewDeal({ name: '', client: '', sector: 'Real Estate', value: '', stage: 'Reception', lead: '', status: 'Active', progress: 0, description: '' });
       setNewDealFees({ engagement: '', monthly: '', success: '', transaction: '', spread: '' });
     } catch (error: any) {
       toast.error(error.message || "Failed to create deal");
@@ -1075,8 +1076,8 @@ export default function AssetManagement({ role = 'Employee' }: AssetManagementPr
                   <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Closed</p>
-                  <p className="text-2xl font-bold">{stats.closedDeals}</p>
+                  <p className="text-sm text-muted-foreground">Invested</p>
+                  <p className="text-2xl font-bold">{stats.investedDeals}</p>
                 </div>
               </div>
             </CardContent>
