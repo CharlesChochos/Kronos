@@ -193,6 +193,7 @@ function StageWorkSection({
         });
         
         await createDocument.mutateAsync({
+          title: title,
           filename: `[${dealName}] ${title}`,
           fileData: base64Data,
           category: categoryMap[documentCategory] || 'Other',
@@ -469,7 +470,7 @@ function StageWorkSection({
                       variant="ghost" 
                       size="icon" 
                       className="h-6 w-6"
-                      onClick={() => deleteStageDocument.mutate({ dealId, documentId: doc.id })}
+                      onClick={() => deleteStageDocument.mutate(doc.id)}
                       data-testid={`delete-doc-${doc.id}`}
                     >
                       <X className="w-3 h-3 text-red-400" />
@@ -576,7 +577,7 @@ function StageWorkSection({
                     variant="ghost" 
                     size="icon" 
                     className="h-4 w-4 opacity-0 group-hover:opacity-100"
-                    onClick={() => deleteStagePodMember.mutate({ dealId, memberId: member.id })}
+                    onClick={() => deleteStagePodMember.mutate(member.id)}
                   >
                     <X className="w-3 h-3 text-red-400" />
                   </Button>
@@ -659,7 +660,7 @@ function StageWorkSection({
                       variant="ghost" 
                       size="icon" 
                       className="h-6 w-6"
-                      onClick={() => deleteStageVoiceNote.mutate({ dealId, voiceNoteId: note.id })}
+                      onClick={() => deleteStageVoiceNote.mutate(note.id)}
                       data-testid={`delete-note-${note.id}`}
                     >
                       <X className="w-3 h-3 text-red-400" />
