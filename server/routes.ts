@@ -8,7 +8,7 @@ import connectPgSimple from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema, insertAssistantConversationSchema, insertAssistantMessageSchema, insertTimeEntrySchema, insertTimeOffRequestSchema, insertAuditLogSchema, insertInvestorSchema, insertInvestorInteractionSchema, insertOkrSchema, insertStakeholderSchema, insertAnnouncementSchema, insertPollSchema, insertMentorshipPairingSchema, insertClientPortalAccessSchema, insertDocumentTemplateSchema, insertInvestorMatchSchema, insertUserPreferencesSchema, insertDealTemplateSchema, insertCalendarEventSchema, insertTaskAttachmentRecordSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
-import { sendMeetingInvite, sendPasswordResetEmail } from "./email";
+import { sendMeetingInvite, sendPasswordResetEmail, sendUserInviteEmail } from "./email";
 import { validateBody, loginSchema, signupSchema, forgotPasswordSchema, resetPasswordSchema } from "./validation";
 import { generalLimiter, authLimiter, strictLimiter, uploadLimiter, aiLimiter, preferencesLimiter } from "./rateLimiter";
 import OpenAI from "openai";
@@ -359,10 +359,19 @@ export async function registerRoutes(
       // Mark token as used
       await storage.markPasswordResetTokenUsed(resetToken.id);
       
-      // Get user for audit log (safely handle if userId is valid)
+      // Get user and activate if pending (for invited users setting password for first time)
       if (resetToken.userId) {
         const user = await storage.getUser(resetToken.userId);
         if (user) {
+          // If user is pending, activate them (invited user completing setup)
+          if (user.status === 'pending') {
+            await storage.updateUserStatus(user.id, 'active');
+            await createAuditLog(req, 'user_activated', 'user', user.id, user.name, { 
+              method: 'invite_completion',
+              previousStatus: 'pending',
+              newStatus: 'active'
+            });
+          }
           await createAuditLog(req, 'password_reset', 'user', user.id, user.name, { method: 'reset_token' });
         }
       }
@@ -712,7 +721,7 @@ export async function registerRoutes(
         }
       }
       
-      const updatedUser = await storage.updateUserProfile(req.params.id, { accessLevel });
+      const updatedUser = await storage.updateUserAccessLevel(req.params.id, accessLevel);
       await createAuditLog(req, 'access_level_changed', 'user', user.id, user.name, { 
         previousAccessLevel: user.accessLevel, 
         newAccessLevel: accessLevel, 
@@ -733,6 +742,145 @@ export async function registerRoutes(
       res.json(logs);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
+  // Invite new user (Admin only)
+  app.post("/api/admin/invite-user", generalLimiter, requireCEO, async (req, res) => {
+    try {
+      const { name, email, accessLevel, jobTitle } = req.body;
+      const currentUser = req.user as any;
+
+      // Validate required fields
+      if (!name || !email) {
+        return res.status(400).json({ error: "Name and email are required" });
+      }
+
+      // Validate email format
+      if (!email.includes('@')) {
+        return res.status(400).json({ error: "Invalid email address" });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "A user with this email already exists" });
+      }
+
+      // Create user with a temporary random password (they'll set their own via reset link)
+      const tempPassword = crypto.randomBytes(32).toString('hex');
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+      const newUser = await storage.createUser({
+        name,
+        email,
+        password: hashedPassword,
+        accessLevel: accessLevel || 'standard',
+        jobTitle: jobTitle || undefined,
+        status: 'pending', // Will be activated when they set their password
+        role: 'Employee',
+      });
+
+      // Create password reset token (24 hour expiry for invites)
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      await storage.createPasswordResetToken(newUser.id, token, expiresAt);
+
+      // Generate setup link
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPLIT_DOMAINS
+          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+          : 'http://localhost:5000';
+      const setupLink = `${baseUrl}/reset-password?token=${token}`;
+
+      // Send invite email
+      const emailResult = await sendUserInviteEmail({
+        email,
+        userName: name,
+        inviterName: currentUser.name,
+        accessLevel: accessLevel || 'standard',
+        jobTitle,
+        setupLink,
+      });
+
+      if (!emailResult.success) {
+        console.error('Failed to send invite email:', emailResult.error);
+        // User was created but email failed - still return success but warn
+        return res.json({ 
+          user: sanitizeUser(newUser), 
+          emailSent: false,
+          message: "User created but invite email could not be sent. You may need to resend the invite."
+        });
+      }
+
+      // Log the invite action
+      await createAuditLog(req, 'user_invited', 'user', newUser.id, newUser.name, { 
+        invitedBy: currentUser.name,
+        accessLevel: accessLevel || 'standard',
+        jobTitle: jobTitle || null,
+      });
+
+      res.json({ 
+        user: sanitizeUser(newUser), 
+        emailSent: true,
+        message: "User invited successfully. They will receive an email to set up their account."
+      });
+    } catch (error) {
+      console.error('Error inviting user:', error);
+      res.status(500).json({ error: "Failed to invite user" });
+    }
+  });
+
+  // Resend invite to pending user (Admin only)
+  app.post("/api/admin/users/:id/resend-invite", generalLimiter, requireCEO, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const user = await storage.getUser(req.params.id);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (user.status !== 'pending') {
+        return res.status(400).json({ error: "Can only resend invites to pending users" });
+      }
+
+      // Create new password reset token (24 hour expiry)
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await storage.createPasswordResetToken(user.id, token, expiresAt);
+
+      // Generate setup link
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPLIT_DOMAINS
+          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+          : 'http://localhost:5000';
+      const setupLink = `${baseUrl}/reset-password?token=${token}`;
+
+      // Send invite email
+      const emailResult = await sendUserInviteEmail({
+        email: user.email,
+        userName: user.name,
+        inviterName: currentUser.name,
+        accessLevel: user.accessLevel,
+        jobTitle: user.jobTitle || undefined,
+        setupLink,
+      });
+
+      if (!emailResult.success) {
+        return res.status(500).json({ error: "Failed to send invite email. Please try again." });
+      }
+
+      await createAuditLog(req, 'invite_resent', 'user', user.id, user.name, { 
+        resentBy: currentUser.name,
+      });
+
+      res.json({ message: "Invite email resent successfully" });
+    } catch (error) {
+      console.error('Error resending invite:', error);
+      res.status(500).json({ error: "Failed to resend invite" });
     }
   });
 

@@ -207,6 +207,7 @@ export interface IStorage {
   
   // User Status Management operations
   updateUserStatus(id: string, status: string): Promise<User | undefined>;
+  updateUserAccessLevel(id: string, accessLevel: string): Promise<User | undefined>;
   getUsersByStatus(status: string): Promise<User[]>;
   updateUserTwoFactor(id: string, enabled: boolean, secret?: string): Promise<User | undefined>;
   
@@ -1211,6 +1212,14 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(schema.users)
       .where(eq(schema.users.status, status))
       .orderBy(desc(schema.users.createdAt));
+  }
+  
+  async updateUserAccessLevel(id: string, accessLevel: string): Promise<User | undefined> {
+    const [user] = await db.update(schema.users)
+      .set({ accessLevel })
+      .where(eq(schema.users.id, id))
+      .returning();
+    return user;
   }
   
   async updateUserTwoFactor(id: string, enabled: boolean, secret?: string): Promise<User | undefined> {

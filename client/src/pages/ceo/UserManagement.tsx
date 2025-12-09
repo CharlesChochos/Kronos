@@ -25,6 +25,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Users,
   UserCheck,
@@ -37,6 +39,8 @@ import {
   FileText,
   ChevronRight,
   AlertTriangle,
+  UserPlus,
+  Mail,
 } from "lucide-react";
 
 type User = {
@@ -111,6 +115,11 @@ export default function UserManagement() {
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [newRole, setNewRole] = useState("");
   const [showSuspendDialog, setShowSuspendDialog] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteAccessLevel, setInviteAccessLevel] = useState("standard");
+  const [inviteJobTitle, setInviteJobTitle] = useState("");
 
   const { data: allUsers = [], isLoading: loadingUsers } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -246,6 +255,60 @@ export default function UserManagement() {
     },
   });
 
+  const inviteMutation = useMutation({
+    mutationFn: async (data: { name: string; email: string; accessLevel: string; jobTitle?: string }) => {
+      const response = await fetch("/api/admin/invite-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Failed to invite user");
+      }
+      return response.json();
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/audit-logs"] });
+      setShowInviteDialog(false);
+      setInviteName("");
+      setInviteEmail("");
+      setInviteAccessLevel("standard");
+      setInviteJobTitle("");
+      if (result.emailSent) {
+        toast.success("User invited successfully! They will receive an email to set up their account.");
+      } else {
+        toast.warning("User created but invite email could not be sent. Use 'Resend Invite' to try again.");
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const resendInviteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch(`/api/admin/users/${userId}/resend-invite`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to resend invite");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast.success("Invite email resent successfully!");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
   const getInitials = (name: string) => {
     return name
       .split(" ")
@@ -262,10 +325,17 @@ export default function UserManagement() {
           <div>
             <h1 className="text-3xl font-display font-bold tracking-tight">User Management</h1>
             <p className="text-muted-foreground mt-1">
-            Manage user access, roles, and review audit logs
-          </p>
+              Manage user access, roles, and review audit logs
+            </p>
+          </div>
+          <Button 
+            onClick={() => setShowInviteDialog(true)}
+            data-testid="button-invite-user"
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            Invite User
+          </Button>
         </div>
-      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="border-border bg-card/50">
@@ -403,6 +473,17 @@ export default function UserManagement() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1"
+                              onClick={() => resendInviteMutation.mutate(user.id)}
+                              disabled={resendInviteMutation.isPending}
+                              data-testid={`button-resend-invite-${user.id}`}
+                            >
+                              <Mail className="h-4 w-4" />
+                              Resend
+                            </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button
@@ -768,6 +849,86 @@ export default function UserManagement() {
               data-testid="button-confirm-suspend"
             >
               {suspendMutation.isPending ? "Suspending..." : "Suspend User"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" />
+              Invite New User
+            </DialogTitle>
+            <DialogDescription>
+              Send an invitation email to add a new team member. They will receive a link to set up their password.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="invite-name">Full Name</Label>
+              <Input
+                id="invite-name"
+                placeholder="John Smith"
+                value={inviteName}
+                onChange={(e) => setInviteName(e.target.value)}
+                data-testid="input-invite-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invite-email">Email Address</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                placeholder="john@equiturn.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                data-testid="input-invite-email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invite-access">Access Level</Label>
+              <Select value={inviteAccessLevel} onValueChange={setInviteAccessLevel}>
+                <SelectTrigger data-testid="select-invite-access">
+                  <SelectValue placeholder="Select access level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="standard">Standard</SelectItem>
+                  <SelectItem value="admin">Admin (Full Access)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invite-job-title">Job Title (optional)</Label>
+              <Input
+                id="invite-job-title"
+                placeholder="Analyst"
+                value={inviteJobTitle}
+                onChange={(e) => setInviteJobTitle(e.target.value)}
+                data-testid="input-invite-job-title"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInviteDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (inviteName && inviteEmail) {
+                  inviteMutation.mutate({
+                    name: inviteName,
+                    email: inviteEmail,
+                    accessLevel: inviteAccessLevel,
+                    jobTitle: inviteJobTitle || undefined,
+                  });
+                }
+              }}
+              disabled={inviteMutation.isPending || !inviteName || !inviteEmail}
+              data-testid="button-send-invite"
+            >
+              {inviteMutation.isPending ? "Sending..." : "Send Invitation"}
             </Button>
           </DialogFooter>
         </DialogContent>
