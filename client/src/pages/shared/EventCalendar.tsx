@@ -94,8 +94,9 @@ export default function EventCalendar({ role }: EventCalendarProps) {
   const [selectedGoogleEvent, setSelectedGoogleEvent] = useState<GoogleCalendarEvent | null>(null);
   const [selectedDayItems, setSelectedDayItems] = useState<{meetings: Meeting[], timeOffs: TimeOffRequest[], googleEvents: GoogleCalendarEvent[]}>({ meetings: [], timeOffs: [], googleEvents: [] });
   const [activeTab, setActiveTab] = useState("calendar");
-  const [calendarView, setCalendarView] = useState<'month' | 'day'>('month');
+  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('month');
   const [dayViewDate, setDayViewDate] = useState<Date>(new Date());
+  const [weekViewDate, setWeekViewDate] = useState<Date>(new Date());
   
   const [newEvent, setNewEvent] = useState({
     title: "",
@@ -496,8 +497,16 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                          data-testid="button-prev-month"
+                          onClick={() => {
+                            if (calendarView === 'day') {
+                              setDayViewDate(addDays(dayViewDate, -1));
+                            } else if (calendarView === 'week') {
+                              setWeekViewDate(addDays(weekViewDate, -7));
+                            } else {
+                              setCurrentMonth(subMonths(currentMonth, 1));
+                            }
+                          }}
+                          data-testid="button-prev"
                         >
                           <ChevronLeft className="w-4 h-4" />
                         </Button>
@@ -507,30 +516,59 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                           onClick={() => {
                             const today = new Date();
                             setDayViewDate(today);
-                            setCalendarView('day');
+                            setWeekViewDate(today);
+                            setCurrentMonth(today);
                           }}
                           data-testid="button-today"
                         >
                           Today
                         </Button>
-                        {calendarView === 'day' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setCalendarView('month')}
-                            data-testid="button-month-view"
-                          >
-                            Month
-                          </Button>
-                        )}
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                          data-testid="button-next-month"
+                          onClick={() => {
+                            if (calendarView === 'day') {
+                              setDayViewDate(addDays(dayViewDate, 1));
+                            } else if (calendarView === 'week') {
+                              setWeekViewDate(addDays(weekViewDate, 7));
+                            } else {
+                              setCurrentMonth(addMonths(currentMonth, 1));
+                            }
+                          }}
+                          data-testid="button-next"
                         >
                           <ChevronRight className="w-4 h-4" />
                         </Button>
+                        <Separator orientation="vertical" className="h-6 mx-1" />
+                        <div className="flex items-center rounded-md border border-border overflow-hidden">
+                          <Button
+                            variant={calendarView === 'day' ? 'secondary' : 'ghost'}
+                            size="sm"
+                            className="rounded-none border-0 h-8"
+                            onClick={() => setCalendarView('day')}
+                            data-testid="button-view-day"
+                          >
+                            Day
+                          </Button>
+                          <Button
+                            variant={calendarView === 'week' ? 'secondary' : 'ghost'}
+                            size="sm"
+                            className="rounded-none border-0 border-l border-r border-border h-8"
+                            onClick={() => setCalendarView('week')}
+                            data-testid="button-view-week"
+                          >
+                            Week
+                          </Button>
+                          <Button
+                            variant={calendarView === 'month' ? 'secondary' : 'ghost'}
+                            size="sm"
+                            className="rounded-none border-0 h-8"
+                            onClick={() => setCalendarView('month')}
+                            data-testid="button-view-month"
+                          >
+                            Month
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
@@ -541,26 +579,6 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                         <div className="text-center mb-4">
                           <div className="text-4xl font-bold text-foreground">{format(dayViewDate, 'd')}</div>
                           <div className="text-sm text-muted-foreground">{format(dayViewDate, 'EEEE, MMMM yyyy')}</div>
-                          <div className="flex items-center justify-center gap-2 mt-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => setDayViewDate(addDays(dayViewDate, -1))}
-                              data-testid="button-prev-day"
-                            >
-                              <ChevronLeft className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => setDayViewDate(addDays(dayViewDate, 1))}
-                              data-testid="button-next-day"
-                            >
-                              <ChevronRight className="w-4 h-4" />
-                            </Button>
-                          </div>
                         </div>
                         <ScrollArea className="h-[600px]">
                           <div className="relative" style={{ minHeight: '1440px' }}>
@@ -656,6 +674,144 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                             </div>
                           </div>
                         </ScrollArea>
+                      </div>
+                    ) : calendarView === 'week' ? (
+                      // Week View with 7-day columns and hourly rows
+                      <div className="relative">
+                        <div className="text-center mb-4">
+                          <div className="text-lg font-bold text-foreground">
+                            {format(startOfWeek(weekViewDate), 'MMM d')} - {format(endOfWeek(weekViewDate), 'MMM d, yyyy')}
+                          </div>
+                        </div>
+                        <div className="border border-border rounded-lg overflow-hidden">
+                          {/* Week header with days */}
+                          <div className="grid grid-cols-8 bg-secondary/50">
+                            <div className="p-2 text-center text-xs font-medium text-muted-foreground border-r border-border w-16" />
+                            {Array.from({ length: 7 }, (_, i) => {
+                              const day = addDays(startOfWeek(weekViewDate), i);
+                              return (
+                                <div
+                                  key={i}
+                                  className={cn(
+                                    "p-2 text-center border-r border-border last:border-r-0",
+                                    isToday(day) && "bg-primary/10"
+                                  )}
+                                >
+                                  <div className="text-xs font-medium text-muted-foreground">{format(day, 'EEE')}</div>
+                                  <div className={cn(
+                                    "text-lg font-bold mt-0.5",
+                                    isToday(day) && "text-primary"
+                                  )}>
+                                    {format(day, 'd')}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {/* Week grid with hours */}
+                          <ScrollArea className="h-[500px]">
+                            <div className="relative" style={{ minHeight: '960px' }}>
+                              {/* Hour rows (6 AM to 10 PM) */}
+                              {Array.from({ length: 17 }, (_, i) => i + 6).map(hour => (
+                                <div
+                                  key={hour}
+                                  className="grid grid-cols-8 border-b border-border"
+                                  style={{ height: '60px' }}
+                                >
+                                  <div className="w-16 text-xs text-muted-foreground pr-2 text-right pt-1 border-r border-border">
+                                    {format(new Date().setHours(hour, 0, 0, 0), 'h a')}
+                                  </div>
+                                  {Array.from({ length: 7 }, (_, dayIdx) => (
+                                    <div key={dayIdx} className="border-r border-border/30 last:border-r-0 relative" />
+                                  ))}
+                                </div>
+                              ))}
+                              {/* Events overlay */}
+                              <div className="absolute top-0 left-16 right-0 grid grid-cols-7" style={{ height: '100%' }}>
+                                {Array.from({ length: 7 }, (_, dayIdx) => {
+                                  const day = addDays(startOfWeek(weekViewDate), dayIdx);
+                                  const dayEvents = getEventsForDate(day);
+                                  const dayGoogleEvents = getGoogleEventsForDate(day);
+                                  const dayTimeOffs = getTimeOffForDate(day);
+                                  
+                                  return (
+                                    <div key={dayIdx} className="relative border-r border-border/30 last:border-r-0">
+                                      {/* Time off banner at top */}
+                                      {dayTimeOffs.length > 0 && (
+                                        <div className="absolute top-0 left-0.5 right-0.5 bg-orange-500/20 border border-orange-500/50 rounded text-[9px] p-1 z-10">
+                                          <span className="text-orange-600 font-medium truncate block">
+                                            {dayTimeOffs[0].type}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {/* Meetings */}
+                                      {dayEvents.map(event => {
+                                        const eventDate = new Date(event.scheduledFor);
+                                        const startHour = eventDate.getHours();
+                                        const startMinute = eventDate.getMinutes();
+                                        const startPos = (startHour - 6) * 60 + startMinute;
+                                        const duration = event.duration || 60;
+                                        
+                                        if (startHour < 6 || startHour >= 22) return null;
+                                        
+                                        return (
+                                          <div
+                                            key={event.id}
+                                            className="absolute left-0.5 right-0.5 bg-blue-500 text-white rounded text-[10px] p-1 cursor-pointer hover:bg-blue-600 transition-colors overflow-hidden z-20"
+                                            style={{
+                                              top: `${startPos}px`,
+                                              height: `${Math.max(duration, 25)}px`,
+                                              minHeight: '20px'
+                                            }}
+                                            onClick={() => {
+                                              setSelectedEvent(event);
+                                              setShowEventDetail(true);
+                                            }}
+                                            data-testid={`week-event-${event.id}`}
+                                          >
+                                            <div className="font-medium truncate">{event.title}</div>
+                                            <div className="opacity-80 truncate">{format(eventDate, 'h:mm a')}</div>
+                                          </div>
+                                        );
+                                      })}
+                                      {/* Google events */}
+                                      {dayGoogleEvents.map(gEvent => {
+                                        const eventDate = new Date(gEvent.start);
+                                        const startHour = eventDate.getHours();
+                                        const startMinute = eventDate.getMinutes();
+                                        const startPos = (startHour - 6) * 60 + startMinute;
+                                        const endDate = new Date(gEvent.end);
+                                        const duration = Math.max((endDate.getTime() - eventDate.getTime()) / 60000, 25);
+                                        
+                                        if (startHour < 6 || startHour >= 22) return null;
+                                        
+                                        return (
+                                          <div
+                                            key={gEvent.id}
+                                            className="absolute left-0.5 right-0.5 bg-green-600 text-white rounded text-[10px] p-1 cursor-pointer hover:bg-green-700 transition-colors overflow-hidden z-20"
+                                            style={{
+                                              top: `${startPos}px`,
+                                              height: `${Math.max(duration, 25)}px`,
+                                              minHeight: '20px'
+                                            }}
+                                            onClick={() => setSelectedGoogleEvent(gEvent)}
+                                            data-testid={`week-google-event-${gEvent.id}`}
+                                          >
+                                            <div className="font-medium truncate flex items-center gap-0.5">
+                                              <Calendar className="w-2.5 h-2.5 flex-shrink-0" />
+                                              {gEvent.title}
+                                            </div>
+                                            <div className="opacity-80 truncate">{format(eventDate, 'h:mm a')}</div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </ScrollArea>
+                        </div>
                       </div>
                     ) : (
                     // Month View (existing grid)
