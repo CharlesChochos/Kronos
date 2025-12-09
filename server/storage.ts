@@ -5,7 +5,13 @@ import * as schema from "@shared/schema";
 import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess, DocumentTemplate, InsertDocumentTemplate, InvestorMatch, InsertInvestorMatch, UserPreferences, InsertUserPreferences, DealTemplate, InsertDealTemplate, CalendarEvent, InsertCalendarEvent, TaskAttachmentRecord, InsertTaskAttachmentRecord, ClientPortalInvite, InsertClientPortalInvite, ClientPortalMessage, InsertClientPortalMessage, ClientPortalUpdate, InsertClientPortalUpdate, DealFee, InsertDealFee, StageDocument, InsertStageDocument, StagePodMember, InsertStagePodMember, StageVoiceNote, InsertStageVoiceNote, TaskComment, InsertTaskComment } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
-const sql = neon(process.env.DATABASE_URL!);
+// Use production database URL when deployed, otherwise use development database
+const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
+const databaseUrl = isProduction 
+  ? (process.env.PRODUCTION_DATABASE_URL || process.env.DATABASE_URL!)
+  : process.env.DATABASE_URL!;
+
+const sql = neon(databaseUrl);
 const db = drizzle(sql, { schema });
 
 export interface IStorage {

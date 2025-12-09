@@ -20,6 +20,12 @@ import multer from "multer";
 // PostgreSQL session store
 const PgSession = connectPgSimple(session);
 
+// Use production database URL when deployed, otherwise use development database
+const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
+const databaseUrl = isProduction 
+  ? (process.env.PRODUCTION_DATABASE_URL || process.env.DATABASE_URL!)
+  : process.env.DATABASE_URL!;
+
 // Initialize OpenAI client with Replit AI Integrations
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({
@@ -40,7 +46,7 @@ export async function registerRoutes(
   app.use(
     session({
       store: new PgSession({
-        conString: process.env.DATABASE_URL,
+        conString: databaseUrl,
         tableName: 'sessions',
         createTableIfMissing: true,
       }),
