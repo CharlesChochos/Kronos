@@ -689,7 +689,7 @@ export default function EmployeeHome() {
                 >
                   <div className="w-12 h-12 rounded-lg bg-primary/20 flex flex-col items-center justify-center">
                     <span className="text-xs font-bold text-primary">
-                      {format(new Date(event.date), 'HH:mm')}
+                      {event.time || '--:--'}
                     </span>
                   </div>
                   <div className="flex-1">

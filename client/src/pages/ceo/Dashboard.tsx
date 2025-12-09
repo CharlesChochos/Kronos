@@ -213,19 +213,35 @@ export default function Dashboard() {
   
   useEffect(() => {
     if (!widgetsInitialized) return;
+    
+    // Skip if widgets haven't actually changed from last saved state
+    if (JSON.stringify(widgets) === JSON.stringify(lastSavedWidgetsRef.current)) {
+      return;
+    }
+    
     if (saveWidgetsTimeoutRef.current) {
       clearTimeout(saveWidgetsTimeoutRef.current);
     }
     saveWidgetsTimeoutRef.current = setTimeout(async () => {
       if (!isMountedRef.current) return;
+      
+      // Double-check we still need to save
+      if (JSON.stringify(widgets) === JSON.stringify(lastSavedWidgetsRef.current)) {
+        return;
+      }
+      
       try {
         await saveUserPrefs.mutateAsync({ dashboardWidgets: widgets });
         lastSavedWidgetsRef.current = widgets;
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to save widget preferences:', error);
-        toast.error('Failed to save dashboard preferences - reverting changes');
-        if (isMountedRef.current) {
-          setWidgets(lastSavedWidgetsRef.current);
+        // Only show toast and revert for non-auth errors
+        // 401 errors are typically session timeouts, handle silently
+        if (error?.response?.status !== 401 && error?.status !== 401) {
+          toast.error('Failed to save dashboard preferences - reverting changes');
+          if (isMountedRef.current) {
+            setWidgets(lastSavedWidgetsRef.current);
+          }
         }
       }
     }, 2000);
@@ -1511,7 +1527,14 @@ export default function Dashboard() {
                           </div>
                           <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
                             <Clock className="w-3 h-3" />
-                            {format(new Date(event.date), 'MMM d, h:mm a')}
+                            {event.time 
+                              ? `${format(new Date(event.date + 'T00:00:00'), 'MMM d')}, ${event.time.replace(/^(\d{1,2}):(\d{2})$/, (_, h, m) => {
+                                  const hour = parseInt(h);
+                                  const ampm = hour >= 12 ? 'PM' : 'AM';
+                                  const displayHour = hour % 12 || 12;
+                                  return `${displayHour}:${m} ${ampm}`;
+                                })}`
+                              : format(new Date(event.date + 'T00:00:00'), 'MMM d')}
                           </div>
                           {event.investor && (
                             <div className="text-[10px] text-muted-foreground flex items-center gap-1">

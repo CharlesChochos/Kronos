@@ -34,6 +34,7 @@ type InvestorEvent = {
   id: string;
   title: string;
   date: Date;
+  time?: string;
   type: 'meeting' | 'call' | 'deadline' | 'followup' | 'presentation';
   investor: string;
   deal?: string;
@@ -88,6 +89,7 @@ export default function CapitalRaisingCalendar() {
       id: event.id || '',
       title: event.title,
       date: event.date ? parseISO(event.date) : new Date(),
+      time: event.time || undefined,
       type: (event.type || 'meeting') as InvestorEvent['type'],
       investor: event.investor || 'Unknown Investor',
       deal: event.dealName || undefined,
@@ -359,7 +361,14 @@ export default function CapitalRaisingCalendar() {
                               {eventTypeLabels[event.type]}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
-                              {format(event.date, 'MMM d, h:mm a')}
+                              {event.time 
+                                ? `${format(event.date, 'MMM d')}, ${event.time.replace(/^(\d{1,2}):(\d{2})$/, (_, h, m) => {
+                                    const hour = parseInt(h);
+                                    const ampm = hour >= 12 ? 'PM' : 'AM';
+                                    const displayHour = hour % 12 || 12;
+                                    return `${displayHour}:${m} ${ampm}`;
+                                  })}`
+                                : format(event.date, 'MMM d')}
                             </span>
                           </div>
                           <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
