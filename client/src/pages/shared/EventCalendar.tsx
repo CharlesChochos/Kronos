@@ -97,7 +97,7 @@ export default function EventCalendar({ role }: EventCalendarProps) {
   const [selectedGoogleEvent, setSelectedGoogleEvent] = useState<GoogleCalendarEvent | null>(null);
   const [selectedDayItems, setSelectedDayItems] = useState<{meetings: Meeting[], timeOffs: TimeOffRequest[], googleEvents: GoogleCalendarEvent[]}>({ meetings: [], timeOffs: [], googleEvents: [] });
   const [activeTab, setActiveTab] = useState("calendar");
-  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('month');
+  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('week');
   const [dayViewDate, setDayViewDate] = useState<Date>(new Date());
   const [weekViewDate, setWeekViewDate] = useState<Date>(new Date());
   
@@ -1114,12 +1114,25 @@ export default function EventCalendar({ role }: EventCalendarProps) {
               </div>
               <div>
                 <Label>Time</Label>
-                <Input
-                  type="time"
+                <Select
                   value={newEvent.time}
-                  onChange={(e) => setNewEvent(prev => ({ ...prev, time: e.target.value }))}
-                  data-testid="input-event-time"
-                />
+                  onValueChange={(v) => setNewEvent(prev => ({ ...prev, time: v }))}
+                >
+                  <SelectTrigger data-testid="select-event-time">
+                    <SelectValue placeholder="Select time" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px]">
+                    {Array.from({ length: 36 }, (_, i) => {
+                      const hour = Math.floor(i / 2) + 6;
+                      const minute = (i % 2) * 30;
+                      const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                      const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+                      const ampm = hour >= 12 ? 'PM' : 'AM';
+                      const display = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+                      return <SelectItem key={time24} value={time24}>{display}</SelectItem>;
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div>

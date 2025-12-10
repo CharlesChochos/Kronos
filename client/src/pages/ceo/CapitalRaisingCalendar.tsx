@@ -468,12 +468,25 @@ export default function CapitalRaisingCalendar() {
               </div>
               <div className="space-y-2">
                 <Label>Time</Label>
-                <Input
-                  type="time"
+                <Select
                   value={newEvent.time}
-                  onChange={(e) => setNewEvent(prev => ({ ...prev, time: e.target.value }))}
-                  data-testid="input-event-time"
-                />
+                  onValueChange={(v) => setNewEvent(prev => ({ ...prev, time: v }))}
+                >
+                  <SelectTrigger data-testid="select-event-time">
+                    <SelectValue placeholder="Select time" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px]">
+                    {Array.from({ length: 36 }, (_, i) => {
+                      const hour = Math.floor(i / 2) + 6;
+                      const minute = (i % 2) * 30;
+                      const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                      const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+                      const ampm = hour >= 12 ? 'PM' : 'AM';
+                      const display = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+                      return <SelectItem key={time24} value={time24}>{display}</SelectItem>;
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-2">

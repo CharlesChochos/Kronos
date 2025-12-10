@@ -358,7 +358,7 @@ export default function Dashboard() {
   const displayActiveDeals = activeDeals;
   const displayActiveValue = activeValue;
   
-  // Sector breakdown
+  // Sector breakdown - All deals
   const sectorStats = useMemo(() => {
     const stats: Record<string, { count: number; value: number }> = {};
     activeDeals.forEach(deal => {
@@ -370,6 +370,32 @@ export default function Dashboard() {
     });
     return stats;
   }, [activeDeals]);
+  
+  // Sector breakdown - IB only
+  const ibSectorStats = useMemo(() => {
+    const stats: Record<string, { count: number; value: number }> = {};
+    ibActiveDeals.forEach(deal => {
+      if (!stats[deal.sector]) {
+        stats[deal.sector] = { count: 0, value: 0 };
+      }
+      stats[deal.sector].count++;
+      stats[deal.sector].value += deal.value;
+    });
+    return stats;
+  }, [ibActiveDeals]);
+  
+  // Sector breakdown - AM only
+  const amSectorStats = useMemo(() => {
+    const stats: Record<string, { count: number; value: number }> = {};
+    amActiveDeals.forEach(deal => {
+      if (!stats[deal.sector]) {
+        stats[deal.sector] = { count: 0, value: 0 };
+      }
+      stats[deal.sector].count++;
+      stats[deal.sector].value += deal.value;
+    });
+    return stats;
+  }, [amActiveDeals]);
 
   // Stage breakdown by division
   const IB_STAGES = ['Origination', 'Execution', 'Negotiation', 'Due Diligence', 'Signing', 'Closed'];
@@ -810,6 +836,20 @@ export default function Dashboard() {
     value: stats.value,
     fill: `hsl(var(--chart-${(index % 5) + 1}))`,
   }));
+  
+  const ibDealsBySector = Object.entries(ibSectorStats).map(([sector, stats], index) => ({
+    sector,
+    count: stats.count,
+    value: stats.value,
+    fill: `hsl(var(--chart-${(index % 5) + 1}))`,
+  }));
+  
+  const amDealsBySector = Object.entries(amSectorStats).map(([sector, stats], index) => ({
+    sector,
+    count: stats.count,
+    value: stats.value,
+    fill: `hsl(var(--chart-${(index % 5) + 1}))`,
+  }));
 
   const taskCompletion = useMemo(() => {
     const completed = tasks.filter(t => t.status === 'Completed').length;
@@ -977,30 +1017,20 @@ export default function Dashboard() {
       {/* Deals by Sector Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Deals by Sector */}
+        {/* IB Deals by Sector */}
         <Card className="bg-card border-border">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <PieChart className="w-5 h-5 text-primary" />
-              Deals by Sector
+              <PieChart className="w-5 h-5 text-blue-500" />
+              IB Deals by Sector
             </CardTitle>
-            <CardDescription>Sector breakdown of active deals (All Divisions)</CardDescription>
+            <CardDescription>Investment Banking sector breakdown ({ibActiveDeals.length} active deals, ${ibActiveValue.toLocaleString()}M)</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4 mb-3 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-blue-500" />
-                <span className="text-muted-foreground">IB: ${ibActiveValue.toLocaleString()}M</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-emerald-500" />
-                <span className="text-muted-foreground">AM: ${amActiveValue.toLocaleString()}M</span>
-              </div>
-            </div>
             <ChartContainer config={chartConfig} className="h-[220px] w-full">
               <RechartsPieChart>
                 <Pie
-                  data={dealsBySector}
+                  data={ibDealsBySector}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
@@ -1011,8 +1041,42 @@ export default function Dashboard() {
                   label={({ sector, count }) => count > 0 ? `${sector}: ${count}` : ''}
                   labelLine={false}
                 >
-                  {dealsBySector.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  {ibDealsBySector.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={`hsl(217, 91%, ${60 - index * 8}%)`} />
+                  ))}
+                </Pie>
+                <ChartTooltip content={<ChartTooltipContent />} />
+              </RechartsPieChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* AM Deals by Sector */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <PieChart className="w-5 h-5 text-emerald-500" />
+              AM Deals by Sector
+            </CardTitle>
+            <CardDescription>Asset Management sector breakdown ({amActiveDeals.length} active deals, ${amActiveValue.toLocaleString()}M)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[220px] w-full">
+              <RechartsPieChart>
+                <Pie
+                  data={amDealsBySector}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  paddingAngle={2}
+                  dataKey="count"
+                  nameKey="sector"
+                  label={({ sector, count }) => count > 0 ? `${sector}: ${count}` : ''}
+                  labelLine={false}
+                >
+                  {amDealsBySector.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={`hsl(160, 84%, ${50 - index * 8}%)`} />
                   ))}
                 </Pie>
                 <ChartTooltip content={<ChartTooltipContent />} />
@@ -2094,11 +2158,25 @@ export default function Dashboard() {
                 </div>
                 <div className="space-y-2">
                   <Label>Time</Label>
-                  <Input 
-                    type="time" 
+                  <Select
                     value={newMeeting.scheduledTime}
-                    onChange={(e) => setNewMeeting({ ...newMeeting, scheduledTime: e.target.value })}
-                  />
+                    onValueChange={(v) => setNewMeeting({ ...newMeeting, scheduledTime: v })}
+                  >
+                    <SelectTrigger data-testid="select-meeting-time">
+                      <SelectValue placeholder="Select time" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[200px]">
+                      {Array.from({ length: 36 }, (_, i) => {
+                        const hour = Math.floor(i / 2) + 6;
+                        const minute = (i % 2) * 30;
+                        const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                        const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+                        const ampm = hour >= 12 ? 'PM' : 'AM';
+                        const display = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+                        return <SelectItem key={time24} value={time24}>{display}</SelectItem>;
+                      })}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               
