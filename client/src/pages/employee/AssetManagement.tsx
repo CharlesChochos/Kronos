@@ -433,19 +433,22 @@ function StageWorkSection({
         </Card>
         <Popover open={showTeamPopover} onOpenChange={setShowTeamPopover}>
           <PopoverTrigger asChild>
-            <Card className="bg-secondary/20 cursor-pointer hover:bg-secondary/30 transition-colors">
+            <Card 
+              className="bg-secondary/20 cursor-pointer hover:bg-secondary/30 transition-colors"
+              onClick={(e) => { e.stopPropagation(); setShowTeamPopover(true); }}
+            >
               <CardContent className="p-3 text-center">
-                <Users className="w-4 h-4 mx-auto mb-1 text-green-400" />
+                <Users className="w-4 h-4 mx-auto mb-1 text-emerald-400" />
                 <div className="text-lg font-bold">{stagePodMembers.length}</div>
                 <div className="text-xs text-muted-foreground">Team</div>
               </CardContent>
             </Card>
           </PopoverTrigger>
-          <PopoverContent className="w-72 p-3" align="center">
+          <PopoverContent className="w-72 p-3" align="center" onClick={(e) => e.stopPropagation()}>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-semibold flex items-center gap-2">
-                  <Users className="w-4 h-4 text-green-400" />
+                  <Users className="w-4 h-4 text-emerald-400" />
                   {activeStageTab} Stage Team
                 </h4>
                 <Badge variant="secondary" className="text-xs">{stagePodMembers.length}</Badge>
@@ -457,7 +460,7 @@ function StageWorkSection({
                   <div className="space-y-2">
                     {stagePodMembers.map((member: any) => (
                       <div key={member.id} className="flex items-center gap-2 p-2 bg-secondary/30 rounded-lg">
-                        <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-sm font-medium">
+                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-sm font-medium">
                           {member.userName?.charAt(0) || '?'}
                         </div>
                         <div className="flex-1 min-w-0">
