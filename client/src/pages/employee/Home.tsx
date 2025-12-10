@@ -803,12 +803,45 @@ export default function EmployeeHome() {
               <span className="text-xs">Documents</span>
             </Button>
           </Link>
-          <Link href="/employee/deals">
-            <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
-              <Briefcase className="w-5 h-5" />
-              <span className="text-xs">My Deals</span>
-            </Button>
-          </Link>
+          {hasAssetManagementAccess ? (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
+                  <Briefcase className="w-5 h-5" />
+                  <span className="text-xs">My Deals</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-2" align="center">
+                <div className="space-y-1">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2 text-blue-400 hover:bg-blue-500/10"
+                    onClick={() => setLocation('/employee/deals')}
+                    data-testid="button-my-deals-ib"
+                  >
+                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                    Investment Banking
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2 text-emerald-400 hover:bg-emerald-500/10"
+                    onClick={() => setLocation('/employee/asset-management')}
+                    data-testid="button-my-deals-am"
+                  >
+                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    Asset Management
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <Link href="/employee/deals">
+              <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
+                <Briefcase className="w-5 h-5" />
+                <span className="text-xs">My Deals</span>
+              </Button>
+            </Link>
+          )}
           <Link href="/employee/chat">
             <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
               <MessageSquare className="w-5 h-5" />

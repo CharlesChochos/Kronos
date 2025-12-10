@@ -877,11 +877,28 @@ export default function Dashboard() {
     return Array.from({ length: 7 }, (_, i) => {
       const date = subDays(new Date(), 6 - i);
       const dayStr = format(date, 'EEE');
-      const dealsOnDay = deals.filter(d => {
-        const dealDate = new Date(d.createdAt || date);
-        return format(dealDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
-      }).length;
-      return { day: dayStr, deals: dealsOnDay, value: Math.floor(Math.random() * 50) + 10 };
+      const dateStr = format(date, 'yyyy-MM-dd');
+      
+      // Filter deals by creation date AND division - only count deals with valid createdAt
+      const ibDealsOnDay = deals.filter(d => {
+        if (!d.createdAt) return false;
+        const dealDate = new Date(d.createdAt);
+        return format(dealDate, 'yyyy-MM-dd') === dateStr && d.dealType !== 'Asset Management';
+      });
+      const amDealsOnDay = deals.filter(d => {
+        if (!d.createdAt) return false;
+        const dealDate = new Date(d.createdAt);
+        return format(dealDate, 'yyyy-MM-dd') === dateStr && d.dealType === 'Asset Management';
+      });
+      
+      return { 
+        day: dayStr, 
+        ib: ibDealsOnDay.length,
+        am: amDealsOnDay.length,
+        ibValue: ibDealsOnDay.reduce((sum, d) => sum + d.value, 0),
+        amValue: amDealsOnDay.reduce((sum, d) => sum + d.value, 0),
+        total: ibDealsOnDay.length + amDealsOnDay.length
+      };
     });
   }, [deals]);
 
@@ -1122,59 +1139,119 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Charts Row 2 */}
+      {/* Charts Row 2 - Weekly Deal Activity by Division */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Weekly Activity */}
+        {/* Weekly Activity - Split by Division */}
         <Card className="bg-card border-border">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Activity className="w-5 h-5 text-primary" />
               Weekly Deal Activity
             </CardTitle>
-            <CardDescription>Deal activity trend over the last 7 days</CardDescription>
+            <CardDescription>Deal activity by division over the last 7 days</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[200px] w-full">
-              <AreaChart data={weeklyDeals} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorDeals" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Area type="monotone" dataKey="value" stroke="hsl(var(--chart-3))" fillOpacity={1} fill="url(#colorDeals)" />
-              </AreaChart>
-            </ChartContainer>
+            <div className="space-y-4">
+              {/* Legend */}
+              <div className="flex gap-4 justify-center text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <span>Investment Banking</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <span>Asset Management</span>
+                </div>
+              </div>
+              <ChartContainer config={{...chartConfig, ib: { label: 'IB Deals', color: 'hsl(217, 91%, 60%)' }, am: { label: 'AM Deals', color: 'hsl(160, 84%, 39%)' }}} className="h-[180px] w-full">
+                <AreaChart data={weeklyDeals} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorIB" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorAM" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Area type="monotone" dataKey="ib" stroke="hsl(217, 91%, 60%)" fillOpacity={1} fill="url(#colorIB)" stackId="1" />
+                  <Area type="monotone" dataKey="am" stroke="hsl(160, 84%, 39%)" fillOpacity={1} fill="url(#colorAM)" stackId="1" />
+                </AreaChart>
+              </ChartContainer>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Task Completion Status */}
+        {/* Task Completion Status - Split by Division */}
         <Card className="bg-card border-border">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <CheckSquare className="w-5 h-5 text-primary" />
               Task Status Overview
             </CardTitle>
-            <CardDescription>Team-wide task completion status</CardDescription>
+            <CardDescription>Task status by division</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[200px] w-full">
-              <BarChart data={taskCompletion} layout="vertical" margin={{ top: 10, right: 30, left: 80, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <YAxis dataKey="status" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} width={70} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                  {taskCompletion.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ChartContainer>
+            <div className="space-y-4">
+              {/* IB Tasks */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <span className="text-sm font-medium text-blue-400">Investment Banking</span>
+                </div>
+                <div className="grid grid-cols-4 gap-2 pl-5">
+                  {(() => {
+                    const ibTasks = tasks.filter((t: Task) => {
+                      const deal = deals.find(d => d.id === t.dealId);
+                      return !deal || deal.dealType !== 'Asset Management';
+                    });
+                    return [
+                      { label: 'Pending', count: ibTasks.filter((t: Task) => t.status === 'Pending').length, color: 'text-yellow-400' },
+                      { label: 'Active', count: ibTasks.filter((t: Task) => t.status === 'In Progress').length, color: 'text-blue-400' },
+                      { label: 'Done', count: ibTasks.filter((t: Task) => t.status === 'Completed').length, color: 'text-green-400' },
+                      { label: 'Blocked', count: ibTasks.filter((t: Task) => t.status === 'Blocked').length, color: 'text-red-400' },
+                    ].map(s => (
+                      <div key={s.label} className="p-2 bg-blue-500/5 border border-blue-500/10 rounded text-center">
+                        <div className={`text-lg font-bold ${s.color}`}>{s.count}</div>
+                        <div className="text-[10px] text-muted-foreground">{s.label}</div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+              
+              {/* AM Tasks */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <span className="text-sm font-medium text-emerald-400">Asset Management</span>
+                </div>
+                <div className="grid grid-cols-4 gap-2 pl-5">
+                  {(() => {
+                    const amTasks = tasks.filter((t: Task) => {
+                      const deal = deals.find(d => d.id === t.dealId);
+                      return deal && deal.dealType === 'Asset Management';
+                    });
+                    return [
+                      { label: 'Pending', count: amTasks.filter((t: Task) => t.status === 'Pending').length, color: 'text-yellow-400' },
+                      { label: 'Active', count: amTasks.filter((t: Task) => t.status === 'In Progress').length, color: 'text-emerald-400' },
+                      { label: 'Done', count: amTasks.filter((t: Task) => t.status === 'Completed').length, color: 'text-green-400' },
+                      { label: 'Blocked', count: amTasks.filter((t: Task) => t.status === 'Blocked').length, color: 'text-red-400' },
+                    ].map(s => (
+                      <div key={s.label} className="p-2 bg-emerald-500/5 border border-emerald-500/10 rounded text-center">
+                        <div className={`text-lg font-bold ${s.color}`}>{s.count}</div>
+                        <div className="text-[10px] text-muted-foreground">{s.label}</div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -2601,22 +2678,64 @@ export default function Dashboard() {
 
               <Separator />
 
-              {/* Sector Breakdown */}
+              {/* Sector Breakdown - Separated by Division */}
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">By Sector</h4>
-                <div className="space-y-2">
-                  {Object.entries(sectorStats).map(([sector, stats]) => (
-                    <div key={sector} className="flex items-center justify-between p-3 bg-secondary/20 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-3 h-3 rounded-full bg-primary" />
-                        <span className="font-medium">{sector}</span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <Badge variant="secondary">{stats.count} deals</Badge>
-                        <span className="text-green-400 font-mono font-bold">${stats.value}M</span>
-                      </div>
-                    </div>
-                  ))}
+                
+                {/* IB Sectors */}
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 rounded-full bg-blue-500" />
+                    <span className="text-sm font-medium text-blue-400">Investment Banking</span>
+                  </div>
+                  <div className="space-y-1 pl-5">
+                    {(() => {
+                      const ibSectors = ibActiveDeals.reduce((acc, deal) => {
+                        const sector = deal.sector || 'Other';
+                        acc[sector] = acc[sector] || { count: 0, value: 0 };
+                        acc[sector].count++;
+                        acc[sector].value += deal.value;
+                        return acc;
+                      }, {} as Record<string, { count: number; value: number }>);
+                      return Object.entries(ibSectors).length > 0 ? Object.entries(ibSectors).map(([sector, stats]) => (
+                        <div key={sector} className="flex items-center justify-between p-2 bg-blue-500/5 border border-blue-500/10 rounded-lg">
+                          <span className="text-sm">{sector}</span>
+                          <div className="flex items-center gap-3">
+                            <Badge variant="secondary" className="text-xs">{stats.count}</Badge>
+                            <span className="text-blue-400 font-mono text-sm">${stats.value}M</span>
+                          </div>
+                        </div>
+                      )) : <p className="text-sm text-muted-foreground py-1">No IB deals</p>;
+                    })()}
+                  </div>
+                </div>
+                
+                {/* AM Sectors */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                    <span className="text-sm font-medium text-emerald-400">Asset Management</span>
+                  </div>
+                  <div className="space-y-1 pl-5">
+                    {(() => {
+                      const amSectors = amActiveDeals.reduce((acc, deal) => {
+                        const sector = deal.sector || 'Other';
+                        acc[sector] = acc[sector] || { count: 0, value: 0 };
+                        acc[sector].count++;
+                        acc[sector].value += deal.value;
+                        return acc;
+                      }, {} as Record<string, { count: number; value: number }>);
+                      return Object.entries(amSectors).length > 0 ? Object.entries(amSectors).map(([sector, stats]) => (
+                        <div key={sector} className="flex items-center justify-between p-2 bg-emerald-500/5 border border-emerald-500/10 rounded-lg">
+                          <span className="text-sm">{sector}</span>
+                          <div className="flex items-center gap-3">
+                            <Badge variant="secondary" className="text-xs">{stats.count}</Badge>
+                            <span className="text-emerald-400 font-mono text-sm">${stats.value}M</span>
+                          </div>
+                        </div>
+                      )) : <p className="text-sm text-muted-foreground py-1">No AM deals</p>;
+                    })()}
+                  </div>
                 </div>
               </div>
 
@@ -2705,27 +2824,50 @@ export default function Dashboard() {
                 <div className="text-sm text-muted-foreground mt-2">Total Capital at Work</div>
               </div>
 
-              {/* Status Breakdown */}
+              {/* Status Breakdown - Separated by Division */}
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">Deal Status Distribution</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-green-400">{activeDeals.length}</div>
-                    <div className="text-xs text-muted-foreground uppercase mt-1">Active</div>
-                    <div className="text-sm text-green-400 font-mono mt-2">${displayActiveValue.toLocaleString()}M</div>
+                
+                {/* IB Status */}
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 rounded-full bg-blue-500" />
+                    <span className="text-sm font-medium text-blue-400">Investment Banking</span>
                   </div>
-                  <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-yellow-400">{deals.filter(d => d.status === 'On Hold').length}</div>
-                    <div className="text-xs text-muted-foreground uppercase mt-1">On Hold</div>
-                    <div className="text-sm text-yellow-400 font-mono mt-2">
-                      ${deals.filter(d => d.status === 'On Hold').reduce((sum, d) => sum + d.value, 0).toLocaleString()}M
+                  <div className="grid grid-cols-3 gap-2 pl-5">
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-center">
+                      <div className="text-xl font-bold text-blue-400">{ibActiveDeals.length}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase">Active</div>
+                    </div>
+                    <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-center">
+                      <div className="text-xl font-bold text-yellow-400">{deals.filter(d => d.status === 'On Hold' && d.dealType !== 'Asset Management').length}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase">On Hold</div>
+                    </div>
+                    <div className="p-3 bg-secondary/30 rounded-lg text-center">
+                      <div className="text-xl font-bold text-muted-foreground">{deals.filter(d => d.status === 'Closed' && d.dealType !== 'Asset Management').length}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase">Closed</div>
                     </div>
                   </div>
-                  <div className="p-4 bg-secondary/30 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-muted-foreground">{deals.filter(d => d.status === 'Closed').length}</div>
-                    <div className="text-xs text-muted-foreground uppercase mt-1">Closed</div>
-                    <div className="text-sm text-muted-foreground font-mono mt-2">
-                      ${deals.filter(d => d.status === 'Closed').reduce((sum, d) => sum + d.value, 0).toLocaleString()}M
+                </div>
+                
+                {/* AM Status */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                    <span className="text-sm font-medium text-emerald-400">Asset Management</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 pl-5">
+                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-center">
+                      <div className="text-xl font-bold text-emerald-400">{amActiveDeals.length}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase">Active</div>
+                    </div>
+                    <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-center">
+                      <div className="text-xl font-bold text-yellow-400">{deals.filter(d => d.status === 'On Hold' && d.dealType === 'Asset Management').length}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase">On Hold</div>
+                    </div>
+                    <div className="p-3 bg-secondary/30 rounded-lg text-center">
+                      <div className="text-xl font-bold text-muted-foreground">{deals.filter(d => d.status === 'Closed' && d.dealType === 'Asset Management').length}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase">Closed</div>
                     </div>
                   </div>
                 </div>
