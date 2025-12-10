@@ -575,10 +575,14 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
       const nameValue = row[importColumnMap.name] || '';
       const companyValue = row[importColumnMap.company] || '';
       
+      // Use company as name if name is empty (common for investor databases)
+      const effectiveName = nameValue || companyValue;
+      const effectiveCompany = companyValue || nameValue;
+      
       return {
-        name: nameValue,
+        name: effectiveName,
         title: row[importColumnMap.title] || '',
-        company: companyValue,
+        company: effectiveCompany,
         type,
         email: row[importColumnMap.email] || null,
         phone: row[importColumnMap.phone] || null,
