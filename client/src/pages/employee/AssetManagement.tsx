@@ -88,6 +88,7 @@ type StageWorkSectionProps = {
   deleteTask: any;
   createDocument: any;
   onAuditEntry?: (action: string, details: string) => Promise<void>;
+  totalTeamCount?: number;
 };
 
 function StageWorkSection({
@@ -109,7 +110,8 @@ function StageWorkSection({
   createTask,
   deleteTask,
   createDocument,
-  onAuditEntry
+  onAuditEntry,
+  totalTeamCount
 }: StageWorkSectionProps) {
   const { data: stageDocuments = [] } = useStageDocuments(dealId, activeStageTab);
   const { data: stagePodMembers = [] } = useStagePodMembers(dealId, activeStageTab);
@@ -386,7 +388,7 @@ function StageWorkSection({
         <Card className="bg-secondary/20">
           <CardContent className="p-3 text-center">
             <Users className="w-4 h-4 mx-auto mb-1 text-green-400" />
-            <div className="text-lg font-bold">{stagePodMembers.length}</div>
+            <div className="text-lg font-bold">{totalTeamCount ?? stagePodMembers.length}</div>
             <div className="text-xs text-muted-foreground">Team</div>
           </CardContent>
         </Card>
@@ -965,6 +967,8 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
   
   // Fetch fees for the selected deal
   const { data: selectedDealFees = [] } = useDealFees(selectedDeal?.id || '');
+  // Fetch ALL stage pod members for the selected deal (across all stages)
+  const { data: allStagePodMembers = [] } = useStagePodMembers(selectedDeal?.id || '', undefined);
   const [activeStageTab, setActiveStageTab] = useState("Reception");
   const [viewMode, setViewMode] = useState<'grid' | 'calendar' | 'compare'>('grid');
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('week');
@@ -2904,6 +2908,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                     createTask={createTask}
                     deleteTask={deleteTask}
                     createDocument={createDocument}
+                    totalTeamCount={allStagePodMembers.length}
                     onAuditEntry={async (action, details) => {
                       try {
                         const auditEntry: AuditEntry = {
