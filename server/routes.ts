@@ -438,7 +438,7 @@ export async function registerRoutes(
   const upload = multer({
     storage: fileStorage,
     limits: {
-      fileSize: 100 * 1024 * 1024, // 100MB max
+      fileSize: 500 * 1024 * 1024, // 500MB max
     },
     fileFilter: (_req, file, cb) => {
       const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.mp4', '.mp3', '.zip', '.rar', '.7z'];
