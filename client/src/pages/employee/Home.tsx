@@ -58,8 +58,8 @@ import {
 } from "lucide-react";
 import { useCurrentUser, useTasks, useDeals, useMeetings, useNotifications, useUsers, useUpdateTask, useUserPreferences, useSaveUserPreferences, useCalendarEvents } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
-import type { UserPreferences } from "@shared/schema";
-import { Link } from "wouter";
+import type { UserPreferences, Deal } from "@shared/schema";
+import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { format, isToday, isTomorrow, parseISO, subDays, startOfDay, isSameDay } from "date-fns";
 import { toast } from "sonner";
@@ -77,11 +77,20 @@ export default function EmployeeHome() {
   const queryClient = useQueryClient();
   const { data: userPrefs, isLoading: prefsLoading } = useUserPreferences();
   const saveUserPrefs = useSaveUserPreferences();
+  const [, setLocation] = useLocation();
   
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
   const [showCustomizePopover, setShowCustomizePopover] = useState(false);
   const [viewTab, setViewTab] = useState<'overview' | 'analytics'>('overview');
+  
+  // My Projects widget state
+  const [projectFilter, setProjectFilter] = useState<'IB' | 'AM'>('IB');
+  const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
+  const [showDealDetailModal, setShowDealDetailModal] = useState(false);
+  
+  // Check if user has Asset Management access
+  const hasAssetManagementAccess = currentUser?.hasAssetManagementAccess === true || currentUser?.accessLevel === 'admin';
   
   // Widget definitions for drag and drop
   type WidgetId = 'quickStats' | 'myTasks' | 'myProjects' | 'schedule' | 'quickActions';
@@ -591,7 +600,28 @@ export default function EmployeeHome() {
       </Card>
   );
 
-  const renderMyProjects = () => widgetSettings.showMyProjects && (
+  const renderMyProjects = () => {
+    // Filter deals based on division
+    const ibDeals = myDeals.filter((d: any) => d.dealType !== 'Asset Management');
+    const amDeals = myDeals.filter((d: any) => d.dealType === 'Asset Management');
+    
+    // Apply filter (if no AM access, always show IB deals only)
+    let filteredDeals = ibDeals;
+    if (hasAssetManagementAccess) {
+      filteredDeals = projectFilter === 'AM' ? amDeals : ibDeals;
+    }
+    
+    // Determine View All destination
+    const viewAllPath = hasAssetManagementAccess && projectFilter === 'AM' 
+      ? '/employee/asset-management' 
+      : '/employee/deals';
+    
+    const openDealDetail = (deal: Deal) => {
+      setSelectedDeal(deal);
+      setShowDealDetailModal(true);
+    };
+    
+    return widgetSettings.showMyProjects && (
       <Card className="bg-card border-border" key="myProjects">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -601,25 +631,59 @@ export default function EmployeeHome() {
             </CardTitle>
             <CardDescription>Deals you're assigned to</CardDescription>
           </div>
-          <Link href="/employee/deals">
-            <Button variant="ghost" size="sm">
+          <div className="flex items-center gap-2">
+            {hasAssetManagementAccess && (
+              <div className="flex rounded-md overflow-hidden border border-border">
+                <Button 
+                  variant={projectFilter === 'IB' ? 'default' : 'ghost'} 
+                  size="sm" 
+                  className="h-7 px-2 rounded-none text-xs"
+                  onClick={() => setProjectFilter('IB')}
+                  data-testid="button-filter-ib"
+                >
+                  IB
+                </Button>
+                <Button 
+                  variant={projectFilter === 'AM' ? 'default' : 'ghost'} 
+                  size="sm" 
+                  className="h-7 px-2 rounded-none text-xs"
+                  onClick={() => setProjectFilter('AM')}
+                  data-testid="button-filter-am"
+                >
+                  AM
+                </Button>
+              </div>
+            )}
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setLocation(viewAllPath)}
+              data-testid="button-view-all-projects"
+            >
               View All <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
-          </Link>
+          </div>
         </CardHeader>
       <CardContent>
-        {myDeals.length > 0 ? (
+        {filteredDeals.length > 0 ? (
           <div className="space-y-3">
-            {myDeals.slice(0, 4).map((deal: any) => (
+            {filteredDeals.slice(0, 4).map((deal: any) => (
               <div 
                 key={deal.id} 
-                className="p-3 bg-secondary/20 rounded-lg hover:bg-secondary/30 transition-colors"
+                className="p-3 bg-secondary/20 rounded-lg hover:bg-secondary/30 transition-colors cursor-pointer"
+                onClick={() => openDealDetail(deal)}
+                data-testid={`card-project-${deal.id}`}
               >
                 <div className="flex items-center justify-between mb-2">
                   <p className="font-medium text-sm">{deal.name}</p>
-                  <Badge variant="secondary" className="text-xs">
-                    {deal.stage}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {deal.dealType === 'Asset Management' && (
+                      <Badge className="text-[10px] bg-emerald-500/20 text-emerald-400">AM</Badge>
+                    )}
+                    <Badge variant="secondary" className="text-xs">
+                      {deal.stage}
+                    </Badge>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>{deal.client}</span>
@@ -632,12 +696,13 @@ export default function EmployeeHome() {
         ) : (
           <div className="text-center py-8 text-muted-foreground">
             <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p>No assigned projects</p>
+            <p>No assigned {hasAssetManagementAccess ? (projectFilter === 'AM' ? 'AM ' : 'IB ') : ''}projects</p>
           </div>
         )}
       </CardContent>
       </Card>
-  );
+    );
+  };
 
   const renderSchedule = () => {
     const today = startOfDay(new Date());
@@ -1322,6 +1387,213 @@ export default function EmployeeHome() {
                 Mark Complete
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deal Detail Modal */}
+      <Dialog open={showDealDetailModal} onOpenChange={setShowDealDetailModal}>
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[85vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-primary" />
+              Project Details
+            </DialogTitle>
+            <DialogDescription>Comprehensive view of the selected deal</DialogDescription>
+          </DialogHeader>
+          
+          {selectedDeal && (
+            <ScrollArea className="max-h-[60vh] pr-4">
+              <div className="space-y-6 py-4">
+                {/* Deal Header */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-semibold">{selectedDeal.name}</h3>
+                    <div className="flex items-center gap-2">
+                      {selectedDeal.dealType === 'Asset Management' && (
+                        <Badge className="bg-emerald-500/20 text-emerald-400">AM</Badge>
+                      )}
+                      {selectedDeal.dealType !== 'Asset Management' && (
+                        <Badge className="bg-blue-500/20 text-blue-400">IB</Badge>
+                      )}
+                      <Badge variant="outline">{selectedDeal.stage}</Badge>
+                    </div>
+                  </div>
+                  <p className="text-muted-foreground mt-1">{selectedDeal.client}</p>
+                </div>
+
+                <Separator />
+
+                {/* Key Metrics */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-4 bg-secondary/20 rounded-lg text-center">
+                    <div className="text-2xl font-bold text-green-400">${selectedDeal.value}M</div>
+                    <div className="text-xs text-muted-foreground uppercase mt-1">Deal Value</div>
+                  </div>
+                  <div className="p-4 bg-secondary/20 rounded-lg text-center">
+                    <div className="text-2xl font-bold text-primary">{selectedDeal.progress || 0}%</div>
+                    <div className="text-xs text-muted-foreground uppercase mt-1">Progress</div>
+                  </div>
+                  <div className="p-4 bg-secondary/20 rounded-lg text-center">
+                    <Badge className={cn(
+                      "text-sm",
+                      selectedDeal.status === 'Active' ? 'bg-green-500/20 text-green-400' :
+                      selectedDeal.status === 'On Hold' ? 'bg-yellow-500/20 text-yellow-400' :
+                      'bg-secondary'
+                    )}>
+                      {selectedDeal.status}
+                    </Badge>
+                    <div className="text-xs text-muted-foreground uppercase mt-2">Status</div>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-muted-foreground">Deal Progress</span>
+                    <span className="font-medium">{selectedDeal.progress || 0}%</span>
+                  </div>
+                  <Progress value={selectedDeal.progress || 0} className="h-3" />
+                </div>
+
+                <Separator />
+
+                {/* Deal Information */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Sector</p>
+                    <p className="font-medium">{selectedDeal.sector}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Deal Type</p>
+                    <p className="font-medium">{selectedDeal.dealType}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Lead</p>
+                    <p className="font-medium">{selectedDeal.lead}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Created</p>
+                    <p className="font-medium">
+                      {selectedDeal.createdAt ? format(new Date(selectedDeal.createdAt), 'MMM d, yyyy') : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Client Contact */}
+                {(selectedDeal.clientContactName || selectedDeal.clientContactEmail) && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Client Contact</p>
+                      <div className="p-4 bg-secondary/20 rounded-lg space-y-2">
+                        {selectedDeal.clientContactName && (
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            <span>{selectedDeal.clientContactName}</span>
+                            {selectedDeal.clientContactRole && (
+                              <Badge variant="outline" className="text-xs">{selectedDeal.clientContactRole}</Badge>
+                            )}
+                          </div>
+                        )}
+                        {selectedDeal.clientContactEmail && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>{selectedDeal.clientContactEmail}</span>
+                          </div>
+                        )}
+                        {selectedDeal.clientContactPhone && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>{selectedDeal.clientContactPhone}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Description */}
+                {selectedDeal.description && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Description</p>
+                      <div className="p-4 bg-secondary/20 rounded-lg">
+                        <p className="text-sm whitespace-pre-wrap">{selectedDeal.description}</p>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Pod Team */}
+                {selectedDeal.podTeam && (selectedDeal.podTeam as any[]).length > 0 && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Team Members</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(selectedDeal.podTeam as PodTeamMember[]).map((member, idx) => (
+                          <div key={idx} className="flex items-center gap-2 p-2 bg-secondary/20 rounded-lg">
+                            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium">
+                              {member.name.split(' ').map(n => n[0]).join('')}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{member.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{member.role}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* My Tasks for this Deal */}
+                {(() => {
+                  const dealTasks = myTasks.filter((t: any) => t.dealId === selectedDeal.id);
+                  if (dealTasks.length === 0) return null;
+                  return (
+                    <>
+                      <Separator />
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">My Tasks for This Deal</p>
+                        <div className="space-y-2">
+                          {dealTasks.slice(0, 5).map((task: any) => (
+                            <div key={task.id} className="flex items-center justify-between p-3 bg-secondary/20 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                {task.status === 'Completed' ? (
+                                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                ) : task.status === 'In Progress' ? (
+                                  <TrendingUp className="w-4 h-4 text-blue-500" />
+                                ) : (
+                                  <Clock className="w-4 h-4 text-yellow-500" />
+                                )}
+                                <span className="text-sm">{task.title}</span>
+                              </div>
+                              <Badge variant="outline" className="text-xs">{task.status}</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </ScrollArea>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDealDetailModal(false)}>
+              Close
+            </Button>
+            <Button onClick={() => {
+              setShowDealDetailModal(false);
+              const path = selectedDeal?.dealType === 'Asset Management' 
+                ? '/employee/asset-management' 
+                : '/employee/deals';
+              setLocation(path);
+            }}>
+              Go to {selectedDeal?.dealType === 'Asset Management' ? 'Asset Management' : 'Deal Management'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

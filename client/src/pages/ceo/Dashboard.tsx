@@ -2622,22 +2622,56 @@ export default function Dashboard() {
 
               <Separator />
 
-              {/* Deal List */}
+              {/* Deal List - Separated by Division */}
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">All Active Deals</h4>
-                <div className="space-y-2">
-                  {activeDeals.map((deal) => (
-                    <div key={deal.id} className="flex items-center justify-between p-3 bg-secondary/20 rounded-lg hover:bg-secondary/30 transition-colors">
-                      <div>
-                        <div className="font-medium">{deal.name}</div>
-                        <div className="text-xs text-muted-foreground">{deal.client} • {deal.sector}</div>
+                
+                {/* Investment Banking Deals */}
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 rounded-full bg-blue-500" />
+                    <span className="text-sm font-medium text-blue-400">Investment Banking ({ibActiveDeals.length})</span>
+                  </div>
+                  <div className="space-y-2 pl-5">
+                    {ibActiveDeals.length > 0 ? ibActiveDeals.map((deal) => (
+                      <div key={deal.id} className="flex items-center justify-between p-3 bg-blue-500/5 border border-blue-500/10 rounded-lg hover:bg-blue-500/10 transition-colors">
+                        <div>
+                          <div className="font-medium">{deal.name}</div>
+                          <div className="text-xs text-muted-foreground">{deal.client} • {deal.sector}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-green-400 font-mono font-bold">${deal.value}M</div>
+                          <Badge variant="outline" className="text-xs">{deal.stage}</Badge>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-green-400 font-mono font-bold">${deal.value}M</div>
-                        <Badge variant="outline" className="text-xs">{deal.stage}</Badge>
+                    )) : (
+                      <p className="text-sm text-muted-foreground py-2">No active IB deals</p>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Asset Management Deals */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                    <span className="text-sm font-medium text-emerald-400">Asset Management ({amActiveDeals.length})</span>
+                  </div>
+                  <div className="space-y-2 pl-5">
+                    {amActiveDeals.length > 0 ? amActiveDeals.map((deal) => (
+                      <div key={deal.id} className="flex items-center justify-between p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-lg hover:bg-emerald-500/10 transition-colors">
+                        <div>
+                          <div className="font-medium">{deal.name}</div>
+                          <div className="text-xs text-muted-foreground">{deal.client} • {deal.sector}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-green-400 font-mono font-bold">${deal.value}M</div>
+                          <Badge variant="outline" className="text-xs">{deal.stage}</Badge>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )) : (
+                      <p className="text-sm text-muted-foreground py-2">No active AM deals</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -2728,23 +2762,59 @@ export default function Dashboard() {
 
               <Separator />
 
-              {/* Stage Distribution */}
+              {/* Stage Distribution - Separated by Division */}
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">Pipeline by Stage</h4>
-                <div className="space-y-2">
-                  {['Origination', 'Due Diligence', 'Structuring', 'Negotiation', 'Closing'].map((stage) => {
-                    const stageDeals = activeDeals.filter(d => d.stage === stage);
-                    const stageValue = stageDeals.reduce((sum, d) => sum + d.value, 0);
-                    return (
-                      <div key={stage} className="flex items-center justify-between p-3 bg-secondary/20 rounded-lg">
-                        <span className="font-medium">{stage}</span>
-                        <div className="flex items-center gap-4">
-                          <Badge variant="secondary">{stageDeals.length} deals</Badge>
-                          <span className="text-primary font-mono font-bold">${stageValue.toLocaleString()}M</span>
+                
+                {/* IB Stages */}
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 rounded-full bg-blue-500" />
+                    <span className="text-sm font-medium text-blue-400">Investment Banking</span>
+                  </div>
+                  <div className="space-y-2 pl-5">
+                    {['Origination', 'Due Diligence', 'Structuring', 'Negotiation', 'Closing'].map((stage) => {
+                      const stageDeals = ibActiveDeals.filter(d => d.stage === stage);
+                      const stageValue = stageDeals.reduce((sum, d) => sum + d.value, 0);
+                      if (stageDeals.length === 0) return null;
+                      return (
+                        <div key={stage} className="flex items-center justify-between p-2 bg-blue-500/5 border border-blue-500/10 rounded-lg">
+                          <span className="text-sm">{stage}</span>
+                          <div className="flex items-center gap-3">
+                            <Badge variant="secondary" className="text-xs">{stageDeals.length}</Badge>
+                            <span className="text-blue-400 font-mono text-sm font-bold">${stageValue.toLocaleString()}M</span>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                {/* AM Stages */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                    <span className="text-sm font-medium text-emerald-400">Asset Management</span>
+                  </div>
+                  <div className="space-y-2 pl-5">
+                    {['Origination', 'Due Diligence', 'Structuring', 'Negotiation', 'Closing'].map((stage) => {
+                      const stageDeals = amActiveDeals.filter(d => d.stage === stage);
+                      const stageValue = stageDeals.reduce((sum, d) => sum + d.value, 0);
+                      if (stageDeals.length === 0) return null;
+                      return (
+                        <div key={stage} className="flex items-center justify-between p-2 bg-emerald-500/5 border border-emerald-500/10 rounded-lg">
+                          <span className="text-sm">{stage}</span>
+                          <div className="flex items-center gap-3">
+                            <Badge variant="secondary" className="text-xs">{stageDeals.length}</Badge>
+                            <span className="text-emerald-400 font-mono text-sm font-bold">${stageValue.toLocaleString()}M</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {amActiveDeals.length === 0 && (
+                      <p className="text-sm text-muted-foreground py-2">No active AM deals</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
