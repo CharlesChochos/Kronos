@@ -16,6 +16,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import multer from "multer";
+import * as XLSX from "xlsx";
 
 // PostgreSQL session store
 const PgSession = connectPgSimple(session);
@@ -5306,6 +5307,94 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
     } catch (error) {
       console.error('Create stakeholder error:', error);
       res.status(500).json({ error: "Failed to create stakeholder" });
+    }
+  });
+  
+  // Parse Excel/CSV file for import (server-side to avoid UI freeze)
+  app.post("/api/stakeholders/parse-file", generalLimiter, requireAuth, upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      
+      const filePath = req.file.path;
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      
+      console.log(`Parsing file: ${req.file.originalname}, size: ${req.file.size} bytes`);
+      
+      let headers: string[] = [];
+      let rows: Record<string, string>[] = [];
+      
+      // Sanitize string values
+      const sanitizeValue = (val: any): string => {
+        if (val === null || val === undefined) return '';
+        const str = String(val);
+        return str.replace(/\x00/g, '').replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]/g, '').trim();
+      };
+      
+      if (ext === '.xlsx' || ext === '.xls') {
+        // Parse Excel file
+        const workbook = XLSX.readFile(filePath);
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(firstSheet, { defval: '' });
+        
+        if (jsonData.length === 0) {
+          fs.unlinkSync(filePath);
+          return res.status(400).json({ error: "File is empty or has no data rows" });
+        }
+        
+        headers = Object.keys(jsonData[0]).map(h => sanitizeValue(h));
+        rows = jsonData.map(row => {
+          const sanitizedRow: Record<string, string> = {};
+          headers.forEach((header, i) => {
+            const originalKey = Object.keys(jsonData[0])[i];
+            sanitizedRow[header] = sanitizeValue(row[originalKey]);
+          });
+          return sanitizedRow;
+        }).filter(row => Object.values(row).some(v => v));
+      } else if (ext === '.csv' || ext === '.tsv' || ext === '.txt') {
+        // Parse CSV/TSV file
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const lines = content.split('\n').filter(line => line.trim());
+        
+        if (lines.length === 0) {
+          fs.unlinkSync(filePath);
+          return res.status(400).json({ error: "File is empty" });
+        }
+        
+        const delimiter = content.includes('\t') ? '\t' : ',';
+        headers = lines[0].split(delimiter).map(h => sanitizeValue(h.replace(/^"|"$/g, '')));
+        
+        rows = lines.slice(1).map(line => {
+          const values = line.split(delimiter).map(v => sanitizeValue(v.replace(/^"|"$/g, '')));
+          const row: Record<string, string> = {};
+          headers.forEach((header, i) => {
+            row[header] = values[i] || '';
+          });
+          return row;
+        }).filter(row => Object.values(row).some(v => v));
+      } else {
+        fs.unlinkSync(filePath);
+        return res.status(400).json({ error: "Unsupported file format" });
+      }
+      
+      // Clean up uploaded file
+      fs.unlinkSync(filePath);
+      
+      console.log(`Parsed ${rows.length} rows with ${headers.length} columns`);
+      
+      res.json({
+        headers,
+        rows,
+        totalRows: rows.length
+      });
+    } catch (error) {
+      console.error('Parse file error:', error);
+      // Clean up file if it exists
+      if (req.file?.path && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      res.status(500).json({ error: "Failed to parse file" });
     }
   });
   
