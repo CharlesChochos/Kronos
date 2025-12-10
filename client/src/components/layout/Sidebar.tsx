@@ -188,9 +188,10 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
     }
   ];
 
-  // Check if user is a division head (Asset Management division)
-  // Sergio manages Asset Management division - only he (and admins) should see it
-  const isAssetManagementDivisionHead = currentUser?.name?.toLowerCase().includes('sergio') || 
+  // Check if user can access Asset Management division
+  // Sergio manages AM division, Guillermo also needs access, plus all admins
+  const canAccessAssetManagement = currentUser?.name?.toLowerCase().includes('sergio') || 
+    currentUser?.name?.toLowerCase().includes('guillermo') ||
     currentUser?.accessLevel === 'admin';
 
   // Employee grouped links - dynamically filter based on user
@@ -198,7 +199,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
     { icon: Home, label: "Home", path: "/employee/home" },
     { icon: CheckSquare, label: "My Tasks", path: "/employee/tasks" },
     { icon: Briefcase, label: "Deal Management", path: "/employee/deals" },
-    ...(isAssetManagementDivisionHead ? [{ icon: BarChart3, label: "Asset Management", path: "/employee/asset-management" }] : []),
+    ...(canAccessAssetManagement ? [{ icon: BarChart3, label: "Asset Management", path: "/employee/asset-management" }] : []),
     { icon: PieChart, label: "Investor Match", path: "/employee/investors" },
     { icon: FileText, label: "Documents", path: "/employee/documents" },
     { icon: FolderOpen, label: "Document Library", path: "/employee/document-library" },
