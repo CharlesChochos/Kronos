@@ -1041,6 +1041,24 @@ export function useAllInvestors() {
   });
 }
 
+// Hook to fetch stakeholder stats (totals by type for summary display)
+export interface StakeholderStatsResponse {
+  total: number;
+  typeCounts: Record<string, number>;
+  favoriteCount: number;
+}
+
+export function useStakeholderStats() {
+  return useQuery({
+    queryKey: ["stakeholders", "stats"],
+    queryFn: async () => {
+      const res = await fetch(`/api/stakeholders/stats`);
+      if (!res.ok) throw new Error("Failed to fetch stakeholder stats");
+      return res.json() as Promise<StakeholderStatsResponse>;
+    },
+  });
+}
+
 export function useCreateStakeholder() {
   const queryClient = useQueryClient();
   return useMutation({

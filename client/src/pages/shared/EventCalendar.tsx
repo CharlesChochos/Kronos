@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,7 +27,8 @@ import {
   CalendarOff,
   Check,
   X,
-  User
+  User,
+  ChevronsUpDown
 } from "lucide-react";
 import { useCurrentUser, useMeetings, useDeals, useUsers, useCreateMeeting, useDeleteMeeting, useTimeOffRequests, useCreateTimeOffRequest, useUpdateTimeOffRequest, useGoogleCalendarStatus, useGoogleCalendarEvents, useCreateGoogleCalendarEvent, useConnectGoogleCalendar, useDisconnectGoogleCalendar, useSyncGoogleCalendar, type GoogleCalendarEvent } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -117,6 +120,9 @@ export default function EventCalendar({ role }: EventCalendarProps) {
     endDate: "",
     notes: ""
   });
+
+  const [dealPopoverOpen, setDealPopoverOpen] = useState(false);
+  const [inviteesPopoverOpen, setInviteesPopoverOpen] = useState(false);
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -1196,20 +1202,55 @@ export default function EventCalendar({ role }: EventCalendarProps) {
             )}
             <div>
               <Label>Related Deal</Label>
-              <Select
-                value={newEvent.dealId || "none"}
-                onValueChange={(v) => setNewEvent(prev => ({ ...prev, dealId: v === "none" ? "" : v }))}
-              >
-                <SelectTrigger data-testid="select-event-deal">
-                  <SelectValue placeholder="Select deal (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No deal</SelectItem>
-                  {deals.map(deal => (
-                    <SelectItem key={deal.id} value={deal.id}>{deal.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={dealPopoverOpen} onOpenChange={setDealPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={dealPopoverOpen}
+                    className="w-full justify-between"
+                    data-testid="select-event-deal"
+                  >
+                    {newEvent.dealId
+                      ? deals.find(d => d.id === newEvent.dealId)?.name || "Select deal..."
+                      : "Select deal (optional)"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search deals..." />
+                    <CommandList>
+                      <CommandEmpty>No deals found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="none"
+                          onSelect={() => {
+                            setNewEvent(prev => ({ ...prev, dealId: "" }));
+                            setDealPopoverOpen(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", !newEvent.dealId ? "opacity-100" : "opacity-0")} />
+                          No deal
+                        </CommandItem>
+                        {deals.map(deal => (
+                          <CommandItem
+                            key={deal.id}
+                            value={deal.name}
+                            onSelect={() => {
+                              setNewEvent(prev => ({ ...prev, dealId: deal.id }));
+                              setDealPopoverOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", newEvent.dealId === deal.id ? "opacity-100" : "opacity-0")} />
+                            {deal.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <Label>Description</Label>
@@ -1240,26 +1281,51 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                   );
                 })}
               </div>
-              <Select
-                value="none"
-                onValueChange={(v) => {
-                  if (v !== "none" && !newEvent.invitees.includes(v)) {
-                    setNewEvent(prev => ({ ...prev, invitees: [...prev.invitees, v] }));
-                  }
-                }}
-              >
-                <SelectTrigger data-testid="select-event-invitees">
-                  <SelectValue placeholder="Select team members to invite..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Select to add...</SelectItem>
-                  {users
-                    .filter(u => u.id !== currentUser?.id && !newEvent.invitees.includes(u.id))
-                    .map(user => (
-                      <SelectItem key={user.id} value={user.id}>{user.name} ({user.jobTitle || user.role})</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <Popover open={inviteesPopoverOpen} onOpenChange={setInviteesPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={inviteesPopoverOpen}
+                    className="w-full justify-between"
+                    data-testid="select-event-invitees"
+                  >
+                    {newEvent.invitees.length > 0
+                      ? `${newEvent.invitees.length} member${newEvent.invitees.length > 1 ? 's' : ''} selected`
+                      : "Select team members to invite..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search team members..." />
+                    <CommandList>
+                      <CommandEmpty>No team members found.</CommandEmpty>
+                      <CommandGroup>
+                        {users
+                          .filter(u => u.id !== currentUser?.id)
+                          .map(user => (
+                            <CommandItem
+                              key={user.id}
+                              value={user.name}
+                              onSelect={() => {
+                                setNewEvent(prev => ({
+                                  ...prev,
+                                  invitees: prev.invitees.includes(user.id)
+                                    ? prev.invitees.filter(id => id !== user.id)
+                                    : [...prev.invitees, user.id]
+                                }));
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", newEvent.invitees.includes(user.id) ? "opacity-100" : "opacity-0")} />
+                              {user.name} ({user.jobTitle || user.role})
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               {newEvent.invitees.length > 0 && (
                 <p className="text-xs text-muted-foreground mt-1">
                   {newEvent.invitees.length} team member{newEvent.invitees.length > 1 ? 's' : ''} will be invited
@@ -1319,25 +1385,29 @@ export default function EventCalendar({ role }: EventCalendarProps) {
                   <Badge variant="outline">{getDealName(selectedEvent.dealId)}</Badge>
                 </div>
               )}
-              {selectedEvent.participants && Array.isArray(selectedEvent.participants) && selectedEvent.participants.length > 0 && (
-                <div>
-                  <Separator className="my-3" />
-                  <div className="flex items-center gap-2 text-sm mb-2">
-                    <User className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-medium">Invited ({selectedEvent.participants.length})</span>
+              {(() => {
+                const participantsList = selectedEvent.participants as string[] | null;
+                if (!participantsList || !Array.isArray(participantsList) || participantsList.length === 0) return null;
+                return (
+                  <div>
+                    <Separator className="my-3" />
+                    <div className="flex items-center gap-2 text-sm mb-2">
+                      <User className="w-4 h-4 text-muted-foreground" />
+                      <span className="font-medium">Invited ({participantsList.length})</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {participantsList.map((participantId: string, idx: number) => {
+                        const participant = users.find(u => u.id === participantId || u.email === participantId);
+                        return (
+                          <Badge key={idx} variant="secondary">
+                            {participant?.name || participantId}
+                          </Badge>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedEvent.participants.map((participantId: string, idx: number) => {
-                      const participant = users.find(u => u.id === participantId || u.email === participantId);
-                      return (
-                        <Badge key={idx} variant="secondary">
-                          {participant?.name || participantId}
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+                );
+              })()}
               {selectedEvent.description && (
                 <div>
                   <Separator className="my-3" />

@@ -339,20 +339,24 @@ export default function Dashboard() {
   // Check if current user is Sergio (Global head of Asset Management)
   const isAssetManagementHead = currentUser?.name?.toLowerCase().includes('sergio');
   
-  // For Sergio, filter to Asset Management deals only for specific widgets
+  // Split deals by division for breakdown display
   const amDeals = deals.filter((d: any) => d.dealType === 'Asset Management');
+  const ibDeals = deals.filter((d: any) => d.dealType !== 'Asset Management');
   const amActiveDeals = amDeals.filter(d => d.status === 'Active');
+  const ibActiveDeals = ibDeals.filter(d => d.status === 'Active');
   
   // Compute analytics using all deals (for general metrics)
   const activeDeals = deals.filter(d => d.status === 'Active');
   const totalValue = deals.reduce((sum, deal) => sum + deal.value, 0);
   const activeValue = activeDeals.reduce((sum, deal) => sum + deal.value, 0);
   
-  // Sergio-specific active deals for widgets
-  const displayActiveDeals = isAssetManagementHead ? amActiveDeals : activeDeals;
-  const displayActiveValue = isAssetManagementHead 
-    ? amActiveDeals.reduce((sum, deal) => sum + deal.value, 0)
-    : activeValue;
+  // Division-specific values
+  const ibActiveValue = ibActiveDeals.reduce((sum, deal) => sum + deal.value, 0);
+  const amActiveValue = amActiveDeals.reduce((sum, deal) => sum + deal.value, 0);
+  
+  // Display active deals - show all for combined view
+  const displayActiveDeals = activeDeals;
+  const displayActiveValue = activeValue;
   
   // Sector breakdown
   const sectorStats = useMemo(() => {
@@ -958,6 +962,31 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      {/* Division Distribution */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Briefcase className="w-5 h-5 text-primary" />
+            Division Distribution
+          </CardTitle>
+          <CardDescription>Active deals split by Investment Banking and Asset Management</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-6">
+            <div className="text-center p-6 bg-blue-500/10 rounded-xl border border-blue-500/20">
+              <div className="text-4xl font-bold text-blue-400">{ibActiveDeals.length}</div>
+              <div className="text-sm text-muted-foreground mt-1">Investment Banking</div>
+              <div className="text-lg font-semibold text-blue-300 mt-2">${ibActiveValue.toLocaleString()}M</div>
+            </div>
+            <div className="text-center p-6 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+              <div className="text-4xl font-bold text-emerald-400">{amActiveDeals.length}</div>
+              <div className="text-sm text-muted-foreground mt-1">Asset Management</div>
+              <div className="text-lg font-semibold text-emerald-300 mt-2">${amActiveValue.toLocaleString()}M</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Charts Row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Weekly Activity */}
@@ -1115,9 +1144,9 @@ export default function Dashboard() {
               <Card className="bg-card border-border overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider truncate">
-                    {isAssetManagementHead ? 'AM Active Deals' : 'Active Deals'}
+                    Active Deals
                   </CardTitle>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setLocation(isAssetManagementHead ? '/ceo/asset-management' : '/ceo/deals')}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setLocation('/ceo/deals')}>
                     <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
                   </Button>
                 </CardHeader>
@@ -1130,6 +1159,16 @@ export default function Dashboard() {
                   <div className="bg-secondary/30 rounded-lg p-2 text-center overflow-hidden">
                     <div className="text-xl font-bold text-green-400 truncate">${displayActiveValue.toLocaleString()}M</div>
                     <div className="text-[9px] text-muted-foreground uppercase truncate">Value</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-center text-xs">
+                  <div className="p-1.5 bg-blue-500/10 rounded border border-blue-500/20">
+                    <div className="text-sm font-semibold text-blue-400">{ibActiveDeals.length}</div>
+                    <div className="text-[8px] text-muted-foreground">IB</div>
+                  </div>
+                  <div className="p-1.5 bg-emerald-500/10 rounded border border-emerald-500/20">
+                    <div className="text-sm font-semibold text-emerald-400">{amActiveDeals.length}</div>
+                    <div className="text-[8px] text-muted-foreground">AM</div>
                   </div>
                 </div>
 
@@ -1602,36 +1641,46 @@ export default function Dashboard() {
             <Card className="bg-card border-border overflow-hidden">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                  {isAssetManagementHead ? 'AM Capital At Work' : 'Capital At Work'}
+                  Capital At Work
                 </CardTitle>
                 <DollarSign className="w-4 h-4 text-primary" />
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="text-center py-4">
-                  <div className="text-4xl font-bold text-primary">
-                    ${displayActiveDeals.reduce((sum, d) => sum + (d.value || 0), 0).toLocaleString()}M
+                <div className="text-center py-2">
+                  <div className="text-3xl font-bold text-primary">
+                    ${displayActiveValue.toLocaleString()}M
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    {isAssetManagementHead ? 'Total AM Deal Value' : 'Total Active Deal Value'}
+                    Total Active Deal Value
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-center text-xs">
+                  <div className="p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                    <div className="text-sm font-semibold text-blue-400">${ibActiveValue.toLocaleString()}M</div>
+                    <div className="text-[9px] text-muted-foreground">IB ({ibActiveDeals.length})</div>
+                  </div>
+                  <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                    <div className="text-sm font-semibold text-emerald-400">${amActiveValue.toLocaleString()}M</div>
+                    <div className="text-[9px] text-muted-foreground">AM ({amActiveDeals.length})</div>
                   </div>
                 </div>
                 <Separator className="bg-border/50" />
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div>
                     <div className="text-lg font-semibold text-green-400">
-                      {(isAssetManagementHead ? amDeals : deals).filter(d => d.status === 'Active').length}
+                      {activeDeals.length}
                     </div>
                     <div className="text-[9px] text-muted-foreground uppercase">Active</div>
                   </div>
                   <div>
                     <div className="text-lg font-semibold text-yellow-400">
-                      {(isAssetManagementHead ? amDeals : deals).filter(d => d.status === 'On Hold').length}
+                      {deals.filter(d => d.status === 'On Hold').length}
                     </div>
                     <div className="text-[9px] text-muted-foreground uppercase">On Hold</div>
                   </div>
                   <div>
                     <div className="text-lg font-semibold text-muted-foreground">
-                      {(isAssetManagementHead ? amDeals : deals).filter(d => d.status === 'Closed').length}
+                      {deals.filter(d => d.status === 'Closed').length}
                     </div>
                     <div className="text-[9px] text-muted-foreground uppercase">Closed</div>
                   </div>
@@ -1645,19 +1694,20 @@ export default function Dashboard() {
             <Card className="bg-card border-border overflow-hidden">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                  {isAssetManagementHead ? 'AM Fee Summary' : 'Fee Summary'}
+                  Fee Summary
                 </CardTitle>
                 <Briefcase className="w-4 h-4 text-primary" />
               </CardHeader>
               <CardContent className="space-y-3">
                 {(() => {
-                  // Get deal IDs for AM deals (for Sergio filtering)
+                  // Calculate fees for all deals with IB/AM breakdown
                   const amDealIds = new Set(amDeals.map(d => d.id));
-                  const relevantFees = isAssetManagementHead 
-                    ? allDealFees.filter(fee => amDealIds.has(fee.dealId))
-                    : allDealFees;
+                  const ibDealIds = new Set(ibDeals.map(d => d.id));
                   
-                  const feesByType = relevantFees.reduce((acc, fee) => {
+                  const ibFees = allDealFees.filter(fee => ibDealIds.has(fee.dealId));
+                  const amFees = allDealFees.filter(fee => amDealIds.has(fee.dealId));
+                  
+                  const feesByType = allDealFees.reduce((acc, fee) => {
                     const type = fee.feeType || 'other';
                     if (!acc[type]) acc[type] = { total: 0, count: 0 };
                     if (fee.amount) {
@@ -1676,6 +1726,8 @@ export default function Dashboard() {
                   };
                   
                   const totalFees = Object.values(feesByType).reduce((sum, f) => sum + f.total, 0);
+                  const ibTotalFees = ibFees.reduce((sum, f) => sum + (f.amount || 0), 0);
+                  const amTotalFees = amFees.reduce((sum, f) => sum + (f.amount || 0), 0);
                   
                   return (
                     <>
@@ -1684,6 +1736,16 @@ export default function Dashboard() {
                           ${totalFees.toLocaleString()}
                         </div>
                         <div className="text-xs text-muted-foreground">Total Fixed Fees</div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-center text-xs">
+                        <div className="p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                          <div className="text-sm font-semibold text-blue-400">${ibTotalFees.toLocaleString()}</div>
+                          <div className="text-[9px] text-muted-foreground">IB Fees</div>
+                        </div>
+                        <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                          <div className="text-sm font-semibold text-emerald-400">${amTotalFees.toLocaleString()}</div>
+                          <div className="text-[9px] text-muted-foreground">AM Fees</div>
+                        </div>
                       </div>
                       <Separator className="bg-border/50" />
                       <div className="space-y-2">

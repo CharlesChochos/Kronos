@@ -147,6 +147,7 @@ export interface IStorage {
     search?: string;
     type?: string;
   }): Promise<{ stakeholders: Stakeholder[]; total: number }>;
+  getStakeholderStats(): Promise<{ total: number; typeCounts: Record<string, number>; favoriteCount: number }>;
   createStakeholder(stakeholder: InsertStakeholder): Promise<Stakeholder>;
   updateStakeholder(id: string, updates: Partial<InsertStakeholder>): Promise<Stakeholder | undefined>;
   deleteStakeholder(id: string): Promise<void>;
@@ -973,6 +974,30 @@ export class DatabaseStorage implements IStorage {
     const stakeholders = await dataQuery;
     
     return { stakeholders, total: Number(total) };
+  }
+  
+  async getStakeholderStats(): Promise<{ total: number; typeCounts: Record<string, number>; favoriteCount: number }> {
+    // Get total count
+    const [{ count: total }] = await db.select({ count: count() }).from(schema.stakeholders);
+    
+    // Get count by type
+    const typeResults = await db
+      .select({ type: schema.stakeholders.type, count: count() })
+      .from(schema.stakeholders)
+      .groupBy(schema.stakeholders.type);
+    
+    const typeCounts: Record<string, number> = {};
+    for (const row of typeResults) {
+      typeCounts[row.type] = Number(row.count);
+    }
+    
+    // Get favorite count
+    const [{ count: favoriteCount }] = await db
+      .select({ count: count() })
+      .from(schema.stakeholders)
+      .where(eq(schema.stakeholders.isFavorite, true));
+    
+    return { total: Number(total), typeCounts, favoriteCount: Number(favoriteCount) };
   }
   
   async createStakeholder(stakeholder: InsertStakeholder): Promise<Stakeholder> {

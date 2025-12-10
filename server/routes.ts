@@ -5303,6 +5303,17 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
     }
   });
   
+  // Get stakeholder stats (total counts by type)
+  app.get("/api/stakeholders/stats", requireAuth, async (req, res) => {
+    try {
+      const stats = await storage.getStakeholderStats();
+      res.json(stats);
+    } catch (error) {
+      console.error('Get stakeholder stats error:', error);
+      res.status(500).json({ error: "Failed to fetch stakeholder stats" });
+    }
+  });
+  
   // Get single stakeholder
   app.get("/api/stakeholders/:id", requireAuth, async (req, res) => {
     try {

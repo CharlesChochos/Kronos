@@ -50,7 +50,7 @@ import {
   FileText,
   Sparkles
 } from "lucide-react";
-import { useDeals, useStakeholders, useCreateStakeholder, useUpdateStakeholder, useDeleteStakeholder } from "@/lib/api";
+import { useDeals, useStakeholders, useStakeholderStats, useCreateStakeholder, useUpdateStakeholder, useDeleteStakeholder } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -110,8 +110,16 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     type: activeTab !== 'all' ? activeTab : undefined
   });
   
+  // Fetch global stats for summary cards (not affected by pagination/filtering)
+  const { data: statsData } = useStakeholderStats();
+  
   const dbStakeholders = stakeholdersData?.stakeholders || [];
   const totalStakeholders = stakeholdersData?.total || 0;
+  
+  // Use global stats for summary cards
+  const globalTotal = statsData?.total || 0;
+  const globalTypeCounts = statsData?.typeCounts || {};
+  const globalFavoriteCount = statsData?.favoriteCount || 0;
   const totalPages = stakeholdersData?.totalPages || 1;
   
   const createStakeholderMutation = useCreateStakeholder();
@@ -756,7 +764,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
                   <Users className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{stakeholders.length}</p>
+                  <p className="text-2xl font-bold">{globalTotal}</p>
                   <p className="text-xs text-muted-foreground">Total</p>
                 </div>
               </div>
@@ -770,7 +778,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
                     <Building className={cn("w-5 h-5", color.replace("bg-", "text-"))} />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{typeCounts[type] || 0}</p>
+                    <p className="text-2xl font-bold">{globalTypeCounts[type] || 0}</p>
                     <p className="text-xs text-muted-foreground capitalize">{type}s</p>
                   </div>
                 </div>
@@ -798,9 +806,9 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="flex-wrap h-auto gap-1">
-                <TabsTrigger value="all">All ({totalStakeholders})</TabsTrigger>
+                <TabsTrigger value="all">All ({globalTotal})</TabsTrigger>
                 <TabsTrigger value="favorites">
-                  <Star className="w-3 h-3 mr-1" /> Favorites ({stakeholders.filter(s => s.isFavorite).length})
+                  <Star className="w-3 h-3 mr-1" /> Favorites ({globalFavoriteCount})
                 </TabsTrigger>
                 <TabsTrigger value="investor">Investors</TabsTrigger>
                 <TabsTrigger value="legal">Legal</TabsTrigger>
