@@ -189,9 +189,11 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
   ];
 
   // Check if user can access Asset Management division
-  // Sergio manages AM division, Guillermo also needs access, plus all admins
-  const canAccessAssetManagement = currentUser?.name?.toLowerCase().includes('sergio') || 
-    currentUser?.name?.toLowerCase().includes('guillermo') ||
+  // Sergio manages AM division, Guillermo always has access, plus all admins
+  const userName = currentUser?.name?.toLowerCase() || '';
+  const canAccessAssetManagement = 
+    userName.includes('sergio') || 
+    userName.includes('guillermo') ||
     currentUser?.accessLevel === 'admin';
 
   // Employee grouped links - dynamically filter based on user
