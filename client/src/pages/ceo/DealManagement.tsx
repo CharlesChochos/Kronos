@@ -213,63 +213,80 @@ function StageWorkSection({
       return;
     }
     
-    const reader = new FileReader();
-    
-    reader.onerror = () => {
-      toast.error("Failed to read file");
-    };
-    
-    reader.onload = async (e) => {
-      try {
-        const base64Data = e.target?.result as string;
-        const title = documentTitle || documentFile.name;
-        
-        const categoryMap: Record<string, string> = {
-          'General': 'Other',
-          'Financial': 'Financial Documents',
-          'Legal': 'Legal',
-          'Technical': 'Reports',
-          'Presentation': 'Presentations'
-        };
-        
-        await createStageDocument.mutateAsync({
-          dealId,
-          doc: {
-            stage: activeStageTab,
-            title: title,
-            filename: documentFile.name,
-            mimeType: documentFile.type,
-            size: documentFile.size,
-          }
-        });
-        
-        await createDocument.mutateAsync({
-          title: title,
-          filename: `[${dealName}] ${title}`,
-          fileData: base64Data,
-          category: categoryMap[documentCategory] || 'Other',
-          dealId: dealId,
-          tags: [activeStageTab, 'Stage Work'],
-          type: 'stage_document',
-          uploadedBy: currentUser?.id
-        });
-        
-        if (onAuditEntry) {
-          await onAuditEntry('Document Uploaded', `${title} uploaded to ${activeStageTab} stage`);
-        }
-        
-        toast.success("Document uploaded and archived");
-        setDocumentTitle("");
-        setDocumentCategory("General");
-        setDocumentFile(null);
-        setShowAddDocument(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      } catch (error) {
-        toast.error("Failed to upload document");
+    try {
+      const title = documentTitle || documentFile.name;
+      
+      // First upload the file to get a URL
+      const formData = new FormData();
+      formData.append('file', documentFile);
+      
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload file');
       }
-    };
-    
-    reader.readAsDataURL(documentFile);
+      
+      const uploadResult = await uploadResponse.json();
+      const fileUrl = uploadResult.url;
+      
+      const categoryMap: Record<string, string> = {
+        'General': 'Other',
+        'Financial': 'Financial Documents',
+        'Legal': 'Legal',
+        'Technical': 'Reports',
+        'Presentation': 'Presentations'
+      };
+      
+      // Save to stage documents with the URL
+      await createStageDocument.mutateAsync({
+        dealId,
+        doc: {
+          stage: activeStageTab,
+          title: title,
+          filename: documentFile.name,
+          url: fileUrl,
+          mimeType: documentFile.type,
+          size: documentFile.size,
+        }
+      });
+      
+      // Also read file as base64 for document library archive
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const base64Data = e.target?.result as string;
+          await createDocument.mutateAsync({
+            title: title,
+            filename: `[${dealName}] ${title}`,
+            fileData: base64Data,
+            category: categoryMap[documentCategory] || 'Other',
+            dealId: dealId,
+            tags: [activeStageTab, 'Stage Work'],
+            type: 'stage_document',
+            uploadedBy: currentUser?.id
+          });
+        } catch (archiveError) {
+          console.error('Failed to archive document (non-critical):', archiveError);
+        }
+      };
+      reader.readAsDataURL(documentFile);
+      
+      if (onAuditEntry) {
+        await onAuditEntry('Document Uploaded', `${title} uploaded to ${activeStageTab} stage`);
+      }
+      
+      toast.success("Document uploaded successfully");
+      setDocumentTitle("");
+      setDocumentCategory("General");
+      setDocumentFile(null);
+      setShowAddDocument(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (error) {
+      toast.error("Failed to upload document");
+    }
   };
   
   const handleAddTask = async () => {
