@@ -256,6 +256,11 @@ export default function Dashboard() {
     };
   }, [widgets, widgetsInitialized]);
   
+  // Widget detail modals
+  const [activeDealsModalOpen, setActiveDealsModalOpen] = useState(false);
+  const [capitalAtWorkModalOpen, setCapitalAtWorkModalOpen] = useState(false);
+  const [feeSummaryModalOpen, setFeeSummaryModalOpen] = useState(false);
+  
   // Market symbols - load from preferences with effect for hydration
   const [marketSymbols, setMarketSymbols] = useState<string[]>(['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY']);
   const [symbolsInitialized, setSymbolsInitialized] = useState(false);
@@ -1271,18 +1276,22 @@ export default function Dashboard() {
           )}
 
           {widgets.find(w => w.id === 'activeDeals')?.enabled && (
-              <Card className="bg-card border-border overflow-hidden">
+              <Card 
+                className="bg-card border-border overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => setActiveDealsModalOpen(true)}
+                data-testid="card-active-deals"
+              >
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider truncate">
                     Active Deals
                   </CardTitle>
                   <div className="flex items-center gap-1">
-                    <div className="flex rounded-md overflow-hidden border border-border">
+                    <div className="flex rounded-md overflow-hidden border border-border" onClick={(e) => e.stopPropagation()}>
                       <Button 
                         variant={activeDealsFilter === 'IB' ? 'default' : 'ghost'} 
                         size="sm" 
                         className="h-6 px-2 rounded-none text-[10px]"
-                        onClick={() => setActiveDealsFilter(activeDealsFilter === 'IB' ? 'all' : 'IB')}
+                        onClick={(e) => { e.stopPropagation(); setActiveDealsFilter(activeDealsFilter === 'IB' ? 'all' : 'IB'); }}
                       >
                         IB
                       </Button>
@@ -1290,7 +1299,7 @@ export default function Dashboard() {
                         variant={activeDealsFilter === 'AM' ? 'default' : 'ghost'} 
                         size="sm" 
                         className="h-6 px-2 rounded-none text-[10px]"
-                        onClick={() => setActiveDealsFilter(activeDealsFilter === 'AM' ? 'all' : 'AM')}
+                        onClick={(e) => { e.stopPropagation(); setActiveDealsFilter(activeDealsFilter === 'AM' ? 'all' : 'AM'); }}
                       >
                         AM
                       </Button>
@@ -1299,7 +1308,7 @@ export default function Dashboard() {
                       variant="ghost" 
                       size="icon" 
                       className="h-6 w-6 flex-shrink-0" 
-                      onClick={() => setLocation(activeDealsFilter === 'AM' ? '/ceo/asset-management' : '/ceo/deals')}
+                      onClick={(e) => { e.stopPropagation(); setLocation(activeDealsFilter === 'AM' ? '/ceo/asset-management' : '/ceo/deals'); }}
                     >
                       <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
                     </Button>
@@ -1790,18 +1799,22 @@ export default function Dashboard() {
 
           {/* Capital At Work Widget */}
           {widgets.find(w => w.id === 'capitalAtWork')?.enabled && (
-            <Card className="bg-card border-border overflow-hidden">
+            <Card 
+              className="bg-card border-border overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
+              onClick={() => setCapitalAtWorkModalOpen(true)}
+              data-testid="card-capital-at-work"
+            >
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
                   Capital At Work
                 </CardTitle>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                   <div className="flex rounded-md overflow-hidden border border-border">
                     <Button 
                       variant={capitalAtWorkFilter === 'IB' ? 'default' : 'ghost'} 
                       size="sm" 
                       className="h-6 px-2 rounded-none text-[10px]"
-                      onClick={() => setCapitalAtWorkFilter(capitalAtWorkFilter === 'IB' ? 'all' : 'IB')}
+                      onClick={(e) => { e.stopPropagation(); setCapitalAtWorkFilter(capitalAtWorkFilter === 'IB' ? 'all' : 'IB'); }}
                     >
                       IB
                     </Button>
@@ -1809,7 +1822,7 @@ export default function Dashboard() {
                       variant={capitalAtWorkFilter === 'AM' ? 'default' : 'ghost'} 
                       size="sm" 
                       className="h-6 px-2 rounded-none text-[10px]"
-                      onClick={() => setCapitalAtWorkFilter(capitalAtWorkFilter === 'AM' ? 'all' : 'AM')}
+                      onClick={(e) => { e.stopPropagation(); setCapitalAtWorkFilter(capitalAtWorkFilter === 'AM' ? 'all' : 'AM'); }}
                     >
                       AM
                     </Button>
@@ -1861,7 +1874,11 @@ export default function Dashboard() {
 
           {/* Fee Summary Widget */}
           {widgets.find(w => w.id === 'feeSummary')?.enabled && (
-            <Card className="bg-card border-border overflow-hidden">
+            <Card 
+              className="bg-card border-border overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
+              onClick={() => setFeeSummaryModalOpen(true)}
+              data-testid="card-fee-summary"
+            >
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
                   Fee Summary
@@ -2522,6 +2539,352 @@ export default function Dashboard() {
             <Button variant="outline" onClick={() => setShowEmployeeDetailModal(false)}>Close</Button>
             <Button onClick={() => { setShowEmployeeDetailModal(false); setLocation('/ceo/team'); }}>
               View in Team Management
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Active Deals Detail Modal */}
+      <Dialog open={activeDealsModalOpen} onOpenChange={setActiveDealsModalOpen}>
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-primary" />
+              Active Deals Analytics
+            </DialogTitle>
+            <DialogDescription>
+              Detailed breakdown of all active deals across Investment Banking and Asset Management
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            <div className="space-y-6">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-4 bg-secondary/30 rounded-lg text-center">
+                  <div className="text-3xl font-bold text-primary">{activeDeals.length}</div>
+                  <div className="text-xs text-muted-foreground uppercase mt-1">Total Active</div>
+                </div>
+                <div className="p-4 bg-secondary/30 rounded-lg text-center">
+                  <div className="text-3xl font-bold text-green-400">${displayActiveValue.toLocaleString()}M</div>
+                  <div className="text-xs text-muted-foreground uppercase mt-1">Total Value</div>
+                </div>
+                <div className="p-4 bg-secondary/30 rounded-lg text-center">
+                  <div className="text-3xl font-bold text-blue-400">
+                    {activeDeals.length > 0 ? Math.round(displayActiveValue / activeDeals.length) : 0}M
+                  </div>
+                  <div className="text-xs text-muted-foreground uppercase mt-1">Avg Deal Size</div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Division Breakdown */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">By Division</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">Investment Banking</span>
+                      <Badge className="bg-blue-500/20 text-blue-400">{ibActiveDeals.length} deals</Badge>
+                    </div>
+                    <div className="text-2xl font-bold text-blue-400">${ibActiveValue.toLocaleString()}M</div>
+                  </div>
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">Asset Management</span>
+                      <Badge className="bg-emerald-500/20 text-emerald-400">{amActiveDeals.length} deals</Badge>
+                    </div>
+                    <div className="text-2xl font-bold text-emerald-400">${amActiveValue.toLocaleString()}M</div>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Sector Breakdown */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">By Sector</h4>
+                <div className="space-y-2">
+                  {Object.entries(sectorStats).map(([sector, stats]) => (
+                    <div key={sector} className="flex items-center justify-between p-3 bg-secondary/20 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 rounded-full bg-primary" />
+                        <span className="font-medium">{sector}</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Badge variant="secondary">{stats.count} deals</Badge>
+                        <span className="text-green-400 font-mono font-bold">${stats.value}M</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Deal List */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">All Active Deals</h4>
+                <div className="space-y-2">
+                  {activeDeals.map((deal) => (
+                    <div key={deal.id} className="flex items-center justify-between p-3 bg-secondary/20 rounded-lg hover:bg-secondary/30 transition-colors">
+                      <div>
+                        <div className="font-medium">{deal.name}</div>
+                        <div className="text-xs text-muted-foreground">{deal.client} • {deal.sector}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-green-400 font-mono font-bold">${deal.value}M</div>
+                        <Badge variant="outline" className="text-xs">{deal.stage}</Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActiveDealsModalOpen(false)}>Close</Button>
+            <Button onClick={() => { setActiveDealsModalOpen(false); setLocation('/ceo/deals'); }}>
+              Go to Deal Management
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Capital At Work Detail Modal */}
+      <Dialog open={capitalAtWorkModalOpen} onOpenChange={setCapitalAtWorkModalOpen}>
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-primary" />
+              Capital At Work Analysis
+            </DialogTitle>
+            <DialogDescription>
+              Comprehensive view of capital deployment across all active engagements
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            <div className="space-y-6">
+              {/* Total Capital */}
+              <div className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg text-center">
+                <div className="text-4xl font-bold text-primary">${displayActiveValue.toLocaleString()}M</div>
+                <div className="text-sm text-muted-foreground mt-2">Total Capital at Work</div>
+              </div>
+
+              {/* Status Breakdown */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">Deal Status Distribution</h4>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg text-center">
+                    <div className="text-2xl font-bold text-green-400">{activeDeals.length}</div>
+                    <div className="text-xs text-muted-foreground uppercase mt-1">Active</div>
+                    <div className="text-sm text-green-400 font-mono mt-2">${displayActiveValue.toLocaleString()}M</div>
+                  </div>
+                  <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-center">
+                    <div className="text-2xl font-bold text-yellow-400">{deals.filter(d => d.status === 'On Hold').length}</div>
+                    <div className="text-xs text-muted-foreground uppercase mt-1">On Hold</div>
+                    <div className="text-sm text-yellow-400 font-mono mt-2">
+                      ${deals.filter(d => d.status === 'On Hold').reduce((sum, d) => sum + d.value, 0).toLocaleString()}M
+                    </div>
+                  </div>
+                  <div className="p-4 bg-secondary/30 rounded-lg text-center">
+                    <div className="text-2xl font-bold text-muted-foreground">{deals.filter(d => d.status === 'Closed').length}</div>
+                    <div className="text-xs text-muted-foreground uppercase mt-1">Closed</div>
+                    <div className="text-sm text-muted-foreground font-mono mt-2">
+                      ${deals.filter(d => d.status === 'Closed').reduce((sum, d) => sum + d.value, 0).toLocaleString()}M
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Division Split */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">Division Allocation</h4>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-blue-500" />
+                        Investment Banking
+                      </span>
+                      <span className="text-blue-400 font-bold">${ibActiveValue.toLocaleString()}M ({ibActiveDeals.length} deals)</span>
+                    </div>
+                    <Progress value={displayActiveValue > 0 ? (ibActiveValue / displayActiveValue) * 100 : 0} className="h-3" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                        Asset Management
+                      </span>
+                      <span className="text-emerald-400 font-bold">${amActiveValue.toLocaleString()}M ({amActiveDeals.length} deals)</span>
+                    </div>
+                    <Progress value={displayActiveValue > 0 ? (amActiveValue / displayActiveValue) * 100 : 0} className="h-3" />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Stage Distribution */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">Pipeline by Stage</h4>
+                <div className="space-y-2">
+                  {['Origination', 'Due Diligence', 'Structuring', 'Negotiation', 'Closing'].map((stage) => {
+                    const stageDeals = activeDeals.filter(d => d.stage === stage);
+                    const stageValue = stageDeals.reduce((sum, d) => sum + d.value, 0);
+                    return (
+                      <div key={stage} className="flex items-center justify-between p-3 bg-secondary/20 rounded-lg">
+                        <span className="font-medium">{stage}</span>
+                        <div className="flex items-center gap-4">
+                          <Badge variant="secondary">{stageDeals.length} deals</Badge>
+                          <span className="text-primary font-mono font-bold">${stageValue.toLocaleString()}M</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCapitalAtWorkModalOpen(false)}>Close</Button>
+            <Button onClick={() => { setCapitalAtWorkModalOpen(false); setLocation('/ceo/deals'); }}>
+              View All Deals
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fee Summary Detail Modal */}
+      <Dialog open={feeSummaryModalOpen} onOpenChange={setFeeSummaryModalOpen}>
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-green-400" />
+              Fee Summary Details
+            </DialogTitle>
+            <DialogDescription>
+              Complete breakdown of fees across all Investment Banking deals
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            {(() => {
+              const ibDealIds = new Set(ibDeals.map(d => d.id));
+              const ibFees = allDealFees.filter(fee => ibDealIds.has(fee.dealId));
+              
+              const feesByType = ibFees.reduce((acc, fee) => {
+                const type = fee.feeType || 'other';
+                if (!acc[type]) acc[type] = { total: 0, count: 0, fees: [] as typeof ibFees };
+                if (fee.amount) {
+                  acc[type].total += fee.amount;
+                  acc[type].count++;
+                  acc[type].fees.push(fee);
+                }
+                return acc;
+              }, {} as Record<string, { total: number; count: number; fees: typeof ibFees }>);
+              
+              const feeLabels: Record<string, { name: string; description: string }> = {
+                engagement: { name: 'Engagement Fees', description: 'Upfront fees charged at deal initiation' },
+                monthly: { name: 'Monthly Retainers', description: 'Recurring monthly advisory fees' },
+                success: { name: 'Success Fees', description: 'Fees contingent on deal completion' },
+                transaction: { name: 'Transaction Fees', description: 'Fees based on transaction value' },
+                spread: { name: 'Spreads', description: 'Fee spreads on capital raised' }
+              };
+              
+              const totalFees = Object.values(feesByType).reduce((sum, f) => sum + f.total, 0);
+              
+              return (
+                <div className="space-y-6">
+                  {/* Total Fees */}
+                  <div className="p-6 bg-gradient-to-br from-green-500/10 to-green-500/5 rounded-lg text-center">
+                    <div className="text-4xl font-bold text-green-400">${totalFees.toLocaleString()}</div>
+                    <div className="text-sm text-muted-foreground mt-2">Total IB Fixed Fees</div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Fee Type Breakdown */}
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">Fee Types</h4>
+                    {Object.entries(feesByType).length > 0 ? (
+                      <div className="space-y-4">
+                        {Object.entries(feesByType).map(([type, data]) => (
+                          <div key={type} className="p-4 bg-secondary/20 rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <div className="font-medium">{feeLabels[type]?.name || type}</div>
+                                <div className="text-xs text-muted-foreground">{feeLabels[type]?.description || ''}</div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xl font-bold text-green-400">${data.total.toLocaleString()}</div>
+                                <Badge variant="secondary" className="mt-1">{data.count} fees</Badge>
+                              </div>
+                            </div>
+                            {data.fees.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-border/50 space-y-2">
+                                {data.fees.slice(0, 5).map((fee) => {
+                                  const deal = ibDeals.find(d => d.id === fee.dealId);
+                                  return (
+                                    <div key={fee.id} className="flex justify-between text-sm">
+                                      <span className="text-muted-foreground truncate">{deal?.name || 'Unknown Deal'}</span>
+                                      <span className="text-green-400 font-mono">${fee.amount?.toLocaleString()}</span>
+                                    </div>
+                                  );
+                                })}
+                                {data.fees.length > 5 && (
+                                  <div className="text-xs text-muted-foreground text-center">
+                                    +{data.fees.length - 5} more fees
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Briefcase className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                        <p>No fees configured yet</p>
+                        <p className="text-xs mt-1">Add fees to deals to see them here</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {Object.entries(feesByType).length > 0 && (
+                    <>
+                      <Separator />
+
+                      {/* Fee Distribution Chart Summary */}
+                      <div>
+                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">Distribution</h4>
+                        <div className="space-y-2">
+                          {Object.entries(feesByType).map(([type, data]) => {
+                            const percentage = totalFees > 0 ? (data.total / totalFees) * 100 : 0;
+                            return (
+                              <div key={type}>
+                                <div className="flex justify-between text-sm mb-1">
+                                  <span>{feeLabels[type]?.name || type}</span>
+                                  <span className="text-muted-foreground">{percentage.toFixed(1)}%</span>
+                                </div>
+                                <Progress value={percentage} className="h-2" />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+          </ScrollArea>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFeeSummaryModalOpen(false)}>Close</Button>
+            <Button onClick={() => { setFeeSummaryModalOpen(false); setLocation('/ceo/deals'); }}>
+              Manage Deal Fees
             </Button>
           </DialogFooter>
         </DialogContent>

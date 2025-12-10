@@ -440,6 +440,50 @@ export function useDeleteNotification() {
   });
 }
 
+// Tag member on deal/opportunity (with notification)
+export function useTagDealMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ dealId, memberId, memberName, memberRole }: { dealId: string; memberId: string; memberName: string; memberRole?: string }) => {
+      const res = await fetch(`/api/deals/${dealId}/tag-member`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId, memberName, memberRole }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to tag member");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+    },
+  });
+}
+
+// Remove member from deal/opportunity
+export function useRemoveDealMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ dealId, memberId }: { dealId: string; memberId: string }) => {
+      const res = await fetch(`/api/deals/${dealId}/remove-member`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to remove member");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+    },
+  });
+}
+
 // Market Data API
 export type MarketDataItem = {
   name: string;

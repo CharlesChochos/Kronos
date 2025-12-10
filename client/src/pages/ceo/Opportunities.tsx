@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { 
   useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers,
-  useCustomSectors, useCreateCustomSector
+  useCustomSectors, useCreateCustomSector, useTagDealMember, useRemoveDealMember
 } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -65,6 +65,8 @@ export default function Opportunities() {
   const createDeal = useCreateDeal();
   const updateDeal = useUpdateDeal();
   const deleteDeal = useDeleteDeal();
+  const tagMember = useTagDealMember();
+  const removeMember = useRemoveDealMember();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const detailFileInputRef = useRef<HTMLInputElement>(null);
   
@@ -750,22 +752,18 @@ export default function Opportunities() {
                                 className="flex items-center gap-3 p-3 hover:bg-secondary/50 cursor-pointer transition-colors"
                                 onClick={async () => {
                                   if (!selectedOpportunity) return;
-                                  const currentTeam = ((selectedOpportunity as any)?.podTeam || []) as PodTeamMember[];
-                                  const newMember: PodTeamMember = {
-                                    name: user.name,
-                                    role: user.jobTitle || user.role || 'Team Member',
-                                    userId: user.id,
-                                  };
                                   try {
-                                    await updateDeal.mutateAsync({
-                                      id: selectedOpportunity.id,
-                                      podTeam: [...currentTeam, newMember],
+                                    await tagMember.mutateAsync({
+                                      dealId: selectedOpportunity.id,
+                                      memberId: user.id,
+                                      memberName: user.name,
+                                      memberRole: user.jobTitle || user.role || 'Team Member',
                                     });
-                                    toast.success(`${user.name} tagged on this opportunity`);
+                                    toast.success(`${user.name} tagged and notified`);
                                     setTeamSearchQuery("");
                                     setShowTeamDropdown(false);
                                   } catch (error: any) {
-                                    toast.error(error.message || "Failed to add team member");
+                                    toast.error(error.message || "Failed to tag team member");
                                   }
                                 }}
                                 data-testid={`tag-member-${user.id}`}
@@ -819,13 +817,11 @@ export default function Opportunities() {
                                 size="icon"
                                 className="h-8 w-8 text-destructive hover:text-destructive"
                                 onClick={async () => {
-                                  if (!selectedOpportunity) return;
-                                  const currentTeam = (selectedOpportunity as any).podTeam as PodTeamMember[];
-                                  const updatedTeam = currentTeam.filter(m => m.userId !== member.userId);
+                                  if (!selectedOpportunity || !member.userId) return;
                                   try {
-                                    await updateDeal.mutateAsync({
-                                      id: selectedOpportunity.id,
-                                      podTeam: updatedTeam,
+                                    await removeMember.mutateAsync({
+                                      dealId: selectedOpportunity.id,
+                                      memberId: member.userId,
                                     });
                                     toast.success(`${member.name} removed from opportunity`);
                                   } catch (error: any) {

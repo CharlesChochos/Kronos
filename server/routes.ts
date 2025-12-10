@@ -1096,6 +1096,88 @@ export async function registerRoutes(
     }
   });
 
+  // ===== MEMBER TAGGING WITH NOTIFICATIONS =====
+  
+  // Tag member on deal/opportunity and notify them
+  app.post("/api/deals/:dealId/tag-member", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { memberId, memberName, memberRole } = req.body;
+      
+      if (!memberId || !memberName) {
+        return res.status(400).json({ error: "Member ID and name are required" });
+      }
+      
+      const deal = await storage.getDeal(req.params.dealId);
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+      
+      // Get current pod team
+      const currentPodTeam = (deal.podTeam as any[] || []);
+      
+      // Check if already tagged
+      if (currentPodTeam.some((m: any) => m.userId === memberId)) {
+        return res.status(400).json({ error: "Member is already tagged on this deal" });
+      }
+      
+      // Add member to pod team
+      const newMember = {
+        userId: memberId,
+        name: memberName,
+        role: memberRole || 'Team Member',
+      };
+      
+      const updatedDeal = await storage.updateDeal(req.params.dealId, {
+        podTeam: [...currentPodTeam, newMember],
+      });
+      
+      // Create notification for the tagged member
+      const dealType = (deal as any).dealType === 'Opportunity' ? 'opportunity' : 'deal';
+      await storage.createNotification({
+        userId: memberId,
+        title: `You were tagged on an ${dealType}`,
+        message: `${user.name} tagged you on "${deal.name}" (${deal.client}). Click to view details.`,
+        type: 'info',
+        link: dealType === 'opportunity' ? '/ceo/opportunities' : '/ceo/deals',
+      });
+      
+      res.json(updatedDeal);
+    } catch (error) {
+      console.error('Tag member error:', error);
+      res.status(500).json({ error: "Failed to tag member" });
+    }
+  });
+  
+  // Remove member from deal/opportunity
+  app.post("/api/deals/:dealId/remove-member", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const { memberId } = req.body;
+      
+      if (!memberId) {
+        return res.status(400).json({ error: "Member ID is required" });
+      }
+      
+      const deal = await storage.getDeal(req.params.dealId);
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+      
+      // Get current pod team and remove member
+      const currentPodTeam = (deal.podTeam as any[] || []);
+      const updatedPodTeam = currentPodTeam.filter((m: any) => m.userId !== memberId);
+      
+      const updatedDeal = await storage.updateDeal(req.params.dealId, {
+        podTeam: updatedPodTeam,
+      });
+      
+      res.json(updatedDeal);
+    } catch (error) {
+      console.error('Remove member error:', error);
+      res.status(500).json({ error: "Failed to remove member" });
+    }
+  });
+
   // ===== STAGE-BASED ROUTES =====
 
   // Stage Documents

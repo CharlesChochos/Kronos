@@ -159,7 +159,7 @@ export function FloatingChatWidget() {
   const activeChatData = activeChat ? conversations.find(c => c.id === activeChat) : null;
   
   return (
-    <div className="fixed bottom-4 right-4 z-40" data-testid="floating-chat-widget">
+    <div className="fixed bottom-6 right-24 z-40" data-testid="floating-chat-widget">
       {/* Main chat widget */}
       {isExpanded && (
         <Card className="w-80 mb-2 bg-card border-border shadow-xl animate-in slide-in-from-bottom-2 duration-200">
