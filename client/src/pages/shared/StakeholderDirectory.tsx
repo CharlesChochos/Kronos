@@ -446,8 +446,24 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
       setImportData(rows);
       setSelectedRows(new Set(rows.map((_: any, i: number) => i)));
       
-      const autoMap: Record<string, string> = { ...importColumnMap };
+      // Create fresh autoMap (don't use stale state)
+      const autoMap: Record<string, string> = {
+        name: '',
+        title: '',
+        company: '',
+        type: '',
+        email: '',
+        phone: '',
+        linkedin: '',
+        website: '',
+        location: '',
+        focus: '',
+        notes: ''
+      };
       const lowerHeaders = headers.map((h: string) => h.toLowerCase().trim());
+      
+      console.log('Auto-mapping - headers:', headers);
+      console.log('Auto-mapping - lowerHeaders:', lowerHeaders);
       
       // Extended mappings to catch more header variations
       const fieldMappings: Record<string, string[]> = {
@@ -471,9 +487,13 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
           if (aliases.includes(lowerH)) return true;
           return aliases.some(alias => lowerH.includes(alias) || alias.includes(lowerH));
         });
-        if (match) autoMap[field] = match;
+        if (match) {
+          autoMap[field] = match;
+          console.log(`Auto-mapped ${field} -> "${match}"`);
+        }
       });
       
+      console.log('Final autoMap:', autoMap);
       setImportColumnMap(autoMap);
       setIsParsingFile(false);
       setShowImportModal(true);
