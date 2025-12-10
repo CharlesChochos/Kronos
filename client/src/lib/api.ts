@@ -1027,6 +1027,20 @@ export function useStakeholders(options?: {
   });
 }
 
+// Hook to fetch all investors (for investor matching pages)
+export function useAllInvestors() {
+  return useQuery({
+    queryKey: ["stakeholders", "allInvestors"],
+    queryFn: async () => {
+      // Fetch investors with a large page size to get all of them
+      const res = await fetch(`/api/stakeholders?type=investor&pageSize=10000`);
+      if (!res.ok) throw new Error("Failed to fetch investors");
+      const data = await res.json() as StakeholdersResponse;
+      return data.stakeholders;
+    },
+  });
+}
+
 export function useCreateStakeholder() {
   const queryClient = useQueryClient();
   return useMutation({

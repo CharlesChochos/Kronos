@@ -42,7 +42,7 @@ import {
   useCustomSectors, useCreateCustomSector,
   useDealFees, type DealFeeType,
   useCreateDocument,
-  useStakeholders
+  useAllInvestors
 } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -900,7 +900,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
   const { data: allDeals = [], isLoading } = useDeals();
   const { data: allUsers = [] } = useUsers();
   const { data: allTasks = [] } = useTasks();
-  const { data: stakeholders = [] } = useStakeholders();
+  const { data: stakeholders = [] } = useAllInvestors();
   
   // Filter deals based on access level - non-admin users only see deals they're assigned to
   // Filter out Opportunities and Asset Management deals - those appear in their own respective pages
@@ -1091,9 +1091,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
   const [investorSearchQuery, setInvestorSearchQuery] = useState('');
 
   const crmInvestors = useMemo(() => {
-    return stakeholders
-      .filter(s => s.type === 'investor')
-      .map(s => ({
+    return stakeholders.map(s => ({
         id: s.id,
         name: s.name,
         firm: s.title || s.company || s.name,

@@ -15,7 +15,7 @@ import {
   Heart,
   Users
 } from "lucide-react";
-import { useCurrentUser, useDeals, useUpdateDeal, useInvestorMatches, useCreateInvestorMatch, useDeleteInvestorMatch, useStakeholders } from "@/lib/api";
+import { useCurrentUser, useDeals, useUpdateDeal, useInvestorMatches, useCreateInvestorMatch, useDeleteInvestorMatch, useAllInvestors } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion";
@@ -39,7 +39,7 @@ type InvestorData = {
 export default function InvestorMatching() {
   const { data: currentUser } = useCurrentUser();
   const { data: allDeals = [], isLoading } = useDeals();
-  const { data: stakeholders = [], isLoading: stakeholdersLoading } = useStakeholders();
+  const { data: investors = [], isLoading: stakeholdersLoading } = useAllInvestors();
   const updateDeal = useUpdateDeal();
   
   const deals = allDeals.filter(deal => {
@@ -63,12 +63,10 @@ export default function InvestorMatching() {
   
   const [rejectedInvestors, setRejectedInvestors] = useState<string[]>([]);
   
-  // Convert stakeholders (type='investor') to InvestorData format
+  // Convert investors to InvestorData format
   // Use stakeholder's actual database ID for stable identification
   const INVESTORS: InvestorData[] = useMemo(() => {
-    return stakeholders
-      .filter(s => s.type === 'investor')
-      .map((s, index) => ({
+    return investors.map((s, index) => ({
         id: s.id,
         numericId: index + 1,
         name: s.name,
@@ -81,7 +79,7 @@ export default function InvestorMatching() {
         phone: s.phone || '',
         website: s.website || '',
       }));
-  }, [stakeholders]);
+  }, [investors]);
   
   const matchedInvestors = useMemo(() => {
     const matchedIds = investorMatches
