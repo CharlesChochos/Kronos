@@ -33,7 +33,18 @@ import {
   Type,
   Bell,
   Smile,
-  AtSign
+  AtSign,
+  Mic,
+  Square,
+  Play,
+  Pause,
+  Pin,
+  ImageIcon,
+  Link,
+  FileText,
+  Sticker,
+  ChevronDown,
+  Volume2
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCurrentUser, useUsers } from "@/lib/api";
@@ -123,7 +134,49 @@ export default function Chat({ role }: ChatProps) {
   
   // Emoji picker for reactions
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
-  const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+  const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏", "🔥", "👏", "🎉", "💯"];
+  
+  // Voice message recording
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [isPlayingVoice, setIsPlayingVoice] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Stickers
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const STICKERS = [
+    { id: 'thumbsup', emoji: '👍', label: 'Thumbs Up' },
+    { id: 'heart', emoji: '❤️', label: 'Heart' },
+    { id: 'celebrate', emoji: '🎉', label: 'Celebrate' },
+    { id: 'fire', emoji: '🔥', label: 'Fire' },
+    { id: 'clap', emoji: '👏', label: 'Clap' },
+    { id: 'rocket', emoji: '🚀', label: 'Rocket' },
+    { id: 'star', emoji: '⭐', label: 'Star' },
+    { id: 'check', emoji: '✅', label: 'Check' },
+    { id: 'thinking', emoji: '🤔', label: 'Thinking' },
+    { id: 'laugh', emoji: '😂', label: 'Laugh' },
+    { id: 'cool', emoji: '😎', label: 'Cool' },
+    { id: 'love', emoji: '🥰', label: 'Love' },
+  ];
+  
+  // Search in conversation
+  const [showConversationSearch, setShowConversationSearch] = useState(false);
+  const [conversationSearchQuery, setConversationSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Message[]>([]);
+  
+  // Pinned messages
+  const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
+  const [showPinnedMessages, setShowPinnedMessages] = useState(false);
+  
+  // Media gallery
+  const [showMediaGallery, setShowMediaGallery] = useState(false);
+  const [mediaGalleryTab, setMediaGalleryTab] = useState<'media' | 'files' | 'links'>('media');
+  
+  // Reaction details popover
+  const [showReactionDetails, setShowReactionDetails] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -318,6 +371,168 @@ export default function Chat({ role }: ChatProps) {
     if (!replyToMessageId) return null;
     return messages.find(m => m.id === replyToMessageId);
   };
+
+  // Voice recording handlers
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (e) => {
+        audioChunksRef.current.push(e.data);
+      };
+      
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setAudioBlob(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (error) {
+      toast.error("Could not access microphone");
+    }
+  };
+  
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+    }
+  };
+  
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    setAudioBlob(null);
+    setRecordingTime(0);
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+    }
+  };
+  
+  const sendVoiceMessage = async () => {
+    if (!audioBlob || !selectedConversationId) return;
+    
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Audio = reader.result as string;
+      try {
+        await sendMessageMutation.mutateAsync({
+          conversationId: selectedConversationId,
+          content: "🎤 Voice message",
+          attachments: [{
+            id: crypto.randomUUID(),
+            filename: `voice_${Date.now()}.webm`,
+            url: base64Audio,
+            size: audioBlob.size,
+            type: 'audio/webm'
+          }]
+        });
+        setAudioBlob(null);
+        setRecordingTime(0);
+      } catch (error) {
+        toast.error("Failed to send voice message");
+      }
+    };
+    reader.readAsDataURL(audioBlob);
+  };
+  
+  const formatRecordingTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  // Send sticker
+  const handleSendSticker = async (sticker: typeof STICKERS[0]) => {
+    if (!selectedConversationId) return;
+    try {
+      await sendMessageMutation.mutateAsync({
+        conversationId: selectedConversationId,
+        content: sticker.emoji,
+        attachments: [{
+          id: crypto.randomUUID(),
+          filename: `sticker_${sticker.id}`,
+          url: '',
+          size: 0,
+          type: 'sticker'
+        }]
+      });
+      setShowStickerPicker(false);
+    } catch (error) {
+      toast.error("Failed to send sticker");
+    }
+  };
+  
+  // Search in conversation
+  const handleConversationSearch = (query: string) => {
+    setConversationSearchQuery(query);
+    if (query.trim()) {
+      const results = messages.filter(m => 
+        m.content.toLowerCase().includes(query.toLowerCase())
+      );
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
+    }
+  };
+  
+  // Pin/unpin message (local state for now)
+  const handlePinMessage = (message: Message) => {
+    const isPinned = pinnedMessages.some(m => m.id === message.id);
+    if (isPinned) {
+      setPinnedMessages(prev => prev.filter(m => m.id !== message.id));
+      toast.success("Message unpinned");
+    } else {
+      setPinnedMessages(prev => [...prev, message]);
+      toast.success("Message pinned");
+    }
+  };
+  
+  // Get media items from conversation
+  const mediaItems = useMemo(() => {
+    const items: { images: Message[]; files: Message[]; links: { message: Message; url: string }[] } = {
+      images: [],
+      files: [],
+      links: []
+    };
+    
+    messages.forEach(msg => {
+      // Check for image attachments
+      msg.attachments?.forEach(att => {
+        if (att.type?.startsWith('image/')) {
+          items.images.push(msg);
+        } else if (att.type && att.type !== 'sticker' && att.type !== 'audio/webm') {
+          items.files.push(msg);
+        }
+      });
+      
+      // Check for links in content
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const matches = msg.content.match(urlRegex);
+      if (matches) {
+        matches.forEach(url => {
+          items.links.push({ message: msg, url });
+        });
+      }
+    });
+    
+    return items;
+  }, [messages]);
 
   // Filter users excluding current user
   const availableUsers = allUsers.filter(u => u.id !== currentUser?.id);
@@ -696,6 +911,50 @@ export default function Chat({ role }: ChatProps) {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
+                    {/* Search in conversation */}
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => setShowConversationSearch(!showConversationSearch)}
+                      className={cn(
+                        "text-muted-foreground",
+                        showConversationSearch && "text-primary bg-primary/10"
+                      )}
+                      data-testid="button-conversation-search"
+                    >
+                      <Search className="w-4 h-4" />
+                    </Button>
+                    
+                    {/* Pinned messages */}
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => setShowPinnedMessages(!showPinnedMessages)}
+                      className={cn(
+                        "text-muted-foreground relative",
+                        showPinnedMessages && "text-yellow-500 bg-yellow-500/10"
+                      )}
+                      data-testid="button-pinned-messages"
+                    >
+                      <Pin className="w-4 h-4" />
+                      {pinnedMessages.length > 0 && (
+                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-500 text-[10px] text-white rounded-full flex items-center justify-center">
+                          {pinnedMessages.length}
+                        </span>
+                      )}
+                    </Button>
+                    
+                    {/* Media gallery */}
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => setShowMediaGallery(true)}
+                      className="text-muted-foreground hover:text-primary"
+                      data-testid="button-media-gallery"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                    </Button>
+                    
                     {selectedConversation && (
                       <Button 
                         variant="ghost" 
@@ -721,6 +980,71 @@ export default function Chat({ role }: ChatProps) {
                     </Button>
                   </div>
                 </div>
+                
+                {/* Search panel */}
+                {showConversationSearch && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search in conversation..."
+                        value={conversationSearchQuery}
+                        onChange={(e) => handleConversationSearch(e.target.value)}
+                        className="pl-9"
+                        data-testid="input-conversation-search"
+                      />
+                    </div>
+                    {searchResults.length > 0 && (
+                      <div className="mt-2 max-h-32 overflow-y-auto">
+                        <p className="text-xs text-muted-foreground mb-1">{searchResults.length} results found</p>
+                        {searchResults.slice(0, 5).map(msg => (
+                          <div 
+                            key={msg.id} 
+                            className="text-xs p-2 hover:bg-secondary rounded cursor-pointer"
+                            onClick={() => {
+                              const el = document.querySelector(`[data-message-id="${msg.id}"]`);
+                              el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }}
+                          >
+                            <span className="font-medium">{msg.senderName}: </span>
+                            <span className="text-muted-foreground">{msg.content.slice(0, 50)}...</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Pinned messages panel */}
+                {showPinnedMessages && pinnedMessages.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <p className="text-xs font-medium text-yellow-500 mb-2 flex items-center gap-1">
+                      <Pin className="w-3 h-3" />
+                      Pinned Messages ({pinnedMessages.length})
+                    </p>
+                    <div className="max-h-32 overflow-y-auto space-y-2">
+                      {pinnedMessages.map(msg => (
+                        <div 
+                          key={msg.id} 
+                          className="text-xs p-2 bg-yellow-500/10 rounded flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <span className="font-medium">{msg.senderName}: </span>
+                            <span className="text-muted-foreground truncate">{msg.content.slice(0, 40)}...</span>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-5 w-5 flex-shrink-0"
+                            onClick={() => handlePinMessage(msg)}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardHeader>
 
               {/* Messages */}
@@ -747,6 +1071,7 @@ export default function Chat({ role }: ChatProps) {
                         return (
                           <div 
                             key={message.id} 
+                            data-message-id={message.id}
                             className={cn("flex gap-3", isOwnMessage && "flex-row-reverse")}
                           >
                             <Avatar className="w-8 h-8">
@@ -867,6 +1192,22 @@ export default function Chat({ role }: ChatProps) {
                                     </PopoverContent>
                                   </Popover>
                                   
+                                  {/* Pin button */}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn(
+                                      "h-6 w-6",
+                                      pinnedMessages.some(m => m.id === message.id) 
+                                        ? "text-yellow-500 hover:text-yellow-600" 
+                                        : "text-muted-foreground hover:text-yellow-500"
+                                    )}
+                                    onClick={() => handlePinMessage(message)}
+                                    data-testid={`button-pin-${message.id}`}
+                                  >
+                                    <Pin className="w-3 h-3" />
+                                  </Button>
+                                  
                                   {/* Unsend button (own messages only) */}
                                   {isOwnMessage && (
                                     <Button
@@ -883,25 +1224,49 @@ export default function Chat({ role }: ChatProps) {
                                 </div>
                               </div>
                               
-                              {/* Reactions display */}
+                              {/* Reactions display with user details */}
                               {groupedReactions.length > 0 && (
                                 <div className={cn("flex flex-wrap gap-1 mt-1", isOwnMessage && "justify-end")}>
                                   {groupedReactions.map(({ emoji, count, hasCurrentUser, users }) => (
-                                    <button
-                                      key={emoji}
-                                      onClick={() => handleReaction(message.id, emoji)}
-                                      title={users.join(', ')}
-                                      className={cn(
-                                        "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs transition-colors",
-                                        hasCurrentUser 
-                                          ? "bg-primary/20 text-primary border border-primary/30" 
-                                          : "bg-secondary hover:bg-secondary/80"
-                                      )}
-                                      data-testid={`reaction-${emoji}-${message.id}`}
-                                    >
-                                      <span>{emoji}</span>
-                                      {count > 1 && <span className="text-[10px]">{count}</span>}
-                                    </button>
+                                    <Popover key={emoji}>
+                                      <PopoverTrigger asChild>
+                                        <button
+                                          className={cn(
+                                            "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs transition-colors",
+                                            hasCurrentUser 
+                                              ? "bg-primary/20 text-primary border border-primary/30" 
+                                              : "bg-secondary hover:bg-secondary/80"
+                                          )}
+                                          data-testid={`reaction-${emoji}-${message.id}`}
+                                        >
+                                          <span>{emoji}</span>
+                                          {count > 1 && <span className="text-[10px]">{count}</span>}
+                                        </button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-48 p-2" side="top">
+                                        <div className="space-y-1">
+                                          <p className="text-xs font-medium text-muted-foreground mb-2">Reacted with {emoji}</p>
+                                          {users.map((userName, idx) => (
+                                            <div key={idx} className="flex items-center gap-2 text-sm">
+                                              <Avatar className="w-5 h-5">
+                                                <AvatarFallback className="text-[8px] bg-secondary">
+                                                  {userName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                                </AvatarFallback>
+                                              </Avatar>
+                                              <span>{userName}</span>
+                                            </div>
+                                          ))}
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="w-full mt-2 text-xs"
+                                            onClick={() => handleReaction(message.id, emoji)}
+                                          >
+                                            {hasCurrentUser ? 'Remove reaction' : 'Add reaction'}
+                                          </Button>
+                                        </div>
+                                      </PopoverContent>
+                                    </Popover>
                                   ))}
                                 </div>
                               )}
@@ -1025,6 +1390,35 @@ export default function Chat({ role }: ChatProps) {
                     <AtSign className="w-4 h-4" />
                   </Button>
                   
+                  {/* Sticker Picker */}
+                  <Popover open={showStickerPicker} onOpenChange={setShowStickerPicker}>
+                    <PopoverTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        data-testid="button-sticker-picker"
+                      >
+                        <Sticker className="w-4 h-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-3" align="start">
+                      <p className="text-sm font-medium mb-2">Stickers</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {STICKERS.map((sticker) => (
+                          <button
+                            key={sticker.id}
+                            className="p-3 hover:bg-secondary rounded-lg text-3xl transition-all hover:scale-110"
+                            onClick={() => handleSendSticker(sticker)}
+                            title={sticker.label}
+                            data-testid={`sticker-${sticker.id}`}
+                          >
+                            {sticker.emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  
                   <div className="flex-1 relative">
                     <Input
                       ref={inputRef}
@@ -1068,6 +1462,65 @@ export default function Chat({ role }: ChatProps) {
                       </div>
                     )}
                   </div>
+                  {/* Voice Message */}
+                  {!isRecording && !audioBlob ? (
+                    <Button 
+                      variant="ghost"
+                      size="icon"
+                      onClick={startRecording}
+                      data-testid="button-start-recording"
+                    >
+                      <Mic className="w-4 h-4" />
+                    </Button>
+                  ) : isRecording ? (
+                    <div className="flex items-center gap-2 px-2 py-1 bg-red-500/10 rounded-lg">
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                      <span className="text-sm text-red-500 font-mono">{formatRecordingTime(recordingTime)}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 text-red-500"
+                        onClick={stopRecording}
+                        data-testid="button-stop-recording"
+                      >
+                        <Square className="w-3 h-3" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7"
+                        onClick={cancelRecording}
+                        data-testid="button-cancel-recording"
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ) : audioBlob ? (
+                    <div className="flex items-center gap-2 px-2 py-1 bg-primary/10 rounded-lg">
+                      <Volume2 className="w-4 h-4 text-primary" />
+                      <span className="text-sm text-primary">{formatRecordingTime(recordingTime)}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 text-primary"
+                        onClick={sendVoiceMessage}
+                        disabled={sendMessageMutation.isPending}
+                        data-testid="button-send-voice"
+                      >
+                        <Send className="w-3 h-3" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7"
+                        onClick={cancelRecording}
+                        data-testid="button-discard-voice"
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ) : null}
+                  
                   <Button 
                     onClick={handleSendMessage}
                     disabled={!messageInput.trim() || sendMessageMutation.isPending}
@@ -1402,6 +1855,151 @@ export default function Chat({ role }: ChatProps) {
                 </div>
               </div>
             )}
+          </div>
+        </SheetContent>
+      </Sheet>
+      
+      {/* Media Gallery Sheet */}
+      <Sheet open={showMediaGallery} onOpenChange={setShowMediaGallery}>
+        <SheetContent className="w-[400px] sm:w-[540px]">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <ImageIcon className="w-5 h-5" />
+              Media Gallery
+            </SheetTitle>
+            <SheetDescription>
+              View all shared media, files, and links
+            </SheetDescription>
+          </SheetHeader>
+          
+          <div className="mt-4">
+            {/* Tabs for Media/Files/Links */}
+            <div className="flex gap-2 mb-4">
+              <Button
+                variant={mediaGalleryTab === 'media' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setMediaGalleryTab('media')}
+                className="flex-1"
+              >
+                <ImageIcon className="w-4 h-4 mr-1" />
+                Media ({mediaItems.images.length})
+              </Button>
+              <Button
+                variant={mediaGalleryTab === 'files' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setMediaGalleryTab('files')}
+                className="flex-1"
+              >
+                <FileText className="w-4 h-4 mr-1" />
+                Files ({mediaItems.files.length})
+              </Button>
+              <Button
+                variant={mediaGalleryTab === 'links' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setMediaGalleryTab('links')}
+                className="flex-1"
+              >
+                <Link className="w-4 h-4 mr-1" />
+                Links ({mediaItems.links.length})
+              </Button>
+            </div>
+            
+            <ScrollArea className="h-[calc(100vh-200px)]">
+              {mediaGalleryTab === 'media' && (
+                <div className="grid grid-cols-3 gap-2">
+                  {mediaItems.images.length > 0 ? (
+                    mediaItems.images.map(msg => 
+                      msg.attachments?.filter(a => a.type?.startsWith('image/')).map((att, idx) => (
+                        <div 
+                          key={`${msg.id}-${idx}`}
+                          className="aspect-square rounded-lg overflow-hidden bg-secondary cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => {
+                            if (att.url) window.open(att.url, '_blank');
+                          }}
+                        >
+                          <img 
+                            src={att.url || ''} 
+                            alt={att.filename || 'Image'} 
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))
+                    )
+                  ) : (
+                    <div className="col-span-3 text-center py-8 text-muted-foreground">
+                      <ImageIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No images shared yet</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {mediaGalleryTab === 'files' && (
+                <div className="space-y-2">
+                  {mediaItems.files.length > 0 ? (
+                    mediaItems.files.map(msg =>
+                      msg.attachments?.filter(a => a.type && !a.type.startsWith('image/') && a.type !== 'sticker' && a.type !== 'audio/webm').map((att, idx) => (
+                        <div 
+                          key={`${msg.id}-${idx}`}
+                          className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50 hover:bg-secondary cursor-pointer transition-colors"
+                          onClick={() => {
+                            if (att.url) {
+                              const link = document.createElement('a');
+                              link.href = att.url;
+                              link.download = att.filename || 'download';
+                              link.click();
+                            }
+                          }}
+                        >
+                          <File className="w-8 h-8 text-muted-foreground" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">{att.filename}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {att.size ? `${(att.size / 1024).toFixed(1)} KB` : 'Unknown size'}
+                            </p>
+                          </div>
+                          <Download className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                      ))
+                    )
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <File className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No files shared yet</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {mediaGalleryTab === 'links' && (
+                <div className="space-y-2">
+                  {mediaItems.links.length > 0 ? (
+                    mediaItems.links.map(({ message, url }, idx) => (
+                      <a 
+                        key={`${message.id}-${idx}`}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
+                      >
+                        <Link className="w-8 h-8 text-blue-500" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-blue-500 truncate">{url}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Shared by {message.senderName}
+                          </p>
+                        </div>
+                      </a>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Link className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No links shared yet</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </ScrollArea>
           </div>
         </SheetContent>
       </Sheet>
