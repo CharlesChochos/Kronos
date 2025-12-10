@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { 
   Loader2, Building2, FileText, MessageSquare, TrendingUp, Calendar, 
-  Download, Send, LogOut, User, Clock, CheckCircle2, AlertCircle, Info
+  Download, Send, LogOut, User, Clock, CheckCircle2, AlertCircle, Info, Eye, ExternalLink
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -227,8 +227,74 @@ function DealDetail({ deal, activeTab, onTabChange }: { deal: Deal; activeTab: s
       link.href = doc.content;
       link.download = doc.originalName || doc.filename;
       link.click();
+      toast.success("Download started");
     } else {
       toast.error("Document content not available");
+    }
+  };
+
+  // Helper to infer mimeType from filename if not provided
+  const inferMimeType = (doc: any): string => {
+    if (doc.mimeType) return doc.mimeType;
+    const filename = (doc.originalName || doc.filename || '').toLowerCase();
+    if (filename.endsWith('.pdf')) return 'application/pdf';
+    if (filename.endsWith('.png')) return 'image/png';
+    if (filename.endsWith('.jpg') || filename.endsWith('.jpeg')) return 'image/jpeg';
+    if (filename.endsWith('.gif')) return 'image/gif';
+    if (filename.endsWith('.txt')) return 'text/plain';
+    return '';
+  };
+
+  const canViewInBrowser = (doc: any): boolean => {
+    if (!doc.content) return false;
+    const mimeType = inferMimeType(doc);
+    return mimeType.includes('pdf') || mimeType.includes('image') || mimeType.includes('text');
+  };
+
+  const handleViewInNewTab = (doc: any) => {
+    if (!doc.content) {
+      toast.error("Document content not available");
+      return;
+    }
+
+    try {
+      const mimeType = inferMimeType(doc);
+      const isDataUrl = doc.content.startsWith('data:');
+      
+      // For PDFs and images, open directly in a new tab
+      if (mimeType.includes('pdf') || mimeType.includes('image')) {
+        const newWindow = window.open(doc.content, '_blank');
+        if (!newWindow) {
+          toast.error("Unable to open document. Please allow popups for this site.");
+        }
+      } else if (mimeType.includes('text') && isDataUrl) {
+        // For text files with base64 content, decode and open
+        try {
+          const base64Content = doc.content.split(',')[1] || '';
+          const decodedContent = atob(base64Content);
+          const blob = new Blob([decodedContent], { type: 'text/plain' });
+          const url = URL.createObjectURL(blob);
+          const newWindow = window.open(url, '_blank');
+          if (!newWindow) {
+            URL.revokeObjectURL(url);
+            toast.error("Unable to open document. Please allow popups for this site.");
+          } else {
+            setTimeout(() => URL.revokeObjectURL(url), 30000);
+          }
+        } catch (decodeError) {
+          console.error('Failed to decode text content:', decodeError);
+          toast.error("Failed to decode document content");
+        }
+      } else {
+        // For other types or non-data URLs, open directly
+        const newWindow = window.open(doc.content, '_blank');
+        if (!newWindow) {
+          toast.error("Unable to open document. Please allow popups for this site.");
+        }
+      }
+    } catch (error) {
+      console.error('Failed to open document:', error);
+      toast.error("Failed to open document");
     }
   };
   
@@ -365,14 +431,28 @@ function DealDetail({ deal, activeTab, onTabChange }: { deal: Deal; activeTab: s
                         </p>
                       </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => handleDownload(doc)}
-                      data-testid={`button-download-${doc.id}`}
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {doc.content && canViewInBrowser(doc) && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleViewInNewTab(doc)}
+                          title="Open in new tab"
+                          data-testid={`button-view-${doc.id}`}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDownload(doc)}
+                        title="Download"
+                        data-testid={`button-download-${doc.id}`}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -44,6 +44,7 @@ import {
   FileCheck,
   Building2,
   PenLine,
+  ExternalLink,
 } from "lucide-react";
 import { useDocuments, useCreateDocument, useUpdateDocument, useDeleteDocument, useDeals, useCurrentUser, type DocumentRecord } from "@/lib/api";
 
@@ -345,6 +346,76 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
       toast.success("Download started");
     } catch (error) {
       toast.error("Failed to download document");
+    }
+  };
+
+  // Helper to infer mimeType from filename if not provided
+  const inferMimeType = (doc: DocumentRecord): string => {
+    if (doc.mimeType) return doc.mimeType;
+    const filename = (doc.originalName || doc.filename || '').toLowerCase();
+    if (filename.endsWith('.pdf')) return 'application/pdf';
+    if (filename.endsWith('.png')) return 'image/png';
+    if (filename.endsWith('.jpg') || filename.endsWith('.jpeg')) return 'image/jpeg';
+    if (filename.endsWith('.gif')) return 'image/gif';
+    if (filename.endsWith('.txt')) return 'text/plain';
+    if (filename.endsWith('.csv')) return 'text/csv';
+    if (filename.endsWith('.doc') || filename.endsWith('.docx')) return 'application/msword';
+    if (filename.endsWith('.xls') || filename.endsWith('.xlsx')) return 'application/vnd.ms-excel';
+    return '';
+  };
+
+  // Check if document can be viewed in browser
+  const canViewInBrowser = (doc: DocumentRecord): boolean => {
+    if (!doc.content) return false;
+    const mimeType = inferMimeType(doc);
+    return mimeType.includes('pdf') || mimeType.includes('image') || mimeType.includes('text');
+  };
+
+  const handleViewInNewTab = (doc: DocumentRecord) => {
+    if (!doc.content) {
+      toast.error("Document content not available");
+      return;
+    }
+
+    try {
+      const mimeType = inferMimeType(doc);
+      const isDataUrl = doc.content.startsWith('data:');
+      
+      // For PDFs and images with data URLs, open directly
+      if (mimeType.includes('pdf') || mimeType.includes('image')) {
+        const newWindow = window.open(doc.content, '_blank');
+        if (!newWindow) {
+          toast.error("Unable to open document. Please allow popups for this site.");
+        }
+      } else if (mimeType.includes('text') && isDataUrl) {
+        // For text files with base64 content, decode and open
+        try {
+          const base64Content = doc.content.split(',')[1] || '';
+          const decodedContent = atob(base64Content);
+          const blob = new Blob([decodedContent], { type: 'text/plain' });
+          const url = URL.createObjectURL(blob);
+          const newWindow = window.open(url, '_blank');
+          if (!newWindow) {
+            URL.revokeObjectURL(url);
+            toast.error("Unable to open document. Please allow popups for this site.");
+          } else {
+            // Revoke URL after a delay to allow the new window to load
+            setTimeout(() => URL.revokeObjectURL(url), 30000);
+          }
+        } catch (decodeError) {
+          console.error('Failed to decode text content:', decodeError);
+          toast.error("Failed to decode document content");
+        }
+      } else {
+        // For other types or non-data URLs, open directly
+        const newWindow = window.open(doc.content, '_blank');
+        if (!newWindow) {
+          toast.error("Unable to open document. Please allow popups for this site.");
+        }
+      }
+    } catch (error) {
+      console.error('Failed to open document:', error);
+      toast.error("Failed to open document");
     }
   };
 
@@ -1002,9 +1073,22 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
                                     size="icon"
                                     onClick={() => handlePreview(doc)}
                                     className="h-8 w-8"
+                                    title="Preview"
                                     data-testid={`button-preview-${doc.id}`}
                                   >
                                     <Eye className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {doc.content && canViewInBrowser(doc) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleViewInNewTab(doc)}
+                                    className="h-8 w-8"
+                                    title="Open in new tab"
+                                    data-testid={`button-view-${doc.id}`}
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
                                   </Button>
                                 )}
                                 {doc.content && (
@@ -1013,6 +1097,7 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
                                     size="icon"
                                     onClick={() => handleDownload(doc)}
                                     className="h-8 w-8"
+                                    title="Download"
                                     data-testid={`button-download-${doc.id}`}
                                   >
                                     <Download className="h-4 w-4" />
@@ -1053,10 +1138,36 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
         <DialogContent className="max-w-4xl max-h-[80vh]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5" />
-              {selectedDocument?.title}
-            </DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                {selectedDocument?.title}
+              </DialogTitle>
+              {selectedDocument && (
+                <div className="flex items-center gap-2 mr-8">
+                  {canViewInBrowser(selectedDocument) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewInNewTab(selectedDocument)}
+                      data-testid="button-view-new-tab"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Open in New Tab
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownload(selectedDocument)}
+                    data-testid="button-download-preview"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                  </Button>
+                </div>
+              )}
+            </div>
           </DialogHeader>
           <ScrollArea className="h-[60vh]">
             {selectedDocument?.content && (
