@@ -48,6 +48,15 @@ import type { Task, Deal } from "@shared/schema";
 
 type SwipeDirection = 'left' | 'right' | 'up' | null;
 
+type UploadedFile = {
+  id: string;
+  filename: string;
+  url: string;
+  size: number;
+  type: string;
+  uploadedAt: string;
+};
+
 type MyTasksProps = {
   role?: 'CEO' | 'Employee';
 };
@@ -77,7 +86,8 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
     dealId: '',
     type: 'General' as 'General' | 'Document Review' | 'Due Diligence' | 'Client Communication' | 'Financial Analysis' | 'Legal' | 'Compliance'
   });
-  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
@@ -382,6 +392,54 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
     }
   };
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    setIsUploading(true);
+    
+    try {
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to upload file');
+        }
+        
+        const uploadedFile: UploadedFile = await response.json();
+        setUploadedFiles(prev => [...prev, uploadedFile]);
+      }
+      toast.success(`${files.length} file(s) uploaded successfully`);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to upload file');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const removeAttachment = async (index: number) => {
+    const file = uploadedFiles[index];
+    if (file) {
+      try {
+        const filename = file.url.replace('/uploads/', '');
+        await fetch(`/api/upload/${filename}`, { method: 'DELETE' });
+      } catch (error) {
+        console.error('Failed to delete file:', error);
+      }
+    }
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleCreateTask = async () => {
     if (!newTaskForm.title.trim()) {
       toast.error("Please enter a task title");
@@ -409,20 +467,28 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
           taskData.dealStage = selectedDeal.stage;
         }
       }
+      const attachmentObjects = uploadedFiles.map(file => ({
+        id: file.id,
+        filename: file.filename,
+        url: file.url,
+        size: file.size,
+        uploadedAt: file.uploadedAt,
+      }));
+
+      if (attachmentObjects.length > 0) {
+        taskData.attachments = attachmentObjects;
+      }
+
       const createdTask = await createTask.mutateAsync(taskData);
       
-      if (attachmentFile && createdTask?.id) {
-        try {
-          await createTaskAttachment.mutateAsync({
-            taskId: createdTask.id,
-            filename: `task_${createdTask.id}_${Date.now()}_${attachmentFile.name}`,
-            originalName: attachmentFile.name,
-            mimeType: attachmentFile.type || null,
-            size: attachmentFile.size,
-          });
-        } catch (attachError) {
-          console.error("Failed to upload attachment:", attachError);
-        }
+      for (const file of uploadedFiles) {
+        await createTaskAttachment.mutateAsync({
+          taskId: createdTask.id,
+          filename: file.url.split('/').pop() || file.filename,
+          originalName: file.filename,
+          mimeType: file.type || null,
+          size: file.size,
+        });
       }
       
       toast.success("Task created successfully!");
@@ -435,7 +501,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
         dealId: '',
         type: 'General'
       });
-      setAttachmentFile(null);
+      setUploadedFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (error: any) {
       toast.error(error.message || "Failed to create task");
@@ -1133,17 +1199,13 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
             </div>
             
             <div className="space-y-2">
-              <Label>Attachment (Optional)</Label>
+              <Label>Attachments (Optional)</Label>
               <div className="flex items-center gap-2">
                 <input
                   ref={fileInputRef}
                   type="file"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setAttachmentFile(file);
-                    }
-                  }}
+                  multiple
+                  onChange={handleFileSelect}
                   className="hidden"
                   data-testid="input-task-attachment"
                 />
@@ -1153,32 +1215,41 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                   size="sm"
                   className="flex-1"
                   onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
                 >
-                  <Paperclip className="w-4 h-4 mr-2" />
-                  {attachmentFile ? 'Change File' : 'Add Attachment'}
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Paperclip className="w-4 h-4 mr-2" />
+                      Add Attachment
+                    </>
+                  )}
                 </Button>
-                {attachmentFile && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-red-500"
-                    onClick={() => {
-                      setAttachmentFile(null);
-                      if (fileInputRef.current) fileInputRef.current.value = '';
-                    }}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                )}
               </div>
-              {attachmentFile && (
-                <div className="flex items-center gap-2 p-2 bg-secondary/30 rounded text-sm">
-                  <Paperclip className="w-4 h-4 text-muted-foreground" />
-                  <span className="truncate flex-1">{attachmentFile.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {(attachmentFile.size / 1024).toFixed(1)} KB
-                  </span>
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2">
+                  {uploadedFiles.map((file, index) => (
+                    <div key={file.id} className="flex items-center gap-2 p-2 bg-secondary/30 rounded text-sm">
+                      <FileText className="w-4 h-4 text-muted-foreground" />
+                      <span className="truncate flex-1">{file.filename}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {(file.size / 1024).toFixed(1)} KB
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-red-500 hover:text-red-700"
+                        onClick={() => removeAttachment(index)}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
