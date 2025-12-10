@@ -480,16 +480,33 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
         notes: ['notes', 'comments', 'description', 'remarks', 'additional info', 'other', 'memo', 'details']
       };
       
+      // First pass: exact matches only (highest priority)
+      const usedHeaders = new Set<string>();
       Object.entries(fieldMappings).forEach(([field, aliases]) => {
         const match = headers.find((h: string, i: number) => {
           const lowerH = lowerHeaders[i];
-          // Check for exact match first, then partial matches
-          if (aliases.includes(lowerH)) return true;
-          return aliases.some(alias => lowerH.includes(alias) || alias.includes(lowerH));
+          if (usedHeaders.has(h)) return false;
+          return aliases.includes(lowerH);
         });
         if (match) {
           autoMap[field] = match;
-          console.log(`Auto-mapped ${field} -> "${match}"`);
+          usedHeaders.add(match);
+          console.log(`Auto-mapped (exact) ${field} -> "${match}"`);
+        }
+      });
+      
+      // Second pass: header contains alias (e.g., "LinkedIn URL" contains "linkedin")
+      Object.entries(fieldMappings).forEach(([field, aliases]) => {
+        if (autoMap[field]) return; // Already mapped
+        const match = headers.find((h: string, i: number) => {
+          const lowerH = lowerHeaders[i];
+          if (usedHeaders.has(h)) return false;
+          return aliases.some(alias => lowerH.includes(alias));
+        });
+        if (match) {
+          autoMap[field] = match;
+          usedHeaders.add(match);
+          console.log(`Auto-mapped (partial) ${field} -> "${match}"`);
         }
       });
       
