@@ -3645,9 +3645,27 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                               size="icon" 
                               className="h-8 w-8"
                               onClick={() => window.open(doc.url, '_blank')}
+                              title="View"
                               data-testid={`button-view-doc-${doc.id}`}
                             >
                               <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = doc.url;
+                                link.download = doc.filename || 'document';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              title="Download"
+                              data-testid={`button-download-doc-${doc.id}`}
+                            >
+                              <Download className="w-4 h-4" />
                             </Button>
                             <Button 
                               variant="ghost" 
@@ -3666,6 +3684,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                                   toast.error("Failed to remove document");
                                 }
                               }}
+                              title="Delete"
                               data-testid={`button-delete-doc-${doc.id}`}
                             >
                               <Trash2 className="w-4 h-4" />
