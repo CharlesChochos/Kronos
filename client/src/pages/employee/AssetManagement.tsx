@@ -3184,6 +3184,61 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                   <div 
                     className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer"
                     onClick={() => document.getElementById('deal-document-upload')?.click()}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.currentTarget.classList.add('border-primary', 'bg-primary/5');
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
+                    }}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
+                      const files = Array.from(e.dataTransfer.files);
+                      if (files.length === 0) return;
+                      
+                      const existingAttachments = (selectedDeal.attachments as any[] || []);
+                      const uploadedAttachments: any[] = [];
+                      
+                      for (const file of files) {
+                        try {
+                          const formData = new FormData();
+                          formData.append('file', file);
+                          
+                          const response = await fetch('/api/upload', {
+                            method: 'POST',
+                            credentials: 'include',
+                            body: formData,
+                          });
+                          
+                          if (response.ok) {
+                            const uploadedFile = await response.json();
+                            uploadedAttachments.push(uploadedFile);
+                          } else {
+                            const error = await response.json();
+                            throw new Error(error.error || 'Upload failed');
+                          }
+                        } catch (error: any) {
+                          toast.error(`Failed to upload ${file.name}: ${error.message || 'Unknown error'}`);
+                        }
+                      }
+                      
+                      if (uploadedAttachments.length > 0) {
+                        try {
+                          await updateDeal.mutateAsync({
+                            id: selectedDeal.id,
+                            attachments: [...existingAttachments, ...uploadedAttachments],
+                          });
+                          toast.success(`${uploadedAttachments.length} file(s) uploaded successfully`);
+                        } catch (error) {
+                          toast.error("Failed to save files to deal");
+                        }
+                      }
+                    }}
                   >
                     <input 
                       type="file" 

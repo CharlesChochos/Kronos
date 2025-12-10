@@ -552,13 +552,40 @@ export default function Opportunities() {
                 <Paperclip className="w-4 h-4" />
                 Attachments
               </Label>
-              <div className="mt-2 border border-dashed border-border rounded-lg p-4">
+              <div 
+              className="mt-2 border border-dashed border-border rounded-lg p-4"
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.currentTarget.classList.add('border-primary', 'bg-primary/5');
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                  const input = fileInputRef.current;
+                  if (input) {
+                    const dataTransfer = new DataTransfer();
+                    Array.from(files).forEach(file => dataTransfer.items.add(file));
+                    input.files = dataTransfer.files;
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                  }
+                }
+              }}
+            >
                 <input
                   ref={fileInputRef}
                   type="file"
                   className="hidden"
                   onChange={(e) => handleFileUpload(e, false)}
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,image/*"
                 />
                 <div className="text-center">
                   <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
@@ -571,7 +598,7 @@ export default function Opportunities() {
                     Upload File
                   </Button>
                   <p className="text-xs text-muted-foreground mt-2">
-                    PDF, Word, Excel, PowerPoint, or images
+                    Drag & drop or click - PDF, Word, Excel, images
                   </p>
                 </div>
                 
