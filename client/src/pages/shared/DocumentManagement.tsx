@@ -330,9 +330,15 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
     }
   };
 
-  const handleDownload = (doc: DocumentRecord) => {
+  const handleDownload = (doc: DocumentRecord & { contentUnavailable?: boolean }) => {
     if (!doc.content) {
       toast.error("Document content not available for download");
+      return;
+    }
+    
+    // Check if legacy file is unavailable
+    if (doc.contentUnavailable) {
+      toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
       return;
     }
 
@@ -375,9 +381,15 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
     return mimeType.includes('pdf') || mimeType.includes('image') || mimeType.includes('text');
   };
 
-  const handleViewInNewTab = (doc: DocumentRecord) => {
+  const handleViewInNewTab = (doc: DocumentRecord & { contentUnavailable?: boolean }) => {
     if (!doc.content) {
       toast.error("Document content not available");
+      return;
+    }
+    
+    // Check if legacy file is unavailable
+    if (doc.contentUnavailable) {
+      toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
       return;
     }
 

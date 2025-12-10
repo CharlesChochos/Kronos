@@ -419,26 +419,13 @@ export async function registerRoutes(
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
 
-  // Configure multer for file uploads
-  const fileStorage = multer.diskStorage({
-    destination: (_req, _file, cb) => {
-      cb(null, uploadsDir);
-    },
-    filename: (_req, file, cb) => {
-      // Generate unique filename with sanitized original name
-      const uniqueId = crypto.randomUUID();
-      const ext = path.extname(file.originalname).toLowerCase();
-      const baseName = path.basename(file.originalname, ext)
-        .replace(/[^a-zA-Z0-9._-]/g, '_')
-        .substring(0, 100);
-      cb(null, `${uniqueId}-${baseName}${ext}`);
-    }
-  });
+  // Configure multer for file uploads - use memory storage for base64 conversion
+  const memoryStorage = multer.memoryStorage();
 
   const upload = multer({
-    storage: fileStorage,
+    storage: memoryStorage,
     limits: {
-      fileSize: 500 * 1024 * 1024, // 500MB max
+      fileSize: 50 * 1024 * 1024, // 50MB max for base64 storage
     },
     fileFilter: (_req, file, cb) => {
       const allowedExtensions = [
@@ -481,19 +468,22 @@ export async function registerRoutes(
     }
   });
 
-  // Upload file using multer
+  // Upload file using multer - returns base64 data URL for persistent storage
   app.post("/api/upload", uploadLimiter, requireAuth, upload.single('file'), (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const fileUrl = `/uploads/${req.file.filename}`;
+      // Convert buffer to base64 data URL for persistent database storage
+      const base64Content = req.file.buffer.toString('base64');
+      const dataUrl = `data:${req.file.mimetype};base64,${base64Content}`;
       
       res.json({
         id: crypto.randomUUID(),
         filename: req.file.originalname,
-        url: fileUrl,
+        url: dataUrl, // Return base64 data URL instead of file path
+        content: dataUrl, // Also include as content for document storage
         size: req.file.size,
         type: req.file.mimetype,
         uploadedAt: new Date().toISOString(),
@@ -504,7 +494,7 @@ export async function registerRoutes(
     }
   });
 
-  // Delete file
+  // Delete file - now handles both filesystem and database-stored files
   app.delete("/api/upload/:filename", requireAuth, async (req, res) => {
     try {
       const requestedFilename = path.normalize(req.params.filename).replace(/^(\.\.[\/\\])+/, '');
@@ -515,12 +505,12 @@ export async function registerRoutes(
         return res.status(403).json({ error: "Access denied" });
       }
       
+      // Try to delete from filesystem (legacy files)
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
-        res.json({ message: "File deleted successfully" });
-      } else {
-        res.status(404).json({ error: "File not found" });
       }
+      // Files stored as base64 in database are deleted when the document record is deleted
+      res.json({ message: "File deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete file" });
     }
@@ -1201,35 +1191,44 @@ export async function registerRoutes(
       
       // Enrich documents that don't have URLs with data from document library
       const enrichedDocs = await Promise.all(docs.map(async (doc: any) => {
-        if (doc.url) {
-          return doc; // Already has URL, no enrichment needed
-        }
+        let enrichedDoc = doc;
         
-        // Try to find matching document in document library
-        try {
-          const allDocuments = await storage.getAllDocuments();
-          // Match by dealId and title similarity
-          const matchingDoc = allDocuments.find((d: any) => 
-            d.dealId === req.params.dealId && (
-              d.title?.includes(doc.title) ||
-              doc.title?.includes(d.title?.split(' - ').pop() || '') ||
-              d.filename?.includes(doc.filename) ||
-              doc.filename === d.filename
-            )
-          );
-          
-          if (matchingDoc && matchingDoc.content) {
-            // The content field can be a file path (/uploads/...) or base64 data
-            return {
-              ...doc,
-              url: matchingDoc.content, // Use content as URL (works for both file paths and data URLs)
-            };
+        if (!doc.url) {
+          // Try to find matching document in document library
+          try {
+            const allDocuments = await storage.getAllDocuments();
+            // Match by dealId and title similarity
+            const matchingDoc = allDocuments.find((d: any) => 
+              d.dealId === req.params.dealId && (
+                d.title?.includes(doc.title) ||
+                doc.title?.includes(d.title?.split(' - ').pop() || '') ||
+                d.filename?.includes(doc.filename) ||
+                doc.filename === d.filename
+              )
+            );
+            
+            if (matchingDoc && matchingDoc.content) {
+              // The content field can be a file path (/uploads/...) or base64 data
+              enrichedDoc = {
+                ...doc,
+                url: matchingDoc.content, // Use content as URL (works for both file paths and data URLs)
+              };
+            }
+          } catch (e) {
+            console.error('Failed to enrich stage document:', e);
           }
-        } catch (e) {
-          console.error('Failed to enrich stage document:', e);
         }
         
-        return doc;
+        // Check if URL is a legacy file path that no longer exists
+        let contentUnavailable = false;
+        if (enrichedDoc.url && enrichedDoc.url.startsWith('/uploads/')) {
+          const filePath = path.join(process.cwd(), enrichedDoc.url);
+          if (!fs.existsSync(filePath)) {
+            contentUnavailable = true;
+          }
+        }
+        
+        return { ...enrichedDoc, contentUnavailable };
       }));
       
       res.json(enrichedDocs);
@@ -7075,7 +7074,18 @@ Only include entries with both name AND company. Extract ALL rows.`
   app.get("/api/documents", requireAuth, async (req, res) => {
     try {
       const documents = await storage.getAllDocuments();
-      res.json(documents);
+      // Flag documents with unavailable legacy file paths
+      const docsWithAvailability = documents.map(doc => {
+        let contentUnavailable = false;
+        if (doc.content && doc.content.startsWith('/uploads/')) {
+          const filePath = path.join(process.cwd(), doc.content);
+          if (!fs.existsSync(filePath)) {
+            contentUnavailable = true;
+          }
+        }
+        return { ...doc, contentUnavailable };
+      });
+      res.json(docsWithAvailability);
     } catch (error) {
       console.error('Get documents error:', error);
       res.status(500).json({ error: "Failed to fetch documents" });
@@ -7086,7 +7096,18 @@ Only include entries with both name AND company. Extract ALL rows.`
   app.get("/api/documents/deal/:dealId", requireAuth, async (req, res) => {
     try {
       const documents = await storage.getDocumentsByDeal(req.params.dealId);
-      res.json(documents);
+      // Flag documents with unavailable legacy file paths
+      const docsWithAvailability = documents.map(doc => {
+        let contentUnavailable = false;
+        if (doc.content && doc.content.startsWith('/uploads/')) {
+          const filePath = path.join(process.cwd(), doc.content);
+          if (!fs.existsSync(filePath)) {
+            contentUnavailable = true;
+          }
+        }
+        return { ...doc, contentUnavailable };
+      });
+      res.json(docsWithAvailability);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch documents" });
     }
@@ -7099,7 +7120,17 @@ Only include entries with both name AND company. Extract ALL rows.`
       if (!doc) {
         return res.status(404).json({ error: "Document not found" });
       }
-      res.json(doc);
+      
+      // Check if legacy file path content is still accessible
+      let contentUnavailable = false;
+      if (doc.content && doc.content.startsWith('/uploads/')) {
+        const filePath = path.join(process.cwd(), doc.content);
+        if (!fs.existsSync(filePath)) {
+          contentUnavailable = true;
+        }
+      }
+      
+      res.json({ ...doc, contentUnavailable });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch document" });
     }

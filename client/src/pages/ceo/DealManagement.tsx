@@ -3644,7 +3644,13 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                               variant="ghost" 
                               size="icon" 
                               className="h-8 w-8"
-                              onClick={() => window.open(doc.url, '_blank')}
+                              onClick={() => {
+                                if (doc.contentUnavailable || (doc.url?.startsWith('/uploads/') && !doc.url?.startsWith('data:'))) {
+                                  toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
+                                  return;
+                                }
+                                window.open(doc.url, '_blank');
+                              }}
                               title="View"
                               data-testid={`button-view-doc-${doc.id}`}
                             >
@@ -3655,6 +3661,10 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                               size="icon" 
                               className="h-8 w-8"
                               onClick={() => {
+                                if (doc.contentUnavailable || (doc.url?.startsWith('/uploads/') && !doc.url?.startsWith('data:'))) {
+                                  toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
+                                  return;
+                                }
                                 const link = document.createElement('a');
                                 link.href = doc.url;
                                 link.download = doc.filename || 'document';
