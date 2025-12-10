@@ -5333,8 +5333,9 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
       };
       
       if (ext === '.xlsx' || ext === '.xls') {
-        // Parse Excel file
-        const workbook = XLSX.readFile(filePath);
+        // Parse Excel file - read as buffer first
+        const fileBuffer = fs.readFileSync(filePath);
+        const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(firstSheet, { defval: '' });
         
