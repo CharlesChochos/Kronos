@@ -851,9 +851,13 @@ export default function Dashboard() {
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                 <DollarSign className="w-5 h-5 text-primary" />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-xs text-muted-foreground uppercase">Total Pipeline</p>
                 <p className="text-2xl font-bold">${totalValue.toLocaleString()}M</p>
+                <div className="flex gap-2 mt-1 text-[10px]">
+                  <span className="text-blue-400">IB: ${ibDeals.reduce((s, d) => s + d.value, 0).toLocaleString()}M</span>
+                  <span className="text-emerald-400">AM: ${amDeals.reduce((s, d) => s + d.value, 0).toLocaleString()}M</span>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -864,9 +868,13 @@ export default function Dashboard() {
               <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
                 <Briefcase className="w-5 h-5 text-green-500" />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-xs text-muted-foreground uppercase">Active Deals</p>
                 <p className="text-2xl font-bold">{activeDeals.length}</p>
+                <div className="flex gap-2 mt-1 text-[10px]">
+                  <span className="text-blue-400">IB: {ibActiveDeals.length}</span>
+                  <span className="text-emerald-400">AM: {amActiveDeals.length}</span>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -908,10 +916,20 @@ export default function Dashboard() {
               <BarChart3 className="w-5 h-5 text-primary" />
               Deal Pipeline by Stage
             </CardTitle>
-            <CardDescription>Distribution of deals across pipeline stages</CardDescription>
+            <CardDescription>Distribution of deals across pipeline stages (All Divisions)</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[250px] w-full">
+            <div className="flex gap-4 mb-3 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-blue-500" />
+                <span className="text-muted-foreground">IB: {ibActiveDeals.length} deals</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-emerald-500" />
+                <span className="text-muted-foreground">AM: {amActiveDeals.length} deals</span>
+              </div>
+            </div>
+            <ChartContainer config={chartConfig} className="h-[220px] w-full">
               <BarChart data={dealsByStage} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="stage" stroke="hsl(var(--muted-foreground))" fontSize={11} />
@@ -934,10 +952,20 @@ export default function Dashboard() {
               <PieChart className="w-5 h-5 text-primary" />
               Deals by Sector
             </CardTitle>
-            <CardDescription>Sector breakdown of active deals</CardDescription>
+            <CardDescription>Sector breakdown of active deals (All Divisions)</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[250px] w-full">
+            <div className="flex gap-4 mb-3 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-blue-500" />
+                <span className="text-muted-foreground">IB: ${ibActiveValue.toLocaleString()}M</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-emerald-500" />
+                <span className="text-muted-foreground">AM: ${amActiveValue.toLocaleString()}M</span>
+              </div>
+            </div>
+            <ChartContainer config={chartConfig} className="h-[220px] w-full">
               <RechartsPieChart>
                 <Pie
                   data={dealsBySector}
@@ -1700,14 +1728,11 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {(() => {
-                  // Calculate fees for all deals with IB/AM breakdown
-                  const amDealIds = new Set(amDeals.map(d => d.id));
+                  // Calculate fees for IB deals only
                   const ibDealIds = new Set(ibDeals.map(d => d.id));
-                  
                   const ibFees = allDealFees.filter(fee => ibDealIds.has(fee.dealId));
-                  const amFees = allDealFees.filter(fee => amDealIds.has(fee.dealId));
                   
-                  const feesByType = allDealFees.reduce((acc, fee) => {
+                  const feesByType = ibFees.reduce((acc, fee) => {
                     const type = fee.feeType || 'other';
                     if (!acc[type]) acc[type] = { total: 0, count: 0 };
                     if (fee.amount) {
@@ -1726,8 +1751,6 @@ export default function Dashboard() {
                   };
                   
                   const totalFees = Object.values(feesByType).reduce((sum, f) => sum + f.total, 0);
-                  const ibTotalFees = ibFees.reduce((sum, f) => sum + (f.amount || 0), 0);
-                  const amTotalFees = amFees.reduce((sum, f) => sum + (f.amount || 0), 0);
                   
                   return (
                     <>
@@ -1735,17 +1758,7 @@ export default function Dashboard() {
                         <div className="text-2xl font-bold text-green-400">
                           ${totalFees.toLocaleString()}
                         </div>
-                        <div className="text-xs text-muted-foreground">Total Fixed Fees</div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                        <div className="p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                          <div className="text-sm font-semibold text-blue-400">${ibTotalFees.toLocaleString()}</div>
-                          <div className="text-[9px] text-muted-foreground">IB Fees</div>
-                        </div>
-                        <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                          <div className="text-sm font-semibold text-emerald-400">${amTotalFees.toLocaleString()}</div>
-                          <div className="text-[9px] text-muted-foreground">AM Fees</div>
-                        </div>
+                        <div className="text-xs text-muted-foreground">IB Fixed Fees</div>
                       </div>
                       <Separator className="bg-border/50" />
                       <div className="space-y-2">
@@ -1760,7 +1773,7 @@ export default function Dashboard() {
                         ))}
                         {Object.keys(feesByType).length === 0 && (
                           <div className="text-center text-xs text-muted-foreground py-4">
-                            No fees configured yet
+                            No IB fees configured yet
                           </div>
                         )}
                       </div>

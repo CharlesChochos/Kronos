@@ -349,8 +349,9 @@ export default function EventCalendar({ role }: EventCalendarProps) {
 
   const upcomingEvents = useMemo(() => {
     const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     return meetings
-      .filter(m => new Date(m.scheduledFor) >= now)
+      .filter(m => new Date(m.scheduledFor) >= todayStart)
       .sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime())
       .slice(0, 5);
   }, [meetings]);

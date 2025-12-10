@@ -1483,8 +1483,8 @@ export async function registerRoutes(
     }
   });
 
-  // Create meeting (CEO only)
-  app.post("/api/meetings", generalLimiter, requireCEO, async (req, res) => {
+  // Create meeting (any authenticated internal user)
+  app.post("/api/meetings", generalLimiter, requireAuth, requireInternal, async (req, res) => {
     try {
       // Extract email formatting fields before validation (they're not in schema)
       const { localDate, localTime, organizerTimezone, ...meetingData } = req.body;
