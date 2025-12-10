@@ -1,4 +1,4 @@
-import { eq, and, desc, gt } from "drizzle-orm";
+import { eq, and, desc, gt, or, ilike, count } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@shared/schema";
@@ -141,6 +141,12 @@ export interface IStorage {
   // Stakeholder operations
   getStakeholder(id: string): Promise<Stakeholder | undefined>;
   getAllStakeholders(): Promise<Stakeholder[]>;
+  getStakeholdersPaginated(options: {
+    page: number;
+    pageSize: number;
+    search?: string;
+    type?: string;
+  }): Promise<{ stakeholders: Stakeholder[]; total: number }>;
   createStakeholder(stakeholder: InsertStakeholder): Promise<Stakeholder>;
   updateStakeholder(id: string, updates: Partial<InsertStakeholder>): Promise<Stakeholder | undefined>;
   deleteStakeholder(id: string): Promise<void>;
@@ -916,6 +922,57 @@ export class DatabaseStorage implements IStorage {
   
   async getAllStakeholders(): Promise<Stakeholder[]> {
     return await db.select().from(schema.stakeholders).orderBy(schema.stakeholders.name);
+  }
+  
+  async getStakeholdersPaginated(options: {
+    page: number;
+    pageSize: number;
+    search?: string;
+    type?: string;
+  }): Promise<{ stakeholders: Stakeholder[]; total: number }> {
+    const { page, pageSize, search, type } = options;
+    const offset = (page - 1) * pageSize;
+    
+    // Build conditions array
+    const conditions = [];
+    
+    if (search) {
+      const searchLower = `%${search.toLowerCase()}%`;
+      conditions.push(
+        or(
+          ilike(schema.stakeholders.name, searchLower),
+          ilike(schema.stakeholders.company, searchLower),
+          ilike(schema.stakeholders.location, searchLower)
+        )
+      );
+    }
+    
+    if (type && type !== 'all') {
+      conditions.push(eq(schema.stakeholders.type, type));
+    }
+    
+    // Get total count
+    const countQuery = conditions.length > 0
+      ? db.select({ count: count() }).from(schema.stakeholders).where(and(...conditions))
+      : db.select({ count: count() }).from(schema.stakeholders);
+    
+    const [{ count: total }] = await countQuery;
+    
+    // Get paginated results
+    const dataQuery = conditions.length > 0
+      ? db.select().from(schema.stakeholders)
+          .where(and(...conditions))
+          .orderBy(schema.stakeholders.name)
+          .limit(pageSize)
+          .offset(offset)
+      : db.select().from(schema.stakeholders)
+          .orderBy(schema.stakeholders.name)
+          .limit(pageSize)
+          .offset(offset);
+    
+    const stakeholders = await dataQuery;
+    
+    return { stakeholders, total: Number(total) };
   }
   
   async createStakeholder(stakeholder: InsertStakeholder): Promise<Stakeholder> {

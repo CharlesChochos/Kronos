@@ -5274,8 +5274,29 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
   // Get all stakeholders
   app.get("/api/stakeholders", requireAuth, async (req, res) => {
     try {
-      const stakeholders = await storage.getAllStakeholders();
-      res.json(stakeholders);
+      // Support pagination via query params with safe defaults
+      const rawPage = parseInt(req.query.page as string);
+      const rawPageSize = parseInt(req.query.pageSize as string);
+      const page = Math.max(1, isNaN(rawPage) ? 1 : rawPage);
+      const pageSize = Math.max(1, Math.min(isNaN(rawPageSize) ? 50 : rawPageSize, 100));
+      const search = req.query.search as string | undefined;
+      const type = req.query.type as string | undefined;
+      
+      // If no pagination params, use paginated with defaults for better performance
+      const result = await storage.getStakeholdersPaginated({
+        page,
+        pageSize,
+        search,
+        type
+      });
+      
+      res.json({
+        stakeholders: result.stakeholders,
+        total: result.total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(result.total / pageSize)
+      });
     } catch (error) {
       console.error('Get stakeholders error:', error);
       res.status(500).json({ error: "Failed to fetch stakeholders" });

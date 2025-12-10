@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -81,7 +81,39 @@ type LocalStakeholder = {
 export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee' }) {
   const queryClient = useQueryClient();
   const { data: deals = [] } = useDeals();
-  const { data: dbStakeholders = [], isLoading } = useStakeholders();
+  
+  // Pagination and search state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("all");
+  const pageSize = 50;
+  
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1); // Reset to first page on search
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  
+  // Reset page when tab changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
+  
+  const { data: stakeholdersData, isLoading } = useStakeholders({
+    page: currentPage,
+    pageSize,
+    search: debouncedSearch || undefined,
+    type: activeTab !== 'all' ? activeTab : undefined
+  });
+  
+  const dbStakeholders = stakeholdersData?.stakeholders || [];
+  const totalStakeholders = stakeholdersData?.total || 0;
+  const totalPages = stakeholdersData?.totalPages || 1;
+  
   const createStakeholderMutation = useCreateStakeholder();
   const updateStakeholderMutation = useUpdateStakeholder();
   const deleteStakeholderMutation = useDeleteStakeholder();
@@ -90,8 +122,6 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
   const [showEditModal, setShowEditModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedStakeholder, setSelectedStakeholder] = useState<LocalStakeholder | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docScanInputRef = useRef<HTMLInputElement>(null);
@@ -191,7 +221,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
       if (result.successCount > 0) {
         toast.success(`Successfully imported ${result.successCount} of ${result.totalFound} stakeholder${result.successCount > 1 ? 's' : ''} from document`);
         // Refresh the stakeholder list to show newly created entries
-        queryClient.invalidateQueries({ queryKey: ['/api/stakeholders'] });
+        queryClient.invalidateQueries({ queryKey: ['stakeholders'], refetchType: 'all' });
       } else if (result.totalFound === 0) {
         toast.info("No stakeholder contacts found in the document. Make sure entries have both name and company.");
       } else {
@@ -320,15 +350,11 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     other: "bg-gray-500"
   };
 
-  const filteredStakeholders = stakeholders.filter(s => {
-    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.title.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    if (activeTab === "all") return matchesSearch;
-    if (activeTab === "favorites") return matchesSearch && s.isFavorite;
-    return matchesSearch && s.type === activeTab;
-  });
+  // Server-side filtering is now applied via API params
+  // Local filtering only for favorites tab (client-side state)
+  const filteredStakeholders = activeTab === "favorites" 
+    ? stakeholders.filter(s => s.isFavorite)
+    : stakeholders;
 
   const handleCreateStakeholder = async () => {
     if (!newStakeholder.name || !newStakeholder.company) {
@@ -639,7 +665,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
       setSelectedRows(new Set());
       
       // Refresh the stakeholder list
-      queryClient.invalidateQueries({ queryKey: ['/api/stakeholders'] });
+      queryClient.invalidateQueries({ queryKey: ['stakeholders'], refetchType: 'all' });
       
       if (result.successCount > 0) {
         toast.success(`Successfully imported ${result.successCount} stakeholder${result.successCount > 1 ? 's' : ''}`);
@@ -772,7 +798,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="flex-wrap h-auto gap-1">
-                <TabsTrigger value="all">All ({stakeholders.length})</TabsTrigger>
+                <TabsTrigger value="all">All ({totalStakeholders})</TabsTrigger>
                 <TabsTrigger value="favorites">
                   <Star className="w-3 h-3 mr-1" /> Favorites ({stakeholders.filter(s => s.isFavorite).length})
                 </TabsTrigger>
@@ -923,10 +949,56 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
                   </div>
                   {filteredStakeholders.length === 0 && (
                     <div className="text-center py-8 text-muted-foreground">
-                      No stakeholders found
+                      {isLoading ? "Loading..." : "No stakeholders found"}
                     </div>
                   )}
                 </ScrollArea>
+                
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, totalStakeholders)} of {totalStakeholders}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1 || isLoading}
+                      >
+                        First
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1 || isLoading}
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-sm px-2">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages || isLoading}
+                      >
+                        Next
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage === totalPages || isLoading}
+                      >
+                        Last
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </CardContent>

@@ -994,14 +994,36 @@ export function useDeleteOkr() {
 }
 
 // ===== STAKEHOLDER API =====
-export function useStakeholders() {
+export interface StakeholdersResponse {
+  stakeholders: Stakeholder[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export function useStakeholders(options?: {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  type?: string;
+}) {
+  const { page = 1, pageSize = 50, search, type } = options || {};
+  
   return useQuery({
-    queryKey: ["stakeholders"],
+    queryKey: ["stakeholders", { page, pageSize, search, type }],
     queryFn: async () => {
-      const res = await fetch("/api/stakeholders");
+      const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('pageSize', String(pageSize));
+      if (search) params.set('search', search);
+      if (type && type !== 'all') params.set('type', type);
+      
+      const res = await fetch(`/api/stakeholders?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch stakeholders");
-      return res.json() as Promise<Stakeholder[]>;
+      return res.json() as Promise<StakeholdersResponse>;
     },
+    placeholderData: (previousData) => previousData,
   });
 }
 
@@ -1021,7 +1043,8 @@ export function useCreateStakeholder() {
       return res.json() as Promise<Stakeholder>;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["stakeholders"] });
+      // Invalidate all stakeholder queries (including paginated)
+      queryClient.invalidateQueries({ queryKey: ["stakeholders"], refetchType: 'all' });
     },
   });
 }
@@ -1042,7 +1065,7 @@ export function useUpdateStakeholder() {
       return res.json() as Promise<Stakeholder>;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["stakeholders"] });
+      queryClient.invalidateQueries({ queryKey: ["stakeholders"], refetchType: 'all' });
     },
   });
 }
@@ -1056,7 +1079,7 @@ export function useDeleteStakeholder() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["stakeholders"] });
+      queryClient.invalidateQueries({ queryKey: ["stakeholders"], refetchType: 'all' });
     },
   });
 }
