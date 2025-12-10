@@ -520,6 +520,13 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     
     // Build array of stakeholders for bulk import
     const validTypes: StakeholderType[] = ['investor', 'advisor', 'legal', 'banker', 'consultant', 'client', 'other'];
+    
+    // Debug: log mapping and sample data
+    console.log('Column mapping:', importColumnMap);
+    console.log('Sample row keys:', importData[0] ? Object.keys(importData[0]) : []);
+    console.log('Sample row:', importData[0]);
+    console.log('Selected rows count:', selectedRows.size);
+    
     const stakeholdersToImport = Array.from(selectedRows).map(index => {
       const row = importData[index];
       if (!row) return null;
@@ -528,10 +535,13 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
       const type = validTypes.includes(typeValue as StakeholderType) ? typeValue as StakeholderType : 'other';
       const focusValue = extractSectorsFromRow(row, importColumnMap.focus);
       
+      const nameValue = row[importColumnMap.name] || '';
+      const companyValue = row[importColumnMap.company] || '';
+      
       return {
-        name: row[importColumnMap.name] || '',
+        name: nameValue,
         title: row[importColumnMap.title] || '',
-        company: row[importColumnMap.company] || '',
+        company: companyValue,
         type,
         email: row[importColumnMap.email] || null,
         phone: row[importColumnMap.phone] || null,
@@ -542,6 +552,14 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
         notes: row[importColumnMap.notes] || null,
       };
     }).filter(s => s !== null && s.name && s.company);
+    
+    console.log('Stakeholders to import count:', stakeholdersToImport.length);
+    if (stakeholdersToImport.length === 0 && selectedRows.size > 0) {
+      console.log('First mapped entry (before filter):', Array.from(selectedRows).slice(0, 1).map(i => {
+        const row = importData[i];
+        return { name: row?.[importColumnMap.name], company: row?.[importColumnMap.company] };
+      }));
+    }
     
     try {
       const response = await fetch('/api/stakeholders/bulk-import', {
