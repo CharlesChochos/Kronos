@@ -554,11 +554,28 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
     }).filter(s => s !== null && s.name && s.company);
     
     console.log('Stakeholders to import count:', stakeholdersToImport.length);
-    if (stakeholdersToImport.length === 0 && selectedRows.size > 0) {
-      console.log('First mapped entry (before filter):', Array.from(selectedRows).slice(0, 1).map(i => {
-        const row = importData[i];
-        return { name: row?.[importColumnMap.name], company: row?.[importColumnMap.company] };
-      }));
+    
+    // Check if all rows were filtered out
+    if (stakeholdersToImport.length === 0) {
+      setIsImporting(false);
+      // Debug info for user
+      const sampleRow = importData[Array.from(selectedRows)[0]];
+      const mappedName = importColumnMap.name ? sampleRow?.[importColumnMap.name] : undefined;
+      const mappedCompany = importColumnMap.company ? sampleRow?.[importColumnMap.company] : undefined;
+      console.log('Debug - Name column mapped to:', importColumnMap.name, '-> value:', mappedName);
+      console.log('Debug - Company column mapped to:', importColumnMap.company, '-> value:', mappedCompany);
+      console.log('Debug - Row keys:', sampleRow ? Object.keys(sampleRow) : []);
+      
+      if (!mappedName && !mappedCompany) {
+        toast.error(`Column mapping issue: The mapped columns don't match the file headers. Please check your column selections.`);
+      } else if (!mappedName) {
+        toast.error(`No valid Name values found in the selected Name column "${importColumnMap.name}"`);
+      } else if (!mappedCompany) {
+        toast.error(`No valid Company values found in the selected Company column "${importColumnMap.company}"`);
+      } else {
+        toast.error("All rows are missing required Name or Company values");
+      }
+      return;
     }
     
     try {
