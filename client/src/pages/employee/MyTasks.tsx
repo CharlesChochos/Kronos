@@ -916,8 +916,43 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
         </Card>
 
         {/* Task Categories Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           
+          {/* Drafts */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <FileEdit className="w-4 h-4 text-gray-500" />
+                Drafts
+              </h3>
+              <Badge variant="outline" className="bg-gray-500/10 text-gray-500 border-gray-500/20">{draftTasks.length}</Badge>
+            </div>
+            <ScrollArea className="h-[400px] pr-2">
+              {draftTasks.length === 0 ? (
+                <Card className="bg-card/50 border-border border-dashed">
+                  <CardContent className="p-4 text-center text-muted-foreground text-sm">
+                    No draft tasks - create a task without a deadline to save as draft
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {draftTasks.map((task) => (
+                    <TaskCard 
+                      key={task.id} 
+                      task={task} 
+                      dealName={getDealName(task.dealId)}
+                      onClick={() => handleTaskClick(task)}
+                      highlighted={highlightedTaskId === task.id}
+                      isFlagged={!!flaggedTasks[task.id]}
+                      onFlag={(e) => { e.stopPropagation(); toggleTaskFlag(task.id); }}
+                      ref={(el) => { taskRefs.current[task.id] = el; }}
+                    />
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+
           {/* Due Today */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -1007,41 +1042,6 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
               ) : (
                 <div className="space-y-3">
                   {dueLaterTasks.map((task) => (
-                    <TaskCard 
-                      key={task.id} 
-                      task={task} 
-                      dealName={getDealName(task.dealId)}
-                      onClick={() => handleTaskClick(task)}
-                      highlighted={highlightedTaskId === task.id}
-                      isFlagged={!!flaggedTasks[task.id]}
-                      onFlag={(e) => { e.stopPropagation(); toggleTaskFlag(task.id); }}
-                      ref={(el) => { taskRefs.current[task.id] = el; }}
-                    />
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-          </div>
-
-          {/* Drafts */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                <FileEdit className="w-4 h-4 text-gray-500" />
-                Drafts
-              </h3>
-              <Badge variant="outline" className="bg-gray-500/10 text-gray-500 border-gray-500/20">{draftTasks.length}</Badge>
-            </div>
-            <ScrollArea className="h-[400px] pr-2">
-              {draftTasks.length === 0 ? (
-                <Card className="bg-card/50 border-border border-dashed">
-                  <CardContent className="p-4 text-center text-muted-foreground text-sm">
-                    No draft tasks - create a task without a deadline to save as draft
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="space-y-3">
-                  {draftTasks.map((task) => (
                     <TaskCard 
                       key={task.id} 
                       task={task} 
