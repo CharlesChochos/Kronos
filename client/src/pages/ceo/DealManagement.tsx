@@ -1819,7 +1819,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                                   data-testid={`calendar-deal-option-${deal.id}`}
                                 >
                                   <div className="font-medium text-sm">{deal.name}</div>
-                                  <div className="text-xs text-muted-foreground">{deal.client} • {deal.sector} • {deal.stage}</div>
+                                  <div className="text-xs text-muted-foreground">{deal.client}{deal.sector ? ` • ${deal.sector}` : ''} • {deal.stage}</div>
                                 </div>
                               ))
                             )}
@@ -1997,7 +1997,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                               <div className="flex items-center justify-between">
                                 <div>
                                   <CardTitle className="text-base">{deal.name}</CardTitle>
-                                  <CardDescription>{deal.client} • {deal.sector}</CardDescription>
+                                  <CardDescription>{deal.client}{deal.sector ? ` • ${deal.sector}` : ''}</CardDescription>
                                 </div>
                                 <Badge variant="outline">{deal.stage}</Badge>
                               </div>
@@ -2126,7 +2126,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                   </DropdownMenu>
                 </div>
                 <CardTitle className="text-xl mt-2 group-hover:text-primary transition-colors">{deal.name}</CardTitle>
-                <CardDescription>{deal.client} • <span className="text-muted-foreground/80">{deal.sector}</span></CardDescription>
+                <CardDescription>{deal.client}{deal.sector ? <> • <span className="font-medium">{deal.sector}</span></> : ''}</CardDescription>
               </CardHeader>
               
               <CardContent className="space-y-4">
