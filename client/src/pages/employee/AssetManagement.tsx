@@ -31,7 +31,7 @@ import {
   Pencil, Trash2, Eye, Users, Phone, Mail, MessageSquare, Plus, X, 
   Building2, TrendingUp, FileText, Clock, CheckCircle2, ChevronRight,
   UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload, GitCompare, ArrowUpDown, BarChart3,
-  Mic, MicOff, Play, Pause, Square, Volume2, Download, UserCircle
+  Mic, MicOff, Play, Pause, Square, Volume2, Download, UserCircle, ExternalLink
 } from "lucide-react";
 import { 
   useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks, useCreateDealFee,
@@ -579,6 +579,26 @@ function StageWorkSection({
                         size="icon" 
                         className="h-6 w-6"
                         onClick={() => window.open(doc.url, '_blank')}
+                        title="View"
+                        data-testid={`view-doc-${doc.id}`}
+                      >
+                        <ExternalLink className="w-3 h-3 text-green-400" />
+                      </Button>
+                    )}
+                    {doc.url && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6"
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = doc.url;
+                          link.download = doc.title || 'document';
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                        title="Download"
                         data-testid={`download-doc-${doc.id}`}
                       >
                         <Download className="w-3 h-3 text-blue-400" />
@@ -589,6 +609,7 @@ function StageWorkSection({
                       size="icon" 
                       className="h-6 w-6"
                       onClick={() => deleteStageDocument.mutate(doc.id)}
+                      title="Delete"
                       data-testid={`delete-doc-${doc.id}`}
                     >
                       <X className="w-3 h-3 text-red-400" />

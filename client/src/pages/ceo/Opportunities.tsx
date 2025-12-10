@@ -24,7 +24,7 @@ import {
 import { 
   Search, Plus, Lightbulb, CheckCircle, XCircle, Eye, Clock, DollarSign,
   Building2, Users, ArrowRight, Briefcase, TrendingUp, AlertTriangle,
-  Upload, FileText, Paperclip, StickyNote, X, Download, Trash2
+  Upload, FileText, Paperclip, StickyNote, X, Download, Trash2, ExternalLink
 } from "lucide-react";
 import { 
   useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers,
@@ -881,17 +881,29 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                             </div>
                             <div className="flex gap-1">
                               <Button variant="ghost" size="icon" className="h-8 w-8"
+                                onClick={() => window.open(file.url, '_blank')}
+                                title="View"
+                                data-testid={`view-attachment-${file.id}`}
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8"
                                 onClick={() => {
                                   const link = document.createElement('a');
                                   link.href = file.url;
                                   link.download = file.filename;
+                                  document.body.appendChild(link);
                                   link.click();
+                                  document.body.removeChild(link);
                                 }}
+                                title="Download"
+                                data-testid={`download-attachment-${file.id}`}
                               >
                                 <Download className="w-4 h-4" />
                               </Button>
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"
                                 onClick={() => removeAttachment(file.id, true)}
+                                title="Delete"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
