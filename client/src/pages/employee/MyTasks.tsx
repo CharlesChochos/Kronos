@@ -49,6 +49,41 @@ import type { Task, Deal } from "@shared/schema";
 
 type SwipeDirection = 'left' | 'right' | 'up' | null;
 
+// Helper to format due date with optional time
+const formatDueDateTime = (dueDate: string) => {
+  if (!dueDate) return '';
+  try {
+    if (dueDate.includes('T')) {
+      // Has time component
+      const date = new Date(dueDate);
+      return format(date, 'MMM d, yyyy h:mm a');
+    } else {
+      // Date only
+      const date = parseISO(dueDate);
+      return format(date, 'MMM d, yyyy');
+    }
+  } catch {
+    return dueDate;
+  }
+};
+
+// Check if task is overdue
+const isTaskOverdue = (dueDate: string, status: string) => {
+  if (!dueDate || status === 'Completed' || status === 'Overdue') return false;
+  try {
+    const now = new Date();
+    let dueDateTime: Date;
+    if (dueDate.includes('T')) {
+      dueDateTime = new Date(dueDate);
+    } else {
+      dueDateTime = new Date(dueDate + 'T23:59:59');
+    }
+    return dueDateTime < now;
+  } catch {
+    return false;
+  }
+};
+
 type UploadedFile = {
   id: string;
   filename: string;
@@ -84,6 +119,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
     description: '',
     priority: 'Medium' as 'Low' | 'Medium' | 'High' | 'Urgent',
     dueDate: '',
+    dueTime: '',
     dealId: '',
     type: 'General' as 'General' | 'Document Review' | 'Due Diligence' | 'Client Communication' | 'Financial Analysis' | 'Legal' | 'Compliance'
   });
@@ -482,6 +518,11 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
     }
     
     try {
+      // Combine date and time for full datetime
+      const fullDueDate = newTaskForm.dueTime 
+        ? `${newTaskForm.dueDate}T${newTaskForm.dueTime}` 
+        : newTaskForm.dueDate;
+      
       const taskData: any = {
         title: newTaskForm.title.trim(),
         description: newTaskForm.description.trim() || null,
@@ -489,7 +530,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
         status: 'Pending',
         type: newTaskForm.type,
         assignedTo: currentUser?.id || '',
-        dueDate: newTaskForm.dueDate,
+        dueDate: fullDueDate,
       };
       if (newTaskForm.dealId && newTaskForm.dealId !== 'none') {
         taskData.dealId = newTaskForm.dealId;
@@ -529,6 +570,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
         description: '',
         priority: 'Medium',
         dueDate: '',
+        dueTime: '',
         dealId: '',
         type: 'General'
       });
@@ -924,8 +966,24 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                   <p className="text-sm mt-1">{getDealName(selectedTask.dealId)}</p>
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">Due Date</Label>
-                  <p className="text-sm mt-1">{selectedTask.dueDate || 'No due date'}</p>
+                  <Label className="text-xs text-muted-foreground">Due Date & Time</Label>
+                  <p className={cn(
+                    "text-sm mt-1 flex items-center gap-1",
+                    (selectedTask.status === 'Overdue' || isTaskOverdue(selectedTask.dueDate, selectedTask.status)) && "text-red-500 font-medium"
+                  )}>
+                    {selectedTask.dueDate ? (
+                      <>
+                        {selectedTask.status === 'Overdue' || isTaskOverdue(selectedTask.dueDate, selectedTask.status) ? (
+                          <AlertCircle className="w-3 h-3" />
+                        ) : selectedTask.dueDate.includes('T') ? (
+                          <Clock className="w-3 h-3" />
+                        ) : (
+                          <Calendar className="w-3 h-3" />
+                        )}
+                        {formatDueDateTime(selectedTask.dueDate)}
+                      </>
+                    ) : 'No due date'}
+                  </p>
                 </div>
               </div>
               
@@ -1202,13 +1260,25 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
             </div>
             
             <div className="space-y-2">
-              <Label>Due Date</Label>
-              <Input
-                type="date"
-                value={newTaskForm.dueDate}
-                onChange={(e) => setNewTaskForm({ ...newTaskForm, dueDate: e.target.value })}
-                data-testid="input-new-task-due-date"
-              />
+              <Label>Due Date & Time</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  value={newTaskForm.dueDate}
+                  onChange={(e) => setNewTaskForm({ ...newTaskForm, dueDate: e.target.value })}
+                  className="flex-1"
+                  data-testid="input-new-task-due-date"
+                />
+                <Input
+                  type="time"
+                  value={newTaskForm.dueTime}
+                  onChange={(e) => setNewTaskForm({ ...newTaskForm, dueTime: e.target.value })}
+                  className="w-32"
+                  placeholder="Time"
+                  data-testid="input-new-task-due-time"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Time is optional - leave blank for end of day</p>
             </div>
             
             <div className="space-y-2">
@@ -1437,9 +1507,18 @@ function SwipeableTaskCard({ task, dealName, onSwipe, onClick }: SwipeableTaskCa
               <span>{dealName}</span>
             </div>
             {task.dueDate && (
-              <div className="flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
-                <span>{task.dueDate}</span>
+              <div className={cn(
+                "flex items-center gap-1",
+                (task.status === 'Overdue' || isTaskOverdue(task.dueDate, task.status)) && "text-red-500 font-medium"
+              )}>
+                {task.status === 'Overdue' || isTaskOverdue(task.dueDate, task.status) ? (
+                  <AlertCircle className="w-4 h-4" />
+                ) : task.dueDate.includes('T') ? (
+                  <Clock className="w-4 h-4" />
+                ) : (
+                  <Calendar className="w-4 h-4" />
+                )}
+                <span>{formatDueDateTime(task.dueDate)}</span>
               </div>
             )}
           </div>
@@ -1537,9 +1616,23 @@ const TaskCard = ({ task, dealName, onClick, highlighted, completed, isFlagged, 
         </div>
         
         {task.dueDate && !completed && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Calendar className="w-3 h-3" />
-            <span>{task.dueDate}</span>
+          <div className={cn(
+            "flex items-center gap-1 text-xs",
+            task.status === 'Overdue' || isTaskOverdue(task.dueDate, task.status) 
+              ? "text-red-500 font-medium" 
+              : "text-muted-foreground"
+          )}>
+            {task.status === 'Overdue' || isTaskOverdue(task.dueDate, task.status) ? (
+              <AlertCircle className="w-3 h-3" />
+            ) : task.dueDate.includes('T') ? (
+              <Clock className="w-3 h-3" />
+            ) : (
+              <Calendar className="w-3 h-3" />
+            )}
+            <span>
+              {task.status === 'Overdue' && 'OVERDUE: '}
+              {formatDueDateTime(task.dueDate)}
+            </span>
           </div>
         )}
       </CardContent>

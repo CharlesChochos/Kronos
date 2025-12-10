@@ -87,6 +87,7 @@ export default function TeamAssignment() {
     priority: 'Medium',
     type: 'Analysis',
     dueDate: new Date().toISOString().split('T')[0],
+    dueTime: '',
   });
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -220,6 +221,11 @@ export default function TeamAssignment() {
         uploadedAt: file.uploadedAt,
       }));
 
+      // Combine date and time for full datetime
+      const fullDueDate = newTask.dueTime 
+        ? `${newTask.dueDate}T${newTask.dueTime}` 
+        : newTask.dueDate;
+      
       const createdTask = await createTask.mutateAsync({
         title: newTask.title,
         description: newTask.description || null,
@@ -228,7 +234,7 @@ export default function TeamAssignment() {
         assignedBy: currentUser?.id || null,
         priority: newTask.priority,
         type: newTask.type,
-        dueDate: newTask.dueDate,
+        dueDate: fullDueDate,
         status: 'Pending',
         attachments: attachmentObjects.length > 0 ? attachmentObjects : [],
       });
@@ -245,7 +251,7 @@ export default function TeamAssignment() {
       
       toast.success(`Task assigned to ${selectedUser.name}!`);
       setShowAssignModal(false);
-      setNewTask({ title: '', description: '', priority: 'Medium', type: 'Analysis', dueDate: new Date().toISOString().split('T')[0] });
+      setNewTask({ title: '', description: '', priority: 'Medium', type: 'Analysis', dueDate: new Date().toISOString().split('T')[0], dueTime: '' });
       setUploadedFiles([]);
       setSelectedUser(null);
       setTaskDealId(null);
@@ -606,12 +612,23 @@ export default function TeamAssignment() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Due Date</Label>
-              <Input 
-                type="date" 
-                value={newTask.dueDate}
-                onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-              />
+              <Label>Due Date & Time</Label>
+              <div className="flex gap-2">
+                <Input 
+                  type="date" 
+                  value={newTask.dueDate}
+                  onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+                  className="flex-1"
+                />
+                <Input 
+                  type="time" 
+                  value={newTask.dueTime}
+                  onChange={(e) => setNewTask({ ...newTask, dueTime: e.target.value })}
+                  className="w-32"
+                  placeholder="Time"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Time is optional - leave blank for end of day</p>
             </div>
             <div className="space-y-2">
               <Label>Attachments</Label>

@@ -1425,6 +1425,47 @@ export async function registerRoutes(
       } else {
         tasks = await storage.getAllTasks();
       }
+      
+      // Check for overdue tasks and update status + send notifications
+      const now = new Date();
+      for (const task of tasks) {
+        if (task.status !== 'Completed' && task.status !== 'Overdue' && task.dueDate) {
+          // Parse dueDate - supports both date-only and datetime formats
+          const dueDateStr = task.dueDate;
+          let dueDateTime: Date;
+          
+          if (dueDateStr.includes('T')) {
+            // Has time component
+            dueDateTime = new Date(dueDateStr);
+          } else {
+            // Date only - consider end of day (23:59:59)
+            dueDateTime = new Date(dueDateStr + 'T23:59:59');
+          }
+          
+          if (dueDateTime < now) {
+            // Mark task as overdue
+            await storage.updateTask(task.id, { status: 'Overdue' });
+            task.status = 'Overdue';
+            
+            // Create notification for assigned user
+            if (task.assignedTo) {
+              try {
+                await storage.createNotification({
+                  userId: task.assignedTo,
+                  type: 'alert',
+                  title: 'Task Overdue',
+                  message: `Your task "${task.title}" is past due.`,
+                  link: '/tasks',
+                  read: false,
+                });
+              } catch (notifError) {
+                console.error('Failed to create overdue notification:', notifError);
+              }
+            }
+          }
+        }
+      }
+      
       res.json(tasks);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch tasks" });
