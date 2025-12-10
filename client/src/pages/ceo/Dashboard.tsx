@@ -141,6 +141,10 @@ export default function Dashboard() {
   const [selectedEmployee, setSelectedEmployee] = useState<UserType | null>(null);
   const [viewTab, setViewTab] = useState<'dashboard' | 'analytics'>('dashboard');
   
+  // Widget filter states
+  const [activeDealsFilter, setActiveDealsFilter] = useState<'all' | 'IB' | 'AM'>('all');
+  const [capitalAtWorkFilter, setCapitalAtWorkFilter] = useState<'all' | 'IB' | 'AM'>('all');
+  
   // Widget configuration - load from user preferences (database)
   const [widgets, setWidgets] = useState<WidgetConfig[]>(DEFAULT_WIDGETS);
   const [widgetsInitialized, setWidgetsInitialized] = useState(false);
@@ -1270,29 +1274,48 @@ export default function Dashboard() {
                   <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider truncate">
                     Active Deals
                   </CardTitle>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setLocation('/ceo/deals')}>
-                    <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <div className="flex rounded-md overflow-hidden border border-border">
+                      <Button 
+                        variant={activeDealsFilter === 'IB' ? 'default' : 'ghost'} 
+                        size="sm" 
+                        className="h-6 px-2 rounded-none text-[10px]"
+                        onClick={() => setActiveDealsFilter(activeDealsFilter === 'IB' ? 'all' : 'IB')}
+                      >
+                        IB
+                      </Button>
+                      <Button 
+                        variant={activeDealsFilter === 'AM' ? 'default' : 'ghost'} 
+                        size="sm" 
+                        className="h-6 px-2 rounded-none text-[10px]"
+                        onClick={() => setActiveDealsFilter(activeDealsFilter === 'AM' ? 'all' : 'AM')}
+                      >
+                        AM
+                      </Button>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 flex-shrink-0" 
+                      onClick={() => setLocation(activeDealsFilter === 'AM' ? '/ceo/asset-management' : '/ceo/deals')}
+                    >
+                      <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                  </div>
                 </CardHeader>
               <CardContent className="space-y-4 overflow-hidden">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-secondary/30 rounded-lg p-2 text-center overflow-hidden">
-                    <div className="text-xl font-bold text-primary truncate">{displayActiveDeals.length}</div>
+                    <div className="text-xl font-bold text-primary truncate">
+                      {activeDealsFilter === 'IB' ? ibActiveDeals.length : activeDealsFilter === 'AM' ? amActiveDeals.length : displayActiveDeals.length}
+                    </div>
                     <div className="text-[9px] text-muted-foreground uppercase truncate">Active</div>
                   </div>
                   <div className="bg-secondary/30 rounded-lg p-2 text-center overflow-hidden">
-                    <div className="text-xl font-bold text-green-400 truncate">${displayActiveValue.toLocaleString()}M</div>
+                    <div className="text-xl font-bold text-green-400 truncate">
+                      ${(activeDealsFilter === 'IB' ? ibActiveValue : activeDealsFilter === 'AM' ? amActiveValue : displayActiveValue).toLocaleString()}M
+                    </div>
                     <div className="text-[9px] text-muted-foreground uppercase truncate">Value</div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                  <div className="p-1.5 bg-blue-500/10 rounded border border-blue-500/20">
-                    <div className="text-sm font-semibold text-blue-400">{ibActiveDeals.length}</div>
-                    <div className="text-[8px] text-muted-foreground">IB</div>
-                  </div>
-                  <div className="p-1.5 bg-emerald-500/10 rounded border border-emerald-500/20">
-                    <div className="text-sm font-semibold text-emerald-400">{amActiveDeals.length}</div>
-                    <div className="text-[8px] text-muted-foreground">AM</div>
                   </div>
                 </div>
 
@@ -1303,7 +1326,7 @@ export default function Dashboard() {
                     <PieChart className="w-3 h-3 flex-shrink-0" /> <span className="truncate">By Sector</span>
                   </div>
                   <div className="space-y-1.5 max-h-24 overflow-y-auto">
-                    {Object.entries(sectorStats).map(([sector, stats]) => (
+                    {Object.entries(activeDealsFilter === 'IB' ? ibSectorStats : activeDealsFilter === 'AM' ? amSectorStats : sectorStats).map(([sector, stats]) => (
                       <div key={sector} className="flex items-center justify-between text-xs gap-1">
                         <span className="text-muted-foreground truncate flex-1 min-w-0">{sector}</span>
                         <div className="flex items-center gap-1 flex-shrink-0">
@@ -1319,21 +1342,24 @@ export default function Dashboard() {
                 
                 <div className="overflow-hidden">
                   <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                    <BarChart3 className="w-3 h-3 flex-shrink-0" /> <span className="truncate">IB Stages</span>
+                    <BarChart3 className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{activeDealsFilter === 'AM' ? 'AM Stages' : 'IB Stages'}</span>
                   </div>
                   <div className="space-y-1 max-h-24 overflow-y-auto">
-                    {ibStageStats.map(({ stage, count }: { stage: string; count: number }) => (
-                      <div key={stage} className="flex items-center gap-1">
-                        <span className="text-[9px] text-muted-foreground w-16 truncate flex-shrink-0">{stage}</span>
-                        <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden min-w-0">
-                          <div 
-                            className="h-full bg-blue-500/60 rounded-full transition-all"
-                            style={{ width: `${ibActiveDeals.length > 0 ? (count / ibActiveDeals.length) * 100 : 0}%` }}
-                          />
+                    {(activeDealsFilter === 'AM' ? amStageStats : ibStageStats).map(({ stage, count }: { stage: string; count: number }) => {
+                      const totalDeals = activeDealsFilter === 'AM' ? amActiveDeals.length : ibActiveDeals.length;
+                      return (
+                        <div key={stage} className="flex items-center gap-1">
+                          <span className="text-[9px] text-muted-foreground w-16 truncate flex-shrink-0">{stage}</span>
+                          <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden min-w-0">
+                            <div 
+                              className={cn("h-full rounded-full transition-all", activeDealsFilter === 'AM' ? "bg-emerald-500/60" : "bg-blue-500/60")}
+                              style={{ width: `${totalDeals > 0 ? (count / totalDeals) * 100 : 0}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] font-mono w-4 text-right flex-shrink-0">{count}</span>
                         </div>
-                        <span className="text-[10px] font-mono w-4 text-right flex-shrink-0">{count}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </CardContent>
@@ -1542,7 +1568,7 @@ export default function Dashboard() {
                             {employee.name}
                             <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </h4>
-                          <p className="text-xs text-muted-foreground">{employee.role}</p>
+                          <p className="text-xs text-muted-foreground">{employee.jobTitle || employee.role}</p>
                         </div>
                       </div>
                       <div className="text-xs font-medium text-muted-foreground">
@@ -1767,44 +1793,62 @@ export default function Dashboard() {
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
                   Capital At Work
                 </CardTitle>
-                <DollarSign className="w-4 h-4 text-primary" />
+                <div className="flex items-center gap-2">
+                  <div className="flex rounded-md overflow-hidden border border-border">
+                    <Button 
+                      variant={capitalAtWorkFilter === 'IB' ? 'default' : 'ghost'} 
+                      size="sm" 
+                      className="h-6 px-2 rounded-none text-[10px]"
+                      onClick={() => setCapitalAtWorkFilter(capitalAtWorkFilter === 'IB' ? 'all' : 'IB')}
+                    >
+                      IB
+                    </Button>
+                    <Button 
+                      variant={capitalAtWorkFilter === 'AM' ? 'default' : 'ghost'} 
+                      size="sm" 
+                      className="h-6 px-2 rounded-none text-[10px]"
+                      onClick={() => setCapitalAtWorkFilter(capitalAtWorkFilter === 'AM' ? 'all' : 'AM')}
+                    >
+                      AM
+                    </Button>
+                  </div>
+                  <DollarSign className="w-4 h-4 text-primary" />
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-center py-2">
-                  <div className="text-3xl font-bold text-primary">
-                    ${displayActiveValue.toLocaleString()}M
+                  <div className={cn("text-3xl font-bold", capitalAtWorkFilter === 'AM' ? "text-emerald-400" : capitalAtWorkFilter === 'IB' ? "text-blue-400" : "text-primary")}>
+                    ${(capitalAtWorkFilter === 'IB' ? ibActiveValue : capitalAtWorkFilter === 'AM' ? amActiveValue : displayActiveValue).toLocaleString()}M
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    Total Active Deal Value
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                  <div className="p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                    <div className="text-sm font-semibold text-blue-400">${ibActiveValue.toLocaleString()}M</div>
-                    <div className="text-[9px] text-muted-foreground">IB ({ibActiveDeals.length})</div>
-                  </div>
-                  <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                    <div className="text-sm font-semibold text-emerald-400">${amActiveValue.toLocaleString()}M</div>
-                    <div className="text-[9px] text-muted-foreground">AM ({amActiveDeals.length})</div>
+                    {capitalAtWorkFilter === 'IB' ? 'IB' : capitalAtWorkFilter === 'AM' ? 'AM' : 'Total'} Active Deal Value
                   </div>
                 </div>
                 <Separator className="bg-border/50" />
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div>
                     <div className="text-lg font-semibold text-green-400">
-                      {activeDeals.length}
+                      {capitalAtWorkFilter === 'IB' ? ibActiveDeals.length : capitalAtWorkFilter === 'AM' ? amActiveDeals.length : activeDeals.length}
                     </div>
                     <div className="text-[9px] text-muted-foreground uppercase">Active</div>
                   </div>
                   <div>
                     <div className="text-lg font-semibold text-yellow-400">
-                      {deals.filter(d => d.status === 'On Hold').length}
+                      {capitalAtWorkFilter === 'IB' 
+                        ? ibDeals.filter(d => d.status === 'On Hold').length 
+                        : capitalAtWorkFilter === 'AM' 
+                          ? amDeals.filter(d => d.status === 'On Hold').length 
+                          : deals.filter(d => d.status === 'On Hold').length}
                     </div>
                     <div className="text-[9px] text-muted-foreground uppercase">On Hold</div>
                   </div>
                   <div>
                     <div className="text-lg font-semibold text-muted-foreground">
-                      {deals.filter(d => d.status === 'Closed').length}
+                      {capitalAtWorkFilter === 'IB' 
+                        ? ibDeals.filter(d => d.status === 'Closed').length 
+                        : capitalAtWorkFilter === 'AM' 
+                          ? amDeals.filter(d => d.status === 'Closed').length 
+                          : deals.filter(d => d.status === 'Closed').length}
                     </div>
                     <div className="text-[9px] text-muted-foreground uppercase">Closed</div>
                   </div>

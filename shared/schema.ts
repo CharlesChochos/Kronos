@@ -91,6 +91,10 @@ export const deals = pgTable("deals", {
   stage: text("stage").notNull().default('Origination'),
   value: integer("value").notNull(), // in millions
   client: text("client").notNull(),
+  clientContactName: text("client_contact_name"),
+  clientContactEmail: text("client_contact_email"),
+  clientContactPhone: text("client_contact_phone"),
+  clientContactRole: text("client_contact_role"),
   sector: text("sector").notNull(),
   lead: text("lead").notNull(),
   progress: integer("progress").default(0),

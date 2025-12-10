@@ -31,7 +31,7 @@ import {
   Pencil, Trash2, Eye, Users, Phone, Mail, MessageSquare, Plus, X, 
   Building2, TrendingUp, FileText, Clock, CheckCircle2, ChevronRight,
   UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload, GitCompare, ArrowUpDown, BarChart3,
-  Mic, MicOff, Play, Pause, Square, Volume2, Download
+  Mic, MicOff, Play, Pause, Square, Volume2, Download, UserCircle
 } from "lucide-react";
 import { 
   useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks, useCreateDealFee,
@@ -959,6 +959,10 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
   const [editingLeadDealId, setEditingLeadDealId] = useState<string | null>(null);
   const [editingLeadValue, setEditingLeadValue] = useState("");
   
+  // Client contact editing state
+  const [editingClientContact, setEditingClientContact] = useState(false);
+  const [clientContactForm, setClientContactForm] = useState({ name: '', email: '', phone: '', role: '' });
+  
   // Fetch fees for the selected deal
   const { data: selectedDealFees = [] } = useDealFees(selectedDeal?.id || '');
   const [activeStageTab, setActiveStageTab] = useState("Reception");
@@ -1287,6 +1291,10 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
       const createdDeal = await createDeal.mutateAsync({
         name: newDeal.name,
         client: newDeal.client,
+        clientContactName: null,
+        clientContactEmail: null,
+        clientContactPhone: null,
+        clientContactRole: null,
         sector: finalSector,
         value: parsedValue,
         stage: newDeal.stage,
@@ -2124,7 +2132,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                   </DropdownMenu>
                 </div>
                 <CardTitle className="text-xl mt-2 group-hover:text-primary transition-colors">{deal.name}</CardTitle>
-                <CardDescription>{deal.client}</CardDescription>
+                <CardDescription>{deal.client} • <span className="text-muted-foreground/80">{deal.sector}</span></CardDescription>
               </CardHeader>
               
               <CardContent className="space-y-4">
@@ -2694,6 +2702,155 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                     </div>
                   )}
 
+                  {/* Client Contact Section */}
+                  <div className="p-3 bg-secondary/30 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <UserCircle className="w-4 h-4 text-primary" />
+                        <span className="font-medium text-sm">Client Contact</span>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 text-xs"
+                        onClick={() => {
+                          setEditingClientContact(true);
+                          setClientContactForm({
+                            name: selectedDeal.clientContactName || '',
+                            email: selectedDeal.clientContactEmail || '',
+                            phone: selectedDeal.clientContactPhone || '',
+                            role: selectedDeal.clientContactRole || '',
+                          });
+                        }}
+                        data-testid="button-edit-client-contact"
+                      >
+                        <Pencil className="w-3 h-3 mr-1" /> Edit
+                      </Button>
+                    </div>
+                    {editingClientContact ? (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-xs">Contact Name</Label>
+                            <Input 
+                              value={clientContactForm.name}
+                              onChange={(e) => setClientContactForm(prev => ({ ...prev, name: e.target.value }))}
+                              placeholder="Contact person name"
+                              className="h-8 text-sm"
+                              data-testid="input-client-contact-name"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Role/Title</Label>
+                            <Input 
+                              value={clientContactForm.role}
+                              onChange={(e) => setClientContactForm(prev => ({ ...prev, role: e.target.value }))}
+                              placeholder="e.g., CFO, CEO"
+                              className="h-8 text-sm"
+                              data-testid="input-client-contact-role"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-xs">Email</Label>
+                            <Input 
+                              type="email"
+                              value={clientContactForm.email}
+                              onChange={(e) => setClientContactForm(prev => ({ ...prev, email: e.target.value }))}
+                              placeholder="email@company.com"
+                              className="h-8 text-sm"
+                              data-testid="input-client-contact-email"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Phone</Label>
+                            <Input 
+                              value={clientContactForm.phone}
+                              onChange={(e) => setClientContactForm(prev => ({ ...prev, phone: e.target.value }))}
+                              placeholder="+1 (555) 123-4567"
+                              className="h-8 text-sm"
+                              data-testid="input-client-contact-phone"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <Button 
+                            size="sm" 
+                            className="h-7 text-xs"
+                            onClick={async () => {
+                              try {
+                                await updateDeal.mutateAsync({
+                                  id: selectedDeal.id,
+                                  clientContactName: clientContactForm.name || null,
+                                  clientContactEmail: clientContactForm.email || null,
+                                  clientContactPhone: clientContactForm.phone || null,
+                                  clientContactRole: clientContactForm.role || null,
+                                });
+                                setSelectedDeal({
+                                  ...selectedDeal,
+                                  clientContactName: clientContactForm.name || null,
+                                  clientContactEmail: clientContactForm.email || null,
+                                  clientContactPhone: clientContactForm.phone || null,
+                                  clientContactRole: clientContactForm.role || null,
+                                });
+                                setEditingClientContact(false);
+                                toast.success("Client contact updated");
+                              } catch {
+                                toast.error("Failed to update client contact");
+                              }
+                            }}
+                            data-testid="button-save-client-contact"
+                          >
+                            Save
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-7 text-xs"
+                            onClick={() => setEditingClientContact(false)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {selectedDeal.clientContactName || selectedDeal.clientContactEmail || selectedDeal.clientContactPhone ? (
+                          <>
+                            {selectedDeal.clientContactName && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <UserCircle className="w-4 h-4 text-muted-foreground" />
+                                <span className="font-medium">{selectedDeal.clientContactName}</span>
+                                {selectedDeal.clientContactRole && (
+                                  <Badge variant="secondary" className="text-[10px]">{selectedDeal.clientContactRole}</Badge>
+                                )}
+                              </div>
+                            )}
+                            {selectedDeal.clientContactEmail && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <Mail className="w-4 h-4 text-muted-foreground" />
+                                <a href={`mailto:${selectedDeal.clientContactEmail}`} className="text-primary hover:underline">
+                                  {selectedDeal.clientContactEmail}
+                                </a>
+                              </div>
+                            )}
+                            {selectedDeal.clientContactPhone && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <Phone className="w-4 h-4 text-muted-foreground" />
+                                <a href={`tel:${selectedDeal.clientContactPhone}`} className="text-primary hover:underline">
+                                  {selectedDeal.clientContactPhone}
+                                </a>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-sm text-muted-foreground italic">No client contact added yet</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Deal Fees Section */}
                   {selectedDealFees.length > 0 && (
                     <div className="p-3 bg-secondary/30 rounded-lg">
@@ -2795,15 +2952,38 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
 
                 {/* Investors Tab */}
                 <TabsContent value="investors" className="mt-4 space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-3">
                     <h4 className="font-medium">Tagged Investors</h4>
-                    <Badge variant="secondary">{(selectedDeal.taggedInvestors as TaggedInvestor[] || []).length} investors</Badge>
+                    <div className="flex items-center gap-2 flex-1 max-w-xs">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                        <Input 
+                          placeholder="Search investors..."
+                          value={investorSearchQuery}
+                          onChange={(e) => setInvestorSearchQuery(e.target.value)}
+                          className="h-8 pl-8 text-sm"
+                          data-testid="input-investor-search"
+                        />
+                      </div>
+                      <Badge variant="secondary">{(selectedDeal.taggedInvestors as TaggedInvestor[] || []).length}</Badge>
+                    </div>
                   </div>
 
                   {/* Investors List */}
                   <ScrollArea className="h-[200px]">
                     <div className="space-y-2">
-                      {(selectedDeal.taggedInvestors as TaggedInvestor[] || []).map((investor) => (
+                      {(selectedDeal.taggedInvestors as TaggedInvestor[] || [])
+                        .filter((investor) => {
+                          if (!investorSearchQuery) return true;
+                          const query = investorSearchQuery.toLowerCase();
+                          return (
+                            investor.name.toLowerCase().includes(query) ||
+                            investor.firm.toLowerCase().includes(query) ||
+                            investor.type.toLowerCase().includes(query) ||
+                            investor.status.toLowerCase().includes(query)
+                          );
+                        })
+                        .map((investor) => (
                         <div key={investor.id} className="p-3 bg-secondary/30 rounded-lg group">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">

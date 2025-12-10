@@ -342,7 +342,7 @@ export default function TeamPerformance() {
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-medium truncate">{member.name}</h4>
-                        <Badge variant="secondary" className="text-xs mt-1">{member.role}</Badge>
+                        <Badge variant="secondary" className="text-xs mt-1">{member.jobTitle || member.role}</Badge>
                       </div>
                       <div className="flex items-center gap-1">
                         <Star className="w-4 h-4 text-yellow-500" />
