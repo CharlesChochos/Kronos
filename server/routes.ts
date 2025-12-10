@@ -441,12 +441,25 @@ export async function registerRoutes(
       fileSize: 500 * 1024 * 1024, // 500MB max
     },
     fileFilter: (_req, file, cb) => {
-      const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.mp4', '.mp3', '.zip', '.rar', '.7z'];
+      const allowedExtensions = [
+        // Documents
+        '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.rtf', '.odt', '.ods', '.odp',
+        // Images
+        '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.tiff', '.ico', '.heic', '.heif',
+        // Videos
+        '.mp4', '.mov', '.avi', '.webm', '.mkv', '.wmv', '.flv', '.m4v', '.mpeg', '.mpg',
+        // Audio
+        '.mp3', '.wav', '.aac', '.flac', '.ogg', '.m4a', '.wma',
+        // Archives
+        '.zip', '.rar', '.7z', '.tar', '.gz',
+        // Other
+        '.json', '.xml', '.html', '.css', '.js', '.ts', '.md'
+      ];
       const ext = path.extname(file.originalname).toLowerCase();
       if (allowedExtensions.includes(ext)) {
         cb(null, true);
       } else {
-        cb(new Error('Invalid file type'));
+        cb(new Error(`File type ${ext} is not allowed. Supported: documents, images, videos, audio, and archives.`));
       }
     }
   });

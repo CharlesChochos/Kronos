@@ -36,7 +36,8 @@ import {
   Brain,
   Flag,
   Plus,
-  Trash2
+  Trash2,
+  Upload
 } from "lucide-react";
 import { useCurrentUser, useTasks, useDeals, useUpdateTask, useCreateTask, useDeleteTask, useUsers, apiRequest, useUserPreferences, useSaveUserPreferences, useCreateTaskAttachment } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
@@ -88,6 +89,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
   });
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
@@ -392,14 +394,14 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const uploadFiles = async (fileList: FileList | File[]) => {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
     
     setIsUploading(true);
     
     try {
-      for (const file of Array.from(files)) {
+      for (const file of files) {
         const formData = new FormData();
         formData.append('file', file);
         
@@ -424,6 +426,35 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      await uploadFiles(e.target.files);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      await uploadFiles(files);
     }
   };
 
@@ -1200,7 +1231,16 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
             
             <div className="space-y-2">
               <Label>Attachments (Optional)</Label>
-              <div className="flex items-center gap-2">
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={cn(
+                  "border-2 border-dashed rounded-lg p-4 transition-colors cursor-pointer",
+                  isDragging ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
+                )}
+                onClick={() => fileInputRef.current?.click()}
+              >
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1209,26 +1249,24 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                   className="hidden"
                   data-testid="input-task-attachment"
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                >
+                <div className="flex flex-col items-center gap-2 text-center">
                   {isUploading ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Uploading...
+                      <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                      <span className="text-sm text-muted-foreground">Uploading...</span>
                     </>
                   ) : (
                     <>
-                      <Paperclip className="w-4 h-4 mr-2" />
-                      Add Attachment
+                      <Upload className="w-8 h-8 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        Drag & drop files here, or click to browse
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Supports documents, images, videos up to 500MB
+                      </span>
                     </>
                   )}
-                </Button>
+                </div>
               </div>
               {uploadedFiles.length > 0 && (
                 <div className="space-y-2">
@@ -1237,14 +1275,20 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                       <FileText className="w-4 h-4 text-muted-foreground" />
                       <span className="truncate flex-1">{file.filename}</span>
                       <span className="text-xs text-muted-foreground">
-                        {(file.size / 1024).toFixed(1)} KB
+                        {file.size >= 1024 * 1024 
+                          ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+                          : `${(file.size / 1024).toFixed(1)} KB`
+                        }
                       </span>
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6 text-red-500 hover:text-red-700"
-                        onClick={() => removeAttachment(index)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeAttachment(index);
+                        }}
                       >
                         <X className="w-3 h-3" />
                       </Button>
