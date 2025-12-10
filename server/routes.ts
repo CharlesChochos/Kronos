@@ -1208,18 +1208,21 @@ export async function registerRoutes(
         // Try to find matching document in document library
         try {
           const allDocuments = await storage.getAllDocuments();
-          // Match by title containing the stage document title, or by dealId and similar filename
+          // Match by dealId and title similarity
           const matchingDoc = allDocuments.find((d: any) => 
-            (d.dealId === req.params.dealId && d.title?.includes(doc.title)) ||
-            (d.dealId === req.params.dealId && doc.title && d.title?.includes(doc.title)) ||
-            (d.filename?.includes(doc.filename))
+            d.dealId === req.params.dealId && (
+              d.title?.includes(doc.title) ||
+              doc.title?.includes(d.title?.split(' - ').pop() || '') ||
+              d.filename?.includes(doc.filename) ||
+              doc.filename === d.filename
+            )
           );
           
-          if (matchingDoc && matchingDoc.fileData) {
-            // Return the base64 fileData as a data URL
+          if (matchingDoc && matchingDoc.content) {
+            // The content field can be a file path (/uploads/...) or base64 data
             return {
               ...doc,
-              fileData: matchingDoc.fileData, // base64 data URL from document library
+              url: matchingDoc.content, // Use content as URL (works for both file paths and data URLs)
             };
           }
         } catch (e) {
