@@ -89,7 +89,11 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
     }
   }, [currentUser]);
   
-  const effectiveRole = currentUser?.accessLevel === 'admin' && isPreviewMode ? 'Employee' : role;
+  // Non-admin users should always see Employee view, regardless of role prop
+  // Only admins can see CEO view (or Employee view in preview mode)
+  const effectiveRole = currentUser?.accessLevel === 'admin' 
+    ? (isPreviewMode ? 'Employee' : role) 
+    : 'Employee';
   
   // Profile editing state
   const [isEditingProfile, setIsEditingProfile] = useState(false);
