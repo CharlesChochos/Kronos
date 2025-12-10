@@ -20,7 +20,8 @@ import {
   Paperclip,
   X,
   FileText,
-  Loader2
+  Loader2,
+  Upload
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser, useUsers, useDeals, useTasks, useCreateTask, useCreateTaskAttachment, useUpdateDeal } from "@/lib/api";
@@ -89,6 +90,7 @@ export default function TeamAssignment() {
   });
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getUserTaskCount = (userId: string) => tasks.filter(t => t.assignedTo === userId && t.status !== 'Completed').length;
@@ -127,14 +129,14 @@ export default function TeamAssignment() {
     );
   });
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const uploadFiles = async (fileList: FileList | File[]) => {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
     
     setIsUploading(true);
     
     try {
-      for (const file of Array.from(files)) {
+      for (const file of files) {
         const formData = new FormData();
         formData.append('file', file);
         
@@ -159,6 +161,35 @@ export default function TeamAssignment() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      await uploadFiles(e.target.files);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      await uploadFiles(files);
     }
   };
 
@@ -584,27 +615,42 @@ export default function TeamAssignment() {
             </div>
             <div className="space-y-2">
               <Label>Attachments</Label>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                multiple
-                className="hidden"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,image/*"
-              />
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="w-full"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-              >
-                {isUploading ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading...</>
-                ) : (
-                  <><Paperclip className="w-4 h-4 mr-2" /> Add Files</>
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={cn(
+                  "border-2 border-dashed rounded-lg p-4 transition-colors cursor-pointer",
+                  isDragging ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
                 )}
-              </Button>
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  multiple
+                  className="hidden"
+                />
+                <div className="flex flex-col items-center gap-2 text-center">
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                      <span className="text-sm text-muted-foreground">Uploading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        Drag & drop files here, or click to browse
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Supports documents, images, videos up to 500MB
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
               {uploadedFiles.length > 0 && (
                 <div className="space-y-2 mt-2">
                   {uploadedFiles.map((file, index) => (
@@ -613,14 +659,20 @@ export default function TeamAssignment() {
                         <FileText className="w-4 h-4 text-primary" />
                         <span className="text-sm truncate max-w-48">{file.filename}</span>
                         <span className="text-xs text-muted-foreground">
-                          ({(file.size / 1024).toFixed(1)} KB)
+                          {file.size >= 1024 * 1024 
+                            ? `(${(file.size / (1024 * 1024)).toFixed(1)} MB)`
+                            : `(${(file.size / 1024).toFixed(1)} KB)`
+                          }
                         </span>
                       </div>
                       <Button 
                         variant="ghost" 
                         size="icon" 
                         className="h-6 w-6"
-                        onClick={() => removeAttachment(index)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeAttachment(index);
+                        }}
                       >
                         <X className="w-3 h-3" />
                       </Button>

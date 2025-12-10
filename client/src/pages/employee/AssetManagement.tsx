@@ -134,6 +134,7 @@ type StageWorkSectionProps = {
   createDocument: any;
   onAuditEntry?: (action: string, details: string) => Promise<void>;
   totalTeamCount?: number;
+  useFullDealTeam?: boolean;
 };
 
 function StageWorkSection({
@@ -156,11 +157,18 @@ function StageWorkSection({
   deleteTask,
   createDocument,
   onAuditEntry,
-  totalTeamCount
+  totalTeamCount,
+  useFullDealTeam = false
 }: StageWorkSectionProps) {
   const { data: stageDocuments = [] } = useStageDocuments(dealId, activeStageTab);
-  const { data: stagePodMembers = [] } = useStagePodMembers(dealId, activeStageTab);
   const { data: stageVoiceNotes = [] } = useStageVoiceNotes(dealId, activeStageTab);
+  
+  // For AM deals (useFullDealTeam=true): fetch all members across all stages
+  // For IB deals (useFullDealTeam=false): fetch only stage-specific members
+  const { data: stagePodMembers = [] } = useStagePodMembers(
+    dealId, 
+    useFullDealTeam ? undefined : activeStageTab
+  );
   
   const [showAddDocument, setShowAddDocument] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
@@ -312,10 +320,14 @@ function StageWorkSection({
       return;
     }
     try {
+      // For AM deals (useFullDealTeam=true), add member at deal level with "All" stage
+      // For IB deals, add member to the specific active stage
+      const memberStage = useFullDealTeam ? "All" : activeStageTab;
+      
       await createStagePodMember.mutateAsync({
         dealId,
         member: {
-          stage: activeStageTab,
+          stage: memberStage,
           userId: selectedMember.id,
           userName: selectedMember.name,
           role: memberRole || selectedMember.role || 'Team Member',
@@ -324,9 +336,12 @@ function StageWorkSection({
         }
       });
       if (onAuditEntry) {
-        await onAuditEntry('Team Member Added', `${selectedMember.name} added to ${activeStageTab} stage`);
+        const auditDetail = useFullDealTeam 
+          ? `${selectedMember.name} added to deal team`
+          : `${selectedMember.name} added to ${activeStageTab} stage`;
+        await onAuditEntry('Team Member Added', auditDetail);
       }
-      toast.success("Team member added to stage");
+      toast.success(useFullDealTeam ? "Team member added to deal" : "Team member added to stage");
       setSelectedMember(null);
       setMemberSearch("");
       setMemberRole("");
@@ -449,12 +464,14 @@ function StageWorkSection({
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-semibold flex items-center gap-2">
                   <Users className="w-4 h-4 text-emerald-400" />
-                  {activeStageTab} Stage Team
+                  {useFullDealTeam ? 'Deal Team' : `${activeStageTab} Stage Team`}
                 </h4>
                 <Badge variant="secondary" className="text-xs">{stagePodMembers.length}</Badge>
               </div>
               {stagePodMembers.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No team members assigned to this stage yet</p>
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  {useFullDealTeam ? 'No team members assigned to this deal yet' : 'No team members assigned to this stage yet'}
+                </p>
               ) : (
                 <ScrollArea className="max-h-48">
                   <div className="space-y-2">
@@ -587,7 +604,7 @@ function StageWorkSection({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h5 className="text-sm font-medium flex items-center gap-2">
-            <Users className="w-4 h-4 text-green-400" /> Stage Team
+            <Users className="w-4 h-4 text-green-400" /> {useFullDealTeam ? 'Deal Team' : 'Stage Team'}
           </h5>
           <Button size="sm" variant="ghost" onClick={() => setShowAddMember(!showAddMember)}>
             <Plus className="w-4 h-4" />
@@ -647,7 +664,7 @@ function StageWorkSection({
               </div>
             )}
             <Input
-              placeholder="Role for this stage"
+              placeholder={useFullDealTeam ? "Role on this deal" : "Role for this stage"}
               value={memberRole}
               onChange={(e) => setMemberRole(e.target.value)}
               className="h-8 text-sm"
@@ -663,7 +680,7 @@ function StageWorkSection({
         <ScrollArea className="h-[80px]">
           {stagePodMembers.length === 0 ? (
             <div className="text-center text-sm text-muted-foreground py-4">
-              No team members for this stage
+              {useFullDealTeam ? 'No team members for this deal' : 'No team members for this stage'}
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
@@ -3001,6 +3018,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                     deleteTask={deleteTask}
                     createDocument={createDocument}
                     totalTeamCount={uniqueTeamCount}
+                    useFullDealTeam={true}
                     onAuditEntry={async (action, details) => {
                       try {
                         const auditEntry: AuditEntry = {
