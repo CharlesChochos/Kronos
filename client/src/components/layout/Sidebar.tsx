@@ -198,6 +198,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
   const employeePlatformLinks = [
     { icon: Home, label: "Home", path: "/employee/home" },
     { icon: CheckSquare, label: "My Tasks", path: "/employee/tasks" },
+    { icon: Target, label: "Opportunities", path: "/employee/opportunities" },
     { icon: Briefcase, label: "Deal Management", path: "/employee/deals" },
     ...(canAccessAssetManagement ? [{ icon: BarChart3, label: "Asset Management", path: "/employee/asset-management" }] : []),
     { icon: PieChart, label: "Investor Match", path: "/employee/investors" },
