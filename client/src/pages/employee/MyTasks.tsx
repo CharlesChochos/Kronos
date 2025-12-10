@@ -38,7 +38,9 @@ import {
   Plus,
   Trash2,
   Upload,
-  Download
+  Download,
+  Pencil,
+  FileEdit
 } from "lucide-react";
 import { useCurrentUser, useTasks, useDeals, useUpdateTask, useCreateTask, useDeleteTask, useUsers, apiRequest, useUserPreferences, useSaveUserPreferences, useCreateTaskAttachment } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
@@ -135,6 +137,18 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
   const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
   const [showForwardModal, setShowForwardModal] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
+  const [showEditTaskModal, setShowEditTaskModal] = useState(false);
+  const [editTaskForm, setEditTaskForm] = useState({
+    id: '',
+    title: '',
+    description: '',
+    priority: 'Medium' as 'Low' | 'Medium' | 'High' | 'Urgent',
+    dueDate: '',
+    dueTime: '',
+    dealId: '',
+    type: 'General' as 'General' | 'Document Review' | 'Due Diligence' | 'Client Communication' | 'Financial Analysis' | 'Legal' | 'Compliance',
+    status: 'Pending' as string
+  });
   const [forwardToUser, setForwardToUser] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<{action: string, reasoning: string, tools: string[]} | null>(null);
@@ -284,11 +298,15 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
   );
   
   const dueLaterTasks = myTasks.filter(t => {
-    if (t.status === 'Completed') return false;
-    if (!t.dueDate) return true;
+    if (t.status === 'Completed' || t.status === 'Draft') return false;
+    if (!t.dueDate) return false;
     const dueDate = parseISO(t.dueDate);
     return !isToday(dueDate) && !isDateWithinThisWeek(t.dueDate);
   });
+  
+  const draftTasks = myTasks.filter(t => 
+    t.status !== 'Completed' && (t.status === 'Draft' || !t.dueDate)
+  );
   
   const completedTasks = myTasks.filter(t => t.status === 'Completed');
 
@@ -371,6 +389,77 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
       setCurrentSwipeIndex(prev => Math.min(prev + 1, swipeableTasks.length - 1));
     } catch (error: any) {
       toast.error(error.message || "Failed to forward task");
+    }
+  };
+
+  const openEditModal = (task: Task) => {
+    // Parse existing due date/time
+    let dueDate = '';
+    let dueTime = '';
+    if (task.dueDate) {
+      if (task.dueDate.includes('T')) {
+        const parts = task.dueDate.split('T');
+        dueDate = parts[0];
+        dueTime = parts[1]?.substring(0, 5) || '';
+      } else {
+        dueDate = task.dueDate;
+      }
+    }
+    
+    setEditTaskForm({
+      id: task.id,
+      title: task.title,
+      description: task.description || '',
+      priority: task.priority as any,
+      dueDate,
+      dueTime,
+      dealId: task.dealId || '',
+      type: (task.type as any) || 'General',
+      status: task.status
+    });
+    setShowEditTaskModal(true);
+  };
+
+  const handleEditTask = async () => {
+    if (!editTaskForm.title.trim()) {
+      toast.error("Please enter a task title");
+      return;
+    }
+    
+    try {
+      // Combine date and time for full datetime (both optional)
+      let fullDueDate: string | null = null;
+      if (editTaskForm.dueDate) {
+        fullDueDate = editTaskForm.dueTime 
+          ? `${editTaskForm.dueDate}T${editTaskForm.dueTime}` 
+          : editTaskForm.dueDate;
+      }
+      
+      // If task has no date, set status to Draft; otherwise preserve or set to Pending
+      let newStatus = editTaskForm.status;
+      if (!fullDueDate && newStatus !== 'Completed') {
+        newStatus = 'Draft';
+      } else if (fullDueDate && newStatus === 'Draft') {
+        newStatus = 'Pending';
+      }
+      
+      await updateTask.mutateAsync({
+        id: editTaskForm.id,
+        title: editTaskForm.title.trim(),
+        description: editTaskForm.description.trim() || null,
+        priority: editTaskForm.priority,
+        status: newStatus,
+        type: editTaskForm.type,
+        dueDate: fullDueDate,
+        dealId: editTaskForm.dealId || null,
+      });
+      
+      toast.success("Task updated successfully!");
+      setShowEditTaskModal(false);
+      setShowTaskDetailModal(false);
+      setSelectedTask(null);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update task");
     }
   };
 
@@ -508,27 +597,54 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
     setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Time options for dropdown
+  const timeOptions = [
+    { value: '', label: 'No specific time' },
+    { value: '09:00', label: '9:00 AM' },
+    { value: '09:30', label: '9:30 AM' },
+    { value: '10:00', label: '10:00 AM' },
+    { value: '10:30', label: '10:30 AM' },
+    { value: '11:00', label: '11:00 AM' },
+    { value: '11:30', label: '11:30 AM' },
+    { value: '12:00', label: '12:00 PM' },
+    { value: '12:30', label: '12:30 PM' },
+    { value: '13:00', label: '1:00 PM' },
+    { value: '13:30', label: '1:30 PM' },
+    { value: '14:00', label: '2:00 PM' },
+    { value: '14:30', label: '2:30 PM' },
+    { value: '15:00', label: '3:00 PM' },
+    { value: '15:30', label: '3:30 PM' },
+    { value: '16:00', label: '4:00 PM' },
+    { value: '16:30', label: '4:30 PM' },
+    { value: '17:00', label: '5:00 PM' },
+    { value: '17:30', label: '5:30 PM' },
+    { value: '18:00', label: '6:00 PM' },
+    { value: '18:30', label: '6:30 PM' },
+    { value: '19:00', label: '7:00 PM' },
+    { value: '20:00', label: '8:00 PM' },
+    { value: '21:00', label: '9:00 PM' },
+  ];
+
   const handleCreateTask = async () => {
     if (!newTaskForm.title.trim()) {
       toast.error("Please enter a task title");
       return;
     }
-    if (!newTaskForm.dueDate) {
-      toast.error("Please select a due date");
-      return;
-    }
     
     try {
-      // Combine date and time for full datetime
-      const fullDueDate = newTaskForm.dueTime 
-        ? `${newTaskForm.dueDate}T${newTaskForm.dueTime}` 
-        : newTaskForm.dueDate;
+      // Combine date and time for full datetime (both optional)
+      let fullDueDate: string | null = null;
+      if (newTaskForm.dueDate) {
+        fullDueDate = newTaskForm.dueTime 
+          ? `${newTaskForm.dueDate}T${newTaskForm.dueTime}` 
+          : newTaskForm.dueDate;
+      }
       
       const taskData: any = {
         title: newTaskForm.title.trim(),
         description: newTaskForm.description.trim() || null,
         priority: newTaskForm.priority,
-        status: 'Pending',
+        status: fullDueDate ? 'Pending' : 'Draft',
         type: newTaskForm.type,
         assignedTo: currentUser?.id || '',
         dueDate: fullDueDate,
@@ -701,6 +817,17 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
               <div>
                 <div className="text-2xl font-bold" data-testid="stat-later">{dueLaterTasks.length}</div>
                 <div className="text-xs text-muted-foreground">Due Later</div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-gray-500/20 flex items-center justify-center text-gray-500">
+                <FileEdit className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold" data-testid="stat-drafts">{draftTasks.length}</div>
+                <div className="text-xs text-muted-foreground">Drafts</div>
               </div>
             </CardContent>
           </Card>
@@ -896,6 +1023,41 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
             </ScrollArea>
           </div>
 
+          {/* Drafts */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <FileEdit className="w-4 h-4 text-gray-500" />
+                Drafts
+              </h3>
+              <Badge variant="outline" className="bg-gray-500/10 text-gray-500 border-gray-500/20">{draftTasks.length}</Badge>
+            </div>
+            <ScrollArea className="h-[400px] pr-2">
+              {draftTasks.length === 0 ? (
+                <Card className="bg-card/50 border-border border-dashed">
+                  <CardContent className="p-4 text-center text-muted-foreground text-sm">
+                    No draft tasks - create a task without a deadline to save as draft
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {draftTasks.map((task) => (
+                    <TaskCard 
+                      key={task.id} 
+                      task={task} 
+                      dealName={getDealName(task.dealId)}
+                      onClick={() => handleTaskClick(task)}
+                      highlighted={highlightedTaskId === task.id}
+                      isFlagged={!!flaggedTasks[task.id]}
+                      onFlag={(e) => { e.stopPropagation(); toggleTaskFlag(task.id); }}
+                      ref={(el) => { taskRefs.current[task.id] = el; }}
+                    />
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+
           {/* Completed */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -1049,6 +1211,9 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
               data-testid="button-delete-task"
             >
               <Trash2 className="w-4 h-4 mr-2" /> Delete
+            </Button>
+            <Button variant="outline" onClick={() => selectedTask && openEditModal(selectedTask)} data-testid="button-edit-task">
+              Edit
             </Button>
             <Button variant="outline" onClick={() => setShowTaskDetailModal(false)}>
               Close
@@ -1295,7 +1460,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
             </div>
             
             <div className="space-y-2">
-              <Label>Due Date & Time</Label>
+              <Label>Due Date & Time (Optional)</Label>
               <div className="flex gap-2">
                 <Input
                   type="date"
@@ -1304,16 +1469,21 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                   className="flex-1"
                   data-testid="input-new-task-due-date"
                 />
-                <Input
-                  type="time"
-                  value={newTaskForm.dueTime}
-                  onChange={(e) => setNewTaskForm({ ...newTaskForm, dueTime: e.target.value })}
-                  className="w-32"
-                  placeholder="Time"
-                  data-testid="input-new-task-due-time"
-                />
+                <Select 
+                  value={newTaskForm.dueTime || 'none'} 
+                  onValueChange={(value) => setNewTaskForm({ ...newTaskForm, dueTime: value === 'none' ? '' : value })}
+                >
+                  <SelectTrigger className="w-36" data-testid="select-new-task-due-time">
+                    <SelectValue placeholder="Time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timeOptions.map(opt => (
+                      <SelectItem key={opt.value || 'none'} value={opt.value || 'none'}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <p className="text-xs text-muted-foreground">Time is optional - leave blank for end of day</p>
+              <p className="text-xs text-muted-foreground">Leave blank to save as a draft without deadline</p>
             </div>
             
             <div className="space-y-2">
@@ -1455,6 +1625,152 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                 <>
                   <Plus className="w-4 h-4 mr-2" />
                   Create Task
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Task Dialog */}
+      <Dialog open={showEditTaskModal} onOpenChange={setShowEditTaskModal}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-primary" />
+              Edit Task
+            </DialogTitle>
+            <DialogDescription>
+              Update task details
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Task Title *</Label>
+              <Input
+                placeholder="Enter task title..."
+                value={editTaskForm.title}
+                onChange={(e) => setEditTaskForm({ ...editTaskForm, title: e.target.value })}
+                data-testid="input-edit-task-title"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Add details about this task..."
+                value={editTaskForm.description}
+                onChange={(e) => setEditTaskForm({ ...editTaskForm, description: e.target.value })}
+                rows={3}
+                className="resize-none"
+                data-testid="textarea-edit-task-description"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Select 
+                  value={editTaskForm.priority} 
+                  onValueChange={(value: 'Low' | 'Medium' | 'High' | 'Urgent') => setEditTaskForm({ ...editTaskForm, priority: value })}
+                >
+                  <SelectTrigger data-testid="select-edit-task-priority">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Low">Low</SelectItem>
+                    <SelectItem value="Medium">Medium</SelectItem>
+                    <SelectItem value="High">High</SelectItem>
+                    <SelectItem value="Urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select 
+                  value={editTaskForm.type} 
+                  onValueChange={(value: typeof editTaskForm.type) => setEditTaskForm({ ...editTaskForm, type: value })}
+                >
+                  <SelectTrigger data-testid="select-edit-task-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="General">General</SelectItem>
+                    <SelectItem value="Document Review">Document Review</SelectItem>
+                    <SelectItem value="Due Diligence">Due Diligence</SelectItem>
+                    <SelectItem value="Client Communication">Client Communication</SelectItem>
+                    <SelectItem value="Financial Analysis">Financial Analysis</SelectItem>
+                    <SelectItem value="Legal">Legal</SelectItem>
+                    <SelectItem value="Compliance">Compliance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Due Date & Time (Optional)</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  value={editTaskForm.dueDate}
+                  onChange={(e) => setEditTaskForm({ ...editTaskForm, dueDate: e.target.value })}
+                  className="flex-1"
+                  data-testid="input-edit-task-due-date"
+                />
+                <Select 
+                  value={editTaskForm.dueTime || 'none'} 
+                  onValueChange={(value) => setEditTaskForm({ ...editTaskForm, dueTime: value === 'none' ? '' : value })}
+                >
+                  <SelectTrigger className="w-36" data-testid="select-edit-task-due-time">
+                    <SelectValue placeholder="Time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timeOptions.map(opt => (
+                      <SelectItem key={opt.value || 'none'} value={opt.value || 'none'}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground">Leave blank to save as a draft without deadline</p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Related Deal (Optional)</Label>
+              <Select 
+                value={editTaskForm.dealId || 'none'} 
+                onValueChange={(value) => setEditTaskForm({ ...editTaskForm, dealId: value === 'none' ? '' : value })}
+              >
+                <SelectTrigger data-testid="select-edit-task-deal">
+                  <SelectValue placeholder="Select a deal..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No deal</SelectItem>
+                  {deals.map(deal => (
+                    <SelectItem key={deal.id} value={deal.id}>{deal.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditTaskModal(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleEditTask} 
+              disabled={updateTask.isPending}
+              data-testid="button-edit-task-submit"
+            >
+              {updateTask.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Save Changes
                 </>
               )}
             </Button>
