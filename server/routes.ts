@@ -1489,6 +1489,11 @@ export async function registerRoutes(
       // Extract email formatting fields before validation (they're not in schema)
       const { localDate, localTime, organizerTimezone, ...meetingData } = req.body;
       
+      // Convert scheduledFor to Date if it's a string
+      if (typeof meetingData.scheduledFor === 'string') {
+        meetingData.scheduledFor = new Date(meetingData.scheduledFor);
+      }
+      
       // Use user-provided video link if available, otherwise generate placeholder
       if (meetingData.videoPlatform && !meetingData.videoLink) {
         const meetingId = crypto.randomUUID().replace(/-/g, '').substring(0, 11);

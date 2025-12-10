@@ -371,14 +371,23 @@ export default function Dashboard() {
     return stats;
   }, [activeDeals]);
 
-  // Stage breakdown
-  const stageStats = useMemo(() => {
-    const stages = ['Origination', 'Structuring', 'Diligence', 'Legal', 'Close'];
-    return stages.map(stage => ({
+  // Stage breakdown by division
+  const IB_STAGES = ['Origination', 'Execution', 'Negotiation', 'Due Diligence', 'Signing', 'Closed'];
+  const AM_STAGES = ['Reception', 'Initial Review', 'Hard Diligence', 'Structure', 'Negotiation', 'Closing', 'Invested'];
+  
+  const ibStageStats = useMemo(() => {
+    return IB_STAGES.map(stage => ({
       stage,
-      count: activeDeals.filter(d => d.stage === stage).length,
+      count: ibActiveDeals.filter(d => d.stage === stage).length,
     }));
-  }, [activeDeals]);
+  }, [ibActiveDeals]);
+  
+  const amStageStats = useMemo(() => {
+    return AM_STAGES.map(stage => ({
+      stage,
+      count: amActiveDeals.filter(d => d.stage === stage).length,
+    }));
+  }, [amActiveDeals]);
 
   // Calculate velocity scores
   const employeeStats = useMemo(() => {
@@ -499,6 +508,7 @@ export default function Dashboard() {
         status: newDeal.status,
         progress: newDeal.progress || 0,
         description: newDeal.description || null,
+        dealType: 'M&A',
         attachments: attachmentMeta,
         podTeam: [],
         taggedInvestors: [],
@@ -664,7 +674,7 @@ export default function Dashboard() {
       y += 10;
       
       doc.setFontSize(10);
-      stageStats.forEach((s) => {
+      ibStageStats.forEach((s) => {
         doc.setTextColor(...mutedColor);
         doc.setFont('helvetica', 'normal');
         doc.text(s.stage, margin, y);
@@ -783,13 +793,15 @@ export default function Dashboard() {
     setShowEmployeeDetailModal(true);
   };
 
-  // Analytics data preparation
-  const dealsByStage = stageStats.map(s => ({
+  // Analytics data preparation - separate IB and AM stage data
+  const ibDealsByStage = ibStageStats.map((s, i) => ({
     ...s,
-    fill: s.stage === 'Origination' ? 'hsl(var(--chart-1))' :
-          s.stage === 'Structuring' ? 'hsl(var(--chart-2))' :
-          s.stage === 'Diligence' ? 'hsl(var(--chart-3))' :
-          s.stage === 'Legal' ? 'hsl(var(--chart-4))' : 'hsl(var(--chart-5))',
+    fill: `hsl(var(--chart-${(i % 5) + 1}))`,
+  }));
+  
+  const amDealsByStage = amStageStats.map((s, i) => ({
+    ...s,
+    fill: `hsl(var(--chart-${(i % 5) + 1}))`,
   }));
 
   const dealsBySector = Object.entries(sectorStats).map(([sector, stats], index) => ({
@@ -907,43 +919,63 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Charts Row 1 */}
+      {/* Charts Row 1 - IB and AM Stage Pipelines */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Deal Pipeline by Stage */}
+        {/* IB Deal Pipeline by Stage */}
         <Card className="bg-card border-border">
-          <CardHeader>
+          <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-primary" />
-              Deal Pipeline by Stage
+              <BarChart3 className="w-5 h-5 text-blue-500" />
+              Investment Banking Pipeline
             </CardTitle>
-            <CardDescription>Distribution of deals across pipeline stages (All Divisions)</CardDescription>
+            <CardDescription>{ibActiveDeals.length} active deals across {IB_STAGES.length} stages</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4 mb-3 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-blue-500" />
-                <span className="text-muted-foreground">IB: {ibActiveDeals.length} deals</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-emerald-500" />
-                <span className="text-muted-foreground">AM: {amActiveDeals.length} deals</span>
-              </div>
-            </div>
-            <ChartContainer config={chartConfig} className="h-[220px] w-full">
-              <BarChart data={dealsByStage} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <ChartContainer config={chartConfig} className="h-[200px] w-full">
+              <BarChart data={ibDealsByStage} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="stage" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+                <XAxis dataKey="stage" stroke="hsl(var(--muted-foreground))" fontSize={9} angle={-20} textAnchor="end" height={50} />
                 <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {dealsByStage.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="hsl(217, 91%, 60%)">
+                  {ibDealsByStage.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={`hsl(217, 91%, ${60 - index * 5}%)`} />
                   ))}
                 </Bar>
               </BarChart>
             </ChartContainer>
           </CardContent>
         </Card>
+
+        {/* AM Deal Pipeline by Stage */}
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-emerald-500" />
+              Asset Management Pipeline
+            </CardTitle>
+            <CardDescription>{amActiveDeals.length} active deals across {AM_STAGES.length} stages</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[200px] w-full">
+              <BarChart data={amDealsByStage} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="stage" stroke="hsl(var(--muted-foreground))" fontSize={9} angle={-20} textAnchor="end" height={50} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="hsl(160, 84%, 39%)">
+                  {amDealsByStage.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={`hsl(160, 84%, ${45 - index * 4}%)`} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Deals by Sector Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Deals by Sector */}
         <Card className="bg-card border-border">
@@ -1223,16 +1255,16 @@ export default function Dashboard() {
                 
                 <div className="overflow-hidden">
                   <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                    <BarChart3 className="w-3 h-3 flex-shrink-0" /> <span className="truncate">By Stage</span>
+                    <BarChart3 className="w-3 h-3 flex-shrink-0" /> <span className="truncate">IB Stages</span>
                   </div>
                   <div className="space-y-1 max-h-24 overflow-y-auto">
-                    {stageStats.map(({ stage, count }) => (
+                    {ibStageStats.map(({ stage, count }: { stage: string; count: number }) => (
                       <div key={stage} className="flex items-center gap-1">
                         <span className="text-[9px] text-muted-foreground w-16 truncate flex-shrink-0">{stage}</span>
                         <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden min-w-0">
                           <div 
-                            className="h-full bg-primary/60 rounded-full transition-all"
-                            style={{ width: `${displayActiveDeals.length > 0 ? (count / displayActiveDeals.length) * 100 : 0}%` }}
+                            className="h-full bg-blue-500/60 rounded-full transition-all"
+                            style={{ width: `${ibActiveDeals.length > 0 ? (count / ibActiveDeals.length) * 100 : 0}%` }}
                           />
                         </div>
                         <span className="text-[10px] font-mono w-4 text-right flex-shrink-0">{count}</span>
