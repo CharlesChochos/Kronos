@@ -46,6 +46,21 @@ import {
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
+// Map legacy IB stages to new stages
+const mapIBStage = (stage: string) => {
+  const legacyMap: Record<string, string> = {
+    'Due Diligence': 'Diligence',
+    'Negotiation': 'Legal',
+    'Closing': 'Close',
+    'Execution': 'Structuring',
+    'Signing': 'Close',
+    'Qualification': 'Origination',
+    'Pitch': 'Structuring',
+    'Documentation': 'Legal',
+  };
+  return legacyMap[stage] || stage;
+};
+
 export default function PipelineForecasting() {
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [] } = useDeals();
@@ -57,11 +72,10 @@ export default function PipelineForecasting() {
 
   const stageWeights: Record<string, number> = {
     'Origination': 0.15,
-    'Pitch': 0.25,
-    'Due Diligence': 0.50,
-    'Negotiation': 0.75,
-    'Documentation': 0.90,
-    'Closing': 0.95,
+    'Structuring': 0.35,
+    'Diligence': 0.55,
+    'Legal': 0.80,
+    'Close': 0.95,
   };
 
   const forecasts = useMemo(() => {
@@ -71,17 +85,20 @@ export default function PipelineForecasting() {
     const activeDeals = deals.filter(d => d.status === 'Active');
     
     const weightedPipeline = activeDeals.reduce((sum, deal) => {
-      const weight = stageWeights[deal.stage] || 0.5;
+      const mappedStage = mapIBStage(deal.stage);
+      const weight = stageWeights[mappedStage] || 0.5;
       return sum + (deal.value * weight * closeRate * valueMultiplier);
     }, 0);
 
     const bestCase = activeDeals.reduce((sum, deal) => {
-      const weight = Math.min((stageWeights[deal.stage] || 0.5) + 0.2, 1);
+      const mappedStage = mapIBStage(deal.stage);
+      const weight = Math.min((stageWeights[mappedStage] || 0.5) + 0.2, 1);
       return sum + (deal.value * weight * 1.1 * valueMultiplier);
     }, 0);
 
     const worstCase = activeDeals.reduce((sum, deal) => {
-      const weight = Math.max((stageWeights[deal.stage] || 0.5) - 0.2, 0);
+      const mappedStage = mapIBStage(deal.stage);
+      const weight = Math.max((stageWeights[mappedStage] || 0.5) - 0.2, 0);
       return sum + (deal.value * weight * 0.8 * valueMultiplier);
     }, 0);
 
@@ -109,9 +126,9 @@ export default function PipelineForecasting() {
   }, [forecasts]);
 
   const stageDistribution = useMemo(() => {
-    const stages = ['Origination', 'Pitch', 'Due Diligence', 'Negotiation', 'Documentation', 'Closing'];
+    const stages = ['Origination', 'Structuring', 'Diligence', 'Legal', 'Close'];
     return stages.map(stage => {
-      const stageDeals = deals.filter(d => d.stage === stage && d.status === 'Active');
+      const stageDeals = deals.filter(d => mapIBStage(d.stage) === stage && d.status === 'Active');
       return {
         name: stage,
         value: stageDeals.reduce((sum, d) => sum + d.value, 0),
@@ -137,7 +154,7 @@ export default function PipelineForecasting() {
 
   const riskAnalysis = useMemo(() => {
     const activeDeals = deals.filter(d => d.status === 'Active');
-    const atRisk = activeDeals.filter(d => (d.progress || 0) < 30 && stageWeights[d.stage] > 0.3);
+    const atRisk = activeDeals.filter(d => (d.progress || 0) < 30 && stageWeights[mapIBStage(d.stage)] > 0.3);
     const onTrack = activeDeals.filter(d => (d.progress || 0) >= 50);
     const delayed = activeDeals.filter(d => (d.progress || 0) >= 30 && (d.progress || 0) < 50);
     

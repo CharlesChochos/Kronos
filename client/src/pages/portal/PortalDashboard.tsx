@@ -139,13 +139,28 @@ export default function PortalDashboard() {
 }
 
 function DealCard({ deal, isSelected, onClick }: { deal: Deal; isSelected: boolean; onClick: () => void }) {
+  // Map legacy IB stages to new stages
+  const mapIBStage = (stage: string) => {
+    const legacyMap: Record<string, string> = {
+      'Due Diligence': 'Diligence',
+      'Negotiation': 'Legal',
+      'Closing': 'Close',
+      'Execution': 'Structuring',
+      'Signing': 'Close',
+    };
+    return legacyMap[stage] || stage;
+  };
+  
   const stageColors: Record<string, string> = {
     Origination: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-    "Due Diligence": "bg-amber-500/10 text-amber-500 border-amber-500/20",
-    Negotiation: "bg-purple-500/10 text-purple-500 border-purple-500/20",
-    Closing: "bg-green-500/10 text-green-500 border-green-500/20",
+    Structuring: "bg-cyan-500/10 text-cyan-500 border-cyan-500/20",
+    Diligence: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+    Legal: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+    Close: "bg-green-500/10 text-green-500 border-green-500/20",
     Closed: "bg-slate-500/10 text-slate-500 border-slate-500/20",
   };
+  
+  const mappedStage = mapIBStage(deal.stage);
   
   return (
     <Card 
@@ -161,8 +176,8 @@ function DealCard({ deal, isSelected, onClick }: { deal: Deal; isSelected: boole
             <h4 className="font-semibold">{deal.name}</h4>
             <p className="text-sm text-muted-foreground">{deal.client}</p>
           </div>
-          <Badge variant="outline" className={stageColors[deal.stage] || ""}>
-            {deal.stage}
+          <Badge variant="outline" className={stageColors[mappedStage] || ""}>
+            {mappedStage}
           </Badge>
         </div>
         

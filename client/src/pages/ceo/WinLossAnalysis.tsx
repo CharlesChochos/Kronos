@@ -40,6 +40,21 @@ import {
 
 const COLORS = ['#10b981', '#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#06b6d4'];
 
+// Map legacy IB stages to new stages
+const mapIBStage = (stage: string) => {
+  const legacyMap: Record<string, string> = {
+    'Due Diligence': 'Diligence',
+    'Negotiation': 'Legal',
+    'Closing': 'Close',
+    'Execution': 'Structuring',
+    'Signing': 'Close',
+    'Qualification': 'Origination',
+    'Pitch': 'Structuring',
+    'Documentation': 'Legal',
+  };
+  return legacyMap[stage] || stage;
+};
+
 export default function WinLossAnalysis() {
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [] } = useDeals();
@@ -65,11 +80,11 @@ export default function WinLossAnalysis() {
   }), [wonDeals, lostDeals]);
 
   const winLossByStage = useMemo(() => {
-    const stages = ['Origination', 'Pitch', 'Due Diligence', 'Negotiation', 'Documentation', 'Closing'];
+    const stages = ['Origination', 'Structuring', 'Diligence', 'Legal', 'Close'];
     return stages.map(stage => ({
       stage,
-      won: wonDeals.filter(d => d.stage === stage).length,
-      lost: lostDeals.filter(d => d.stage === stage).length,
+      won: wonDeals.filter(d => mapIBStage(d.stage) === stage).length,
+      lost: lostDeals.filter(d => mapIBStage(d.stage) === stage).length,
     }));
   }, [wonDeals, lostDeals]);
 

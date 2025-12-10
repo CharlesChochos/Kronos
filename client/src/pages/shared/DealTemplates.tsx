@@ -409,7 +409,7 @@ export default function DealTemplates({ role }: { role: 'CEO' | 'Employee' }) {
               <Input
                 value={newTemplate.stages}
                 onChange={(e) => setNewTemplate({ ...newTemplate, stages: e.target.value })}
-                placeholder="Origination, Due Diligence, Closing"
+                placeholder="Origination, Structuring, Diligence, Legal, Close"
                 data-testid="input-template-stages"
               />
             </div>

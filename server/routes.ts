@@ -2584,12 +2584,12 @@ Consider common investment banking tasks like:
 - **Term Sheet**: Non-binding summary of key transaction terms
 - **Closing conditions**: Conditions precedent to transaction completion
 
-### Stage-Based Best Practices:
+### Stage-Based Best Practices (Investment Banking):
 - Origination: Focus on relationship building and deal qualification
-- Due Diligence: Maintain momentum, respond to requests within 24-48 hours
-- Negotiation: Balance commercial terms with closing certainty
-- Documentation: Track open items, coordinate with legal counsel
-- Closing: Ensure all conditions satisfied, coordinate funds flow
+- Structuring: Define transaction structure, prepare materials
+- Diligence: Maintain momentum, respond to requests within 24-48 hours
+- Legal: Track open items, coordinate with legal counsel
+- Close: Ensure all conditions satisfied, coordinate funds flow
 
 ## YOUR CAPABILITIES:
 
@@ -2637,7 +2637,7 @@ Example: "Create a task for Sarah to review the Alpha Corp proposal by Friday" -
 Example: "Schedule a meeting with the tech team tomorrow at 2pm" -> call schedule_meeting
 
 **Updating Deals:** When asked to update a deal's status, stage, or progress, use update_deal.
-Example: "Update Alpha Corp deal to Negotiation stage" -> call update_deal
+Example: "Update Alpha Corp deal to Diligence stage" -> call update_deal
 
 **Updating Tasks:** When asked to mark a task complete, change priority, or update status, use update_task.
 Example: "Mark the compliance review task as completed" -> call update_task
@@ -2828,7 +2828,7 @@ Example: "Generate a pipeline report" -> call generate_report
                 },
                 stage: {
                   type: "string",
-                  description: "New stage for the deal (e.g., 'Origination', 'Due Diligence', 'Negotiation', 'Closing')"
+                  description: "New stage for the deal (e.g., 'Origination', 'Structuring', 'Diligence', 'Legal', 'Close')"
                 },
                 status: {
                   type: "string",
@@ -3542,35 +3542,28 @@ Example: "Generate a pipeline report" -> call generate_report
                     'Draft engagement letter and fee proposal',
                     'Conduct initial market assessment'
                   ],
-                  'Qualification': [
-                    'Complete preliminary due diligence',
-                    'Validate deal economics and feasibility',
-                    'Assess client financials and documentation',
-                    'Identify key risk factors',
-                    'Prepare internal deal committee memo'
+                  'Structuring': [
+                    'Define transaction structure and key terms',
+                    'Prepare confidential information memorandum (CIM)',
+                    'Develop marketing materials and teaser',
+                    'Identify target investor/buyer list',
+                    'Prepare management presentation outline'
                   ],
-                  'Due Diligence': [
+                  'Diligence': [
                     'Organize virtual data room',
                     'Coordinate management presentations',
                     'Address buyer/investor questions promptly',
                     'Track due diligence request list completion',
                     'Prepare for potential issues discovered'
                   ],
-                  'Negotiation': [
+                  'Legal': [
                     'Review and markup transaction documents',
                     'Negotiate key commercial terms',
-                    'Address open due diligence items',
-                    'Prepare closing conditions checklist',
-                    'Coordinate with legal counsel on documentation'
-                  ],
-                  'Documentation': [
-                    'Finalize purchase agreement',
                     'Complete disclosure schedules',
                     'Obtain necessary third-party consents',
-                    'Coordinate regulatory filings',
-                    'Prepare closing mechanics'
+                    'Coordinate with legal counsel on documentation'
                   ],
-                  'Closing': [
+                  'Close': [
                     'Confirm all closing conditions satisfied',
                     'Coordinate funds flow',
                     'Execute signature pages',

@@ -958,7 +958,7 @@ export type DealFee = typeof dealFees.$inferSelect;
 export const stageDocuments = pgTable("stage_documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   dealId: varchar("deal_id").references(() => deals.id).notNull(),
-  stage: text("stage").notNull(), // Origination, Due Diligence, Negotiation, etc.
+  stage: text("stage").notNull(), // Origination, Structuring, Diligence, Legal, Close
   documentId: varchar("document_id").references(() => documentsTable.id),
   title: text("title").notNull(),
   filename: text("filename"),

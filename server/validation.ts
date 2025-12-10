@@ -57,7 +57,7 @@ export const resetPasswordSchema = z.object({
 
 export const dealSchema = z.object({
   name: z.string().min(1, "Deal name is required").max(200).transform(sanitizeString),
-  stage: z.enum(['Origination', 'Qualification', 'Due Diligence', 'Negotiation', 'Closing', 'Closed Won', 'Closed Lost']).optional(),
+  stage: z.enum(['Origination', 'Structuring', 'Diligence', 'Legal', 'Close', 'Closed Won', 'Closed Lost', 'Due Diligence', 'Negotiation', 'Closing', 'Execution', 'Signing', 'Qualification', 'Pitch', 'Documentation']).optional(),
   value: z.number().min(0).max(1000000),
   client: z.string().min(1, "Client is required").max(200).transform(sanitizeString),
   sector: z.string().min(1, "Sector is required").max(100).transform(sanitizeString),

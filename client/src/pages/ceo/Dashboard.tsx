@@ -407,13 +407,28 @@ export default function Dashboard() {
   }, [amActiveDeals]);
 
   // Stage breakdown by division
-  const IB_STAGES = ['Origination', 'Execution', 'Negotiation', 'Due Diligence', 'Signing', 'Closed'];
+  const IB_STAGES = ['Origination', 'Structuring', 'Diligence', 'Legal', 'Close'];
   const AM_STAGES = ['Reception', 'Initial Review', 'Hard Diligence', 'Structure', 'Negotiation', 'Closing', 'Invested'];
+  
+  // Map legacy IB stages to new stages
+  const mapIBStage = (stage: string) => {
+    const legacyMap: Record<string, string> = {
+      'Due Diligence': 'Diligence',
+      'Negotiation': 'Legal',
+      'Closing': 'Close',
+      'Execution': 'Structuring',
+      'Signing': 'Close',
+      'Qualification': 'Origination',
+      'Pitch': 'Structuring',
+      'Documentation': 'Legal',
+    };
+    return legacyMap[stage] || stage;
+  };
   
   const ibStageStats = useMemo(() => {
     return IB_STAGES.map(stage => ({
       stage,
-      count: ibActiveDeals.filter(d => d.stage === stage).length,
+      count: ibActiveDeals.filter(d => mapIBStage(d.stage) === stage).length,
     }));
   }, [ibActiveDeals]);
   
@@ -2915,8 +2930,8 @@ export default function Dashboard() {
                     <span className="text-sm font-medium text-blue-400">Investment Banking</span>
                   </div>
                   <div className="space-y-2 pl-5">
-                    {['Origination', 'Due Diligence', 'Structuring', 'Negotiation', 'Closing'].map((stage) => {
-                      const stageDeals = ibActiveDeals.filter(d => d.stage === stage);
+                    {['Origination', 'Structuring', 'Diligence', 'Legal', 'Close'].map((stage) => {
+                      const stageDeals = ibActiveDeals.filter(d => mapIBStage(d.stage) === stage);
                       const stageValue = stageDeals.reduce((sum, d) => sum + d.value, 0);
                       if (stageDeals.length === 0) return null;
                       return (
