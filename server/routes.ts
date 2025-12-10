@@ -5383,6 +5383,11 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
       fs.unlinkSync(filePath);
       
       console.log(`Parsed ${rows.length} rows with ${headers.length} columns`);
+      console.log('Headers:', headers);
+      if (rows.length > 0) {
+        console.log('Sample row keys:', Object.keys(rows[0]));
+        console.log('Sample row:', rows[0]);
+      }
       
       res.json({
         headers,
