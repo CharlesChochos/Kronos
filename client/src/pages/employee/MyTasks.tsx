@@ -37,7 +37,8 @@ import {
   Flag,
   Plus,
   Trash2,
-  Upload
+  Upload,
+  Download
 } from "lucide-react";
 import { useCurrentUser, useTasks, useDeals, useUpdateTask, useCreateTask, useDeleteTask, useUsers, apiRequest, useUserPreferences, useSaveUserPreferences, useCreateTaskAttachment } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
@@ -993,15 +994,49 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                     <Paperclip className="w-3 h-3" /> Attachments
                   </Label>
                   <div className="mt-2 space-y-2">
-                    {(selectedTask.attachments as any[]).map((attachment: any, i: number) => (
-                      <div key={i} className="flex items-center gap-2 p-2 bg-secondary/30 rounded-lg">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm flex-1 truncate">{typeof attachment === 'string' ? attachment : attachment?.name || 'Attachment'}</span>
-                        <Button variant="ghost" size="icon" className="h-6 w-6">
-                          <ExternalLink className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    ))}
+                    {(selectedTask.attachments as any[]).map((attachment: any, i: number) => {
+                      const filename = typeof attachment === 'string' ? attachment : attachment?.filename || attachment?.name || 'Attachment';
+                      const url = typeof attachment === 'string' ? attachment : attachment?.url;
+                      return (
+                        <div key={i} className="flex items-center gap-2 p-2 bg-secondary/30 rounded-lg">
+                          <FileText className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm flex-1 truncate">{filename}</span>
+                          <div className="flex items-center gap-1">
+                            {url && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-6 w-6"
+                                onClick={() => window.open(url, '_blank')}
+                                title="View"
+                                data-testid={`view-attachment-${i}`}
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                              </Button>
+                            )}
+                            {url && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-6 w-6"
+                                onClick={() => {
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.download = filename;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                }}
+                                title="Download"
+                                data-testid={`download-attachment-${i}`}
+                              >
+                                <Download className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1354,11 +1389,45 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                         type="button"
                         variant="ghost"
                         size="icon"
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(file.url, '_blank');
+                        }}
+                        title="View"
+                        data-testid={`view-upload-${index}`}
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const link = document.createElement('a');
+                          link.href = file.url;
+                          link.download = file.filename;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                        title="Download"
+                        data-testid={`download-upload-${index}`}
+                      >
+                        <Download className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
                         className="h-6 w-6 text-red-500 hover:text-red-700"
                         onClick={(e) => {
                           e.stopPropagation();
                           removeAttachment(index);
                         }}
+                        title="Remove"
                       >
                         <X className="w-3 h-3" />
                       </Button>
