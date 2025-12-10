@@ -338,7 +338,10 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
 
     try {
       const link = document.createElement('a');
-      link.href = doc.content;
+      // Handle both base64 data URLs and file paths
+      link.href = doc.content.startsWith('data:') || doc.content.startsWith('http') || doc.content.startsWith('blob:') 
+        ? doc.content 
+        : doc.content; // File paths like /uploads/... work directly
       link.download = doc.originalName || doc.filename || `${doc.title}.pdf`;
       document.body.appendChild(link);
       link.click();
@@ -368,6 +371,7 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
   const canViewInBrowser = (doc: DocumentRecord): boolean => {
     if (!doc.content) return false;
     const mimeType = inferMimeType(doc);
+    // PDFs and images can be viewed in browser
     return mimeType.includes('pdf') || mimeType.includes('image') || mimeType.includes('text');
   };
 
@@ -378,40 +382,10 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
     }
 
     try {
-      const mimeType = inferMimeType(doc);
-      const isDataUrl = doc.content.startsWith('data:');
-      
-      // For PDFs and images with data URLs, open directly
-      if (mimeType.includes('pdf') || mimeType.includes('image')) {
-        const newWindow = window.open(doc.content, '_blank');
-        if (!newWindow) {
-          toast.error("Unable to open document. Please allow popups for this site.");
-        }
-      } else if (mimeType.includes('text') && isDataUrl) {
-        // For text files with base64 content, decode and open
-        try {
-          const base64Content = doc.content.split(',')[1] || '';
-          const decodedContent = atob(base64Content);
-          const blob = new Blob([decodedContent], { type: 'text/plain' });
-          const url = URL.createObjectURL(blob);
-          const newWindow = window.open(url, '_blank');
-          if (!newWindow) {
-            URL.revokeObjectURL(url);
-            toast.error("Unable to open document. Please allow popups for this site.");
-          } else {
-            // Revoke URL after a delay to allow the new window to load
-            setTimeout(() => URL.revokeObjectURL(url), 30000);
-          }
-        } catch (decodeError) {
-          console.error('Failed to decode text content:', decodeError);
-          toast.error("Failed to decode document content");
-        }
-      } else {
-        // For other types or non-data URLs, open directly
-        const newWindow = window.open(doc.content, '_blank');
-        if (!newWindow) {
-          toast.error("Unable to open document. Please allow popups for this site.");
-        }
+      // For file paths (like /uploads/...) or any URL, just open directly
+      const newWindow = window.open(doc.content, '_blank');
+      if (!newWindow) {
+        toast.error("Unable to open document. Please allow popups for this site.");
       }
     } catch (error) {
       console.error('Failed to open document:', error);

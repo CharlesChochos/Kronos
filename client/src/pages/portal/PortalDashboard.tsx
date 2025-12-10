@@ -258,39 +258,10 @@ function DealDetail({ deal, activeTab, onTabChange }: { deal: Deal; activeTab: s
     }
 
     try {
-      const mimeType = inferMimeType(doc);
-      const isDataUrl = doc.content.startsWith('data:');
-      
-      // For PDFs and images, open directly in a new tab
-      if (mimeType.includes('pdf') || mimeType.includes('image')) {
-        const newWindow = window.open(doc.content, '_blank');
-        if (!newWindow) {
-          toast.error("Unable to open document. Please allow popups for this site.");
-        }
-      } else if (mimeType.includes('text') && isDataUrl) {
-        // For text files with base64 content, decode and open
-        try {
-          const base64Content = doc.content.split(',')[1] || '';
-          const decodedContent = atob(base64Content);
-          const blob = new Blob([decodedContent], { type: 'text/plain' });
-          const url = URL.createObjectURL(blob);
-          const newWindow = window.open(url, '_blank');
-          if (!newWindow) {
-            URL.revokeObjectURL(url);
-            toast.error("Unable to open document. Please allow popups for this site.");
-          } else {
-            setTimeout(() => URL.revokeObjectURL(url), 30000);
-          }
-        } catch (decodeError) {
-          console.error('Failed to decode text content:', decodeError);
-          toast.error("Failed to decode document content");
-        }
-      } else {
-        // For other types or non-data URLs, open directly
-        const newWindow = window.open(doc.content, '_blank');
-        if (!newWindow) {
-          toast.error("Unable to open document. Please allow popups for this site.");
-        }
+      // For file paths or any URL, just open directly
+      const newWindow = window.open(doc.content, '_blank');
+      if (!newWindow) {
+        toast.error("Unable to open document. Please allow popups for this site.");
       }
     } catch (error) {
       console.error('Failed to open document:', error);
