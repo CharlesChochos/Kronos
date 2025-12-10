@@ -225,7 +225,7 @@ function Router() {
           {() => <ProtectedRoute component={EmployeeDocumentGenerator} />}
         </Route>
         <Route path="/employee/opportunities">
-          {() => <ProtectedRoute component={Opportunities} />}
+          {() => <ProtectedRoute component={() => <Opportunities role="Employee" />} />}
         </Route>
         <Route path="/employee/deals">
           {() => <ProtectedRoute component={EmployeeDealManagement} />}

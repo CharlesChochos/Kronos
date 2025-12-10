@@ -56,7 +56,11 @@ type OpportunityNote = {
   createdAt: string;
 };
 
-export default function Opportunities() {
+type OpportunitiesProps = {
+  role?: 'CEO' | 'Employee';
+};
+
+export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [], isLoading } = useDeals();
   const { data: users = [] } = useUsers();
@@ -287,7 +291,7 @@ export default function Opportunities() {
   };
 
   return (
-    <Layout role="CEO" pageTitle="Potential Opportunities">
+    <Layout role={role} pageTitle="Potential Opportunities">
       <div className="space-y-6">
         {/* Header Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
