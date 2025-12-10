@@ -969,6 +969,15 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
   const { data: selectedDealFees = [] } = useDealFees(selectedDeal?.id || '');
   // Fetch ALL stage pod members for the selected deal (across all stages)
   const { data: allStagePodMembers = [] } = useStagePodMembers(selectedDeal?.id || '', undefined);
+  // Count unique team members (deduplicated by email or name)
+  const uniqueTeamCount = useMemo(() => {
+    const seen = new Set<string>();
+    allStagePodMembers.forEach((member: any) => {
+      const key = member.email || member.userName || member.userId || crypto.randomUUID();
+      seen.add(key);
+    });
+    return seen.size;
+  }, [allStagePodMembers]);
   const [activeStageTab, setActiveStageTab] = useState("Reception");
   const [viewMode, setViewMode] = useState<'grid' | 'calendar' | 'compare'>('grid');
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('week');
@@ -2908,7 +2917,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                     createTask={createTask}
                     deleteTask={deleteTask}
                     createDocument={createDocument}
-                    totalTeamCount={allStagePodMembers.length}
+                    totalTeamCount={uniqueTeamCount}
                     onAuditEntry={async (action, details) => {
                       try {
                         const auditEntry: AuditEntry = {
@@ -3001,6 +3010,11 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
+                              {investor.email && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" asChild data-testid={`investor-email-${investor.id}`}>
+                                  <a href={`mailto:${investor.email}`}><Mail className="w-4 h-4 text-blue-500" /></a>
+                                </Button>
+                              )}
                               <Select 
                                 value={investor.status} 
                                 onValueChange={(v) => handleUpdateInvestorStatus(investor.id, v)}
