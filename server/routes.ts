@@ -1198,7 +1198,38 @@ export async function registerRoutes(
     try {
       const { stage } = req.query;
       const docs = await storage.getStageDocuments(req.params.dealId, stage as string | undefined);
-      res.json(docs);
+      
+      // Enrich documents that don't have URLs with data from document library
+      const enrichedDocs = await Promise.all(docs.map(async (doc: any) => {
+        if (doc.url) {
+          return doc; // Already has URL, no enrichment needed
+        }
+        
+        // Try to find matching document in document library
+        try {
+          const allDocuments = await storage.getAllDocuments();
+          // Match by title containing the stage document title, or by dealId and similar filename
+          const matchingDoc = allDocuments.find((d: any) => 
+            (d.dealId === req.params.dealId && d.title?.includes(doc.title)) ||
+            (d.dealId === req.params.dealId && doc.title && d.title?.includes(doc.title)) ||
+            (d.filename?.includes(doc.filename))
+          );
+          
+          if (matchingDoc && matchingDoc.fileData) {
+            // Return the base64 fileData as a data URL
+            return {
+              ...doc,
+              fileData: matchingDoc.fileData, // base64 data URL from document library
+            };
+          }
+        } catch (e) {
+          console.error('Failed to enrich stage document:', e);
+        }
+        
+        return doc;
+      }));
+      
+      res.json(enrichedDocs);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch stage documents" });
     }

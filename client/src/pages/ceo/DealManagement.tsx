@@ -570,30 +570,36 @@ function StageWorkSection({
                     <span className="truncate">{doc.title}</span>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
-                    {doc.url && (
+                    {(doc.url || doc.fileData) && (
                       <Button 
                         variant="ghost" 
                         size="icon" 
                         className="h-6 w-6"
-                        onClick={() => window.open(doc.url, '_blank')}
+                        onClick={() => {
+                          const viewUrl = doc.url || doc.fileData;
+                          if (viewUrl) window.open(viewUrl, '_blank');
+                        }}
                         title="View"
                         data-testid={`view-doc-${doc.id}`}
                       >
                         <ExternalLink className="w-3 h-3 text-green-400" />
                       </Button>
                     )}
-                    {doc.url && (
+                    {(doc.url || doc.fileData) && (
                       <Button 
                         variant="ghost" 
                         size="icon" 
                         className="h-6 w-6"
                         onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = doc.url;
-                          link.download = doc.title || 'document';
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
+                          const downloadUrl = doc.url || doc.fileData;
+                          if (downloadUrl) {
+                            const link = document.createElement('a');
+                            link.href = downloadUrl;
+                            link.download = doc.filename || doc.title || 'document';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }
                         }}
                         title="Download"
                         data-testid={`download-doc-${doc.id}`}
