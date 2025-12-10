@@ -104,6 +104,10 @@ export default function Opportunities() {
   const [opportunityNotes, setOpportunityNotes] = useState<OpportunityNote[]>([]);
   const [opportunityAttachments, setOpportunityAttachments] = useState<OpportunityAttachment[]>([]);
   
+  // Member tagging state
+  const [teamSearchQuery, setTeamSearchQuery] = useState("");
+  const [showTeamDropdown, setShowTeamDropdown] = useState(false);
+  
   // Filter for Opportunity deals only
   const opportunities = useMemo(() => {
     return deals.filter((deal: Deal) => (deal as any).dealType === 'Opportunity');
@@ -619,15 +623,21 @@ export default function Opportunities() {
           {selectedOpportunity && (
             <div className="mt-6">
               <Tabs value={detailTab} onValueChange={(v) => setDetailTab(v as any)}>
-                <TabsList className="w-full">
-                  <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
-                  <TabsTrigger value="attachments" className="flex-1">
-                    Attachments
+                <TabsList className="w-full grid grid-cols-4">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="team">
+                    Team
+                    {((selectedOpportunity as any)?.podTeam?.length > 0) && (
+                      <Badge variant="secondary" className="ml-1 h-5 px-1.5">{(selectedOpportunity as any).podTeam.length}</Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="attachments">
+                    Attach.
                     {opportunityAttachments.length > 0 && (
                       <Badge variant="secondary" className="ml-1 h-5 px-1.5">{opportunityAttachments.length}</Badge>
                     )}
                   </TabsTrigger>
-                  <TabsTrigger value="notes" className="flex-1">
+                  <TabsTrigger value="notes">
                     Notes
                     {opportunityNotes.length > 0 && (
                       <Badge variant="secondary" className="ml-1 h-5 px-1.5">{opportunityNotes.length}</Badge>
@@ -673,6 +683,143 @@ export default function Opportunities() {
                         <p className="text-sm">{format(new Date((selectedOpportunity as any).createdAt), 'PPp')}</p>
                       </div>
                     )}
+                  </TabsContent>
+                  
+                  {/* Team Tagging Tab */}
+                  <TabsContent value="team" className="space-y-4 pr-4 mt-0">
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search team members..."
+                        value={teamSearchQuery}
+                        onChange={(e) => {
+                          setTeamSearchQuery(e.target.value);
+                          setShowTeamDropdown(true);
+                        }}
+                        onFocus={() => setShowTeamDropdown(true)}
+                        className="pl-9"
+                        data-testid="input-search-team-members"
+                      />
+                      {showTeamDropdown && teamSearchQuery && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                          {users
+                            .filter(user => {
+                              const searchLower = teamSearchQuery.toLowerCase();
+                              const alreadyTagged = ((selectedOpportunity as any)?.podTeam || []).some(
+                                (m: any) => m.userId === user.id
+                              );
+                              if (alreadyTagged) return false;
+                              return (
+                                user.name.toLowerCase().includes(searchLower) ||
+                                (user.email?.toLowerCase() || '').includes(searchLower) ||
+                                (user.role?.toLowerCase() || '').includes(searchLower) ||
+                                (user.jobTitle?.toLowerCase() || '').includes(searchLower)
+                              );
+                            })
+                            .slice(0, 8)
+                            .map(user => (
+                              <div
+                                key={user.id}
+                                className="flex items-center gap-3 p-3 hover:bg-secondary/50 cursor-pointer transition-colors"
+                                onClick={async () => {
+                                  if (!selectedOpportunity) return;
+                                  const currentTeam = ((selectedOpportunity as any)?.podTeam || []) as PodTeamMember[];
+                                  const newMember: PodTeamMember = {
+                                    name: user.name,
+                                    role: user.jobTitle || user.role || 'Team Member',
+                                    userId: user.id,
+                                  };
+                                  try {
+                                    await updateDeal.mutateAsync({
+                                      id: selectedOpportunity.id,
+                                      podTeam: [...currentTeam, newMember],
+                                    });
+                                    toast.success(`${user.name} tagged on this opportunity`);
+                                    setTeamSearchQuery("");
+                                    setShowTeamDropdown(false);
+                                  } catch (error: any) {
+                                    toast.error(error.message || "Failed to add team member");
+                                  }
+                                }}
+                                data-testid={`tag-member-${user.id}`}
+                              >
+                                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                                  {user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium truncate">{user.name}</div>
+                                  <div className="text-xs text-muted-foreground truncate">{user.jobTitle || user.role}</div>
+                                </div>
+                                <Badge variant="secondary" className="text-xs shrink-0">{user.role}</Badge>
+                              </div>
+                            ))}
+                          {users.filter(user => {
+                            const searchLower = teamSearchQuery.toLowerCase();
+                            const alreadyTagged = ((selectedOpportunity as any)?.podTeam || []).some(
+                              (m: any) => m.userId === user.id
+                            );
+                            return !alreadyTagged && (
+                              user.name.toLowerCase().includes(searchLower) ||
+                              (user.email?.toLowerCase() || '').includes(searchLower)
+                            );
+                          }).length === 0 && (
+                            <div className="p-3 text-sm text-muted-foreground text-center">
+                              No matching team members found
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Tagged Members List */}
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Tagged Team Members</p>
+                      {((selectedOpportunity as any)?.podTeam && (selectedOpportunity as any).podTeam.length > 0) ? (
+                        <div className="space-y-2">
+                          {((selectedOpportunity as any).podTeam as PodTeamMember[]).map((member, index) => (
+                            <div key={member.userId || index} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                                  {member.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">{member.name}</p>
+                                  <p className="text-xs text-muted-foreground">{member.role}</p>
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={async () => {
+                                  if (!selectedOpportunity) return;
+                                  const currentTeam = (selectedOpportunity as any).podTeam as PodTeamMember[];
+                                  const updatedTeam = currentTeam.filter(m => m.userId !== member.userId);
+                                  try {
+                                    await updateDeal.mutateAsync({
+                                      id: selectedOpportunity.id,
+                                      podTeam: updatedTeam,
+                                    });
+                                    toast.success(`${member.name} removed from opportunity`);
+                                  } catch (error: any) {
+                                    toast.error(error.message || "Failed to remove team member");
+                                  }
+                                }}
+                                data-testid={`remove-member-${member.userId}`}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">No team members tagged yet</p>
+                          <p className="text-xs mt-1">Search above to add team members</p>
+                        </div>
+                      )}
+                    </div>
                   </TabsContent>
                   
                   <TabsContent value="attachments" className="space-y-4 pr-4 mt-0">

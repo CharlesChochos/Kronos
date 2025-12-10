@@ -1326,6 +1326,7 @@ export default function Chat({ role }: ChatProps) {
                     className="hidden"
                     onChange={handleFileUpload}
                     multiple
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,image/*"
                   />
                   <Button 
                     variant="ghost" 

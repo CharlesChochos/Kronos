@@ -1079,7 +1079,7 @@ export function ReaperAssistant() {
                       ref={fileInputRef}
                       onChange={handleFileUpload}
                       className="hidden"
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,image/*"
                       multiple
                       data-testid="input-file-upload"
                     />

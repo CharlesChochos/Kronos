@@ -76,6 +76,8 @@ export default function TeamAssignment() {
     }
   }, [searchString, users]);
   const [filterAvailability, setFilterAvailability] = useState<string | null>(null);
+  const [dealSearchQuery, setDealSearchQuery] = useState("");
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [newTask, setNewTask] = useState({
@@ -98,8 +100,31 @@ export default function TeamAssignment() {
   };
 
   const filteredUsers = users.filter(user => {
-    if (!filterAvailability) return true;
-    return getUserAvailability(user.id) === filterAvailability;
+    // Filter by availability
+    if (filterAvailability && getUserAvailability(user.id) !== filterAvailability) return false;
+    // Filter by search query
+    if (memberSearchQuery) {
+      const searchLower = memberSearchQuery.toLowerCase();
+      return (
+        user.name.toLowerCase().includes(searchLower) ||
+        (user.email?.toLowerCase() || '').includes(searchLower) ||
+        (user.role?.toLowerCase() || '').includes(searchLower) ||
+        (user.jobTitle?.toLowerCase() || '').includes(searchLower)
+      );
+    }
+    return true;
+  });
+
+  const filteredDeals = deals.filter(deal => {
+    if (!deal.status || deal.status !== 'Active') return false;
+    if (!dealSearchQuery) return true;
+    const searchLower = dealSearchQuery.toLowerCase();
+    return (
+      deal.name.toLowerCase().includes(searchLower) ||
+      (deal.client?.toLowerCase() || '').includes(searchLower) ||
+      (deal.sector?.toLowerCase() || '').includes(searchLower) ||
+      (deal.stage?.toLowerCase() || '').includes(searchLower)
+    );
   });
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -316,8 +341,18 @@ export default function TeamAssignment() {
                     
                     <div className="pt-4 border-t border-border">
                         <h4 className="text-xs font-medium text-muted-foreground mb-3 uppercase">Active Deals</h4>
+                        <div className="relative mb-3">
+                          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            placeholder="Search deals..."
+                            value={dealSearchQuery}
+                            onChange={(e) => setDealSearchQuery(e.target.value)}
+                            className="pl-9 h-9"
+                            data-testid="input-search-deals"
+                          />
+                        </div>
                         <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                            {deals.filter(d => d.status === 'Active').map(deal => (
+                            {filteredDeals.map(deal => (
                                 <div 
                                   key={deal.id} 
                                   className={cn(
@@ -352,9 +387,19 @@ export default function TeamAssignment() {
             
             <Card className="bg-card border-border h-[calc(100%-3rem)] flex flex-col">
                 <div className="p-4 border-b border-border bg-secondary/10">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-3">
                       <span className="text-sm font-medium">Team Members</span>
                       <Badge variant="secondary">{filteredUsers.length} members</Badge>
+                    </div>
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search members by name, email, role..."
+                        value={memberSearchQuery}
+                        onChange={(e) => setMemberSearchQuery(e.target.value)}
+                        className="pl-9 h-9"
+                        data-testid="input-search-members"
+                      />
                     </div>
                 </div>
                 
