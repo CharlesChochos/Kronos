@@ -38,7 +38,7 @@ import {
   Plus,
   Trash2
 } from "lucide-react";
-import { useCurrentUser, useTasks, useDeals, useUpdateTask, useCreateTask, useDeleteTask, useUsers, apiRequest, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
+import { useCurrentUser, useTasks, useDeals, useUpdateTask, useCreateTask, useDeleteTask, useUsers, apiRequest, useUserPreferences, useSaveUserPreferences, useCreateTaskAttachment } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import type { UserPreferences } from "@shared/schema";
 import { cn } from "@/lib/utils";
@@ -62,6 +62,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
   const updateTask = useUpdateTask();
   const createTask = useCreateTask();
   const deleteTask = useDeleteTask();
+  const createTaskAttachment = useCreateTaskAttachment();
   const queryClient = useQueryClient();
   const { data: userPrefs, isLoading: prefsLoading } = useUserPreferences();
   const saveUserPrefs = useSaveUserPreferences();
@@ -76,6 +77,8 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
     dealId: '',
     type: 'General' as 'General' | 'Document Review' | 'Due Diligence' | 'Client Communication' | 'Financial Analysis' | 'Legal' | 'Compliance'
   });
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
   const [currentSwipeIndex, setCurrentSwipeIndex] = useState(0);
@@ -406,7 +409,21 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
           taskData.dealStage = selectedDeal.stage;
         }
       }
-      await createTask.mutateAsync(taskData);
+      const createdTask = await createTask.mutateAsync(taskData);
+      
+      if (attachmentFile && createdTask?.id) {
+        try {
+          await createTaskAttachment.mutateAsync({
+            taskId: createdTask.id,
+            filename: `task_${createdTask.id}_${Date.now()}_${attachmentFile.name}`,
+            originalName: attachmentFile.name,
+            mimeType: attachmentFile.type || null,
+            size: attachmentFile.size,
+          });
+        } catch (attachError) {
+          console.error("Failed to upload attachment:", attachError);
+        }
+      }
       
       toast.success("Task created successfully!");
       setShowCreateTaskModal(false);
@@ -418,6 +435,8 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
         dealId: '',
         type: 'General'
       });
+      setAttachmentFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (error: any) {
       toast.error(error.message || "Failed to create task");
     }
@@ -1111,6 +1130,57 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Attachment (Optional)</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setAttachmentFile(file);
+                    }
+                  }}
+                  className="hidden"
+                  data-testid="input-task-attachment"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Paperclip className="w-4 h-4 mr-2" />
+                  {attachmentFile ? 'Change File' : 'Add Attachment'}
+                </Button>
+                {attachmentFile && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-red-500"
+                    onClick={() => {
+                      setAttachmentFile(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+              {attachmentFile && (
+                <div className="flex items-center gap-2 p-2 bg-secondary/30 rounded text-sm">
+                  <Paperclip className="w-4 h-4 text-muted-foreground" />
+                  <span className="truncate flex-1">{attachmentFile.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {(attachmentFile.size / 1024).toFixed(1)} KB
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
