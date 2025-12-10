@@ -25,6 +25,8 @@ export const users = pgTable("users", {
   isExternal: boolean("is_external").default(false),
   externalOrganization: text("external_organization"), // Company/org name for external users
   invitedBy: varchar("invited_by"), // User ID who invited this external user
+  // Asset Management access flag (for standard users who need AM visibility)
+  hasAssetManagementAccess: boolean("has_asset_management_access").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
