@@ -3190,7 +3190,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                       id="deal-document-upload" 
                       className="hidden" 
                       multiple 
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,image/*"
                       onChange={async (e) => {
                         const files = Array.from(e.target.files || []);
                         if (files.length === 0) return;

@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect, ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import { Sidebar } from "./Sidebar";
 import { ReaperAssistant } from "../assistant/ReaperAssistant";
+import { FloatingChatWidget } from "../chat/FloatingChatWidget";
 import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check, Rocket, TrendingUp, UserCheck, ChevronRight, PanelLeftClose, PanelLeft, Camera, Trash2, Calendar, Paperclip, ExternalLink, Loader2, Shield, ShieldCheck, ShieldOff, Copy, Smartphone, QrCode, Eye, EyeOff } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -1951,6 +1952,9 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
       
       {/* Kronos AI Assistant - Global access */}
       <ReaperAssistant />
+      
+      {/* Floating Chat Widget - LinkedIn style */}
+      <FloatingChatWidget />
     </div>
   );
 }

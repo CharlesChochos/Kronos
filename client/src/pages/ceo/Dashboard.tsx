@@ -421,7 +421,9 @@ export default function Dashboard() {
 
   // Calculate velocity scores
   const employeeStats = useMemo(() => {
-    return users.map(user => {
+    // Filter to only show active users (not pending or suspended)
+    const activeUsers = users.filter(user => user.status === 'active');
+    return activeUsers.map(user => {
       const userTasks = tasks.filter(t => t.assignedTo === user.id);
       const completedTasks = userTasks.filter(t => t.status === 'Completed').length;
       const inProgressTasks = userTasks.filter(t => t.status === 'In Progress').length;
