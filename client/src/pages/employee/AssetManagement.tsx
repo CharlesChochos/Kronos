@@ -65,6 +65,51 @@ import {
 const COMPARISON_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 const DEAL_STAGES = ['Reception', 'Initial Review', 'Hard Diligence', 'Structure', 'Negotiation', 'Closing', 'Invested'];
+
+function DealStageTeamCount({ dealId, stage }: { dealId: string; stage: string }) {
+  const { data: stagePodMembers = [] } = useStagePodMembers(dealId, stage);
+  const [showPopover, setShowPopover] = useState(false);
+  
+  return (
+    <Popover open={showPopover} onOpenChange={setShowPopover}>
+      <PopoverTrigger asChild>
+        <div className="cursor-pointer hover:text-primary transition-colors" onClick={(e) => { e.stopPropagation(); setShowPopover(true); }}>
+          <span className="font-medium">{stagePodMembers.length} members</span>
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-3" align="start" onClick={(e) => e.stopPropagation()}>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              <Users className="w-4 h-4 text-emerald-400" />
+              {stage} Stage Team
+            </h4>
+            <Badge variant="secondary" className="text-xs">{stagePodMembers.length}</Badge>
+          </div>
+          {stagePodMembers.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No team members assigned to this stage yet</p>
+          ) : (
+            <ScrollArea className="max-h-48">
+              <div className="space-y-2">
+                {stagePodMembers.map((member: any) => (
+                  <div key={member.id} className="flex items-center gap-2 p-2 bg-secondary/30 rounded-lg">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-sm font-medium">
+                      {member.userName?.charAt(0) || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm truncate">{member.userName || 'Unknown'}</div>
+                      <div className="text-xs text-muted-foreground truncate">{member.role}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 const INVESTOR_TYPES = ['PE', 'VC', 'Strategic', 'Family Office', 'Hedge Fund', 'Sovereign Wealth'];
 const INVESTOR_STATUSES = ['Contacted', 'Interested', 'In DD', 'Term Sheet', 'Passed', 'Closed'];
 
@@ -120,6 +165,7 @@ function StageWorkSection({
   const [showAddDocument, setShowAddDocument] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
+  const [showTeamPopover, setShowTeamPopover] = useState(false);
   const [documentTitle, setDocumentTitle] = useState("");
   const [documentCategory, setDocumentCategory] = useState("General");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
@@ -385,13 +431,47 @@ function StageWorkSection({
             <div className="text-xs text-muted-foreground">Documents</div>
           </CardContent>
         </Card>
-        <Card className="bg-secondary/20">
-          <CardContent className="p-3 text-center">
-            <Users className="w-4 h-4 mx-auto mb-1 text-green-400" />
-            <div className="text-lg font-bold">{totalTeamCount ?? stagePodMembers.length}</div>
-            <div className="text-xs text-muted-foreground">Team</div>
-          </CardContent>
-        </Card>
+        <Popover open={showTeamPopover} onOpenChange={setShowTeamPopover}>
+          <PopoverTrigger asChild>
+            <Card className="bg-secondary/20 cursor-pointer hover:bg-secondary/30 transition-colors">
+              <CardContent className="p-3 text-center">
+                <Users className="w-4 h-4 mx-auto mb-1 text-green-400" />
+                <div className="text-lg font-bold">{stagePodMembers.length}</div>
+                <div className="text-xs text-muted-foreground">Team</div>
+              </CardContent>
+            </Card>
+          </PopoverTrigger>
+          <PopoverContent className="w-72 p-3" align="center">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  <Users className="w-4 h-4 text-green-400" />
+                  {activeStageTab} Stage Team
+                </h4>
+                <Badge variant="secondary" className="text-xs">{stagePodMembers.length}</Badge>
+              </div>
+              {stagePodMembers.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No team members assigned to this stage yet</p>
+              ) : (
+                <ScrollArea className="max-h-48">
+                  <div className="space-y-2">
+                    {stagePodMembers.map((member: any) => (
+                      <div key={member.id} className="flex items-center gap-2 p-2 bg-secondary/30 rounded-lg">
+                        <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-sm font-medium">
+                          {member.userName?.charAt(0) || '?'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm truncate">{member.userName || 'Unknown'}</div>
+                          <div className="text-xs text-muted-foreground truncate">{member.role}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
         <Card className="bg-secondary/20">
           <CardContent className="p-3 text-center">
             <Mic className="w-4 h-4 mx-auto mb-1 text-purple-400" />
@@ -2199,9 +2279,9 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                   </div>
                   <div className="space-y-1">
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                      <Users className="w-3 h-3" /> Team
+                      <Users className="w-3 h-3" /> Stage Team
                     </div>
-                    <div className="font-medium">{(deal.podTeam as PodTeamMember[] || []).length} members</div>
+                    <DealStageTeamCount dealId={deal.id} stage={deal.stage} />
                   </div>
                 </div>
 
