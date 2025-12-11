@@ -48,16 +48,21 @@ export const strictLimiter = rateLimit({
 });
 
 export const uploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 50, // Limit file uploads
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200, // Allow 200 file uploads per 15 minutes for bulk operations
   standardHeaders,
   legacyHeaders,
-  message: { error: 'Too many file uploads, please try again later.' },
+  message: { error: 'Too many file uploads, please wait a few minutes and try again.' },
   handler: (req: Request, res: Response) => {
     res.status(429).json({ 
-      error: 'Too many file uploads, please try again later.',
-      retryAfter: '1 hour',
+      error: 'Too many file uploads, please wait a few minutes and try again.',
+      retryAfter: '15 minutes',
     });
+  },
+  keyGenerator: (req: Request) => {
+    // Rate limit per user instead of per IP to allow multiple users from same office
+    const user = (req as any).user;
+    return user?.id || req.ip || 'anonymous';
   },
 });
 
