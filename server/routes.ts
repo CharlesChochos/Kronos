@@ -109,9 +109,16 @@ export async function registerRoutes(
   passport.deserializeUser(async (id: string, done) => {
     try {
       const user = await storage.getUser(id);
+      if (!user) {
+        // User not found - session references a deleted user
+        console.warn(`[Auth] Session references non-existent user: ${id}`);
+        return done(null, false);
+      }
       done(null, user);
     } catch (error) {
-      done(error);
+      // Log the error but don't crash - just invalidate the session
+      console.error(`[Auth] Error deserializing user ${id}:`, error);
+      done(null, false);
     }
   });
 
@@ -167,6 +174,37 @@ export async function registerRoutes(
         error: "Failed to fetch deals",
         details: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined
+      });
+    }
+  });
+
+  // Session debug endpoint (no auth required - TEMPORARY)
+  app.get("/api/health/session", async (req, res) => {
+    try {
+      const sessionInfo = {
+        hasSession: !!req.session,
+        sessionID: req.sessionID ? req.sessionID.substring(0, 8) + '...' : null,
+        isAuthenticated: req.isAuthenticated ? req.isAuthenticated() : false,
+        hasUser: !!req.user,
+        userId: req.user ? (req.user as any).id?.substring(0, 8) + '...' : null,
+        userName: req.user ? (req.user as any).name : null,
+        cookie: req.session?.cookie ? {
+          maxAge: req.session.cookie.maxAge,
+          secure: req.session.cookie.secure,
+          httpOnly: req.session.cookie.httpOnly,
+          sameSite: req.session.cookie.sameSite,
+        } : null,
+        env: {
+          nodeEnv: process.env.NODE_ENV,
+          replitDeployment: process.env.REPLIT_DEPLOYMENT,
+        }
+      };
+      res.json(sessionInfo);
+    } catch (error) {
+      console.error("[Health Check] Session error:", error);
+      res.status(500).json({
+        error: "Failed to get session info",
+        details: error instanceof Error ? error.message : String(error),
       });
     }
   });
