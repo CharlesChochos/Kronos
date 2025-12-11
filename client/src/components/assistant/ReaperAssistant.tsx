@@ -110,6 +110,18 @@ export function ReaperAssistant() {
   const recognitionRef = useRef<any>(null);
   const queryClient = useQueryClient();
   
+  // Listen for custom event to open the assistant from sidebar
+  useEffect(() => {
+    const handleOpenAssistant = () => {
+      setIsOpen(true);
+    };
+    
+    window.addEventListener('openKronosAssistant', handleOpenAssistant);
+    return () => {
+      window.removeEventListener('openKronosAssistant', handleOpenAssistant);
+    };
+  }, []);
+  
   // Initialize speech recognition (supports both webkit and standard)
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1201,27 +1213,6 @@ export function ReaperAssistant() {
         )}
       </AnimatePresence>
 
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setIsOpen(!isOpen)}
-        className={cn(
-          "fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-lg z-50 flex items-center justify-center transition-colors",
-          isOpen 
-            ? "bg-secondary text-secondary-foreground" 
-            : "bg-primary text-primary-foreground hover:bg-primary/90"
-        )}
-        data-testid="button-open-reaper"
-      >
-        {isOpen ? (
-          <X className="w-6 h-6" />
-        ) : (
-          <div className="relative">
-            <Sparkles className="w-6 h-6" />
-            <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          </div>
-        )}
-      </motion.button>
     </>
   );
 }

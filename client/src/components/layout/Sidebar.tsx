@@ -5,7 +5,7 @@ import {
   FileText, 
   Users, 
   PieChart, 
-  LogOut,
+  Bot,
   CheckSquare,
   Home,
   MessageCircle,
@@ -25,8 +25,7 @@ import {
   ClipboardList
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useLogout, useUserPreferences, useSaveUserPreferences, useCurrentUser } from "@/lib/api";
-import { toast } from "sonner";
+import { useUserPreferences, useSaveUserPreferences, useCurrentUser } from "@/lib/api";
 import { useDashboardContext } from "@/contexts/DashboardContext";
 import logo from "@assets/generated_images/abstract_minimalist_layer_icon_for_fintech_logo.png";
 import { useState, useEffect, useRef } from "react";
@@ -51,7 +50,6 @@ type CategoryGroup = {
 
 export function Sidebar({ role, collapsed = false }: SidebarProps) {
   const [location, setLocation] = useLocation();
-  const logoutMutation = useLogout();
   const { data: currentUser } = useCurrentUser();
   const { unreadMessageCount, clearUnreadMessages } = useDashboardContext();
   const queryClient = useQueryClient();
@@ -114,14 +112,9 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
     }));
   };
   
-  const handleLogout = async () => {
-    try {
-      await logoutMutation.mutateAsync();
-      toast.success("Logged out successfully");
-      setLocation("/");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to log out");
-    }
+  const openAIAssistant = () => {
+    // Dispatch custom event to open the AI assistant
+    window.dispatchEvent(new CustomEvent('openKronosAssistant'));
   };
 
   const isActive = (path: string) => location === path;
@@ -376,17 +369,16 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
 
       <div className="p-4 border-t border-sidebar-border">
         <button
-          onClick={handleLogout}
-          disabled={logoutMutation.isPending}
+          onClick={openAIAssistant}
           className={cn(
-            "flex items-center rounded-md text-sm font-medium text-red-400 hover:bg-red-400/10 cursor-pointer transition-colors w-full disabled:opacity-50",
+            "flex items-center rounded-md text-sm font-medium text-primary hover:bg-primary/10 cursor-pointer transition-colors w-full",
             collapsed ? "justify-center px-2 py-3" : "gap-3 px-3 py-2 text-left"
           )}
-          data-testid="sidebar-signout"
-          title={collapsed ? "Sign Out" : undefined}
+          data-testid="sidebar-ai-assistant"
+          title={collapsed ? "Kronos AI" : undefined}
         >
-          <LogOut className="w-4 h-4 flex-shrink-0" />
-          {!collapsed && (logoutMutation.isPending ? "Signing Out..." : "Sign Out")}
+          <Bot className="w-4 h-4 flex-shrink-0" />
+          {!collapsed && "Kronos AI"}
         </button>
       </div>
     </div>

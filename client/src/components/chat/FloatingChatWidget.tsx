@@ -176,7 +176,7 @@ export function FloatingChatWidget() {
   };
   
   return (
-    <div className="fixed bottom-6 right-24 z-40" data-testid="floating-chat-widget">
+    <div className="fixed bottom-6 right-6 z-40" data-testid="floating-chat-widget">
       {/* Expanded chat panel */}
       {isExpanded && (
         <Card className="w-80 mb-2 bg-white dark:bg-card border border-gray-200 dark:border-border shadow-xl rounded-lg overflow-hidden animate-in slide-in-from-bottom-2 duration-200">
