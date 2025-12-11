@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
@@ -40,9 +42,11 @@ import {
   Upload,
   Download,
   Pencil,
-  FileEdit
+  FileEdit,
+  Mail
 } from "lucide-react";
-import { useCurrentUser, useTasks, useDealsListing, useUpdateTask, useCreateTask, useDeleteTask, useUsers, apiRequest, useUserPreferences, useSaveUserPreferences, useCreateTaskAttachment } from "@/lib/api";
+import { useCurrentUser, useTasks, useDealsListing, useUpdateTask, useCreateTask, useDeleteTask, useUsers, apiRequest, useUserPreferences, useSaveUserPreferences, useCreateTaskAttachment, useStakeholders, useCreateStakeholder } from "@/lib/api";
+import type { Stakeholder } from "@shared/schema";
 import { useQueryClient } from "@tanstack/react-query";
 import type { UserPreferences } from "@shared/schema";
 import { cn } from "@/lib/utils";
@@ -185,6 +189,9 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
   const { data: allTasks = [], isLoading } = useTasks();
   const { data: deals = [] } = useDealsListing();
   const { data: users = [] } = useUsers();
+  const { data: stakeholdersData } = useStakeholders({ pageSize: 1000 });
+  const stakeholders = stakeholdersData?.stakeholders || [];
+  const createStakeholder = useCreateStakeholder();
   const updateTask = useUpdateTask();
   const createTask = useCreateTask();
   const deleteTask = useDeleteTask();
@@ -236,6 +243,19 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
   const [showSendWorkModal, setShowSendWorkModal] = useState(false);
   const [completedWorkNotes, setCompletedWorkNotes] = useState("");
   const [sendWorkAttachments, setSendWorkAttachments] = useState<UploadedFile[]>([]);
+  
+  // Enhanced Send Work modal state
+  const [sendWorkTab, setSendWorkTab] = useState<'internal' | 'external'>('internal');
+  const [selectedInternalUsers, setSelectedInternalUsers] = useState<string[]>([]);
+  const [internalUserSearch, setInternalUserSearch] = useState("");
+  const [externalRecipientId, setExternalRecipientId] = useState<string>("");
+  const [externalRecipientEmail, setExternalRecipientEmail] = useState("");
+  const [externalRecipientName, setExternalRecipientName] = useState("");
+  const [externalRecipientCompany, setExternalRecipientCompany] = useState("");
+  const [externalEmailMessage, setExternalEmailMessage] = useState("");
+  const [stakeholderSearch, setStakeholderSearch] = useState("");
+  const [showAddNewContact, setShowAddNewContact] = useState(false);
+  const [isSendingExternal, setIsSendingExternal] = useState(false);
   
   // Flagged tasks - persisted to user_preferences.settings.flaggedTasks
   const [flaggedTasks, setFlaggedTasks] = useState<Record<string, string>>({});
@@ -769,45 +789,152 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
   };
   
   const handleSendWork = async () => {
-    if (!selectedTask || !forwardToUser) {
-      toast.error("Please select a team member to send your work to");
+    if (!selectedTask) {
+      toast.error("No task selected");
       return;
     }
     
-    try {
-      // Add a note about the completed work
-      const currentDescription = selectedTask.description || '';
-      const workNote = completedWorkNotes ? `\n\n--- Work Completed ---\n${completedWorkNotes}` : '';
+    if (sendWorkTab === 'internal') {
+      // Internal: send to selected platform users
+      if (selectedInternalUsers.length === 0) {
+        toast.error("Please select at least one team member");
+        return;
+      }
       
-      // Combine existing attachments with new ones
-      const existingAttachments = (selectedTask.attachments as any[]) || [];
-      const newAttachments = sendWorkAttachments.map(f => ({
-        id: f.id,
-        filename: f.filename,
-        url: f.url,
-        size: f.size,
-        uploadedAt: f.uploadedAt,
-      }));
-      const allAttachments = [...existingAttachments, ...newAttachments];
+      try {
+        const currentDescription = selectedTask.description || '';
+        const workNote = completedWorkNotes ? `\n\n--- Work Completed ---\n${completedWorkNotes}` : '';
+        
+        const existingAttachments = (selectedTask.attachments as any[]) || [];
+        const newAttachments = sendWorkAttachments.map(f => ({
+          id: f.id,
+          filename: f.filename,
+          url: f.url,
+          size: f.size,
+          uploadedAt: f.uploadedAt,
+        }));
+        const allAttachments = [...existingAttachments, ...newAttachments];
+        
+        // If one user selected, update the existing task
+        if (selectedInternalUsers.length === 1) {
+          await updateTask.mutateAsync({ 
+            id: selectedTask.id, 
+            assignedTo: selectedInternalUsers[0],
+            description: currentDescription + workNote,
+            attachments: allAttachments,
+            status: 'Pending'
+          });
+        } else {
+          // Multiple users: create copies of the task for each
+          for (const userId of selectedInternalUsers) {
+            await createTask.mutateAsync({
+              title: selectedTask.title,
+              description: currentDescription + workNote,
+              priority: selectedTask.priority as any,
+              status: 'Pending',
+              type: selectedTask.type as any,
+              dueDate: selectedTask.dueDate || null,
+              dealId: selectedTask.dealId || null,
+              assignedTo: userId,
+              assignedBy: currentUser?.id || '',
+              attachments: allAttachments,
+            });
+          }
+          // Mark original as completed
+          await updateTask.mutateAsync({
+            id: selectedTask.id,
+            status: 'Completed',
+            description: currentDescription + workNote + `\n\n[Forwarded to ${selectedInternalUsers.length} team members]`,
+          });
+        }
+        
+        toast.success(`Work sent to ${selectedInternalUsers.length} team member(s)!`);
+        resetSendWorkModal();
+      } catch (error: any) {
+        toast.error(error.message || "Failed to send work");
+      }
+    } else {
+      // External: send email to external stakeholder
+      const recipientEmail = externalRecipientEmail || stakeholders.find(s => s.id === externalRecipientId)?.email;
+      const recipientName = externalRecipientName || stakeholders.find(s => s.id === externalRecipientId)?.name;
       
-      await updateTask.mutateAsync({ 
-        id: selectedTask.id, 
-        assignedTo: forwardToUser,
-        description: currentDescription + workNote,
-        attachments: allAttachments,
-        status: 'Pending'
-      });
+      if (!recipientEmail) {
+        toast.error("Please provide a valid email address");
+        return;
+      }
       
-      toast.success("Work sent successfully!");
-      setShowSendWorkModal(false);
-      setWorkingTask(null);
-      setSelectedTask(null);
-      setForwardToUser("");
-      setCompletedWorkNotes("");
-      setSendWorkAttachments([]);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to send work");
+      setIsSendingExternal(true);
+      try {
+        // If adding new contact, save it first
+        if (showAddNewContact && externalRecipientName && externalRecipientEmail) {
+          await createStakeholder.mutateAsync({
+            name: externalRecipientName,
+            email: externalRecipientEmail,
+            company: externalRecipientCompany || 'Unknown',
+            title: 'Contact',
+            type: 'other',
+          });
+        }
+        
+        // Send email with attachments
+        const response = await fetch('/api/send-external-work', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipientEmail,
+            recipientName: recipientName || 'Recipient',
+            senderName: currentUser?.name || 'Team Member',
+            taskTitle: selectedTask.title,
+            message: externalEmailMessage || completedWorkNotes,
+            attachments: sendWorkAttachments.map(f => ({
+              filename: f.filename,
+              url: f.url,
+            })),
+          }),
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to send email');
+        }
+        
+        // Mark task as completed with note about external send
+        const currentDescription = selectedTask.description || '';
+        const workNote = `\n\n--- Sent Externally ---\nTo: ${recipientName} <${recipientEmail}>\nDate: ${new Date().toLocaleString()}\n${externalEmailMessage || completedWorkNotes}`;
+        
+        await updateTask.mutateAsync({
+          id: selectedTask.id,
+          status: 'Completed',
+          description: currentDescription + workNote,
+        });
+        
+        toast.success(`Work sent to ${recipientName} via email!`);
+        resetSendWorkModal();
+      } catch (error: any) {
+        toast.error(error.message || "Failed to send email");
+      } finally {
+        setIsSendingExternal(false);
+      }
     }
+  };
+  
+  const resetSendWorkModal = () => {
+    setShowSendWorkModal(false);
+    setWorkingTask(null);
+    setSelectedTask(null);
+    setForwardToUser("");
+    setCompletedWorkNotes("");
+    setSendWorkAttachments([]);
+    setSendWorkTab('internal');
+    setSelectedInternalUsers([]);
+    setInternalUserSearch("");
+    setExternalRecipientId("");
+    setExternalRecipientEmail("");
+    setExternalRecipientName("");
+    setExternalRecipientCompany("");
+    setExternalEmailMessage("");
+    setStakeholderSearch("");
+    setShowAddNewContact(false);
   };
 
   const handleSearchSelect = (type: 'task' | 'deal', id: string) => {
@@ -1681,134 +1808,289 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Send Work Modal */}
-      <Dialog open={showSendWorkModal} onOpenChange={setShowSendWorkModal}>
-        <DialogContent className="bg-card border-border max-w-lg">
+      {/* Enhanced Send Work Modal */}
+      <Dialog open={showSendWorkModal} onOpenChange={(open) => { if (!open) resetSendWorkModal(); else setShowSendWorkModal(true); }}>
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Send className="w-5 h-5 text-primary" />
               Send Completed Work
             </DialogTitle>
             <DialogDescription>
-              Send your completed work for "{selectedTask?.title}" to a team member
+              Send your completed work for "{selectedTask?.title}"
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-              <p className="text-xs text-blue-400">
-                <strong>Tip:</strong> If you created files in an external app, save them to your computer first, 
-                then upload them below using the attachment button. The recipient will receive the task with your files and notes.
-              </p>
-            </div>
+          
+          <Tabs value={sendWorkTab} onValueChange={(v) => {
+            setSendWorkTab(v as 'internal' | 'external');
+            // Reset tab-specific selections when switching tabs
+            setSelectedInternalUsers([]);
+            setInternalUserSearch("");
+            setExternalRecipientId("");
+            setExternalRecipientEmail("");
+            setExternalRecipientName("");
+            setExternalRecipientCompany("");
+            setStakeholderSearch("");
+            setShowAddNewContact(false);
+          }}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="internal" className="flex items-center gap-2">
+                <User className="w-4 h-4" /> Internal Team
+              </TabsTrigger>
+              <TabsTrigger value="external" className="flex items-center gap-2">
+                <Send className="w-4 h-4" /> External (Email)
+              </TabsTrigger>
+            </TabsList>
             
-            <div className="space-y-2">
-              <Label>Work Notes (Optional)</Label>
-              <Textarea
-                placeholder="Describe what you completed, any notes for the recipient..."
-                value={completedWorkNotes}
-                onChange={(e) => setCompletedWorkNotes(e.target.value)}
-                rows={3}
-                className="resize-none"
-                data-testid="textarea-work-notes"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Attach Completed Files (Optional)</Label>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.multiple = true;
-                    input.onchange = async (e) => {
-                      const files = (e.target as HTMLInputElement).files;
-                      if (!files) return;
-                      for (const file of Array.from(files)) {
-                        const formData = new FormData();
-                        formData.append('file', file);
-                        try {
-                          const response = await fetch('/api/upload', {
-                            method: 'POST',
-                            body: formData,
-                          });
-                          if (response.ok) {
-                            const uploaded = await response.json();
-                            setSendWorkAttachments(prev => [...prev, uploaded]);
-                            toast.success(`Attached: ${file.name}`);
-                          }
-                        } catch {
-                          toast.error(`Failed to upload ${file.name}`);
-                        }
-                      }
-                    };
-                    input.click();
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <Upload className="w-4 h-4" />
-                  Upload Files
-                </Button>
-                <span className="text-xs text-muted-foreground">
-                  {sendWorkAttachments.length > 0 ? `${sendWorkAttachments.length} file(s) attached` : 'No files attached'}
-                </span>
+            {/* Shared: Work Notes & Attachments */}
+            <div className="space-y-4 py-4">
+              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <p className="text-xs text-blue-400">
+                  <strong>Tip:</strong> Upload your completed files below. {sendWorkTab === 'internal' 
+                    ? 'Recipients will see the task in their MyTasks page.' 
+                    : 'Recipients will receive an email with your message and file links.'}
+                </p>
               </div>
-              {sendWorkAttachments.length > 0 && (
-                <div className="space-y-1 mt-2">
-                  {sendWorkAttachments.map((file, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-2 bg-secondary/30 rounded text-sm">
-                      <div className="flex items-center gap-2">
-                        <Paperclip className="w-3 h-3" />
-                        <span className="truncate max-w-48">{file.filename}</span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => setSendWorkAttachments(prev => prev.filter((_, i) => i !== idx))}
-                      >
-                        <X className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ))}
+              
+              <div className="space-y-2">
+                <Label>{sendWorkTab === 'external' ? 'Message' : 'Work Notes'} (Optional)</Label>
+                <Textarea
+                  placeholder={sendWorkTab === 'external' 
+                    ? "Write a message to include in the email..." 
+                    : "Describe what you completed, any notes for the recipient..."}
+                  value={sendWorkTab === 'external' ? externalEmailMessage : completedWorkNotes}
+                  onChange={(e) => sendWorkTab === 'external' ? setExternalEmailMessage(e.target.value) : setCompletedWorkNotes(e.target.value)}
+                  rows={3}
+                  className="resize-none"
+                  data-testid="textarea-work-notes"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Attach Completed Files</Label>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.multiple = true;
+                      input.onchange = async (e) => {
+                        const files = (e.target as HTMLInputElement).files;
+                        if (!files) return;
+                        for (const file of Array.from(files)) {
+                          const formData = new FormData();
+                          formData.append('file', file);
+                          try {
+                            const response = await fetch('/api/upload', { method: 'POST', body: formData });
+                            if (response.ok) {
+                              const uploaded = await response.json();
+                              setSendWorkAttachments(prev => [...prev, uploaded]);
+                              toast.success(`Attached: ${file.name}`);
+                            }
+                          } catch {
+                            toast.error(`Failed to upload ${file.name}`);
+                          }
+                        }
+                      };
+                      input.click();
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <Upload className="w-4 h-4" /> Upload Files
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {sendWorkAttachments.length > 0 ? `${sendWorkAttachments.length} file(s)` : 'No files'}
+                  </span>
                 </div>
-              )}
+                {sendWorkAttachments.length > 0 && (
+                  <div className="space-y-1 mt-2 max-h-24 overflow-y-auto">
+                    {sendWorkAttachments.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 bg-secondary/30 rounded text-sm">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Paperclip className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{file.filename}</span>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSendWorkAttachments(prev => prev.filter((_, i) => i !== idx))}>
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             
-            <div className="space-y-2">
-              <Label>Send To *</Label>
-              <Select value={forwardToUser} onValueChange={setForwardToUser}>
-                <SelectTrigger data-testid="select-send-to">
-                  <SelectValue placeholder="Select team member" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.filter(u => u.id !== currentUser?.id).map(user => (
-                    <SelectItem key={user.id} value={user.id}>
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4" />
-                        <span>{user.name}</span>
-                        <span className="text-muted-foreground">({user.jobTitle || user.role})</span>
+            <TabsContent value="internal" className="space-y-4 mt-0">
+              <div className="space-y-2">
+                <Label>Send To (select one or more team members) *</Label>
+                <Input
+                  placeholder="Search team members..."
+                  value={internalUserSearch}
+                  onChange={(e) => setInternalUserSearch(e.target.value)}
+                  className="mb-2"
+                  data-testid="input-search-internal-users"
+                />
+                <ScrollArea className="h-40 border rounded-md p-2">
+                  {users
+                    .filter(u => u.id !== currentUser?.id)
+                    .filter(u => internalUserSearch === '' || u.name.toLowerCase().includes(internalUserSearch.toLowerCase()))
+                    .map(user => (
+                      <div 
+                        key={user.id} 
+                        className={cn(
+                          "flex items-center gap-3 p-2 rounded-md cursor-pointer hover:bg-secondary/50",
+                          selectedInternalUsers.includes(user.id) && "bg-primary/10 border border-primary/30"
+                        )}
+                        onClick={() => {
+                          setSelectedInternalUsers(prev => 
+                            prev.includes(user.id) 
+                              ? prev.filter(id => id !== user.id) 
+                              : [...prev, user.id]
+                          );
+                        }}
+                      >
+                        <Checkbox 
+                          checked={selectedInternalUsers.includes(user.id)} 
+                          onCheckedChange={() => {
+                            setSelectedInternalUsers(prev => 
+                              prev.includes(user.id) 
+                                ? prev.filter(id => id !== user.id) 
+                                : [...prev, user.id]
+                            );
+                          }}
+                        />
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-muted-foreground" />
+                          <span className="font-medium">{user.name}</span>
+                          <span className="text-xs text-muted-foreground">({user.jobTitle || user.role})</span>
+                        </div>
                       </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+                    ))}
+                </ScrollArea>
+                {selectedInternalUsers.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {selectedInternalUsers.length} user(s) selected
+                  </p>
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="external" className="space-y-4 mt-0">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Recipient</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setShowAddNewContact(!showAddNewContact);
+                      setExternalRecipientId("");
+                    }}
+                    className="text-xs"
+                  >
+                    {showAddNewContact ? 'Select from Directory' : '+ Add New Contact'}
+                  </Button>
+                </div>
+                
+                {showAddNewContact ? (
+                  <div className="space-y-3 p-3 border rounded-lg bg-secondary/20">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Name *</Label>
+                      <Input
+                        placeholder="Contact name"
+                        value={externalRecipientName}
+                        onChange={(e) => setExternalRecipientName(e.target.value)}
+                        data-testid="input-external-name"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Email *</Label>
+                      <Input
+                        type="email"
+                        placeholder="email@example.com"
+                        value={externalRecipientEmail}
+                        onChange={(e) => setExternalRecipientEmail(e.target.value)}
+                        data-testid="input-external-email"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Company</Label>
+                      <Input
+                        placeholder="Company name (optional)"
+                        value={externalRecipientCompany}
+                        onChange={(e) => setExternalRecipientCompany(e.target.value)}
+                        data-testid="input-external-company"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      This contact will be saved to your directory for future use.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <Input
+                      placeholder="Search stakeholders..."
+                      value={stakeholderSearch}
+                      onChange={(e) => setStakeholderSearch(e.target.value)}
+                      className="mb-2"
+                      data-testid="input-search-stakeholders"
+                    />
+                    <ScrollArea className="h-40 border rounded-md p-2">
+                      {stakeholders
+                        .filter(s => s.email)
+                        .filter(s => stakeholderSearch === '' || 
+                          s.name.toLowerCase().includes(stakeholderSearch.toLowerCase()) ||
+                          s.company?.toLowerCase().includes(stakeholderSearch.toLowerCase()) ||
+                          s.email?.toLowerCase().includes(stakeholderSearch.toLowerCase())
+                        )
+                        .map(stakeholder => (
+                          <div 
+                            key={stakeholder.id} 
+                            className={cn(
+                              "flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-secondary/50",
+                              externalRecipientId === stakeholder.id && "bg-primary/10 border border-primary/30"
+                            )}
+                            onClick={() => setExternalRecipientId(stakeholder.id)}
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium text-sm">{stakeholder.name}</span>
+                              <span className="text-xs text-muted-foreground">{stakeholder.email}</span>
+                            </div>
+                            <Badge variant="outline" className="text-xs">{stakeholder.type}</Badge>
+                          </div>
+                        ))}
+                      {stakeholders.filter(s => s.email).length === 0 && (
+                        <div className="text-center py-4 text-muted-foreground text-sm">
+                          No stakeholders with email found. Click "Add New Contact" above.
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+          
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowSendWorkModal(false);
-              setCompletedWorkNotes("");
-              setForwardToUser("");
-              setSendWorkAttachments([]);
-            }}>
+            <Button variant="outline" onClick={resetSendWorkModal}>
               Cancel
             </Button>
-            <Button onClick={handleSendWork} disabled={!forwardToUser}>
-              <Send className="w-4 h-4 mr-2" /> Send Work
+            <Button 
+              onClick={handleSendWork} 
+              disabled={
+                (sendWorkTab === 'internal' && selectedInternalUsers.length === 0) ||
+                (sendWorkTab === 'external' && !externalRecipientId && !externalRecipientEmail) ||
+                isSendingExternal
+              }
+            >
+              {isSendingExternal ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</>
+              ) : (
+                <><Send className="w-4 h-4 mr-2" /> {sendWorkTab === 'internal' ? 'Send Work' : 'Send Email'}</>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

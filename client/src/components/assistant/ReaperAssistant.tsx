@@ -362,6 +362,8 @@ export function ReaperAssistant() {
 
   // State to track if we need to create a conversation (used by useEffect below)
   const [shouldCreateConversation, setShouldCreateConversation] = useState(false);
+  // Track if we just deleted a conversation to prevent auto-create
+  const [justDeleted, setJustDeleted] = useState(false);
 
   const { data: messages = [], isLoading: messagesLoading } = useQuery<AssistantMessage[]>({
     queryKey: [`/api/assistant/conversations/${activeConversationId}/messages`],
@@ -503,6 +505,9 @@ export function ReaperAssistant() {
 
   // Auto-select most recent conversation or create new one when opening
   useEffect(() => {
+    // Don't auto-create if we just deleted a conversation
+    if (justDeleted) return;
+    
     if (isOpen && !conversationsLoading && !activeConversationId && !createConversation.isPending) {
       if (conversations.length > 0) {
         setActiveConversationId(conversations[0].id);
@@ -512,7 +517,7 @@ export function ReaperAssistant() {
         setShouldCreateConversation(true);
       }
     }
-  }, [isOpen, conversationsLoading, conversations, activeConversationId, createConversation.isPending]);
+  }, [isOpen, conversationsLoading, conversations, activeConversationId, createConversation.isPending, justDeleted]);
 
   // Handle the actual creation after state is set (to avoid hoisting issues)
   useEffect(() => {
@@ -617,11 +622,15 @@ export function ReaperAssistant() {
       return { deletedId: id };
     },
     onSuccess: (data) => {
+      setJustDeleted(true);
       queryClient.invalidateQueries({ queryKey: ["/api/assistant/conversations"] });
       if (activeConversationId === data.deletedId) {
         setActiveConversationId(null);
         setShowConversations(true);
       }
+      toast.success("Conversation deleted");
+      // Reset justDeleted after a short delay
+      setTimeout(() => setJustDeleted(false), 1000);
     },
   });
   

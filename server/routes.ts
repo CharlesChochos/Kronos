@@ -8,7 +8,7 @@ import connectPgSimple from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema, insertAssistantConversationSchema, insertAssistantMessageSchema, insertTimeEntrySchema, insertTimeOffRequestSchema, insertAuditLogSchema, insertInvestorSchema, insertInvestorInteractionSchema, insertOkrSchema, insertStakeholderSchema, insertAnnouncementSchema, insertPollSchema, insertMentorshipPairingSchema, insertClientPortalAccessSchema, insertDocumentTemplateSchema, insertInvestorMatchSchema, insertUserPreferencesSchema, insertDealTemplateSchema, insertCalendarEventSchema, insertTaskAttachmentRecordSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
-import { sendMeetingInvite, sendPasswordResetEmail, sendUserInviteEmail } from "./email";
+import { sendMeetingInvite, sendPasswordResetEmail, sendUserInviteEmail, sendExternalWorkEmail } from "./email";
 import { validateBody, loginSchema, signupSchema, forgotPasswordSchema, resetPasswordSchema } from "./validation";
 import { generalLimiter, authLimiter, strictLimiter, uploadLimiter, aiLimiter, preferencesLimiter } from "./rateLimiter";
 import OpenAI from "openai";
@@ -604,6 +604,35 @@ export async function registerRoutes(
       res.json({ message: "File deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete file" });
+    }
+  });
+
+  // Send external work email
+  app.post("/api/send-external-work", generalLimiter, requireAuth, async (req, res) => {
+    try {
+      const { recipientEmail, recipientName, senderName, taskTitle, message, attachments } = req.body;
+      
+      if (!recipientEmail || !taskTitle) {
+        return res.status(400).json({ error: "Recipient email and task title are required" });
+      }
+      
+      const result = await sendExternalWorkEmail({
+        recipientEmail,
+        recipientName: recipientName || 'Recipient',
+        senderName: senderName || 'Team Member',
+        taskTitle,
+        message: message || '',
+        attachments: attachments || [],
+      });
+      
+      if (!result.success) {
+        return res.status(500).json({ error: result.error || "Failed to send email" });
+      }
+      
+      res.json({ success: true, message: "Email sent successfully" });
+    } catch (error) {
+      console.error('Error sending external work email:', error);
+      res.status(500).json({ error: "Failed to send email" });
     }
   });
 

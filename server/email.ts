@@ -588,3 +588,114 @@ Kronos - Investment Banking Operations Platform
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
+
+export interface ExternalWorkEmailData {
+  recipientEmail: string;
+  recipientName: string;
+  senderName: string;
+  taskTitle: string;
+  message: string;
+  attachments?: { filename: string; url: string }[];
+}
+
+export async function sendExternalWorkEmail(data: ExternalWorkEmailData): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { client, fromEmail } = await getUncachableResendClient();
+    
+    const attachmentLinks = data.attachments && data.attachments.length > 0
+      ? data.attachments.map(a => `<li><a href="${a.url}" style="color: #1a1a2e;">${a.filename}</a></li>`).join('')
+      : '';
+    
+    const attachmentSection = attachmentLinks 
+      ? `
+        <div style="background: #f0f4ff; border-left: 4px solid #1a1a2e; padding: 15px; margin: 15px 0; border-radius: 0 8px 8px 0;">
+          <p style="margin: 0 0 10px 0;"><strong>Attachments:</strong></p>
+          <ul style="margin: 0; padding-left: 20px;">${attachmentLinks}</ul>
+        </div>
+      `
+      : '';
+    
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #1a1a2e; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; }
+            .header h1 { margin: 0; font-size: 24px; }
+            .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px; }
+            .message-box { background: white; border-radius: 8px; padding: 25px; margin: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+            .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>${data.taskTitle}</h1>
+              <p style="margin: 10px 0 0 0; opacity: 0.9;">Work delivery from ${data.senderName}</p>
+            </div>
+            <div class="content">
+              <div class="message-box">
+                <p>Hi ${data.recipientName},</p>
+                <p><strong>${data.senderName}</strong> has sent you completed work regarding: <strong>${data.taskTitle}</strong></p>
+                
+                ${data.message ? `
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                  <p style="margin: 0; white-space: pre-wrap;">${data.message}</p>
+                </div>
+                ` : ''}
+                
+                ${attachmentSection}
+                
+                <p style="color: #666; font-size: 13px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+                  This email was sent from the Kronos platform. Please reply directly to this email if you have any questions.
+                </p>
+              </div>
+            </div>
+            <div class="footer">
+              <p>Kronos - Investment Banking Operations Platform</p>
+              <p>Equiturn &copy; ${new Date().getFullYear()}</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const attachmentTextList = data.attachments && data.attachments.length > 0
+      ? data.attachments.map(a => `- ${a.filename}: ${a.url}`).join('\n')
+      : '';
+
+    const emailText = `
+${data.taskTitle}
+
+Hi ${data.recipientName},
+
+${data.senderName} has sent you completed work regarding: ${data.taskTitle}
+
+${data.message ? `Message:\n${data.message}\n` : ''}
+${attachmentTextList ? `\nAttachments:\n${attachmentTextList}` : ''}
+
+---
+Kronos - Investment Banking Operations Platform
+    `.trim();
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      to: data.recipientEmail,
+      subject: `Work Delivery: ${data.taskTitle} from ${data.senderName}`,
+      html: emailHtml,
+      text: emailText,
+    });
+
+    if (result.error) {
+      return { success: false, error: result.error.message };
+    }
+
+    console.log(`Successfully sent external work email to: ${data.recipientEmail}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to send external work email:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
