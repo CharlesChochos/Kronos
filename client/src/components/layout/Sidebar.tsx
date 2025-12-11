@@ -35,6 +35,7 @@ import type { UserPreferences } from "@shared/schema";
 type SidebarProps = {
   role: 'CEO' | 'Employee';
   collapsed?: boolean;
+  inMobileDrawer?: boolean; // When true, uses fixed width without responsive classes
 };
 
 type LinkItem = {
@@ -48,7 +49,7 @@ type CategoryGroup = {
   links: LinkItem[];
 };
 
-export function Sidebar({ role, collapsed = false }: SidebarProps) {
+export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: SidebarProps) {
   const [location, setLocation] = useLocation();
   const { data: currentUser } = useCurrentUser();
   const { unreadMessageCount, clearUnreadMessages } = useDashboardContext();
@@ -230,18 +231,27 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
   // Use the role prop to determine navigation (supports preview mode for admins)
   const groups = role === 'CEO' ? ceoGroups : employeeGroups;
 
+  // Determine if sidebar should show in collapsed state (icons only)
+  // In mobile drawer, always show expanded (labels visible)
+  const showCollapsed = inMobileDrawer ? false : collapsed;
+  
   return (
     <div className={cn(
-      "h-screen bg-sidebar border-r border-sidebar-border flex flex-col text-sidebar-foreground fixed left-0 top-0 z-50 transition-all duration-300",
-      collapsed ? "w-20" : "w-64",
-      "w-20 lg:w-64", // Responsive: collapsed on medium screens, expanded on large
-      collapsed && "lg:w-20" // Override when explicitly collapsed
+      "h-screen bg-sidebar flex flex-col text-sidebar-foreground transition-all duration-300",
+      // In mobile drawer: no fixed positioning, no border (Sheet handles it)
+      inMobileDrawer ? "w-64 border-0" : [
+        "fixed left-0 top-0 z-50 border-r border-sidebar-border",
+        // Width: collapsed on md, full on lg, unless explicitly collapsed
+        collapsed ? "w-20" : "w-64",
+        "md:w-20 lg:w-64",
+        collapsed && "lg:w-20"
+      ]
     )}>
-      <div className={cn("p-6 flex items-center", collapsed ? "justify-center" : "gap-3")}>
+      <div className={cn("p-6 flex items-center", showCollapsed ? "justify-center" : "gap-3")}>
         <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center overflow-hidden flex-shrink-0">
             <img src={logo} alt="Logo" className="w-full h-full object-cover" />
         </div>
-        {!collapsed && (
+        {!showCollapsed && (
           <div>
             <h1 className="font-display font-bold text-lg leading-none tracking-tight">Kronos</h1>
             <p className="text-xs text-muted-foreground mt-0.5">v2.4</p>
@@ -256,7 +266,7 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
           
           return (
             <div key={group.category} className="mb-2">
-              {!collapsed ? (
+              {!showCollapsed ? (
                 <>
                   <button
                     onClick={() => toggleCategory(group.category)}
@@ -372,16 +382,16 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
           onClick={openAIAssistant}
           className={cn(
             "flex items-center rounded-lg text-sm font-semibold bg-gradient-to-r from-primary/20 to-primary/10 hover:from-primary/30 hover:to-primary/20 text-primary cursor-pointer transition-all w-full group shadow-sm hover:shadow-md border border-primary/20",
-            collapsed ? "justify-center px-2 py-3" : "gap-3 px-3 py-3 text-left"
+            showCollapsed ? "justify-center px-2 py-3" : "gap-3 px-3 py-3 text-left"
           )}
           data-testid="sidebar-ai-assistant"
-          title={collapsed ? "Ask Kronos AI" : undefined}
+          title={showCollapsed ? "Ask Kronos AI" : undefined}
         >
           <div className="relative">
             <Bot className="w-5 h-5 flex-shrink-0 group-hover:scale-110 transition-transform" />
             <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
           </div>
-          {!collapsed && (
+          {!showCollapsed && (
             <div className="flex flex-col">
               <span>Ask Kronos AI</span>
               <span className="text-[10px] text-primary/70 font-normal">Click to chat</span>

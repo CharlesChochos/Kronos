@@ -560,7 +560,7 @@ function StageWorkSection({
         {activeStageTab === dealStage && <span className="ml-1 text-green-500">(Current)</span>}
       </div>
       
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Card className="bg-secondary/20">
           <CardContent className="p-3 text-center">
             <FileText className="w-4 h-4 mx-auto mb-1 text-blue-400" />

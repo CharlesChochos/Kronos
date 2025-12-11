@@ -335,7 +335,7 @@ export default function EmployeeHome() {
   };
   
   const renderQuickStats = () => widgetSettings.showQuickStats && (
-    <div className="grid grid-cols-1 md:grid-cols-5 gap-4" key="quickStats">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4" key="quickStats">
       <Card className="bg-card border-border">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
@@ -920,15 +920,15 @@ export default function EmployeeHome() {
   const renderAnalyticsView = () => (
     <div className="space-y-6">
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <Activity className="w-5 h-5 text-primary" />
+          <CardContent className="p-3 md:p-4">
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Activity className="w-4 h-4 md:w-5 md:h-5 text-primary" />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground uppercase">Completion Rate</p>
+              <div className="min-w-0">
+                <p className="text-[10px] md:text-xs text-muted-foreground uppercase truncate">Completion Rate</p>
                 <p className="text-2xl font-bold">{taskCompletionRate}%</p>
               </div>
             </div>

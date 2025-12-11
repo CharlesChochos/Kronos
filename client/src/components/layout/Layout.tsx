@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { Sidebar } from "./Sidebar";
 import { ReaperAssistant } from "../assistant/ReaperAssistant";
 import { FloatingChatWidget } from "../chat/FloatingChatWidget";
-import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check, Rocket, TrendingUp, UserCheck, ChevronRight, PanelLeftClose, PanelLeft, Camera, Trash2, Calendar, Paperclip, ExternalLink, Loader2, Shield, ShieldCheck, ShieldOff, Copy, Smartphone, QrCode, Eye, EyeOff } from "lucide-react";
+import { Bell, Search, User, BookOpen, Palette, Briefcase, CheckSquare, Users, FileText, X, Settings, BarChart3, Target, Mail, Phone, Lock, Pencil, AlertCircle, Info, Check, Rocket, TrendingUp, UserCheck, ChevronRight, PanelLeftClose, PanelLeft, Camera, Trash2, Calendar, Paperclip, ExternalLink, Loader2, Shield, ShieldCheck, ShieldOff, Copy, Smartphone, QrCode, Eye, EyeOff, Menu } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -145,6 +145,9 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   // Sidebar collapsed state - from database preferences
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarInitialized, setSidebarInitialized] = useState(false);
+  
+  // Mobile sidebar drawer state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   // Settings preferences - from database preferences
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -646,27 +649,51 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
-      <Sidebar role={effectiveRole} collapsed={sidebarCollapsed} />
+      {/* Desktop Sidebar - hidden on small screens */}
+      <div className="hidden md:block">
+        <Sidebar role={effectiveRole} collapsed={sidebarCollapsed} />
+      </div>
+      
+      {/* Mobile Sidebar Drawer */}
+      <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+        <SheetContent side="left" className="p-0 w-64 bg-sidebar border-sidebar-border">
+          <Sidebar role={effectiveRole} collapsed={false} inMobileDrawer={true} />
+        </SheetContent>
+      </Sheet>
       
       <div className={cn(
         "flex flex-col min-h-screen transition-all duration-300",
-        sidebarCollapsed ? "pl-20" : "pl-64",
-        "md:pl-20 lg:pl-64", // Responsive padding based on screen size when sidebar is expanded
-        sidebarCollapsed && "md:pl-20 lg:pl-20" // Override when explicitly collapsed
+        // No left padding on mobile (sidebar is hidden/drawer)
+        "pl-0",
+        // Medium screens: collapsed sidebar width
+        "md:pl-20",
+        // Large screens: full sidebar width (unless explicitly collapsed)
+        sidebarCollapsed ? "lg:pl-20" : "lg:pl-64"
       )}>
         {/* Header */}
         <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-40 px-3 sm:px-4 md:px-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* Mobile menu button - only shown on small screens */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMobileMenuOpen(true)}
+              className="w-8 h-8 md:hidden"
+              data-testid="button-mobile-menu"
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+            {/* Desktop sidebar toggle - hidden on mobile */}
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="w-8 h-8"
+              className="w-8 h-8 hidden md:flex"
               data-testid="button-toggle-sidebar"
             >
               {sidebarCollapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
             </Button>
-            <h2 className="text-lg font-display font-semibold tracking-tight">{pageTitle}</h2>
+            <h2 className="text-base sm:text-lg font-display font-semibold tracking-tight truncate max-w-[150px] sm:max-w-none">{pageTitle}</h2>
           </div>
           
           <div className="flex items-center gap-4">
