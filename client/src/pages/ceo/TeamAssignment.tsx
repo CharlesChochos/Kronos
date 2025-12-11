@@ -208,7 +208,7 @@ export default function TeamAssignment() {
   };
 
   const handleAssignTask = async () => {
-    if (!selectedUser || !taskDealId || !newTask.title) {
+    if (!selectedUser || !newTask.title) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -229,7 +229,7 @@ export default function TeamAssignment() {
       const createdTask = await createTask.mutateAsync({
         title: newTask.title,
         description: newTask.description || null,
-        dealId: taskDealId,
+        dealId: taskDealId || undefined,
         assignedTo: selectedUser.id,
         assignedBy: currentUser?.id || null,
         priority: newTask.priority,
@@ -418,7 +418,7 @@ export default function TeamAssignment() {
         <div className="col-span-12 md:col-span-9">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-sm font-medium text-muted-foreground">
-                  {selectedDeal ? `Assigning team for: ${currentDeal?.name}` : 'Select a deal to assign team members'}
+                  {selectedDeal ? `Assigning team for: ${currentDeal?.name}` : 'All Team Members (select a deal to manage team)'}
                 </h2>
             </div>
             
@@ -440,107 +440,95 @@ export default function TeamAssignment() {
                     </div>
                 </div>
                 
-                {selectedDeal ? (
-                  <div className="flex-1 p-4 overflow-y-auto">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {filteredUsers.map(user => {
-                        const availability = getUserAvailability(user.id);
-                        const taskCount = getUserTaskCount(user.id);
-                        return (
-                          <Card 
-                            key={user.id}
-                            ref={(el) => { userRefs.current[user.id] = el; }}
-                            className={cn(
-                              "bg-secondary/20 border-border hover:border-primary/50 transition-all",
-                              highlightedUserId === user.id && "ring-2 ring-primary border-primary animate-pulse"
-                            )}
-                          >
-                            <CardContent className="p-4">
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary">
-                                    {user.name.split(' ').map((n: string) => n[0]).join('')}
-                                  </div>
-                                  <div>
-                                    <h4 className="font-medium">{user.name}</h4>
-                                    <p className="text-xs text-muted-foreground">{user.jobTitle || user.role}</p>
-                                  </div>
+                <div className="flex-1 p-4 overflow-y-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredUsers.map(user => {
+                      const availability = getUserAvailability(user.id);
+                      const taskCount = getUserTaskCount(user.id);
+                      return (
+                        <Card 
+                          key={user.id}
+                          ref={(el) => { userRefs.current[user.id] = el; }}
+                          className={cn(
+                            "bg-secondary/20 border-border hover:border-primary/50 transition-all",
+                            highlightedUserId === user.id && "ring-2 ring-primary border-primary animate-pulse"
+                          )}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary">
+                                  {user.name.split(' ').map((n: string) => n[0]).join('')}
                                 </div>
-                                <Badge className={cn(
-                                  "text-xs",
-                                  availability === 'Available' ? "bg-green-500/20 text-green-400" :
-                                  availability === 'Light' ? "bg-yellow-500/20 text-yellow-400" :
-                                  "bg-red-500/20 text-red-400"
-                                )}>
-                                  {availability}
-                                </Badge>
-                              </div>
-                              
-                              <div className="grid grid-cols-3 gap-2 mb-3 text-center text-xs">
-                                <div className="bg-secondary/50 rounded p-2">
-                                  <div className="font-bold">{taskCount}</div>
-                                  <div className="text-muted-foreground">Active</div>
-                                </div>
-                                <div className="bg-secondary/50 rounded p-2">
-                                  <div className="font-bold">{user.completedTasks || 0}</div>
-                                  <div className="text-muted-foreground">Done</div>
-                                </div>
-                                <div className="bg-secondary/50 rounded p-2">
-                                  <div className="font-bold">{user.score || 0}</div>
-                                  <div className="text-muted-foreground">Score</div>
+                                <div>
+                                  <h4 className="font-medium">{user.name}</h4>
+                                  <p className="text-xs text-muted-foreground">{user.jobTitle || user.role}</p>
                                 </div>
                               </div>
-                              
-                              <div className="flex gap-2">
-                                {isUserInDealTeam(user.id, selectedDeal!) ? (
-                                  <Button 
-                                    variant="outline"
-                                    className="flex-1 border-red-500/30 text-red-400 hover:bg-red-500/10" 
-                                    size="sm"
-                                    onClick={() => handleRemoveFromTeam(user)}
-                                    disabled={updateDeal.isPending}
-                                    data-testid={`button-remove-team-${user.id}`}
-                                  >
-                                    <X className="w-4 h-4 mr-1" /> Remove
-                                  </Button>
-                                ) : (
-                                  <Button 
-                                    variant="outline"
-                                    className="flex-1 border-green-500/30 text-green-400 hover:bg-green-500/10" 
-                                    size="sm"
-                                    onClick={() => handleAddToTeam(user)}
-                                    disabled={updateDeal.isPending}
-                                    data-testid={`button-add-team-${user.id}`}
-                                  >
-                                    <UserPlus className="w-4 h-4 mr-1" /> Add
-                                  </Button>
-                                )}
+                              <Badge className={cn(
+                                "text-xs",
+                                availability === 'Available' ? "bg-green-500/20 text-green-400" :
+                                availability === 'Light' ? "bg-yellow-500/20 text-yellow-400" :
+                                "bg-red-500/20 text-red-400"
+                              )}>
+                                {availability}
+                              </Badge>
+                            </div>
+                            
+                            <div className="grid grid-cols-3 gap-2 mb-3 text-center text-xs">
+                              <div className="bg-secondary/50 rounded p-2">
+                                <div className="font-bold">{taskCount}</div>
+                                <div className="text-muted-foreground">Active</div>
+                              </div>
+                              <div className="bg-secondary/50 rounded p-2">
+                                <div className="font-bold">{user.completedTasks || 0}</div>
+                                <div className="text-muted-foreground">Done</div>
+                              </div>
+                              <div className="bg-secondary/50 rounded p-2">
+                                <div className="font-bold">{user.score || 0}</div>
+                                <div className="text-muted-foreground">Score</div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex gap-2">
+                              {selectedDeal && isUserInDealTeam(user.id, selectedDeal) ? (
                                 <Button 
-                                  className="flex-1" 
+                                  variant="outline"
+                                  className="flex-1 border-red-500/30 text-red-400 hover:bg-red-500/10" 
                                   size="sm"
-                                  onClick={() => openAssignModal(user)}
-                                  data-testid={`button-assign-${user.id}`}
+                                  onClick={() => handleRemoveFromTeam(user)}
+                                  disabled={updateDeal.isPending}
+                                  data-testid={`button-remove-team-${user.id}`}
                                 >
-                                  <CheckCircle className="w-4 h-4 mr-1" /> Task
+                                  <X className="w-4 h-4 mr-1" /> Remove
                                 </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
+                              ) : selectedDeal ? (
+                                <Button 
+                                  variant="outline"
+                                  className="flex-1 border-green-500/30 text-green-400 hover:bg-green-500/10" 
+                                  size="sm"
+                                  onClick={() => handleAddToTeam(user)}
+                                  disabled={updateDeal.isPending}
+                                  data-testid={`button-add-team-${user.id}`}
+                                >
+                                  <UserPlus className="w-4 h-4 mr-1" /> Add
+                                </Button>
+                              ) : null}
+                              <Button 
+                                className={cn("flex-1", !selectedDeal && "w-full")} 
+                                size="sm"
+                                onClick={() => openAssignModal(user)}
+                                data-testid={`button-assign-${user.id}`}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" /> Assign Task
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
-                ) : (
-                  <div className="flex-1 p-8 flex items-center justify-center border-2 border-dashed border-border/50 m-4 rounded-lg bg-secondary/5">
-                      <div className="text-center">
-                          <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
-                              <Users className="w-8 h-8 text-muted-foreground" />
-                          </div>
-                          <h3 className="text-lg font-medium">Select a Deal</h3>
-                          <p className="text-muted-foreground text-sm mt-1">Choose a deal from the sidebar to start assigning team members</p>
-                      </div>
-                  </div>
-                )}
+                </div>
             </Card>
         </div>
       </div>
@@ -553,12 +541,13 @@ export default function TeamAssignment() {
           </DialogHeader>
           <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
             <div className="space-y-2">
-              <Label>Related Deal *</Label>
-              <Select value={taskDealId || ""} onValueChange={(v) => setTaskDealId(v)}>
+              <Label>Related Deal (optional)</Label>
+              <Select value={taskDealId || ""} onValueChange={(v) => setTaskDealId(v || null)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a deal..." />
+                  <SelectValue placeholder="No deal - general task" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="">No deal - general task</SelectItem>
                   {deals.filter(d => d.status === 'Active').map(deal => (
                     <SelectItem key={deal.id} value={deal.id}>{deal.name}</SelectItem>
                   ))}
