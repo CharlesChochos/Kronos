@@ -1,16 +1,20 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MessageCircle, X, Send, Plus, Trash2, ChevronLeft, Loader2, Bot, User, Sparkles, Paperclip, FileText, Download, Settings, Mic, MicOff, Volume2, VolumeX, Maximize2, Minimize2, Share2, Copy, Check } from "lucide-react";
+import { MessageCircle, X, Send, Plus, Trash2, ChevronLeft, Loader2, Bot, User, Sparkles, Paperclip, FileText, Download, Settings, Mic, MicOff, Volume2, VolumeX, Maximize2, Minimize2, Share2, Copy, Check, Pencil, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { useCurrentUser } from "@/lib/api";
+import { useCurrentUser, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
+import type { UserPreferences } from "@shared/schema";
 
 type AssistantConversation = {
   id: string;
@@ -61,6 +65,9 @@ export function ReaperAssistant() {
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [textToSpeechEnabled, setTextToSpeechEnabled] = useState(false);
   const [windowSize, setWindowSize] = useState<WindowSize>('normal');
+  const [responseStyle, setResponseStyle] = useState<'concise' | 'detailed' | 'technical'>('concise');
+  const [autoSuggest, setAutoSuggest] = useState(true);
+  const [soundNotifications, setSoundNotifications] = useState(true);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -69,9 +76,59 @@ export function ReaperAssistant() {
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionIndex, setMentionIndex] = useState(0);
   
+  // Conversation editing state
+  const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  
   // Get current user for role-based prompts
   const { data: currentUser } = useCurrentUser();
   const isAdmin = currentUser?.accessLevel === 'admin';
+  
+  // User preferences for persistence
+  const { data: userPrefs } = useUserPreferences();
+  const saveUserPrefs = useSaveUserPreferences();
+  const [prefsInitialized, setPrefsInitialized] = useState(false);
+  
+  // Load preferences on mount
+  useEffect(() => {
+    if (userPrefs && !prefsInitialized) {
+      const assistantSettings = (userPrefs?.settings as any)?.assistantSettings;
+      if (assistantSettings) {
+        setVoiceEnabled(assistantSettings.voiceEnabled ?? false);
+        setTextToSpeechEnabled(assistantSettings.textToSpeechEnabled ?? false);
+        setWindowSize(assistantSettings.windowSize ?? 'normal');
+        setResponseStyle(assistantSettings.responseStyle ?? 'concise');
+        setAutoSuggest(assistantSettings.autoSuggest ?? true);
+        setSoundNotifications(assistantSettings.soundNotifications ?? true);
+      }
+      setPrefsInitialized(true);
+    }
+  }, [userPrefs, prefsInitialized]);
+  
+  // Save preferences when they change
+  const saveAssistantPreferences = useCallback(() => {
+    if (!prefsInitialized) return;
+    
+    const freshPrefs = queryClient.getQueryData<UserPreferences>(['userPreferences']) || userPrefs;
+    const { id, userId, updatedAt, ...mutablePrefs } = (freshPrefs || {}) as any;
+    const existingSettings = (freshPrefs?.settings as any) || {};
+    
+    saveUserPrefs.mutate({
+      ...mutablePrefs,
+      settings: {
+        ...existingSettings,
+        assistantSettings: {
+          voiceEnabled,
+          textToSpeechEnabled,
+          windowSize,
+          responseStyle,
+          autoSuggest,
+          soundNotifications,
+        },
+      },
+    });
+  }, [prefsInitialized, userPrefs, queryClient, voiceEnabled, textToSpeechEnabled, windowSize, responseStyle, autoSuggest, soundNotifications, saveUserPrefs]);
   
   // Role-based quick prompts
   const quickPrompts = useMemo(() => ({
@@ -553,6 +610,29 @@ export function ReaperAssistant() {
       }
     },
   });
+  
+  const renameConversation = useMutation({
+    mutationFn: async ({ id, title }: { id: string; title: string }) => {
+      const response = await fetch(`/api/assistant/conversations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ title }),
+      });
+      if (!response.ok) throw new Error("Failed to rename conversation");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/assistant/conversations"] });
+      setShowRenameDialog(false);
+      setEditingConversationId(null);
+      setEditingTitle("");
+      toast.success("Conversation renamed");
+    },
+    onError: () => {
+      toast.error("Failed to rename conversation");
+    },
+  });
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -701,54 +781,179 @@ export function ReaperAssistant() {
       
       {/* Settings Dialog */}
       <Dialog open={showSettings} onOpenChange={setShowSettings}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
             <DialogTitle>Kronos Settings</DialogTitle>
             <DialogDescription>Configure your AI assistant preferences</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="voice-input">Voice Input</Label>
-                <p className="text-xs text-muted-foreground">Use microphone to speak to Kronos</p>
+          <Tabs defaultValue="general" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="general">General</TabsTrigger>
+              <TabsTrigger value="voice">Voice</TabsTrigger>
+              <TabsTrigger value="display">Display</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="general" className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Response Style</Label>
+                <Select value={responseStyle} onValueChange={(v) => setResponseStyle(v as any)}>
+                  <SelectTrigger data-testid="select-response-style">
+                    <SelectValue placeholder="Select style" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="concise">Concise - Brief, to-the-point answers</SelectItem>
+                    <SelectItem value="detailed">Detailed - Comprehensive explanations</SelectItem>
+                    <SelectItem value="technical">Technical - Include technical details</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Switch
-                id="voice-input"
-                checked={voiceEnabled}
-                onCheckedChange={setVoiceEnabled}
-                data-testid="switch-voice-input"
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="text-to-speech">Text-to-Speech</Label>
-                <p className="text-xs text-muted-foreground">Have Kronos read responses aloud</p>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="auto-suggest">Auto-Suggest</Label>
+                  <p className="text-xs text-muted-foreground">Show suggested prompts on new conversations</p>
+                </div>
+                <Switch
+                  id="auto-suggest"
+                  checked={autoSuggest}
+                  onCheckedChange={setAutoSuggest}
+                  data-testid="switch-auto-suggest"
+                />
               </div>
-              <Switch
-                id="text-to-speech"
-                checked={textToSpeechEnabled}
-                onCheckedChange={setTextToSpeechEnabled}
-                data-testid="switch-text-to-speech"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Window Size</Label>
-              <div className="flex gap-2">
-                {(['compact', 'normal', 'expanded'] as WindowSize[]).map((size) => (
-                  <Button
-                    key={size}
-                    variant={windowSize === size ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setWindowSize(size)}
-                    className="flex-1 capitalize"
-                    data-testid={`button-size-${size}`}
-                  >
-                    {size}
-                  </Button>
-                ))}
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="sound-notifications">Sound Notifications</Label>
+                  <p className="text-xs text-muted-foreground">Play sound when receiving responses</p>
+                </div>
+                <Switch
+                  id="sound-notifications"
+                  checked={soundNotifications}
+                  onCheckedChange={setSoundNotifications}
+                  data-testid="switch-sound-notifications"
+                />
               </div>
-            </div>
+            </TabsContent>
+            
+            <TabsContent value="voice" className="space-y-4 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="voice-input">Voice Input</Label>
+                  <p className="text-xs text-muted-foreground">Use microphone to speak to Kronos</p>
+                </div>
+                <Switch
+                  id="voice-input"
+                  checked={voiceEnabled}
+                  onCheckedChange={setVoiceEnabled}
+                  data-testid="switch-voice-input"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="text-to-speech">Text-to-Speech</Label>
+                  <p className="text-xs text-muted-foreground">Have Kronos read responses aloud</p>
+                </div>
+                <Switch
+                  id="text-to-speech"
+                  checked={textToSpeechEnabled}
+                  onCheckedChange={setTextToSpeechEnabled}
+                  data-testid="switch-text-to-speech"
+                />
+              </div>
+              <div className="p-3 bg-secondary/30 rounded-lg">
+                <p className="text-xs text-muted-foreground">
+                  Voice features use your browser's built-in speech recognition and synthesis. 
+                  Availability may vary by browser.
+                </p>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="display" className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Window Size</Label>
+                <div className="flex gap-2">
+                  {(['compact', 'normal', 'expanded'] as WindowSize[]).map((size) => (
+                    <Button
+                      key={size}
+                      variant={windowSize === size ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setWindowSize(size)}
+                      className="flex-1 capitalize"
+                      data-testid={`button-size-${size}`}
+                    >
+                      {size}
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Choose how large the assistant window appears
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSettings(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              saveAssistantPreferences();
+              setShowSettings(false);
+              toast.success("Settings saved");
+            }}>
+              <Save className="w-4 h-4 mr-2" />
+              Save Settings
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Rename Conversation Dialog */}
+      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Rename Conversation</DialogTitle>
+            <DialogDescription>Give this conversation a descriptive name</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="conversation-name">Conversation Name</Label>
+            <Input
+              id="conversation-name"
+              value={editingTitle}
+              onChange={(e) => setEditingTitle(e.target.value)}
+              placeholder="Enter a name..."
+              className="mt-2"
+              data-testid="input-conversation-name"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && editingTitle.trim() && editingConversationId) {
+                  renameConversation.mutate({ id: editingConversationId, title: editingTitle.trim() });
+                }
+              }}
+            />
           </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowRenameDialog(false);
+              setEditingConversationId(null);
+              setEditingTitle("");
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (editingConversationId && editingTitle.trim()) {
+                  renameConversation.mutate({ id: editingConversationId, title: editingTitle.trim() });
+                }
+              }}
+              disabled={!editingTitle.trim() || renameConversation.isPending}
+            >
+              {renameConversation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       
@@ -888,18 +1093,36 @@ export function ReaperAssistant() {
                                 {new Date(conv.updatedAt).toLocaleDateString()}
                               </p>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteConversation.mutate(conv.id);
-                              }}
-                              data-testid={`delete-conversation-${conv.id}`}
-                            >
-                              <Trash2 className="w-3 h-3 text-destructive" />
-                            </Button>
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingConversationId(conv.id);
+                                  setEditingTitle(conv.title || '');
+                                  setShowRenameDialog(true);
+                                }}
+                                title="Rename"
+                                data-testid={`rename-conversation-${conv.id}`}
+                              >
+                                <Pencil className="w-3 h-3 text-muted-foreground" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteConversation.mutate(conv.id);
+                                }}
+                                title="Delete"
+                                data-testid={`delete-conversation-${conv.id}`}
+                              >
+                                <Trash2 className="w-3 h-3 text-destructive" />
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
