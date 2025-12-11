@@ -440,12 +440,8 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
       setCurrentSwipeIndex(prev => Math.min(prev + 1, swipeableTasks.length - 1));
     } else if (direction === 'left') {
       setSelectedTask(task);
-      // If this is the working task, open send work modal instead
-      if (workingTask?.id === task.id) {
-        setShowSendWorkModal(true);
-      } else {
-        setShowForwardModal(true);
-      }
+      // Always use the enhanced Send Work modal for consistency
+      setShowSendWorkModal(true);
     } else if (direction === 'up') {
       setSelectedTask(task);
       setShowAIModal(true);
