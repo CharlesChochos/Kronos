@@ -136,9 +136,9 @@ export const tasks = pgTable("tasks", {
   assignedTo: varchar("assigned_to").references(() => users.id),
   assignedBy: varchar("assigned_by").references(() => users.id),
   priority: text("priority").notNull().default('Medium'),
-  dueDate: text("due_date").notNull(),
+  dueDate: text("due_date"), // Optional - tasks without due dates are valid
   status: text("status").notNull().default('Pending'),
-  type: text("type").notNull(),
+  type: text("type").default('General'), // Optional with default
   attachments: jsonb("attachments").default([]).$type<TaskAttachment[]>(),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
