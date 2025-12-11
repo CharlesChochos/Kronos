@@ -70,7 +70,7 @@ const formatDueDateTime = (dueDate: string) => {
   }
 };
 
-// Check if task is overdue - properly handles datetime comparison
+// Check if task is overdue - properly handles datetime comparison in LOCAL timezone
 const isTaskOverdue = (dueDate: string, status: string) => {
   if (!dueDate || status === 'Completed' || status === 'Overdue') return false;
   try {
@@ -78,17 +78,14 @@ const isTaskOverdue = (dueDate: string, status: string) => {
     let dueDateTime: Date;
     
     if (dueDate.includes('T')) {
-      // Has time component - parse the full datetime
-      // Handle both ISO format (2024-12-11T14:00:00) and combined format (2024-12-11T14:00)
-      dueDateTime = new Date(dueDate);
-      
-      // If the parsed date is invalid, try parsing as local time
-      if (isNaN(dueDateTime.getTime())) {
-        const [datePart, timePart] = dueDate.split('T');
-        const [year, month, day] = datePart.split('-').map(Number);
-        const [hours, minutes] = timePart.split(':').map(Number);
-        dueDateTime = new Date(year, month - 1, day, hours, minutes || 0);
-      }
+      // Has time component - ALWAYS parse as local time to avoid UTC confusion
+      const [datePart, timePart] = dueDate.split('T');
+      const [year, month, day] = datePart.split('-').map(Number);
+      const timeParts = timePart.replace('Z', '').split(':');
+      const hours = parseInt(timeParts[0]) || 0;
+      const minutes = parseInt(timeParts[1]) || 0;
+      const seconds = parseInt(timeParts[2]) || 0;
+      dueDateTime = new Date(year, month - 1, day, hours, minutes, seconds);
     } else {
       // Date only - treat as end of day (23:59:59) in local timezone
       const [year, month, day] = dueDate.split('-').map(Number);
@@ -681,7 +678,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
       app && self.findIndex(a => a?.name === app.name) === index
     );
     
-    return uniqueApps.slice(0, 6); // Max 6 apps
+    return uniqueApps.slice(0, 3); // Max 3 best apps
   };
   
   const openAppForTask = (app: AppSuggestion, task: Task) => {
@@ -1202,6 +1199,46 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
             )}
           </CardContent>
         </Card>
+
+        {/* Work in Progress Indicator - placed under main task widget */}
+        {workingTask && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mt-4"
+          >
+            <Card className="bg-primary/90 text-primary-foreground shadow-lg border-0 px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                  <span className="text-sm font-medium">Working on: {workingTask.title}</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="secondary" 
+                    className="h-7 text-xs"
+                    onClick={handleBringBackWork}
+                    data-testid="button-send-work"
+                  >
+                    <Send className="w-3 h-3 mr-1" />
+                    Send Work
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="h-7 text-xs text-primary-foreground hover:text-primary-foreground hover:bg-white/20"
+                    onClick={() => setWorkingTask(null)}
+                    data-testid="button-clear-working"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Task Categories Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -2201,44 +2238,6 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Floating Working Task Indicator */}
-      {workingTask && (
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 50 }}
-          className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40"
-        >
-          <Card className="bg-primary/90 text-primary-foreground shadow-lg border-0 px-4 py-3 flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              <span className="text-sm font-medium">Working on: {workingTask.title}</span>
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                size="sm" 
-                variant="secondary" 
-                className="h-7 text-xs"
-                onClick={handleBringBackWork}
-                data-testid="button-send-work"
-              >
-                <Send className="w-3 h-3 mr-1" />
-                Send Work
-              </Button>
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                className="h-7 text-xs text-primary-foreground hover:text-primary-foreground hover:bg-white/20"
-                onClick={() => setWorkingTask(null)}
-                data-testid="button-clear-working"
-              >
-                <X className="w-3 h-3" />
-              </Button>
-            </div>
-          </Card>
-        </motion.div>
-      )}
 
     </Layout>
   );
