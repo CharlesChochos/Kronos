@@ -932,7 +932,8 @@ export async function registerRoutes(
       const deals = await storage.getAllDeals();
       res.json(deals);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch deals" });
+      console.error("[API] Failed to fetch deals:", error);
+      res.status(500).json({ error: "Failed to fetch deals", details: error instanceof Error ? error.message : String(error) });
     }
   });
 
