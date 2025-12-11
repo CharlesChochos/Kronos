@@ -84,6 +84,7 @@ export function ReaperAssistant() {
   // Get current user for role-based prompts
   const { data: currentUser } = useCurrentUser();
   const isAdmin = currentUser?.accessLevel === 'admin';
+  const queryClient = useQueryClient();
   
   // User preferences for persistence
   const { data: userPrefs } = useUserPreferences();
@@ -165,7 +166,6 @@ export function ReaperAssistant() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
-  const queryClient = useQueryClient();
   
   // Listen for custom event to open the assistant from sidebar
   useEffect(() => {
