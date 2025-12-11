@@ -110,6 +110,77 @@ function DealStageTeamCount({ dealId, stage }: { dealId: string; stage: string }
     </Popover>
   );
 }
+
+function DealTotalTeamCount({ dealId }: { dealId: string }) {
+  const { data: allStagePodMembers = [] } = useStagePodMembers(dealId);
+  const [showPopover, setShowPopover] = useState(false);
+  
+  const distinctMembers = useMemo(() => {
+    const seen = new Map<string, any>();
+    allStagePodMembers.forEach((member: any) => {
+      if (member.userId && !seen.has(member.userId)) {
+        seen.set(member.userId, member);
+      }
+    });
+    return Array.from(seen.values());
+  }, [allStagePodMembers]);
+  
+  return (
+    <Popover open={showPopover} onOpenChange={setShowPopover}>
+      <PopoverTrigger asChild>
+        <div className="cursor-pointer hover:text-primary transition-colors" onClick={(e) => { e.stopPropagation(); setShowPopover(true); }}>
+          <span className="font-medium">{distinctMembers.length} members</span>
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-3" align="start" onClick={(e) => e.stopPropagation()}>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              <Users className="w-4 h-4 text-blue-400" />
+              Deal Team
+            </h4>
+            <Badge variant="secondary" className="text-xs">{distinctMembers.length}</Badge>
+          </div>
+          {distinctMembers.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No team members assigned yet</p>
+          ) : (
+            <ScrollArea className="max-h-48">
+              <div className="space-y-2">
+                {distinctMembers.map((member: any) => (
+                  <div key={member.userId} className="flex items-center gap-2 p-2 bg-secondary/30 rounded-lg">
+                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 text-sm font-medium">
+                      {member.userName?.charAt(0) || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm truncate">{member.userName || 'Unknown'}</div>
+                      <div className="text-xs text-muted-foreground truncate">{member.role}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function DealTotalTeamCountNumber({ dealId }: { dealId: string }) {
+  const { data: allStagePodMembers = [] } = useStagePodMembers(dealId);
+  
+  const distinctCount = useMemo(() => {
+    const seen = new Set<string>();
+    allStagePodMembers.forEach((member: any) => {
+      if (member.userId) {
+        seen.add(member.userId);
+      }
+    });
+    return seen.size;
+  }, [allStagePodMembers]);
+  
+  return <>{distinctCount}</>;
+}
 const INVESTOR_TYPES = ['PE', 'VC', 'Strategic', 'Family Office', 'Hedge Fund', 'Sovereign Wealth'];
 const INVESTOR_STATUSES = ['Contacted', 'Interested', 'In DD', 'Term Sheet', 'Passed', 'Closed'];
 
@@ -2335,9 +2406,9 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                   </div>
                   <div className="space-y-1">
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                      <Users className="w-3 h-3" /> Stage Team
+                      <Users className="w-3 h-3" /> Team
                     </div>
-                    <DealStageTeamCount dealId={deal.id} stage={deal.stage} />
+                    <DealTotalTeamCount dealId={deal.id} />
                   </div>
                 </div>
 
@@ -2763,7 +2834,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     <Card className="bg-secondary/30">
                       <CardContent className="p-4 text-center">
                         <Users className="w-5 h-5 mx-auto mb-1 text-primary" />
-                        <div className="text-2xl font-bold text-primary">{(selectedDeal.podTeam as PodTeamMember[] || []).length}</div>
+                        <div className="text-2xl font-bold text-primary"><DealTotalTeamCountNumber dealId={selectedDeal.id} /></div>
                         <div className="text-xs text-muted-foreground">Team Members</div>
                       </CardContent>
                     </Card>
