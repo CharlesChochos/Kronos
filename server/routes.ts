@@ -122,6 +122,40 @@ export async function registerRoutes(
     return userWithoutPassword;
   };
 
+  // Health check endpoint for debugging database connectivity (no auth required)
+  app.get("/api/health/db", async (req, res) => {
+    try {
+      // Try a simple database query
+      const users = await storage.getAllUsers();
+      const deals = await storage.getAllDeals();
+      res.json({
+        status: "ok",
+        database: "connected",
+        usersCount: users.length,
+        dealsCount: deals.length,
+        env: {
+          hasProductionDbUrl: !!process.env.PRODUCTION_DATABASE_URL,
+          hasDatabaseUrl: !!process.env.DATABASE_URL,
+          nodeEnv: process.env.NODE_ENV,
+          replitDeployment: process.env.REPLIT_DEPLOYMENT,
+        }
+      });
+    } catch (error) {
+      console.error("[Health Check] Database error:", error);
+      res.status(500).json({
+        status: "error",
+        database: "disconnected",
+        error: error instanceof Error ? error.message : String(error),
+        env: {
+          hasProductionDbUrl: !!process.env.PRODUCTION_DATABASE_URL,
+          hasDatabaseUrl: !!process.env.DATABASE_URL,
+          nodeEnv: process.env.NODE_ENV,
+          replitDeployment: process.env.REPLIT_DEPLOYMENT,
+        }
+      });
+    }
+  });
+
   // Middleware to check authentication
   const requireAuth = (req: any, res: any, next: any) => {
     if (req.isAuthenticated()) {
