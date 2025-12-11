@@ -3476,8 +3476,9 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                             attachments: [...existingAttachments, ...uploadedAttachments],
                           });
                           toast.success(`${uploadedAttachments.length} file(s) uploaded successfully`);
-                        } catch (error) {
-                          toast.error("Failed to save files to deal");
+                        } catch (error: any) {
+                          console.error('Error saving files to deal:', error);
+                          toast.error(error.message || "Failed to save files to deal");
                         }
                       }
                     }}
@@ -3549,8 +3550,9 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                             }
                             
                             toast.success(`${uploadedAttachments.length} file(s) uploaded successfully`);
-                          } catch (error) {
-                            toast.error("Failed to save files to deal");
+                          } catch (error: any) {
+                            console.error('Error saving files to deal:', error);
+                            toast.error(error.message || "Failed to save files to deal");
                           }
                         }
                         

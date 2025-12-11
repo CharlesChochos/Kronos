@@ -60,9 +60,11 @@ export const uploadLimiter = rateLimit({
     });
   },
   keyGenerator: (req: Request) => {
-    // Rate limit per user instead of per IP to allow multiple users from same office
     const user = (req as any).user;
-    return user?.id || req.ip || 'anonymous';
+    if (user?.id) {
+      return user.id;
+    }
+    return 'anonymous';
   },
 });
 
