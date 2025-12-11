@@ -474,6 +474,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteTask(id: string): Promise<void> {
+    // Delete related records first to avoid foreign key constraint violations
+    await db.delete(schema.taskComments).where(eq(schema.taskComments.taskId, id));
+    await db.delete(schema.taskAttachmentsTable).where(eq(schema.taskAttachmentsTable.taskId, id));
+    await db.update(schema.timeEntries).set({ taskId: null }).where(eq(schema.timeEntries.taskId, id));
     await db.delete(schema.tasks).where(eq(schema.tasks.id, id));
   }
   
