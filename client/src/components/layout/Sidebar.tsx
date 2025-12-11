@@ -371,14 +371,22 @@ export function Sidebar({ role, collapsed = false }: SidebarProps) {
         <button
           onClick={openAIAssistant}
           className={cn(
-            "flex items-center rounded-md text-sm font-medium text-primary hover:bg-primary/10 cursor-pointer transition-colors w-full",
-            collapsed ? "justify-center px-2 py-3" : "gap-3 px-3 py-2 text-left"
+            "flex items-center rounded-lg text-sm font-semibold bg-gradient-to-r from-primary/20 to-primary/10 hover:from-primary/30 hover:to-primary/20 text-primary cursor-pointer transition-all w-full group shadow-sm hover:shadow-md border border-primary/20",
+            collapsed ? "justify-center px-2 py-3" : "gap-3 px-3 py-3 text-left"
           )}
           data-testid="sidebar-ai-assistant"
-          title={collapsed ? "Kronos AI" : undefined}
+          title={collapsed ? "Ask Kronos AI" : undefined}
         >
-          <Bot className="w-4 h-4 flex-shrink-0" />
-          {!collapsed && "Kronos AI"}
+          <div className="relative">
+            <Bot className="w-5 h-5 flex-shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          </div>
+          {!collapsed && (
+            <div className="flex flex-col">
+              <span>Ask Kronos AI</span>
+              <span className="text-[10px] text-primary/70 font-normal">Click to chat</span>
+            </div>
+          )}
         </button>
       </div>
     </div>

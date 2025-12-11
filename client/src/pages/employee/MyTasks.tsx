@@ -96,6 +96,35 @@ type UploadedFile = {
   uploadedAt: string;
 };
 
+type AppSuggestion = {
+  name: string;
+  icon: string;
+  description: string;
+  url?: string;
+  action: 'open' | 'create' | 'edit';
+};
+
+const APP_CATALOG: Record<string, AppSuggestion> = {
+  'excel': { name: 'Excel Online', icon: '📊', description: 'Create or edit spreadsheets', url: 'https://www.office.com/launch/excel', action: 'create' },
+  'word': { name: 'Word Online', icon: '📄', description: 'Create or edit documents', url: 'https://www.office.com/launch/word', action: 'create' },
+  'powerpoint': { name: 'PowerPoint Online', icon: '📽️', description: 'Create presentations', url: 'https://www.office.com/launch/powerpoint', action: 'create' },
+  'google_docs': { name: 'Google Docs', icon: '📝', description: 'Create or edit documents', url: 'https://docs.google.com/document/create', action: 'create' },
+  'google_sheets': { name: 'Google Sheets', icon: '📈', description: 'Create or edit spreadsheets', url: 'https://docs.google.com/spreadsheets/create', action: 'create' },
+  'google_slides': { name: 'Google Slides', icon: '🎞️', description: 'Create presentations', url: 'https://docs.google.com/presentation/create', action: 'create' },
+  'email': { name: 'Email Client', icon: '✉️', description: 'Send emails', url: 'mailto:', action: 'open' },
+  'calendar': { name: 'Calendar', icon: '📅', description: 'Schedule meetings', url: 'https://calendar.google.com', action: 'open' },
+  'pdf_editor': { name: 'PDF Editor', icon: '📕', description: 'Edit PDF documents', url: 'https://www.adobe.com/acrobat/online/pdf-editor.html', action: 'edit' },
+  'bloomberg': { name: 'Bloomberg', icon: '💹', description: 'Financial data & analysis', url: 'https://www.bloomberg.com', action: 'open' },
+  'pitchbook': { name: 'PitchBook', icon: '📊', description: 'Deal & investor data', url: 'https://pitchbook.com', action: 'open' },
+  'capital_iq': { name: 'Capital IQ', icon: '📈', description: 'Financial research', url: 'https://www.capitaliq.com', action: 'open' },
+  'factset': { name: 'FactSet', icon: '📉', description: 'Financial data platform', url: 'https://www.factset.com', action: 'open' },
+  'docusign': { name: 'DocuSign', icon: '✍️', description: 'Electronic signatures', url: 'https://www.docusign.com', action: 'open' },
+  'zoom': { name: 'Zoom', icon: '🎥', description: 'Video meetings', url: 'https://zoom.us', action: 'open' },
+  'teams': { name: 'Microsoft Teams', icon: '💬', description: 'Team collaboration', url: 'https://teams.microsoft.com', action: 'open' },
+  'slack': { name: 'Slack', icon: '💼', description: 'Team messaging', url: 'https://slack.com', action: 'open' },
+  'notion': { name: 'Notion', icon: '📓', description: 'Notes & documentation', url: 'https://www.notion.so', action: 'open' },
+};
+
 type MyTasksProps = {
   role?: 'CEO' | 'Employee';
 };
@@ -151,8 +180,11 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
   });
   const [forwardToUser, setForwardToUser] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [aiSuggestion, setAiSuggestion] = useState<{action: string, reasoning: string, tools: string[]} | null>(null);
+  const [aiSuggestion, setAiSuggestion] = useState<{action: string, reasoning: string, tools: string[], apps?: AppSuggestion[]} | null>(null);
   const [deferredTasks, setDeferredTasks] = useState<string[]>([]);
+  const [workingTask, setWorkingTask] = useState<Task | null>(null);
+  const [showSendWorkModal, setShowSendWorkModal] = useState(false);
+  const [completedWorkNotes, setCompletedWorkNotes] = useState("");
   
   // Flagged tasks - persisted to user_preferences.settings.flaggedTasks
   const [flaggedTasks, setFlaggedTasks] = useState<Record<string, string>>({});
@@ -337,7 +369,12 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
       setCurrentSwipeIndex(prev => Math.min(prev + 1, swipeableTasks.length - 1));
     } else if (direction === 'left') {
       setSelectedTask(task);
-      setShowForwardModal(true);
+      // If this is the working task, open send work modal instead
+      if (workingTask?.id === task.id) {
+        setShowSendWorkModal(true);
+      } else {
+        setShowForwardModal(true);
+      }
     } else if (direction === 'up') {
       setSelectedTask(task);
       setShowAIModal(true);
@@ -469,6 +506,9 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
     
     try {
       const deal = getDeal(task.dealId);
+      const attachmentCount = (task.attachments as any[])?.length || 0;
+      const hasAttachments = attachmentCount > 0;
+      
       const response = await fetch('/api/ai/analyze-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -478,6 +518,8 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
             description: task.description,
             type: task.type,
             priority: task.priority,
+            hasAttachments,
+            attachmentCount,
           },
           deal: deal ? {
             name: deal.name,
@@ -493,16 +535,153 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
       }
       
       const data = await response.json();
-      setAiSuggestion(data);
+      
+      // Map suggested tools to app catalog
+      const suggestedApps = mapToolsToApps(data.tools || [], task);
+      setAiSuggestion({ ...data, apps: suggestedApps });
     } catch (error: any) {
       toast.error("Failed to analyze task with AI");
+      const fallbackApps = mapToolsToApps(["Document Editor", "Email Client", "Calendar"], task);
       setAiSuggestion({
         action: "Manual Analysis Required",
         reasoning: "Unable to get AI suggestions at this time. Please analyze the task manually.",
-        tools: ["Document Editor", "Email Client", "Calendar"]
+        tools: ["Document Editor", "Email Client", "Calendar"],
+        apps: fallbackApps
       });
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+  
+  const mapToolsToApps = (tools: string[], task: Task): AppSuggestion[] => {
+    const apps: AppSuggestion[] = [];
+    const taskType = task.type?.toLowerCase() || '';
+    const title = task.title?.toLowerCase() || '';
+    const desc = task.description?.toLowerCase() || '';
+    
+    // Add context-aware apps based on task type
+    if (taskType.includes('financial') || title.includes('model') || title.includes('valuation') || desc.includes('excel')) {
+      apps.push(APP_CATALOG['excel'] || APP_CATALOG['google_sheets']);
+    }
+    if (taskType.includes('document') || title.includes('memo') || title.includes('report') || desc.includes('document')) {
+      apps.push(APP_CATALOG['word'] || APP_CATALOG['google_docs']);
+    }
+    if (title.includes('presentation') || title.includes('deck') || title.includes('pitch')) {
+      apps.push(APP_CATALOG['powerpoint'] || APP_CATALOG['google_slides']);
+    }
+    if (taskType.includes('communication') || title.includes('email') || title.includes('client')) {
+      apps.push(APP_CATALOG['email']);
+    }
+    if (title.includes('meeting') || title.includes('call') || title.includes('schedule')) {
+      apps.push(APP_CATALOG['calendar']);
+      apps.push(APP_CATALOG['zoom']);
+    }
+    if (title.includes('sign') || title.includes('signature') || desc.includes('signature')) {
+      apps.push(APP_CATALOG['docusign']);
+    }
+    if (taskType.includes('due diligence') || title.includes('research') || desc.includes('research')) {
+      apps.push(APP_CATALOG['capital_iq']);
+      apps.push(APP_CATALOG['pitchbook']);
+    }
+    
+    // Map any remaining tools from AI response
+    tools.forEach(tool => {
+      const toolLower = tool.toLowerCase();
+      if (toolLower.includes('excel') || toolLower.includes('spreadsheet')) {
+        if (!apps.find(a => a.name.includes('Excel') || a.name.includes('Sheets'))) {
+          apps.push(APP_CATALOG['excel']);
+        }
+      }
+      if (toolLower.includes('word') || toolLower.includes('document')) {
+        if (!apps.find(a => a.name.includes('Word') || a.name.includes('Docs'))) {
+          apps.push(APP_CATALOG['word']);
+        }
+      }
+      if (toolLower.includes('powerpoint') || toolLower.includes('presentation') || toolLower.includes('slides')) {
+        if (!apps.find(a => a.name.includes('PowerPoint') || a.name.includes('Slides'))) {
+          apps.push(APP_CATALOG['powerpoint']);
+        }
+      }
+      if (toolLower.includes('email') || toolLower.includes('mail')) {
+        if (!apps.find(a => a.name.includes('Email'))) {
+          apps.push(APP_CATALOG['email']);
+        }
+      }
+      if (toolLower.includes('calendar')) {
+        if (!apps.find(a => a.name.includes('Calendar'))) {
+          apps.push(APP_CATALOG['calendar']);
+        }
+      }
+      if (toolLower.includes('pdf')) {
+        if (!apps.find(a => a.name.includes('PDF'))) {
+          apps.push(APP_CATALOG['pdf_editor']);
+        }
+      }
+    });
+    
+    // Ensure at least some apps are suggested
+    if (apps.length === 0) {
+      apps.push(APP_CATALOG['word'], APP_CATALOG['email'], APP_CATALOG['calendar']);
+    }
+    
+    // Remove duplicates and filter undefined
+    const uniqueApps = apps.filter((app, index, self) => 
+      app && self.findIndex(a => a?.name === app.name) === index
+    );
+    
+    return uniqueApps.slice(0, 6); // Max 6 apps
+  };
+  
+  const openApp = (app: AppSuggestion, task: Task) => {
+    if (!app.url) {
+      toast.error(`Unable to open ${app.name}`);
+      return;
+    }
+    
+    // Set this task as the working task
+    setWorkingTask(task);
+    setShowAIModal(false);
+    
+    // Open the app in a new tab
+    window.open(app.url, '_blank');
+    
+    toast.success(`Opening ${app.name}. Swipe left on the task when ready to send your work.`, {
+      duration: 5000,
+    });
+  };
+  
+  const handleBringBackWork = () => {
+    if (!workingTask) return;
+    setSelectedTask(workingTask);
+    setShowSendWorkModal(true);
+  };
+  
+  const handleSendWork = async () => {
+    if (!selectedTask || !forwardToUser) {
+      toast.error("Please select a team member to send your work to");
+      return;
+    }
+    
+    try {
+      // Add a note about the completed work
+      const currentDescription = selectedTask.description || '';
+      const workNote = completedWorkNotes ? `\n\n--- Work Completed ---\n${completedWorkNotes}` : '';
+      
+      await updateTask.mutateAsync({ 
+        id: selectedTask.id, 
+        assignedTo: forwardToUser,
+        description: currentDescription + workNote,
+        status: 'Pending'
+      });
+      
+      toast.success("Work sent successfully!");
+      setShowSendWorkModal(false);
+      setWorkingTask(null);
+      setSelectedTask(null);
+      setForwardToUser("");
+      setCompletedWorkNotes("");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send work");
     }
   };
 
@@ -1284,7 +1463,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
             {isAnalyzing ? (
               <div className="flex flex-col items-center justify-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-                <p className="text-muted-foreground">Analyzing task details...</p>
+                <p className="text-muted-foreground">Analyzing task details and attachments...</p>
               </div>
             ) : aiSuggestion ? (
               <>
@@ -1301,12 +1480,23 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                 <Separator />
                 
                 <div>
-                  <h4 className="font-medium text-sm mb-3">Suggested Tools</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {aiSuggestion.tools.map((tool, i) => (
-                      <Button key={i} variant="outline" size="sm" className="gap-2">
-                        <ExternalLink className="w-3 h-3" />
-                        {tool}
+                  <h4 className="font-medium text-sm mb-3">Choose an App to Start Working</h4>
+                  <p className="text-xs text-muted-foreground mb-3">Click an app below to open it. When finished, swipe left on the task to send your work.</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(aiSuggestion.apps || []).map((app, i) => (
+                      <Button 
+                        key={i} 
+                        variant="outline" 
+                        className="h-auto py-3 px-4 flex flex-col items-start gap-1 hover:bg-primary/10 hover:border-primary/30 transition-all"
+                        onClick={() => selectedTask && openApp(app, selectedTask)}
+                        data-testid={`button-open-app-${i}`}
+                      >
+                        <div className="flex items-center gap-2 w-full">
+                          <span className="text-xl">{app.icon}</span>
+                          <span className="font-medium text-sm">{app.name}</span>
+                          <ExternalLink className="w-3 h-3 ml-auto text-muted-foreground" />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground text-left">{app.description}</span>
                       </Button>
                     ))}
                   </div>
@@ -1322,14 +1512,66 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
             <Button variant="outline" onClick={() => setShowAIModal(false)}>
               Close
             </Button>
-            {selectedTask?.status !== 'Completed' && !isAnalyzing && (
-              <Button onClick={() => {
-                setShowAIModal(false);
-                handleStartTask(selectedTask?.id || '');
-              }}>
-                Start Working
-              </Button>
-            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Work Modal */}
+      <Dialog open={showSendWorkModal} onOpenChange={setShowSendWorkModal}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5 text-primary" />
+              Send Completed Work
+            </DialogTitle>
+            <DialogDescription>
+              Send your completed work for "{selectedTask?.title}" to a team member
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Work Notes (Optional)</Label>
+              <Textarea
+                placeholder="Describe what you completed, any notes for the recipient..."
+                value={completedWorkNotes}
+                onChange={(e) => setCompletedWorkNotes(e.target.value)}
+                rows={4}
+                className="resize-none"
+                data-testid="textarea-work-notes"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Send To</Label>
+              <Select value={forwardToUser} onValueChange={setForwardToUser}>
+                <SelectTrigger data-testid="select-send-to">
+                  <SelectValue placeholder="Select team member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.filter(u => u.id !== currentUser?.id).map(user => (
+                    <SelectItem key={user.id} value={user.id}>
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        <span>{user.name}</span>
+                        <span className="text-muted-foreground">({user.jobTitle || user.role})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowSendWorkModal(false);
+              setCompletedWorkNotes("");
+              setForwardToUser("");
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendWork} disabled={!forwardToUser}>
+              <Send className="w-4 h-4 mr-2" /> Send Work
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1777,6 +2019,44 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Floating Working Task Indicator */}
+      {workingTask && (
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 50 }}
+          className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40"
+        >
+          <Card className="bg-primary/90 text-primary-foreground shadow-lg border-0 px-4 py-3 flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              <span className="text-sm font-medium">Working on: {workingTask.title}</span>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                size="sm" 
+                variant="secondary" 
+                className="h-7 text-xs"
+                onClick={handleBringBackWork}
+                data-testid="button-send-work"
+              >
+                <Send className="w-3 h-3 mr-1" />
+                Send Work
+              </Button>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="h-7 text-xs text-primary-foreground hover:text-primary-foreground hover:bg-white/20"
+                onClick={() => setWorkingTask(null)}
+                data-testid="button-clear-working"
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+          </Card>
+        </motion.div>
+      )}
 
     </Layout>
   );
