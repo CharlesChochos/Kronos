@@ -1577,15 +1577,22 @@ export async function registerRoutes(
       for (const task of tasks) {
         if (task.status !== 'Completed' && task.status !== 'Overdue' && task.dueDate) {
           // Parse dueDate - supports both date-only and datetime formats
+          // IMPORTANT: Parse as local time by manually constructing Date to avoid UTC interpretation
           const dueDateStr = task.dueDate;
           let dueDateTime: Date;
           
           if (dueDateStr.includes('T')) {
-            // Has time component
-            dueDateTime = new Date(dueDateStr);
+            // Has time component - parse as local time
+            const [datePart, timePart] = dueDateStr.split('T');
+            const [year, month, day] = datePart.split('-').map(Number);
+            const timeParts = timePart.replace('Z', '').split(':');
+            const hours = parseInt(timeParts[0]) || 0;
+            const minutes = parseInt(timeParts[1]) || 0;
+            dueDateTime = new Date(year, month - 1, day, hours, minutes, 0);
           } else {
-            // Date only - consider end of day (23:59:59)
-            dueDateTime = new Date(dueDateStr + 'T23:59:59');
+            // Date only - consider end of day (23:59:59) in local time
+            const [year, month, day] = dueDateStr.split('-').map(Number);
+            dueDateTime = new Date(year, month - 1, day, 23, 59, 59);
           }
           
           if (dueDateTime < now) {
@@ -2564,7 +2571,7 @@ Consider common investment banking tasks like:
       
       // Gather expanded context for the AI (use lightweight listing to avoid 507 errors)
       const [deals, tasks, users, allTasks, investors, meetings, timeEntries, documents] = await Promise.all([
-        storage.getAllDealsListing(), // Lightweight version without full document data
+        storage.getDealsListing(), // Lightweight version without full document data
         storage.getTasksByUser(currentUser.id),
         storage.getAllUsers(),
         storage.getAllTasks(),

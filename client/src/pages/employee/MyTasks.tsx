@@ -93,7 +93,8 @@ const isTaskOverdue = (dueDate: string, status: string) => {
     }
     
     return dueDateTime < now;
-  } catch {
+  } catch (e) {
+    console.error('isTaskOverdue error:', e);
     return false;
   }
 };
