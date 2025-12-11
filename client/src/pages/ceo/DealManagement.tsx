@@ -168,7 +168,7 @@ function StageWorkSection({
   const [showTeamPopover, setShowTeamPopover] = useState(false);
   const [documentTitle, setDocumentTitle] = useState("");
   const [documentCategory, setDocumentCategory] = useState("General");
-  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [memberRole, setMemberRole] = useState("");
@@ -208,84 +208,106 @@ function StageWorkSection({
   }, [allUsers, memberSearch]);
   
   const handleAddDocument = async () => {
-    if (!documentFile) {
-      toast.error("Please select a file to upload");
+    if (documentFiles.length === 0) {
+      toast.error("Please select at least one file to upload");
       return;
     }
     
+    const categoryMap: Record<string, string> = {
+      'General': 'Other',
+      'Financial': 'Financial Documents',
+      'Legal': 'Legal',
+      'Technical': 'Reports',
+      'Presentation': 'Presentations'
+    };
+    
+    let uploadedCount = 0;
+    let failedCount = 0;
+    
     try {
-      const title = documentTitle || documentFile.name;
-      
-      // First upload the file to get a URL
-      const formData = new FormData();
-      formData.append('file', documentFile);
-      
-      const uploadResponse = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload file');
-      }
-      
-      const uploadResult = await uploadResponse.json();
-      const fileUrl = uploadResult.url;
-      
-      const categoryMap: Record<string, string> = {
-        'General': 'Other',
-        'Financial': 'Financial Documents',
-        'Legal': 'Legal',
-        'Technical': 'Reports',
-        'Presentation': 'Presentations'
-      };
-      
-      // Save to stage documents with the URL
-      await createStageDocument.mutateAsync({
-        dealId,
-        doc: {
-          stage: activeStageTab,
-          title: title,
-          filename: documentFile.name,
-          url: fileUrl,
-          mimeType: documentFile.type,
-          size: documentFile.size,
-        }
-      });
-      
-      // Also read file as base64 for document library archive
-      const reader = new FileReader();
-      reader.onload = async (e) => {
+      for (const file of documentFiles) {
         try {
-          const base64Data = e.target?.result as string;
-          await createDocument.mutateAsync({
-            title: title,
-            filename: `[${dealName}] ${title}`,
-            fileData: base64Data,
-            category: categoryMap[documentCategory] || 'Other',
-            dealId: dealId,
-            tags: [activeStageTab, 'Stage Work'],
-            type: 'stage_document',
-            uploadedBy: currentUser?.id
+          const title = file.name;
+          
+          // First upload the file to get a URL
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
           });
-        } catch (archiveError) {
-          console.error('Failed to archive document (non-critical):', archiveError);
+          
+          if (!uploadResponse.ok) {
+            throw new Error('Failed to upload file');
+          }
+          
+          const uploadResult = await uploadResponse.json();
+          const fileUrl = uploadResult.url;
+          
+          // Save to stage documents with the URL
+          await createStageDocument.mutateAsync({
+            dealId,
+            doc: {
+              stage: activeStageTab,
+              title: title,
+              filename: file.name,
+              url: fileUrl,
+              mimeType: file.type,
+              size: file.size,
+            }
+          });
+          
+          // Also read file as base64 for document library archive
+          const base64Data = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.onerror = () => reject(new Error("Failed to read file"));
+            reader.readAsDataURL(file);
+          });
+          
+          try {
+            await createDocument.mutateAsync({
+              title: title,
+              filename: `[${dealName}] ${title}`,
+              content: base64Data,
+              category: categoryMap[documentCategory] || 'Other',
+              dealId: dealId,
+              tags: [activeStageTab, 'Stage Work'],
+              type: 'stage_document',
+              uploadedBy: currentUser?.id,
+              originalName: file.name,
+              mimeType: file.type,
+              size: file.size,
+            });
+          } catch (archiveError) {
+            console.error('Failed to archive document (non-critical):', archiveError);
+          }
+          
+          uploadedCount++;
+        } catch (error) {
+          console.error(`Failed to upload ${file.name}:`, error);
+          failedCount++;
         }
-      };
-      reader.readAsDataURL(documentFile);
-      
-      if (onAuditEntry) {
-        await onAuditEntry('Document Uploaded', `${title} uploaded to ${activeStageTab} stage`);
       }
       
-      toast.success("Document uploaded successfully");
+      if (onAuditEntry && uploadedCount > 0) {
+        await onAuditEntry('Documents Uploaded', `${uploadedCount} document(s) uploaded to ${activeStageTab} stage`);
+      }
+      
+      if (uploadedCount > 0) {
+        toast.success(`${uploadedCount} document(s) uploaded successfully${failedCount > 0 ? `, ${failedCount} failed` : ''}`);
+      } else {
+        toast.error("Failed to upload documents");
+      }
+      
       setDocumentTitle("");
       setDocumentCategory("General");
-      setDocumentFile(null);
+      setDocumentFiles([]);
       setShowAddDocument(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (error) {
-      toast.error("Failed to upload document");
+      toast.error("Failed to upload documents");
     }
   };
   
@@ -513,28 +535,21 @@ function StageWorkSection({
             <input
               ref={fileInputRef}
               type="file"
+              multiple
               onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setDocumentFile(file);
-                  if (!documentTitle) setDocumentTitle(file.name);
+                const files = e.target.files;
+                if (files && files.length > 0) {
+                  setDocumentFiles(Array.from(files));
                 }
               }}
               className="w-full text-sm file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
               data-testid="input-file-upload"
             />
-            {documentFile && (
+            {documentFiles.length > 0 && (
               <div className="text-xs text-muted-foreground">
-                Selected: {documentFile.name} ({(documentFile.size / 1024).toFixed(1)} KB)
+                Selected: {documentFiles.length} file(s) - {documentFiles.map(f => f.name).join(', ')}
               </div>
             )}
-            <Input
-              placeholder="Document title (optional)"
-              value={documentTitle}
-              onChange={(e) => setDocumentTitle(e.target.value)}
-              className="h-8 text-sm"
-              data-testid="input-document-title"
-            />
             <Select value={documentCategory} onValueChange={setDocumentCategory}>
               <SelectTrigger className="h-8 text-sm" data-testid="select-document-category">
                 <SelectValue />
@@ -548,10 +563,10 @@ function StageWorkSection({
               </SelectContent>
             </Select>
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleAddDocument} className="flex-1" disabled={!documentFile} data-testid="button-upload-document">
+              <Button size="sm" onClick={handleAddDocument} className="flex-1" disabled={documentFiles.length === 0} data-testid="button-upload-document">
                 Upload
               </Button>
-              <Button size="sm" variant="outline" onClick={() => { setShowAddDocument(false); setDocumentFile(null); setDocumentTitle(''); }}>Cancel</Button>
+              <Button size="sm" variant="outline" onClick={() => { setShowAddDocument(false); setDocumentFiles([]); setDocumentTitle(''); }}>Cancel</Button>
             </div>
           </div>
         )}

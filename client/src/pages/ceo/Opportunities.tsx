@@ -153,31 +153,40 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    const file = files[0];
-    const reader = new FileReader();
+    // Handle multiple files
+    const fileArray = Array.from(files);
+    let uploadedCount = 0;
     
-    reader.onload = () => {
-      const attachment: OpportunityAttachment = {
-        id: crypto.randomUUID(),
-        filename: file.name,
-        url: reader.result as string,
-        size: file.size,
-        uploadedAt: new Date().toISOString(),
+    for (const file of fileArray) {
+      const reader = new FileReader();
+      
+      reader.onload = () => {
+        const attachment: OpportunityAttachment = {
+          id: crypto.randomUUID(),
+          filename: file.name,
+          url: reader.result as string,
+          size: file.size,
+          uploadedAt: new Date().toISOString(),
+        };
+        
+        if (isDetail) {
+          setOpportunityAttachments(prev => [...prev, attachment]);
+        } else {
+          setNewOpportunity(prev => ({
+            ...prev,
+            attachments: [...prev.attachments, attachment]
+          }));
+        }
+        
+        uploadedCount++;
+        if (uploadedCount === fileArray.length) {
+          toast.success(`${fileArray.length} file(s) attached`);
+        }
       };
       
-      if (isDetail) {
-        setOpportunityAttachments(prev => [...prev, attachment]);
-        toast.success(`File "${file.name}" attached`);
-      } else {
-        setNewOpportunity(prev => ({
-          ...prev,
-          attachments: [...prev.attachments, attachment]
-        }));
-        toast.success(`File "${file.name}" attached`);
-      }
-    };
+      reader.readAsDataURL(file);
+    }
     
-    reader.readAsDataURL(file);
     e.target.value = '';
   };
   
@@ -663,6 +672,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                 <input
                   ref={fileInputRef}
                   type="file"
+                  multiple
                   className="hidden"
                   onChange={(e) => handleFileUpload(e, false)}
                   accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,image/*"
@@ -1081,6 +1091,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                     <input
                       ref={detailFileInputRef}
                       type="file"
+                      multiple
                       className="hidden"
                       onChange={(e) => handleFileUpload(e, true)}
                       accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png"
@@ -1091,7 +1102,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                       onClick={() => detailFileInputRef.current?.click()}
                     >
                       <Upload className="w-4 h-4 mr-2" />
-                      Upload Attachment
+                      Upload Attachments
                     </Button>
                     
                     {opportunityAttachments.length > 0 ? (

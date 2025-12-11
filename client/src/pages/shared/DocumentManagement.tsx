@@ -209,12 +209,11 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [uploadForm, setUploadForm] = useState({
-    title: "",
     type: "uploaded",
     category: "general",
     dealId: "",
     tags: "",
-    file: null as File | null,
+    files: [] as File[],
   });
 
   const filteredDocuments = documents.filter((doc) => {
@@ -234,68 +233,93 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
   );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    const validFiles: File[] = [];
+    for (const file of Array.from(files)) {
       if (file.size > 10 * 1024 * 1024) {
-        toast.error("File size must be less than 10MB");
-        return;
+        toast.error(`File "${file.name}" exceeds 10MB limit`);
+      } else {
+        validFiles.push(file);
       }
-      setUploadForm({ ...uploadForm, file, title: uploadForm.title || file.name.replace(/\.[^/.]+$/, "") });
+    }
+    
+    if (validFiles.length > 0) {
+      setUploadForm({ ...uploadForm, files: [...uploadForm.files, ...validFiles] });
     }
   };
 
+  const removeFile = (index: number) => {
+    setUploadForm({
+      ...uploadForm,
+      files: uploadForm.files.filter((_, i) => i !== index)
+    });
+  };
+
   const handleUpload = async () => {
-    if (!uploadForm.file || !uploadForm.title) {
-      toast.error("Please select a file and enter a title");
+    if (uploadForm.files.length === 0) {
+      toast.error("Please select at least one file");
       return;
     }
 
     setIsUploading(true);
+    const dealIdToUse = uploadForm.dealId === "none" ? undefined : uploadForm.dealId || undefined;
+    const selectedDeal = dealIdToUse ? deals.find(d => d.id === dealIdToUse) : undefined;
+    const tags = uploadForm.tags ? uploadForm.tags.split(',').map(t => t.trim()) : [];
+
+    let uploadedCount = 0;
+    let failedCount = 0;
 
     try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Content = reader.result as string;
-        const dealIdToUse = uploadForm.dealId === "none" ? undefined : uploadForm.dealId || undefined;
-        const selectedDeal = dealIdToUse ? deals.find(d => d.id === dealIdToUse) : undefined;
+      for (const file of uploadForm.files) {
+        try {
+          const base64Content = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error("Failed to read file"));
+            reader.readAsDataURL(file);
+          });
 
-        await createDocument.mutateAsync({
-          title: uploadForm.title,
-          type: uploadForm.type,
-          category: uploadForm.category,
-          filename: uploadForm.file!.name,
-          originalName: uploadForm.file!.name,
-          mimeType: uploadForm.file!.type,
-          size: uploadForm.file!.size,
-          content: base64Content,
-          dealId: dealIdToUse,
-          dealName: selectedDeal?.name || undefined,
-          tags: uploadForm.tags ? uploadForm.tags.split(',').map(t => t.trim()) : [],
-        });
-
-        toast.success("Document uploaded successfully");
-        setShowUploadDialog(false);
-        setUploadForm({
-          title: "",
-          type: "uploaded",
-          category: "general",
-          dealId: "",
-          tags: "",
-          file: null,
-        });
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
+          await createDocument.mutateAsync({
+            title: file.name.replace(/\.[^/.]+$/, ""),
+            type: uploadForm.type,
+            category: uploadForm.category,
+            filename: file.name,
+            originalName: file.name,
+            mimeType: file.type,
+            size: file.size,
+            content: base64Content,
+            dealId: dealIdToUse,
+            dealName: selectedDeal?.name || undefined,
+            tags,
+          });
+          uploadedCount++;
+        } catch (error) {
+          console.error(`Failed to upload ${file.name}:`, error);
+          failedCount++;
         }
-      };
+      }
 
-      reader.onerror = () => {
-        toast.error("Failed to read file");
-        setIsUploading(false);
-      };
+      if (uploadedCount > 0) {
+        toast.success(`${uploadedCount} document(s) uploaded successfully${failedCount > 0 ? `, ${failedCount} failed` : ''}`);
+      } else {
+        toast.error("Failed to upload documents");
+      }
 
-      reader.readAsDataURL(uploadForm.file);
+      setShowUploadDialog(false);
+      setUploadForm({
+        type: "uploaded",
+        category: "general",
+        dealId: "",
+        tags: "",
+        files: [],
+      });
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     } catch (error: any) {
-      toast.error(error.message || "Failed to upload document");
+      toast.error(error.message || "Failed to upload documents");
     } finally {
       setIsUploading(false);
     }
@@ -546,54 +570,50 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="space-y-2">
-                    <Label>File *</Label>
+                    <Label>Files *</Label>
                     <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
                       <input
                         ref={fileInputRef}
                         type="file"
+                        multiple
                         onChange={handleFileSelect}
                         className="hidden"
                         accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.json,.xml,.jpg,.jpeg,.png,.gif"
                         data-testid="input-file-upload"
                       />
-                      {uploadForm.file ? (
-                        <div className="flex items-center justify-center gap-2">
-                          {getFileIcon(uploadForm.file.type)}
-                          <span className="text-sm">{uploadForm.file.name}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setUploadForm({ ...uploadForm, file: null });
-                              if (fileInputRef.current) fileInputRef.current.value = "";
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div
-                          onClick={() => fileInputRef.current?.click()}
-                          className="cursor-pointer"
-                        >
-                          <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                          <p className="text-sm text-muted-foreground">
-                            Click to select a file (max 10MB)
-                          </p>
-                        </div>
-                      )}
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className="cursor-pointer"
+                      >
+                        <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">
+                          Click to select files (max 10MB each)
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          You can select multiple files at once
+                        </p>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="doc-title">Title *</Label>
-                    <Input
-                      id="doc-title"
-                      value={uploadForm.title}
-                      onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
-                      placeholder="Document title"
-                      data-testid="input-document-title"
-                    />
+                    {uploadForm.files.length > 0 && (
+                      <div className="space-y-2 mt-3 max-h-32 overflow-y-auto">
+                        {uploadForm.files.map((file, index) => (
+                          <div key={index} className="flex items-center justify-between p-2 bg-secondary/50 rounded-lg">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {getFileIcon(file.type)}
+                              <span className="text-sm truncate">{file.name}</span>
+                              <span className="text-xs text-muted-foreground">({(file.size / 1024).toFixed(1)} KB)</span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeFile(index)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -673,16 +693,16 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
                   </Button>
                   <Button
                     onClick={handleUpload}
-                    disabled={isUploading || createDocument.isPending || !uploadForm.file || !uploadForm.title}
+                    disabled={isUploading || createDocument.isPending || uploadForm.files.length === 0}
                     data-testid="button-confirm-upload"
                   >
                     {isUploading || createDocument.isPending ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Uploading...
+                        Uploading {uploadForm.files.length} file(s)...
                       </>
                     ) : (
-                      "Upload"
+                      `Upload ${uploadForm.files.length > 0 ? `(${uploadForm.files.length})` : ''}`
                     )}
                   </Button>
                 </DialogFooter>
