@@ -7295,6 +7295,60 @@ Only include entries with both name AND company. Extract ALL rows.`
     }
   });
   
+  // Download document - streams content from database
+  app.get("/api/documents/:id/download", requireAuth, async (req, res) => {
+    try {
+      const doc = await storage.getDocument(req.params.id);
+      if (!doc) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      if (!doc.content) {
+        return res.status(404).json({ error: "Document content not available" });
+      }
+      
+      // Check if content is base64 data URL
+      if (doc.content.startsWith('data:')) {
+        // Parse data URL: data:[<mediatype>][;base64],<data>
+        const matches = doc.content.match(/^data:([^;]+);base64,(.+)$/);
+        if (!matches) {
+          return res.status(400).json({ error: "Invalid document content format" });
+        }
+        
+        const mimeType = matches[1];
+        const base64Data = matches[2];
+        const buffer = Buffer.from(base64Data, 'base64');
+        
+        const filename = doc.originalName || doc.filename || `${doc.title}.pdf`;
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+        res.setHeader('Content-Length', buffer.length);
+        return res.send(buffer);
+      }
+      
+      // Check if content is a legacy file path
+      if (doc.content.startsWith('/uploads/')) {
+        // Remove leading slash for proper path joining
+        const relativePath = doc.content.replace(/^\//, '');
+        const filePath = path.join(process.cwd(), relativePath);
+        if (!fs.existsSync(filePath)) {
+          return res.status(410).json({ 
+            error: "This file was stored in temporary storage and is no longer available. Please re-upload the document." 
+          });
+        }
+        const filename = doc.originalName || doc.filename || path.basename(filePath);
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+        return res.sendFile(filePath);
+      }
+      
+      // For other URL types, redirect
+      return res.redirect(doc.content);
+    } catch (error) {
+      console.error('Download document error:', error);
+      res.status(500).json({ error: "Failed to download document" });
+    }
+  });
+  
   // ===== DATABASE INVESTORS ROUTES =====
   
   // Get all investors from database

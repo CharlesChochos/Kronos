@@ -221,15 +221,27 @@ function DealDetail({ deal, activeTab, onTabChange }: { deal: Deal; activeTab: s
     }
   };
   
-  const handleDownload = (doc: any) => {
-    if (doc.content) {
+  const handleDownload = async (doc: any) => {
+    try {
+      const response = await fetch(`/api/documents/${doc.id}/download`);
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "Download failed" }));
+        toast.error(error.error || "Failed to download document");
+        return;
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = doc.content;
+      link.href = url;
       link.download = doc.originalName || doc.filename;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
       toast.success("Download started");
-    } else {
-      toast.error("Document content not available");
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error("Failed to download document");
     }
   };
 
@@ -246,22 +258,26 @@ function DealDetail({ deal, activeTab, onTabChange }: { deal: Deal; activeTab: s
   };
 
   const canViewInBrowser = (doc: any): boolean => {
-    if (!doc.content) return false;
+    // Can't view if content is unavailable (legacy files)
+    if (doc.contentUnavailable) return false;
     const mimeType = inferMimeType(doc);
     return mimeType.includes('pdf') || mimeType.includes('image') || mimeType.includes('text');
   };
 
-  const handleViewInNewTab = (doc: any) => {
-    if (!doc.content) {
-      toast.error("Document content not available");
-      return;
-    }
-
+  const handleViewInNewTab = async (doc: any) => {
     try {
-      // For file paths or any URL, just open directly
-      const newWindow = window.open(doc.content, '_blank');
+      const response = await fetch(`/api/documents/${doc.id}/download`);
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "Failed to open document" }));
+        toast.error(error.error || "Failed to open document");
+        return;
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const newWindow = window.open(url, '_blank');
       if (!newWindow) {
         toast.error("Unable to open document. Please allow popups for this site.");
+        window.URL.revokeObjectURL(url);
       }
     } catch (error) {
       console.error('Failed to open document:', error);

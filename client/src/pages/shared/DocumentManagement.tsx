@@ -330,12 +330,7 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
     }
   };
 
-  const handleDownload = (doc: DocumentRecord & { contentUnavailable?: boolean }) => {
-    if (!doc.content) {
-      toast.error("Document content not available for download");
-      return;
-    }
-    
+  const handleDownload = async (doc: DocumentRecord & { contentUnavailable?: boolean }) => {
     // Check if legacy file is unavailable
     if (doc.contentUnavailable) {
       toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
@@ -343,17 +338,28 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
     }
 
     try {
+      // Use the server download endpoint which handles all content types properly
+      const response = await fetch(`/api/documents/${doc.id}/download`);
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "Download failed" }));
+        toast.error(error.error || "Failed to download document");
+        return;
+      }
+      
+      // Create a blob from the response and download it
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      // Handle both base64 data URLs and file paths
-      link.href = doc.content.startsWith('data:') || doc.content.startsWith('http') || doc.content.startsWith('blob:') 
-        ? doc.content 
-        : doc.content; // File paths like /uploads/... work directly
+      link.href = url;
       link.download = doc.originalName || doc.filename || `${doc.title}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
       toast.success("Download started");
     } catch (error) {
+      console.error('Download error:', error);
       toast.error("Failed to download document");
     }
   };
@@ -374,19 +380,15 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
   };
 
   // Check if document can be viewed in browser
-  const canViewInBrowser = (doc: DocumentRecord): boolean => {
-    if (!doc.content) return false;
+  const canViewInBrowser = (doc: DocumentRecord & { contentUnavailable?: boolean }): boolean => {
+    // Can't view if content is unavailable (legacy files)
+    if (doc.contentUnavailable) return false;
     const mimeType = inferMimeType(doc);
     // PDFs and images can be viewed in browser
     return mimeType.includes('pdf') || mimeType.includes('image') || mimeType.includes('text');
   };
 
-  const handleViewInNewTab = (doc: DocumentRecord & { contentUnavailable?: boolean }) => {
-    if (!doc.content) {
-      toast.error("Document content not available");
-      return;
-    }
-    
+  const handleViewInNewTab = async (doc: DocumentRecord & { contentUnavailable?: boolean }) => {
     // Check if legacy file is unavailable
     if (doc.contentUnavailable) {
       toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
@@ -394,11 +396,24 @@ export default function DocumentManagement({ role = 'CEO', defaultTab = 'templat
     }
 
     try {
-      // For file paths (like /uploads/...) or any URL, just open directly
-      const newWindow = window.open(doc.content, '_blank');
+      // Use the server download endpoint and open the result in a new tab
+      const response = await fetch(`/api/documents/${doc.id}/download`);
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "Failed to open document" }));
+        toast.error(error.error || "Failed to open document");
+        return;
+      }
+      
+      // Create a blob URL and open it
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const newWindow = window.open(url, '_blank');
       if (!newWindow) {
         toast.error("Unable to open document. Please allow popups for this site.");
+        window.URL.revokeObjectURL(url);
       }
+      // Note: We don't revoke the URL immediately because the new window needs it
     } catch (error) {
       console.error('Failed to open document:', error);
       toast.error("Failed to open document");
