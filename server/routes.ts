@@ -156,6 +156,21 @@ export async function registerRoutes(
     }
   });
 
+  // Test deals endpoint for debugging (no auth required - TEMPORARY)
+  app.get("/api/health/deals", async (req, res) => {
+    try {
+      const deals = await storage.getAllDeals();
+      res.json(deals);
+    } catch (error) {
+      console.error("[Health Check] Deals error:", error);
+      res.status(500).json({
+        error: "Failed to fetch deals",
+        details: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+    }
+  });
+
   // Middleware to check authentication
   const requireAuth = (req: any, res: any, next: any) => {
     if (req.isAuthenticated()) {
