@@ -2415,56 +2415,113 @@ Generate only the document content, no additional commentary.`;
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
       });
 
+      // Build rich task context
+      const taskTitle = (task.title || '').toLowerCase();
+      const taskDesc = (task.description || '').toLowerCase();
+      const taskType = task.type || 'General';
+      const hasAttachments = task.hasAttachments || false;
+      const attachmentCount = task.attachmentCount || 0;
+      
+      // Detect task category for more accurate suggestions
+      const isFinancialModeling = taskTitle.includes('model') || taskTitle.includes('valuation') || 
+        taskTitle.includes('dcf') || taskTitle.includes('lbo') || taskTitle.includes('financial') ||
+        taskDesc.includes('excel') || taskDesc.includes('spreadsheet') || taskDesc.includes('analysis');
+      
+      const isDocumentDrafting = taskTitle.includes('draft') || taskTitle.includes('memo') || 
+        taskTitle.includes('document') || taskTitle.includes('write') || taskTitle.includes('prepare') ||
+        taskTitle.includes('letter') || taskTitle.includes('agreement') || taskTitle.includes('contract');
+      
+      const isPresentation = taskTitle.includes('presentation') || taskTitle.includes('pitch') || 
+        taskTitle.includes('deck') || taskTitle.includes('slides') || taskTitle.includes('powerpoint');
+      
+      const isResearch = taskTitle.includes('research') || taskTitle.includes('diligence') || 
+        taskTitle.includes('analyze') || taskTitle.includes('review') || taskTitle.includes('investigate');
+      
+      const isCommunication = taskTitle.includes('email') || taskTitle.includes('call') || 
+        taskTitle.includes('meeting') || taskTitle.includes('schedule') || taskTitle.includes('contact');
+      
+      const isDataEntry = taskTitle.includes('update') || taskTitle.includes('enter') || 
+        taskTitle.includes('input') || taskTitle.includes('log') || taskTitle.includes('record');
+
       const taskContext = `
-Task Information:
-- Title: ${task.title || 'N/A'}
-- Description: ${task.description || 'No description'}
-- Type: ${task.type || 'General'}
+TASK DETAILS:
+- Title: ${task.title || 'Untitled Task'}
+- Description: ${task.description || 'No description provided'}
+- Task Type: ${taskType}
 - Priority: ${task.priority || 'Medium'}
-`;
+- Has Attachments: ${hasAttachments ? `Yes (${attachmentCount} files)` : 'No'}
+
+DETECTED TASK CATEGORY: ${
+  isFinancialModeling ? 'Financial Modeling/Analysis' :
+  isDocumentDrafting ? 'Document Drafting/Legal' :
+  isPresentation ? 'Presentation Creation' :
+  isResearch ? 'Research/Due Diligence' :
+  isCommunication ? 'Communication/Scheduling' :
+  isDataEntry ? 'Data Entry/Updates' :
+  'General Task'
+}`;
 
       const dealContext = deal ? `
-Deal Context:
-- Name: ${deal.name || 'N/A'}
+DEAL CONTEXT:
+- Deal Name: ${deal.name || 'N/A'}
 - Client: ${deal.client || 'N/A'}
 - Sector: ${deal.sector || 'N/A'}
-- Stage: ${deal.stage || 'N/A'}
-` : 'No deal context provided.';
+- Current Stage: ${deal.stage || 'N/A'}
+${deal.stage ? `
+STAGE-SPECIFIC CONSIDERATIONS:
+${deal.stage === 'Opportunity' ? '- Early stage: Focus on initial research, market sizing, preliminary valuation' :
+  deal.stage === 'Pitch' ? '- Pitch stage: Focus on pitch materials, management presentations, initial financials' :
+  deal.stage === 'Due Diligence' ? '- DD stage: Focus on detailed analysis, data room review, verification' :
+  deal.stage === 'Negotiation' ? '- Negotiation: Focus on term sheets, deal terms, legal documentation' :
+  deal.stage === 'Closing' ? '- Closing: Focus on final documentation, closing conditions, execution' :
+  '- Standard deal workflow applies'}` : ''}` : '';
 
-      const prompt = `You are an AI assistant for an investment banking platform. Analyze the following task and suggest the best action to take.
+      const systemPrompt = `You are an expert investment banking workflow assistant at Equiturn Holdings. You help analysts and associates determine the best approach to complete their tasks efficiently.
+
+AVAILABLE TOOLS (use EXACT names from this list):
+- "Excel" - Financial modeling, data analysis, calculations, spreadsheets
+- "Word" - Documents, memos, letters, agreements, contracts
+- "PowerPoint" - Presentations, pitch decks, slides
+- "Email" - Client/team communication, sending documents
+- "Calendar" - Scheduling meetings, calls, deadlines
+- "Web Research" - Market research, company research, news
+- "Bloomberg" - Market data, financial information, company filings
+- "CapIQ" - Company financials, comparable analysis, screening
+- "Data Room" - Document review, due diligence materials
+- "PDF Editor" - Reviewing/annotating documents, combining files
+- "Teams/Zoom" - Video calls, virtual meetings
+
+Always respond with valid JSON matching the exact schema requested.`;
+
+      const prompt = `Analyze this investment banking task and provide specific, actionable guidance:
 
 ${taskContext}
 ${dealContext}
 
-Based on this task, provide:
-1. A recommended action (1-2 sentences)
-2. Brief reasoning for this recommendation (2-3 sentences)
-3. List of 2-4 relevant tools/applications the user should use
-
-Respond in JSON format:
+Provide your analysis in this exact JSON format:
 {
-  "action": "string - the recommended action",
-  "reasoning": "string - explanation of why this action is best",
-  "tools": ["array", "of", "tool", "names"]
+  "action": "A specific, actionable recommendation in 1-2 sentences. Be precise about what to do first.",
+  "reasoning": "Explain why this approach is best for this specific task. Reference the task type, deal stage, or industry best practices. 2-3 sentences.",
+  "tools": ["Tool1", "Tool2", "Tool3"],
+  "estimatedTime": "Estimated time to complete (e.g., '30 minutes', '2 hours', '1-2 days')",
+  "keySteps": ["Step 1 brief description", "Step 2 brief description", "Step 3 brief description"]
 }
 
-Consider common investment banking tasks like:
-- Document preparation (Word, Excel, PowerPoint)
-- Financial modeling (Excel, specialized tools)
-- Due diligence research (web research, databases)
-- Client communication (Email, Calendar)
-- Data analysis (Excel, BI tools)
-- Presentation creation (PowerPoint)
-- Legal review (Document management)`;
+IMPORTANT:
+- Recommend 2-4 tools from the AVAILABLE TOOLS list
+- Order tools by importance (primary tool first)
+- Be specific to investment banking workflows
+- Consider the deal stage when making recommendations
+- Provide realistic time estimates`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
-          { role: "system", content: "You are an expert investment banking workflow assistant. Always respond with valid JSON." },
+          { role: "system", content: systemPrompt },
           { role: "user", content: prompt }
         ],
-        max_tokens: 500,
-        temperature: 0.7,
+        max_tokens: 600,
+        temperature: 0.3, // Lower temperature for more consistent, accurate responses
         response_format: { type: "json_object" }
       });
       
@@ -2481,7 +2538,9 @@ Consider common investment banking tasks like:
       res.status(500).json({ 
         action: "Manual Review Required",
         reasoning: "Unable to analyze the task automatically at this time.",
-        tools: ["Document Editor", "Email Client", "Calendar"]
+        tools: ["Excel", "Word", "Email"],
+        estimatedTime: "Varies",
+        keySteps: ["Review task requirements", "Gather necessary materials", "Complete task"]
       });
     }
   });

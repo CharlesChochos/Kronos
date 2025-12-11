@@ -43,7 +43,8 @@ import {
   Download,
   Pencil,
   FileEdit,
-  Mail
+  Mail,
+  ListChecks
 } from "lucide-react";
 import { useCurrentUser, useTasks, useDealsListing, useUpdateTask, useCreateTask, useDeleteTask, useUsers, apiRequest, useUserPreferences, useSaveUserPreferences, useCreateTaskAttachment, useStakeholders, useCreateStakeholder } from "@/lib/api";
 import type { Stakeholder } from "@shared/schema";
@@ -1737,7 +1738,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
 
       {/* AI Analysis Modal */}
       <Dialog open={showAIModal} onOpenChange={setShowAIModal}>
-        <DialogContent className="bg-card border-border max-w-lg">
+        <DialogContent className="bg-card border-border max-w-xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Brain className="w-5 h-5 text-primary" />
@@ -1751,12 +1752,21 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
             {isAnalyzing ? (
               <div className="flex flex-col items-center justify-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-                <p className="text-muted-foreground">Analyzing task details and attachments...</p>
+                <p className="text-muted-foreground">Analyzing task details...</p>
+                <p className="text-xs text-muted-foreground mt-1">Considering deal stage and IB best practices</p>
               </div>
             ) : aiSuggestion ? (
               <>
                 <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
-                  <h4 className="font-medium text-sm mb-2">Recommended Action</h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-sm">Recommended Action</h4>
+                    {aiSuggestion.estimatedTime && (
+                      <Badge variant="secondary" className="text-xs">
+                        <Clock className="w-3 h-3 mr-1" />
+                        {aiSuggestion.estimatedTime}
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-lg font-semibold">{aiSuggestion.action}</p>
                 </div>
                 
@@ -1764,6 +1774,25 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                   <h4 className="font-medium text-sm mb-2">Reasoning</h4>
                   <p className="text-sm text-muted-foreground">{aiSuggestion.reasoning}</p>
                 </div>
+                
+                {aiSuggestion.keySteps && aiSuggestion.keySteps.length > 0 && (
+                  <div className="p-3 bg-secondary/30 rounded-lg">
+                    <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                      <ListChecks className="w-4 h-4" />
+                      Key Steps
+                    </h4>
+                    <ol className="space-y-1.5 text-sm text-muted-foreground">
+                      {aiSuggestion.keySteps.map((step: string, i: number) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="flex-shrink-0 w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center text-xs font-medium text-primary">
+                            {i + 1}
+                          </span>
+                          <span>{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
                 
                 <Separator />
                 
