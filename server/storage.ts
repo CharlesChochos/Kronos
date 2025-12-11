@@ -243,6 +243,7 @@ export interface IStorage {
   // Document Table operations
   getDocument(id: string): Promise<schema.DocumentTable | undefined>;
   getAllDocuments(): Promise<schema.DocumentTable[]>;
+  getDocumentsList(): Promise<Omit<schema.DocumentTable, 'fileData'>[]>; // Lightweight version without file data
   getDocumentsByDeal(dealId: string): Promise<schema.DocumentTable[]>;
   getDocumentsByUser(userId: string): Promise<schema.DocumentTable[]>;
   createDocument(doc: schema.InsertDocumentTable): Promise<schema.DocumentTable>;
@@ -1403,6 +1404,23 @@ export class DatabaseStorage implements IStorage {
   
   async getAllDocuments(): Promise<schema.DocumentTable[]> {
     return await db.select().from(schema.documentsTable)
+      .where(eq(schema.documentsTable.isArchived, false))
+      .orderBy(desc(schema.documentsTable.createdAt));
+  }
+  
+  async getDocumentsList(): Promise<Omit<schema.DocumentTable, 'fileData'>[]> {
+    // Lightweight version that excludes file data to avoid 507 errors
+    return await db.select({
+      id: schema.documentsTable.id,
+      filename: schema.documentsTable.filename,
+      category: schema.documentsTable.category,
+      dealId: schema.documentsTable.dealId,
+      tags: schema.documentsTable.tags,
+      uploadedBy: schema.documentsTable.uploadedBy,
+      isArchived: schema.documentsTable.isArchived,
+      createdAt: schema.documentsTable.createdAt,
+      updatedAt: schema.documentsTable.updatedAt,
+    }).from(schema.documentsTable)
       .where(eq(schema.documentsTable.isArchived, false))
       .orderBy(desc(schema.documentsTable.createdAt));
   }

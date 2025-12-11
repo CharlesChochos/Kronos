@@ -2562,16 +2562,16 @@ Consider common investment banking tasks like:
         }
       }
       
-      // Gather expanded context for the AI
+      // Gather expanded context for the AI (use lightweight listing to avoid 507 errors)
       const [deals, tasks, users, allTasks, investors, meetings, timeEntries, documents] = await Promise.all([
-        storage.getAllDeals(),
+        storage.getAllDealsListing(), // Lightweight version without full document data
         storage.getTasksByUser(currentUser.id),
         storage.getAllUsers(),
         storage.getAllTasks(),
         storage.getAllInvestors(),
         storage.getAllMeetings(),
         storage.getAllTimeEntries(),
-        storage.getAllDocuments(),
+        storage.getDocumentsList(), // Lightweight version without file data
       ]);
       
       // Calculate analytics
