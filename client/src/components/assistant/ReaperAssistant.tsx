@@ -360,18 +360,8 @@ export function ReaperAssistant() {
     }
   }, [showMentions, filteredMentions, mentionIndex, insertMention]);
 
-  // Auto-select most recent conversation or create new one when opening
-  useEffect(() => {
-    if (isOpen && !conversationsLoading && !activeConversationId && !createConversation.isPending) {
-      if (conversations.length > 0) {
-        setActiveConversationId(conversations[0].id);
-        setShowConversations(false);
-      } else {
-        // No conversations exist, create one automatically
-        createConversation.mutate();
-      }
-    }
-  }, [isOpen, conversationsLoading, conversations, activeConversationId, createConversation.isPending]);
+  // State to track if we need to create a conversation (used by useEffect below)
+  const [shouldCreateConversation, setShouldCreateConversation] = useState(false);
 
   const { data: messages = [], isLoading: messagesLoading } = useQuery<AssistantMessage[]>({
     queryKey: [`/api/assistant/conversations/${activeConversationId}/messages`],
@@ -507,8 +497,29 @@ export function ReaperAssistant() {
       queryClient.invalidateQueries({ queryKey: ["/api/assistant/conversations"] });
       setActiveConversationId(data.id);
       setShowConversations(false);
+      setShouldCreateConversation(false);
     },
   });
+
+  // Auto-select most recent conversation or create new one when opening
+  useEffect(() => {
+    if (isOpen && !conversationsLoading && !activeConversationId && !createConversation.isPending) {
+      if (conversations.length > 0) {
+        setActiveConversationId(conversations[0].id);
+        setShowConversations(false);
+      } else {
+        // No conversations exist, create one automatically
+        setShouldCreateConversation(true);
+      }
+    }
+  }, [isOpen, conversationsLoading, conversations, activeConversationId, createConversation.isPending]);
+
+  // Handle the actual creation after state is set (to avoid hoisting issues)
+  useEffect(() => {
+    if (shouldCreateConversation && !createConversation.isPending) {
+      createConversation.mutate();
+    }
+  }, [shouldCreateConversation, createConversation.isPending]);
 
   const sendMessage = useMutation({
     mutationFn: async ({ content, attachments, mentions }: { 
