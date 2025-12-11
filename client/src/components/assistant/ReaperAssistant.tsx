@@ -362,13 +362,16 @@ export function ReaperAssistant() {
 
   // Auto-select most recent conversation or create new one when opening
   useEffect(() => {
-    if (isOpen && !conversationsLoading && !activeConversationId) {
+    if (isOpen && !conversationsLoading && !activeConversationId && !createConversation.isPending) {
       if (conversations.length > 0) {
         setActiveConversationId(conversations[0].id);
         setShowConversations(false);
+      } else {
+        // No conversations exist, create one automatically
+        createConversation.mutate();
       }
     }
-  }, [isOpen, conversationsLoading, conversations, activeConversationId]);
+  }, [isOpen, conversationsLoading, conversations, activeConversationId, createConversation.isPending]);
 
   const { data: messages = [], isLoading: messagesLoading } = useQuery<AssistantMessage[]>({
     queryKey: [`/api/assistant/conversations/${activeConversationId}/messages`],

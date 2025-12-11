@@ -227,6 +227,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
     type: 'General' as 'General' | 'Document Review' | 'Due Diligence' | 'Client Communication' | 'Financial Analysis' | 'Legal' | 'Compliance',
     status: 'Pending' as string
   });
+  const [editAttachments, setEditAttachments] = useState<UploadedFile[]>([]);
   const [forwardToUser, setForwardToUser] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<{action: string, reasoning: string, tools: string[], apps?: AppSuggestion[]} | null>(null);
@@ -504,6 +505,16 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
       type: (task.type as any) || 'General',
       status: task.status
     });
+    // Load existing attachments for editing
+    const existingAttachments = (task.attachments as any[]) || [];
+    setEditAttachments(existingAttachments.map(a => ({
+      id: a.id || crypto.randomUUID(),
+      filename: a.filename,
+      url: a.url,
+      size: a.size || 0,
+      type: a.type || 'application/octet-stream',
+      uploadedAt: a.uploadedAt || new Date().toISOString(),
+    })));
     setShowEditTaskModal(true);
   };
 
@@ -539,6 +550,13 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
         type: editTaskForm.type,
         dueDate: fullDueDate,
         dealId: editTaskForm.dealId || null,
+        attachments: editAttachments.map(f => ({
+          id: f.id,
+          filename: f.filename,
+          url: f.url,
+          size: f.size,
+          uploadedAt: f.uploadedAt,
+        })),
       });
       
       toast.success("Task updated successfully!");
@@ -2213,6 +2231,71 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Attachments</Label>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.multiple = true;
+                    input.onchange = async (e) => {
+                      const files = (e.target as HTMLInputElement).files;
+                      if (!files) return;
+                      for (const file of Array.from(files)) {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        try {
+                          const response = await fetch('/api/upload', {
+                            method: 'POST',
+                            body: formData,
+                          });
+                          if (response.ok) {
+                            const uploaded = await response.json();
+                            setEditAttachments(prev => [...prev, uploaded]);
+                            toast.success(`Added: ${file.name}`);
+                          }
+                        } catch {
+                          toast.error(`Failed to upload ${file.name}`);
+                        }
+                      }
+                    };
+                    input.click();
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Upload className="w-4 h-4" />
+                  Add Files
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {editAttachments.length > 0 ? `${editAttachments.length} file(s)` : 'No files attached'}
+                </span>
+              </div>
+              {editAttachments.length > 0 && (
+                <div className="space-y-1 mt-2 max-h-32 overflow-y-auto">
+                  {editAttachments.map((file, idx) => (
+                    <div key={file.id || idx} className="flex items-center justify-between p-2 bg-secondary/30 rounded text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Paperclip className="w-3 h-3 flex-shrink-0" />
+                        <span className="truncate">{file.filename}</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 flex-shrink-0"
+                        onClick={() => setEditAttachments(prev => prev.filter((_, i) => i !== idx))}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
