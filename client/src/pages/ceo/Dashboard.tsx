@@ -348,15 +348,18 @@ export default function Dashboard() {
   // Check if current user is Sergio (Global head of Asset Management)
   const isAssetManagementHead = currentUser?.name?.toLowerCase().includes('sergio');
   
+  // Exclude opportunities from all dashboard calculations
+  const nonOpportunityDeals = deals.filter((d: any) => d.dealType !== 'Opportunity');
+  
   // Split deals by division for breakdown display
-  const amDeals = deals.filter((d: any) => d.dealType === 'Asset Management');
-  const ibDeals = deals.filter((d: any) => d.dealType !== 'Asset Management');
+  const amDeals = nonOpportunityDeals.filter((d: any) => d.dealType === 'Asset Management');
+  const ibDeals = nonOpportunityDeals.filter((d: any) => d.dealType !== 'Asset Management');
   const amActiveDeals = amDeals.filter(d => d.status === 'Active');
   const ibActiveDeals = ibDeals.filter(d => d.status === 'Active');
   
-  // Compute analytics using all deals (for general metrics)
-  const activeDeals = deals.filter(d => d.status === 'Active');
-  const totalValue = deals.reduce((sum, deal) => sum + deal.value, 0);
+  // Compute analytics using all deals (for general metrics) - excluding opportunities
+  const activeDeals = nonOpportunityDeals.filter(d => d.status === 'Active');
+  const totalValue = nonOpportunityDeals.reduce((sum, deal) => sum + deal.value, 0);
   const activeValue = activeDeals.reduce((sum, deal) => sum + deal.value, 0);
   
   // Division-specific values
@@ -894,13 +897,13 @@ export default function Dashboard() {
       const dayStr = format(date, 'EEE');
       const dateStr = format(date, 'yyyy-MM-dd');
       
-      // Filter deals by creation date AND division - only count deals with valid createdAt
-      const ibDealsOnDay = deals.filter(d => {
+      // Filter deals by creation date AND division - only count deals with valid createdAt (excluding opportunities)
+      const ibDealsOnDay = nonOpportunityDeals.filter(d => {
         if (!d.createdAt) return false;
         const dealDate = new Date(d.createdAt);
         return format(dealDate, 'yyyy-MM-dd') === dateStr && d.dealType !== 'Asset Management';
       });
-      const amDealsOnDay = deals.filter(d => {
+      const amDealsOnDay = nonOpportunityDeals.filter(d => {
         if (!d.createdAt) return false;
         const dealDate = new Date(d.createdAt);
         return format(dealDate, 'yyyy-MM-dd') === dateStr && d.dealType === 'Asset Management';
@@ -915,7 +918,7 @@ export default function Dashboard() {
         total: ibDealsOnDay.length + amDealsOnDay.length
       };
     });
-  }, [deals]);
+  }, [nonOpportunityDeals]);
 
   const topPerformers = useMemo(() => {
     return employeeStats
@@ -1945,7 +1948,7 @@ export default function Dashboard() {
                         ? ibDeals.filter(d => d.status === 'On Hold').length 
                         : capitalAtWorkFilter === 'AM' 
                           ? amDeals.filter(d => d.status === 'On Hold').length 
-                          : deals.filter(d => d.status === 'On Hold').length}
+                          : nonOpportunityDeals.filter(d => d.status === 'On Hold').length}
                     </div>
                     <div className="text-[9px] text-muted-foreground uppercase">On Hold</div>
                   </div>
@@ -1955,7 +1958,7 @@ export default function Dashboard() {
                         ? ibDeals.filter(d => d.status === 'Closed').length 
                         : capitalAtWorkFilter === 'AM' 
                           ? amDeals.filter(d => d.status === 'Closed').length 
-                          : deals.filter(d => d.status === 'Closed').length}
+                          : nonOpportunityDeals.filter(d => d.status === 'Closed').length}
                     </div>
                     <div className="text-[9px] text-muted-foreground uppercase">Closed</div>
                   </div>
@@ -2855,11 +2858,11 @@ export default function Dashboard() {
                       <div className="text-[10px] text-muted-foreground uppercase">Active</div>
                     </div>
                     <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-center">
-                      <div className="text-xl font-bold text-yellow-400">{deals.filter(d => d.status === 'On Hold' && d.dealType !== 'Asset Management').length}</div>
+                      <div className="text-xl font-bold text-yellow-400">{ibDeals.filter(d => d.status === 'On Hold').length}</div>
                       <div className="text-[10px] text-muted-foreground uppercase">On Hold</div>
                     </div>
                     <div className="p-3 bg-secondary/30 rounded-lg text-center">
-                      <div className="text-xl font-bold text-muted-foreground">{deals.filter(d => d.status === 'Closed' && d.dealType !== 'Asset Management').length}</div>
+                      <div className="text-xl font-bold text-muted-foreground">{ibDeals.filter(d => d.status === 'Closed').length}</div>
                       <div className="text-[10px] text-muted-foreground uppercase">Closed</div>
                     </div>
                   </div>
@@ -2877,11 +2880,11 @@ export default function Dashboard() {
                       <div className="text-[10px] text-muted-foreground uppercase">Active</div>
                     </div>
                     <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-center">
-                      <div className="text-xl font-bold text-yellow-400">{deals.filter(d => d.status === 'On Hold' && d.dealType === 'Asset Management').length}</div>
+                      <div className="text-xl font-bold text-yellow-400">{amDeals.filter(d => d.status === 'On Hold').length}</div>
                       <div className="text-[10px] text-muted-foreground uppercase">On Hold</div>
                     </div>
                     <div className="p-3 bg-secondary/30 rounded-lg text-center">
-                      <div className="text-xl font-bold text-muted-foreground">{deals.filter(d => d.status === 'Closed' && d.dealType === 'Asset Management').length}</div>
+                      <div className="text-xl font-bold text-muted-foreground">{amDeals.filter(d => d.status === 'Closed').length}</div>
                       <div className="text-[10px] text-muted-foreground uppercase">Closed</div>
                     </div>
                   </div>

@@ -24,7 +24,8 @@ import {
 import { 
   Search, Plus, Lightbulb, CheckCircle, XCircle, Eye, Clock, DollarSign,
   Building2, Users, ArrowRight, Briefcase, TrendingUp, AlertTriangle,
-  Upload, FileText, Paperclip, StickyNote, X, Download, Trash2, ExternalLink
+  Upload, FileText, Paperclip, StickyNote, X, Download, Trash2, ExternalLink,
+  Pencil, Save
 } from "lucide-react";
 import { 
   useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers,
@@ -93,6 +94,17 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const [approvalDivision, setApprovalDivision] = useState<string>('Investment Banking');
   const [detailTab, setDetailTab] = useState<'overview' | 'attachments' | 'notes'>('overview');
   const [newNote, setNewNote] = useState("");
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    client: "",
+    sector: "",
+    customSector: "",
+    value: "" as string,
+    description: "",
+    lead: "",
+  });
+  const [editSectorOpen, setEditSectorOpen] = useState(false);
   
   const [newOpportunity, setNewOpportunity] = useState({
     name: "",
@@ -277,11 +289,73 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const openOpportunityDetail = (opportunity: Deal) => {
     setSelectedOpportunity(opportunity);
     setDetailTab('overview');
+    setIsEditMode(false);
     // Load any existing attachments/notes from the opportunity
     const opp = opportunity as any;
     setOpportunityAttachments(opp.attachments || []);
     setOpportunityNotes(opp.opportunityNotes || []);
+    // Initialize edit form with opportunity data
+    setEditForm({
+      name: opportunity.name,
+      client: opportunity.client,
+      sector: SECTORS.includes(opportunity.sector) ? opportunity.sector : 'Other',
+      customSector: SECTORS.includes(opportunity.sector) ? '' : opportunity.sector,
+      value: opportunity.value.toString(),
+      description: opportunity.description || '',
+      lead: opportunity.lead || '',
+    });
     setShowOpportunityDetail(true);
+  };
+  
+  const handleSaveEdit = async () => {
+    if (!selectedOpportunity) return;
+    if (!editForm.name || !editForm.client) {
+      toast.error("Name and client are required");
+      return;
+    }
+    try {
+      const finalSector = editForm.sector === 'Other' && editForm.customSector 
+        ? editForm.customSector 
+        : editForm.sector;
+      
+      // Save custom sector if new
+      if (editForm.sector === 'Other' && editForm.customSector) {
+        const existingNames = customSectors.map((s: any) => s.name.toLowerCase());
+        if (!existingNames.includes(editForm.customSector.toLowerCase()) && !BASE_SECTORS.includes(editForm.customSector)) {
+          try {
+            await createCustomSector.mutateAsync(editForm.customSector);
+          } catch (e) {
+            console.log("Custom sector may already exist:", e);
+          }
+        }
+      }
+      
+      await updateDeal.mutateAsync({
+        id: selectedOpportunity.id,
+        name: editForm.name,
+        client: editForm.client,
+        sector: finalSector,
+        value: parseFloat(editForm.value) || 0,
+        description: editForm.description,
+        lead: editForm.lead,
+      } as any);
+      
+      // Update the selectedOpportunity with the new values so the UI reflects changes immediately
+      setSelectedOpportunity({
+        ...selectedOpportunity,
+        name: editForm.name,
+        client: editForm.client,
+        sector: finalSector,
+        value: parseFloat(editForm.value) || 0,
+        description: editForm.description,
+        lead: editForm.lead,
+      });
+      
+      toast.success("Opportunity updated");
+      setIsEditMode(false);
+    } catch (error) {
+      toast.error("Failed to update opportunity");
+    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -680,41 +754,195 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                 
                 <ScrollArea className="h-[calc(100vh-350px)] mt-4">
                   <TabsContent value="overview" className="space-y-4 pr-4 mt-0">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-3 rounded-lg bg-secondary/30">
-                        <p className="text-xs text-muted-foreground">Estimated Value</p>
-                        <p className="text-lg font-bold text-primary">${selectedOpportunity.value}M</p>
+                    {isEditMode ? (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Opportunity Name *</Label>
+                          <Input
+                            value={editForm.name}
+                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                            placeholder="Enter opportunity name"
+                            data-testid="input-edit-opportunity-name"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Client *</Label>
+                          <Input
+                            value={editForm.client}
+                            onChange={(e) => setEditForm({ ...editForm, client: e.target.value })}
+                            placeholder="Enter client name"
+                            data-testid="input-edit-client"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Sector</Label>
+                          <Popover open={editSectorOpen} onOpenChange={setEditSectorOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={editSectorOpen}
+                                className="w-full justify-between"
+                                data-testid="select-edit-sector"
+                              >
+                                {editForm.sector === 'Other' && editForm.customSector 
+                                  ? editForm.customSector 
+                                  : editForm.sector || "Select sector..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0">
+                              <Command>
+                                <CommandInput placeholder="Search or add sector..." />
+                                <CommandList>
+                                  <CommandEmpty>
+                                    <Button
+                                      variant="ghost"
+                                      className="w-full justify-start"
+                                      onClick={() => {
+                                        const searchValue = (document.querySelector('[cmdk-input]') as HTMLInputElement)?.value || '';
+                                        if (searchValue) {
+                                          setEditForm({ ...editForm, sector: 'Other', customSector: searchValue });
+                                          setEditSectorOpen(false);
+                                        }
+                                      }}
+                                    >
+                                      <Plus className="mr-2 h-4 w-4" />
+                                      Add new sector
+                                    </Button>
+                                  </CommandEmpty>
+                                  <CommandGroup>
+                                    {SECTORS.map((sector) => (
+                                      <CommandItem
+                                        key={sector}
+                                        value={sector}
+                                        onSelect={(value) => {
+                                          setEditForm({ ...editForm, sector: value, customSector: '' });
+                                          setEditSectorOpen(false);
+                                        }}
+                                      >
+                                        <CheckIcon
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            editForm.sector === sector ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        {sector}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          {editForm.sector === 'Other' && (
+                            <Input
+                              value={editForm.customSector}
+                              onChange={(e) => setEditForm({ ...editForm, customSector: e.target.value })}
+                              placeholder="Enter custom sector"
+                              className="mt-2"
+                              data-testid="input-edit-custom-sector"
+                            />
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Estimated Value ($M)</Label>
+                          <Input
+                            type="number"
+                            value={editForm.value}
+                            onChange={(e) => setEditForm({ ...editForm, value: e.target.value })}
+                            placeholder="0"
+                            data-testid="input-edit-value"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Lead Contact</Label>
+                          <Input
+                            value={editForm.lead}
+                            onChange={(e) => setEditForm({ ...editForm, lead: e.target.value })}
+                            placeholder="Enter lead contact name"
+                            data-testid="input-edit-lead"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Description</Label>
+                          <Textarea
+                            value={editForm.description}
+                            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                            placeholder="Enter opportunity details..."
+                            rows={4}
+                            data-testid="textarea-edit-description"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => setIsEditMode(false)}
+                            data-testid="button-cancel-edit"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            className="flex-1"
+                            onClick={handleSaveEdit}
+                            disabled={updateDeal.isPending}
+                            data-testid="button-save-edit"
+                          >
+                            <Save className="w-4 h-4 mr-2" />
+                            {updateDeal.isPending ? "Saving..." : "Save Changes"}
+                          </Button>
+                        </div>
                       </div>
-                      <div className="p-3 rounded-lg bg-secondary/30">
-                        <p className="text-xs text-muted-foreground">Sector</p>
-                        <p className="font-medium">{selectedOpportunity.sector}</p>
-                      </div>
-                    </div>
-                    
-                    {selectedOpportunity.lead && (
-                      <div className="p-3 rounded-lg bg-secondary/30">
-                        <p className="text-xs text-muted-foreground">Lead Contact</p>
-                        <p className="font-medium">{selectedOpportunity.lead}</p>
-                      </div>
-                    )}
-                    
-                    {selectedOpportunity.description && (
-                      <div className="p-3 rounded-lg bg-secondary/30">
-                        <p className="text-xs text-muted-foreground mb-1">Description</p>
-                        <p className="text-sm whitespace-pre-wrap">{selectedOpportunity.description}</p>
-                      </div>
-                    )}
-                    
-                    <div className="p-3 rounded-lg bg-secondary/30">
-                      <p className="text-xs text-muted-foreground mb-1">Stage</p>
-                      <Badge>{selectedOpportunity.stage}</Badge>
-                    </div>
-                    
-                    {(selectedOpportunity as any).createdAt && (
-                      <div className="p-3 rounded-lg bg-secondary/30">
-                        <p className="text-xs text-muted-foreground">Created</p>
-                        <p className="text-sm">{format(new Date((selectedOpportunity as any).createdAt), 'PPp')}</p>
-                      </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-3 rounded-lg bg-secondary/30">
+                            <p className="text-xs text-muted-foreground">Estimated Value</p>
+                            <p className="text-lg font-bold text-primary">${selectedOpportunity.value}M</p>
+                          </div>
+                          <div className="p-3 rounded-lg bg-secondary/30">
+                            <p className="text-xs text-muted-foreground">Sector</p>
+                            <p className="font-medium">{selectedOpportunity.sector}</p>
+                          </div>
+                        </div>
+                        
+                        {selectedOpportunity.lead && (
+                          <div className="p-3 rounded-lg bg-secondary/30">
+                            <p className="text-xs text-muted-foreground">Lead Contact</p>
+                            <p className="font-medium">{selectedOpportunity.lead}</p>
+                          </div>
+                        )}
+                        
+                        {selectedOpportunity.description && (
+                          <div className="p-3 rounded-lg bg-secondary/30">
+                            <p className="text-xs text-muted-foreground mb-1">Description</p>
+                            <p className="text-sm whitespace-pre-wrap">{selectedOpportunity.description}</p>
+                          </div>
+                        )}
+                        
+                        <div className="p-3 rounded-lg bg-secondary/30">
+                          <p className="text-xs text-muted-foreground mb-1">Stage</p>
+                          <Badge>{selectedOpportunity.stage}</Badge>
+                        </div>
+                        
+                        {(selectedOpportunity as any).createdAt && (
+                          <div className="p-3 rounded-lg bg-secondary/30">
+                            <p className="text-xs text-muted-foreground">Created</p>
+                            <p className="text-sm">{format(new Date((selectedOpportunity as any).createdAt), 'PPp')}</p>
+                          </div>
+                        )}
+                        
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => setIsEditMode(true)}
+                          data-testid="button-edit-opportunity"
+                        >
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Edit Opportunity
+                        </Button>
+                      </>
                     )}
                   </TabsContent>
                   
