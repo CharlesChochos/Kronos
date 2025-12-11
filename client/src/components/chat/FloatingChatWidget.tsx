@@ -433,15 +433,19 @@ export function FloatingChatWidget() {
             variant="ghost" 
             size="icon" 
             className="h-7 w-7 hover:bg-gray-100 dark:hover:bg-secondary rounded-full"
-            onClick={(e) => { e.stopPropagation(); }}
+            onClick={(e) => { e.stopPropagation(); openFullChat(); }}
+            title="Open full chat"
+            data-testid="button-chat-fullscreen"
           >
-            <MoreHorizontal className="w-4 h-4 text-gray-600 dark:text-muted-foreground" />
+            <Maximize2 className="w-4 h-4 text-gray-600 dark:text-muted-foreground" />
           </Button>
           <Button 
             variant="ghost" 
             size="icon" 
             className="h-7 w-7 hover:bg-gray-100 dark:hover:bg-secondary rounded-full"
             onClick={(e) => { e.stopPropagation(); openFullChat(); }}
+            title="New message"
+            data-testid="button-chat-new-message"
           >
             <PenSquare className="w-4 h-4 text-gray-600 dark:text-muted-foreground" />
           </Button>
@@ -450,6 +454,8 @@ export function FloatingChatWidget() {
             size="icon" 
             className="h-7 w-7 hover:bg-gray-100 dark:hover:bg-secondary rounded-full"
             onClick={(e) => { e.stopPropagation(); setIsExpanded(true); }}
+            title="Expand"
+            data-testid="button-chat-expand"
           >
             <ChevronUp className="w-4 h-4 text-gray-600 dark:text-muted-foreground" />
           </Button>
