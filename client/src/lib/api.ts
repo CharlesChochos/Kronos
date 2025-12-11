@@ -1643,6 +1643,7 @@ export function useDocuments() {
       if (!res.ok) throw new Error("Failed to fetch documents");
       return res.json() as Promise<DocumentRecord[]>;
     },
+    staleTime: 0, // Always refetch on invalidation for immediate updates
   });
 }
 
@@ -1688,7 +1689,7 @@ export function useCreateDocument() {
       return res.json() as Promise<DocumentRecord>;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      queryClient.invalidateQueries({ queryKey: ["documents"], refetchType: 'all' });
     },
   });
 }
@@ -1710,7 +1711,7 @@ export function useUpdateDocument() {
       return res.json() as Promise<DocumentRecord>;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      queryClient.invalidateQueries({ queryKey: ["documents"], refetchType: 'all' });
     },
   });
 }
@@ -1724,7 +1725,7 @@ export function useDeleteDocument() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      queryClient.invalidateQueries({ queryKey: ["documents"], refetchType: 'all' });
     },
   });
 }
