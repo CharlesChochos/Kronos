@@ -21,9 +21,11 @@ import * as XLSX from "xlsx";
 // PostgreSQL session store
 const PgSession = connectPgSimple(session);
 
-// Use the same database for both development and production
-// This ensures all data is shared across environments
-const databaseUrl = process.env.DATABASE_URL!;
+// Use production database URL when deployed, otherwise use development database
+const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
+const databaseUrl = isProduction 
+  ? (process.env.PRODUCTION_DATABASE_URL || process.env.DATABASE_URL!)
+  : process.env.DATABASE_URL!;
 
 // Initialize OpenAI client with Replit AI Integrations
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
