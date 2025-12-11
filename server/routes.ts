@@ -3307,8 +3307,9 @@ Example: "Generate a pipeline report" -> call generate_report
       
       // Call OpenAI API with function calling
       try {
+        console.log('[Assistant] Making OpenAI request with model gpt-4o...');
         const completion = await openai.chat.completions.create({
-          model: "gpt-5",
+          model: "gpt-4o",
           messages: [
             { role: "system", content: systemPrompt },
             ...conversationHistory,
@@ -3319,8 +3320,10 @@ Example: "Generate a pipeline report" -> call generate_report
           max_completion_tokens: 2048,
         });
         
+        console.log('[Assistant] OpenAI response received:', JSON.stringify(completion.choices[0], null, 2).slice(0, 500));
         const responseMessage = completion.choices[0]?.message;
         let assistantContent = responseMessage?.content || "";
+        console.log('[Assistant] Initial content:', assistantContent ? assistantContent.slice(0, 100) : 'EMPTY');
         
         // Handle function calls
         if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
@@ -4310,7 +4313,7 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
           }));
           
           const followUpCompletion = await openai.chat.completions.create({
-            model: "gpt-5",
+            model: "gpt-4o",
             messages: [
               { role: "system", content: systemPrompt },
               ...conversationHistory,
@@ -4321,6 +4324,7 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
             max_completion_tokens: 2048,
           });
           
+          console.log('[Assistant] Follow-up content:', followUpCompletion.choices[0]?.message?.content?.slice(0, 100) || 'EMPTY');
           assistantContent = followUpCompletion.choices[0]?.message?.content || "I've completed the action.";
         }
         
