@@ -388,6 +388,17 @@ export default function TeamAssignment() {
                             data-testid="input-search-deals"
                           />
                         </div>
+                        {selectedDeal && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full mb-2 text-muted-foreground hover:text-foreground"
+                            onClick={() => setSelectedDeal(null)}
+                            data-testid="button-clear-deal-selection"
+                          >
+                            <X className="w-3 h-3 mr-1" /> Clear deal selection
+                          </Button>
+                        )}
                         <div className="space-y-2 max-h-[300px] overflow-y-auto">
                             {filteredDeals.map(deal => (
                                 <div 
@@ -398,7 +409,7 @@ export default function TeamAssignment() {
                                       ? "bg-primary/20 border border-primary" 
                                       : "bg-secondary/30 border border-border/50 hover:border-primary/50"
                                   )}
-                                  onClick={() => setSelectedDeal(deal.id)}
+                                  onClick={() => setSelectedDeal(selectedDeal === deal.id ? null : deal.id)}
                                   data-testid={`deal-select-${deal.id}`}
                                 >
                                     <div className="font-medium mb-1 text-sm">{deal.name}</div>
