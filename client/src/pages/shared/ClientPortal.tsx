@@ -37,13 +37,13 @@ import {
   Building2,
   XCircle
 } from "lucide-react";
-import { useDeals, useClientPortalAccess, useCreateClientPortalAccess, useUpdateClientPortalAccess, useDeleteClientPortalAccess, usePortalInvites, useCreatePortalInvite, useRevokePortalInvite, useExternalUsers } from "@/lib/api";
+import { useDealsListing, useClientPortalAccess, useCreateClientPortalAccess, useUpdateClientPortalAccess, useDeleteClientPortalAccess, usePortalInvites, useCreatePortalInvite, useRevokePortalInvite, useExternalUsers } from "@/lib/api";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import type { ClientPortalAccess } from "@shared/schema";
 
 export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
-  const { data: deals = [] } = useDeals();
+  const { data: deals = [] } = useDealsListing();
   const { data: clientAccess = [], isLoading } = useClientPortalAccess();
   const { data: portalInvites = [], isLoading: invitesLoading } = usePortalInvites();
   const { data: externalUsers = [] } = useExternalUsers();

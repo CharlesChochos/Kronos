@@ -1020,9 +1020,30 @@ export async function registerRoutes(
 
   // ===== DEAL ROUTES =====
   
+  // Lightweight deals listing - returns only essential fields (no large JSON fields)
+  // Use this for deal list views to reduce payload size
+  app.get("/api/deals/listing", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const startTime = Date.now();
+      console.log("[API] Fetching deals listing (lightweight)...");
+      const deals = await storage.getDealsListing();
+      const duration = Date.now() - startTime;
+      console.log(`[API] Fetched ${deals.length} deals (listing) in ${duration}ms`);
+      res.json(deals);
+    } catch (error) {
+      console.error("[API] Failed to fetch deals listing:", error);
+      res.status(500).json({ error: "Failed to fetch deals", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // Full deals endpoint - returns all fields including large JSON data
   app.get("/api/deals", requireAuth, requireInternal, async (req, res) => {
     try {
+      const startTime = Date.now();
+      console.log("[API] Fetching all deals...");
       const deals = await storage.getAllDeals();
+      const duration = Date.now() - startTime;
+      console.log(`[API] Fetched ${deals.length} deals in ${duration}ms`);
       res.json(deals);
     } catch (error) {
       console.error("[API] Failed to fetch deals:", error);

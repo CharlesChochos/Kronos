@@ -46,7 +46,7 @@ import {
   PenLine,
   ExternalLink,
 } from "lucide-react";
-import { useDocuments, useCreateDocument, useUpdateDocument, useDeleteDocument, useDeals, useCurrentUser, type DocumentRecord } from "@/lib/api";
+import { useDocuments, useCreateDocument, useUpdateDocument, useDeleteDocument, useDealsListing, useCurrentUser, type DocumentRecord } from "@/lib/api";
 
 type DocumentManagementProps = {
   role?: 'CEO' | 'Employee';
@@ -185,7 +185,7 @@ const formatFileSize = (bytes?: number) => {
 export default function DocumentManagement({ role = 'CEO', defaultTab = 'templates' }: DocumentManagementProps) {
   const { data: currentUser } = useCurrentUser();
   const { data: documents = [], isLoading } = useDocuments();
-  const { data: deals = [] } = useDeals();
+  const { data: deals = [] } = useDealsListing();
   const createDocument = useCreateDocument();
   const updateDocument = useUpdateDocument();
   const deleteDocument = useDeleteDocument();

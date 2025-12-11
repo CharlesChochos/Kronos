@@ -50,7 +50,7 @@ import {
   FileText,
   Sparkles
 } from "lucide-react";
-import { useDeals, useStakeholders, useStakeholderStats, useCreateStakeholder, useUpdateStakeholder, useDeleteStakeholder } from "@/lib/api";
+import { useDealsListing, useStakeholders, useStakeholderStats, useCreateStakeholder, useUpdateStakeholder, useDeleteStakeholder } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -80,7 +80,7 @@ type LocalStakeholder = {
 
 export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee' }) {
   const queryClient = useQueryClient();
-  const { data: deals = [] } = useDeals();
+  const { data: deals = [] } = useDealsListing();
   
   // Pagination and search state
   const [currentPage, setCurrentPage] = useState(1);

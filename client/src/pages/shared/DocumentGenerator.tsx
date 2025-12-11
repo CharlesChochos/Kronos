@@ -22,7 +22,7 @@ import {
   ChevronRight,
   Loader2
 } from "lucide-react";
-import { useCurrentUser, useDeals, useGenerateDocument, useDocumentTemplates, useUpdateDocumentTemplate, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
+import { useCurrentUser, useDealsListing, useGenerateDocument, useDocumentTemplates, useUpdateDocumentTemplate, useUserPreferences, useSaveUserPreferences } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
@@ -34,7 +34,7 @@ type DocumentGeneratorProps = {
 
 export default function DocumentGenerator({ role = 'CEO' }: DocumentGeneratorProps) {
   const { data: currentUser } = useCurrentUser();
-  const { data: deals = [], isLoading: isLoadingDeals } = useDeals();
+  const { data: deals = [], isLoading: isLoadingDeals } = useDealsListing();
   const { data: templates = [], isLoading: isLoadingTemplates } = useDocumentTemplates();
   const { data: userPrefs, isLoading: isLoadingPrefs } = useUserPreferences();
   const saveUserPrefs = useSaveUserPreferences();

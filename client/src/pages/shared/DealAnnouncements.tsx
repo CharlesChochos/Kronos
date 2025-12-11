@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import { 
   useCurrentUser, 
-  useDeals, 
+  useDealsListing, 
   useUsers,
   useAnnouncements,
   useCreateAnnouncement,
@@ -59,7 +59,7 @@ type LocalComment = { id: string; authorId: string; authorName: string; content:
 
 export default function DealAnnouncements({ role }: { role: 'CEO' | 'Employee' }) {
   const { data: currentUser } = useCurrentUser();
-  const { data: deals = [] } = useDeals();
+  const { data: deals = [] } = useDealsListing();
   const { data: users = [] } = useUsers();
   const { data: announcements = [], isLoading: announcementsLoading } = useAnnouncements();
   const { data: polls = [], isLoading: pollsLoading } = usePolls();

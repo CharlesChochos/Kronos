@@ -30,7 +30,7 @@ import {
   User,
   ChevronsUpDown
 } from "lucide-react";
-import { useCurrentUser, useMeetings, useDeals, useUsers, useCreateMeeting, useDeleteMeeting, useTimeOffRequests, useCreateTimeOffRequest, useUpdateTimeOffRequest, useGoogleCalendarStatus, useGoogleCalendarEvents, useCreateGoogleCalendarEvent, useConnectGoogleCalendar, useDisconnectGoogleCalendar, useSyncGoogleCalendar, type GoogleCalendarEvent } from "@/lib/api";
+import { useCurrentUser, useMeetings, useDealsListing, useUsers, useCreateMeeting, useDeleteMeeting, useTimeOffRequests, useCreateTimeOffRequest, useUpdateTimeOffRequest, useGoogleCalendarStatus, useGoogleCalendarEvents, useCreateGoogleCalendarEvent, useConnectGoogleCalendar, useDisconnectGoogleCalendar, useSyncGoogleCalendar, type GoogleCalendarEvent } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, isToday, parseISO, isWithinInterval, addHours } from "date-fns";
 import { toast } from "sonner";
@@ -46,7 +46,7 @@ export default function EventCalendar({ role }: EventCalendarProps) {
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const { data: meetings = [] } = useMeetings();
-  const { data: deals = [] } = useDeals();
+  const { data: deals = [] } = useDealsListing();
   const { data: users = [] } = useUsers();
   const { data: timeOffRequests = [] } = useTimeOffRequests();
   const { data: googleCalendarStatus } = useGoogleCalendarStatus();

@@ -21,7 +21,7 @@ import {
   Timer,
   Trash2
 } from "lucide-react";
-import { useCurrentUser, useDeals, useTimeEntries, useCreateTimeEntry, useDeleteTimeEntry } from "@/lib/api";
+import { useCurrentUser, useDealsListing, useTimeEntries, useCreateTimeEntry, useDeleteTimeEntry } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, parseISO } from "date-fns";
 import { toast } from "sonner";
@@ -46,7 +46,7 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'
 
 export default function TimeTracking({ role }: TimeTrackingProps) {
   const { data: currentUser } = useCurrentUser();
-  const { data: deals = [] } = useDeals();
+  const { data: deals = [] } = useDealsListing();
   const { data: timeEntries = [], isLoading } = useTimeEntries();
   const createTimeEntry = useCreateTimeEntry();
   const deleteTimeEntry = useDeleteTimeEntry();

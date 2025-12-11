@@ -115,7 +115,7 @@ export function useUser(id: string) {
   });
 }
 
-// Deal API
+// Deal API - fetches all deals (paginated by default in production)
 export function useDeals() {
   return useQuery({
     queryKey: ["deals"],
@@ -123,6 +123,22 @@ export function useDeals() {
       const res = await fetch("/api/deals");
       if (!res.ok) throw new Error("Failed to fetch deals");
       return res.json() as Promise<Deal[]>;
+    },
+  });
+}
+
+// Lightweight deal type for listing endpoints (excludes large JSON fields)
+export type DealListing = Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt'>;
+
+// Lightweight deals listing (excludes large JSON fields for performance)
+// Use this for dropdowns, selectors, or simple lists that don't need full data
+export function useDealsListing() {
+  return useQuery({
+    queryKey: ["deals-listing"],
+    queryFn: async () => {
+      const res = await fetch("/api/deals/listing");
+      if (!res.ok) throw new Error("Failed to fetch deals");
+      return res.json() as Promise<DealListing[]>;
     },
   });
 }
@@ -153,6 +169,7 @@ export function useCreateDeal() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
@@ -176,6 +193,7 @@ export function useUpdateDeal() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
@@ -194,6 +212,7 @@ export function useDeleteDeal() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
@@ -284,6 +303,7 @@ export function useCreateTask() {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
     },
   });
 }
@@ -304,6 +324,7 @@ export function useUpdateTask() {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
     },
   });
 }
@@ -322,6 +343,7 @@ export function useDeleteTask() {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
     },
   });
 }
@@ -458,6 +480,7 @@ export function useTagDealMember() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
     },
   });
 }
@@ -480,6 +503,7 @@ export function useRemoveDealMember() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
     },
   });
 }

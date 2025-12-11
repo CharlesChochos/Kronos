@@ -25,7 +25,7 @@ import {
   AlertCircle,
   CheckCircle
 } from "lucide-react";
-import { useCurrentUser, useDeals, useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent, CalendarEventType } from "@/lib/api";
+import { useCurrentUser, useDealsListing, useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent, CalendarEventType } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, parseISO } from "date-fns";
 import { toast } from "sonner";
@@ -61,7 +61,7 @@ const eventTypeLabels: Record<string, string> = {
 
 export default function CapitalRaisingCalendar() {
   const { data: currentUser } = useCurrentUser();
-  const { data: deals = [] } = useDeals();
+  const { data: deals = [] } = useDealsListing();
   const { data: calendarEvents = [], isLoading: eventsLoading } = useCalendarEvents();
   const createEventMutation = useCreateCalendarEvent();
   const updateEventMutation = useUpdateCalendarEvent();
