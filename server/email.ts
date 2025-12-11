@@ -35,9 +35,25 @@ async function getCredentials() {
 
 async function getUncachableResendClient() {
   const credentials = await getCredentials();
+  // Use Resend's test sender for development
+  // For production: verify your domain at https://resend.com/domains
+  // Then update the Resend connector settings with your verified from_email
+  const configuredEmail = credentials.fromEmail;
+  
+  // If using an unverified custom domain, fallback to test sender
+  // The test sender only works for emails to the Resend account owner
+  const isVerifiedDomain = configuredEmail && (
+    configuredEmail.endsWith('@resend.dev') ||
+    configuredEmail.endsWith('.replit.dev') ||
+    process.env.RESEND_DOMAIN_VERIFIED === 'true'
+  );
+  
+  const fromEmail = isVerifiedDomain ? configuredEmail : 'Kronos <onboarding@resend.dev>';
+  
   return {
     client: new Resend(credentials.apiKey),
-    fromEmail: credentials.fromEmail
+    fromEmail: fromEmail,
+    isTestMode: !isVerifiedDomain
   };
 }
 
@@ -689,13 +705,28 @@ Kronos - Investment Banking Operations Platform
     });
 
     if (result.error) {
+      // Check if it's a domain verification error
+      const errorMsg = result.error.message || '';
+      if (errorMsg.includes('domain is not verified') || errorMsg.includes('not verified')) {
+        return { 
+          success: false, 
+          error: 'Email domain not verified. For production use, verify your domain at https://resend.com/domains. In test mode, you can only send emails to the Resend account owner.' 
+        };
+      }
       return { success: false, error: result.error.message };
     }
 
     console.log(`Successfully sent external work email to: ${data.recipientEmail}`);
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to send external work email:', error);
+    const errorMsg = error?.message || '';
+    if (errorMsg.includes('domain is not verified') || errorMsg.includes('not verified')) {
+      return { 
+        success: false, 
+        error: 'Email domain not verified. For production use, verify your domain at https://resend.com/domains. In test mode, you can only send emails to the Resend account owner.' 
+      };
+    }
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
