@@ -2815,9 +2815,6 @@ export default function Dashboard() {
           </ScrollArea>
           <DialogFooter>
             <Button variant="outline" onClick={() => setActiveDealsModalOpen(false)}>Close</Button>
-            <Button onClick={() => { setActiveDealsModalOpen(false); setLocation('/ceo/deals'); }}>
-              Go to Deal Management
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2981,9 +2978,6 @@ export default function Dashboard() {
           </ScrollArea>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCapitalAtWorkModalOpen(false)}>Close</Button>
-            <Button onClick={() => { setCapitalAtWorkModalOpen(false); setLocation('/ceo/deals'); }}>
-              View All Deals
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3113,9 +3107,6 @@ export default function Dashboard() {
           </ScrollArea>
           <DialogFooter>
             <Button variant="outline" onClick={() => setFeeSummaryModalOpen(false)}>Close</Button>
-            <Button onClick={() => { setFeeSummaryModalOpen(false); setLocation('/ceo/deals'); }}>
-              Manage Deal Fees
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
