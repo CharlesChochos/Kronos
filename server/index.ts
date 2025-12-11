@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { logger, requestIdMiddleware, requestLoggingMiddleware, errorLoggingMiddleware, logServerStart } from "./logger";
+import { seedAdminIfEmpty } from "./seedAdmin";
 
 const app = express();
 const httpServer = createServer(app);
@@ -41,6 +42,8 @@ app.use(requestLoggingMiddleware);
 
 (async () => {
   await registerRoutes(httpServer, app);
+  
+  await seedAdminIfEmpty();
 
   app.use(errorLoggingMiddleware);
 
