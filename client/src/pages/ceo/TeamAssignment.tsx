@@ -553,12 +553,12 @@ export default function TeamAssignment() {
           <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
             <div className="space-y-2">
               <Label>Related Deal (optional)</Label>
-              <Select value={taskDealId || ""} onValueChange={(v) => setTaskDealId(v || null)}>
+              <Select value={taskDealId || "none"} onValueChange={(v) => setTaskDealId(v === "none" ? null : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="No deal - general task" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No deal - general task</SelectItem>
+                  <SelectItem value="none">No deal - general task</SelectItem>
                   {deals.filter(d => d.status === 'Active').map(deal => (
                     <SelectItem key={deal.id} value={deal.id}>{deal.name}</SelectItem>
                   ))}
