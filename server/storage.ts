@@ -11,6 +11,12 @@ const databaseUrl = isProduction
   ? (process.env.PRODUCTION_DATABASE_URL || process.env.DATABASE_URL!)
   : process.env.DATABASE_URL!;
 
+// Debug logging for database connection
+console.log(`[Storage] Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
+console.log(`[Storage] REPLIT_DEPLOYMENT: ${process.env.REPLIT_DEPLOYMENT}`);
+console.log(`[Storage] Using PRODUCTION_DATABASE_URL: ${isProduction && !!process.env.PRODUCTION_DATABASE_URL}`);
+console.log(`[Storage] Database URL exists: ${!!databaseUrl}`);
+
 const sql = neon(databaseUrl);
 const db = drizzle(sql, { schema });
 
