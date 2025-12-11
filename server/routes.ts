@@ -7304,7 +7304,9 @@ Only include entries with both name AND company. Extract ALL rows.`
       }
       
       if (!doc.content) {
-        return res.status(404).json({ error: "Document content not available" });
+        return res.status(404).json({ 
+          error: "Document content not stored. Please regenerate or re-upload this document." 
+        });
       }
       
       // Check if content is base64 data URL
