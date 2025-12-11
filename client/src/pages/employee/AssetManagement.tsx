@@ -34,7 +34,7 @@ import {
   Mic, MicOff, Play, Pause, Square, Volume2, Download, UserCircle, ExternalLink
 } from "lucide-react";
 import { 
-  useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks, useCreateDealFee,
+  useCurrentUser, useDealsListing, useDeal, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks, useCreateDealFee,
   useStageDocuments, useCreateStageDocument, useDeleteStageDocument,
   useStagePodMembers, useCreateStagePodMember, useDeleteStagePodMember,
   useStageVoiceNotes, useCreateStageVoiceNote, useDeleteStageVoiceNote,
@@ -1055,7 +1055,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
   const searchString = useSearch();
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
-  const { data: allDeals = [], isLoading } = useDeals();
+  const { data: allDeals = [], isLoading } = useDealsListing();
   const { data: allUsers = [] } = useUsers();
   const { data: allTasks = [] } = useTasks();
   const { data: stakeholders = [] } = useAllInvestors();

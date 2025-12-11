@@ -24,7 +24,7 @@ import {
   Download,
   RefreshCw
 } from "lucide-react";
-import { useCurrentUser, useDeals } from "@/lib/api";
+import { useCurrentUser, useDealsListing } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
   LineChart,
@@ -63,7 +63,7 @@ const mapIBStage = (stage: string) => {
 
 export default function PipelineForecasting() {
   const { data: currentUser } = useCurrentUser();
-  const { data: deals = [] } = useDeals();
+  const { data: deals = [] } = useDealsListing();
   
   const [timeframe, setTimeframe] = useState<string>("Q4 2024");
   const [scenarioType, setScenarioType] = useState<string>("base");

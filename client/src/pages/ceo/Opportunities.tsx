@@ -28,7 +28,7 @@ import {
   Pencil, Save
 } from "lucide-react";
 import { 
-  useCurrentUser, useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers,
+  useCurrentUser, useDealsListing, useDeal, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers,
   useCustomSectors, useCreateCustomSector, useTagDealMember, useRemoveDealMember
 } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -63,7 +63,7 @@ type OpportunitiesProps = {
 
 export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const { data: currentUser } = useCurrentUser();
-  const { data: deals = [], isLoading } = useDeals();
+  const { data: deals = [], isLoading } = useDealsListing();
   const { data: users = [] } = useUsers();
   const { data: customSectors = [] } = useCustomSectors();
   const createCustomSector = useCreateCustomSector();

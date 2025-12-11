@@ -15,7 +15,7 @@ import {
   Heart,
   Users
 } from "lucide-react";
-import { useCurrentUser, useDeals, useUpdateDeal, useInvestorMatches, useCreateInvestorMatch, useDeleteInvestorMatch, useAllInvestors } from "@/lib/api";
+import { useCurrentUser, useDealsListing, useUpdateDeal, useInvestorMatches, useCreateInvestorMatch, useDeleteInvestorMatch, useAllInvestors } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion";
@@ -38,7 +38,7 @@ type InvestorData = {
 
 export default function InvestorMatching() {
   const { data: currentUser } = useCurrentUser();
-  const { data: deals = [], isLoading } = useDeals();
+  const { data: deals = [], isLoading } = useDealsListing();
   const { data: investors = [], isLoading: stakeholdersLoading } = useAllInvestors();
   const updateDeal = useUpdateDeal();
   

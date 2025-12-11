@@ -27,7 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDashboardContext } from "@/contexts/DashboardContext";
-import { useNotifications, useDeals, useTasks, useUsers, useLogout, useCurrentUser, useMarkNotificationRead, useUpdateUserProfile, useChangePassword, useUserPreferences, useSaveUserPreferences, use2FAStatus, useSetup2FA, useVerify2FA, useDisable2FA } from "@/lib/api";
+import { useNotifications, useDealsListing, useTasks, useUsers, useLogout, useCurrentUser, useMarkNotificationRead, useUpdateUserProfile, useChangePassword, useUserPreferences, useSaveUserPreferences, use2FAStatus, useSetup2FA, useVerify2FA, useDisable2FA } from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -301,7 +301,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   } = useDashboardContext();
   
   const { data: notifications = [] } = useNotifications();
-  const { data: deals = [] } = useDeals();
+  const { data: deals = [] } = useDealsListing();
   const { data: tasks = [] } = useTasks();
   const { data: users = [] } = useUsers();
   const unreadCount = notifications.filter((n: any) => !n.read).length;

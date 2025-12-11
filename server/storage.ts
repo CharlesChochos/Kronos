@@ -31,7 +31,7 @@ export interface IStorage {
   // Deal operations
   getDeal(id: string): Promise<Deal | undefined>;
   getAllDeals(): Promise<Deal[]>;
-  getDealsListing(): Promise<Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt'>[]>;
+  getDealsListing(): Promise<Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt' | 'podTeam'>[]>;
   createDeal(deal: InsertDeal): Promise<Deal>;
   updateDeal(id: string, updates: Partial<InsertDeal>): Promise<Deal | undefined>;
   deleteDeal(id: string): Promise<void>;
@@ -369,8 +369,8 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(schema.deals);
   }
 
-  async getDealsListing(): Promise<Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt'>[]> {
-    // Return essential fields for listing - excludes large JSON fields like attachments, podTeam, taggedInvestors, auditTrail
+  async getDealsListing(): Promise<Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt' | 'podTeam'>[]> {
+    // Return essential fields for listing - includes podTeam for filtering, excludes very large JSON fields like attachments, taggedInvestors, auditTrail
     return await db.select({
       id: schema.deals.id,
       name: schema.deals.name,
@@ -386,6 +386,7 @@ export class DatabaseStorage implements IStorage {
       status: schema.deals.status,
       description: schema.deals.description,
       createdAt: schema.deals.createdAt,
+      podTeam: schema.deals.podTeam,
     }).from(schema.deals);
   }
 

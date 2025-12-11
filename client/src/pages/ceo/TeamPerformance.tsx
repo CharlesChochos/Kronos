@@ -23,7 +23,7 @@ import {
   ArrowDownRight,
   Calendar
 } from "lucide-react";
-import { useCurrentUser, useUsers, useDeals, useTasks } from "@/lib/api";
+import { useCurrentUser, useUsers, useDealsListing, useTasks } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
   BarChart,
@@ -46,7 +46,7 @@ import {
 export default function TeamPerformance() {
   const { data: currentUser } = useCurrentUser();
   const { data: users = [] } = useUsers();
-  const { data: deals = [] } = useDeals();
+  const { data: deals = [] } = useDealsListing();
   const { data: tasks = [] } = useTasks();
   
   const [timeframe, setTimeframe] = useState<string>("month");

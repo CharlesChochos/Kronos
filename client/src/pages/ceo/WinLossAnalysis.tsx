@@ -20,7 +20,7 @@ import {
   Lightbulb,
   AlertTriangle
 } from "lucide-react";
-import { useCurrentUser, useDeals } from "@/lib/api";
+import { useCurrentUser, useDealsListing } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
   BarChart,
@@ -57,7 +57,7 @@ const mapIBStage = (stage: string) => {
 
 export default function WinLossAnalysis() {
   const { data: currentUser } = useCurrentUser();
-  const { data: deals = [] } = useDeals();
+  const { data: deals = [] } = useDealsListing();
   
   const [timeframe, setTimeframe] = useState<string>("year");
 

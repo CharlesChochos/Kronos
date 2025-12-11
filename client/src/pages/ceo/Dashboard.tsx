@@ -82,7 +82,7 @@ import {
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { useCurrentUser, useUsers, useDeals, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews, useUserPreferences, useSaveUserPreferences, useCalendarEvents, useAllDealFees, useCustomSectors, useCreateCustomSector } from "@/lib/api";
+import { useCurrentUser, useUsers, useDealsListing, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews, useUserPreferences, useSaveUserPreferences, useCalendarEvents, useAllDealFees, useCustomSectors, useCreateCustomSector } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, subDays, startOfDay, isAfter, isSameDay } from "date-fns";
@@ -114,7 +114,7 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { data: currentUser } = useCurrentUser();
   const { data: users = [], isLoading: usersLoading } = useUsers();
-  const { data: deals = [], isLoading: dealsLoading } = useDeals();
+  const { data: deals = [], isLoading: dealsLoading } = useDealsListing();
   const { data: tasks = [], isLoading: tasksLoading } = useTasks();
   const { data: notifications = [] } = useNotifications();
   const { data: meetings = [] } = useMeetings();

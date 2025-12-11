@@ -42,7 +42,7 @@ import {
   Pencil,
   FileEdit
 } from "lucide-react";
-import { useCurrentUser, useTasks, useDeals, useUpdateTask, useCreateTask, useDeleteTask, useUsers, apiRequest, useUserPreferences, useSaveUserPreferences, useCreateTaskAttachment } from "@/lib/api";
+import { useCurrentUser, useTasks, useDealsListing, useUpdateTask, useCreateTask, useDeleteTask, useUsers, apiRequest, useUserPreferences, useSaveUserPreferences, useCreateTaskAttachment } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import type { UserPreferences } from "@shared/schema";
 import { cn } from "@/lib/utils";
@@ -105,7 +105,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
   const searchString = useSearch();
   const { data: currentUser } = useCurrentUser();
   const { data: allTasks = [], isLoading } = useTasks();
-  const { data: deals = [] } = useDeals();
+  const { data: deals = [] } = useDealsListing();
   const { data: users = [] } = useUsers();
   const updateTask = useUpdateTask();
   const createTask = useCreateTask();

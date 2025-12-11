@@ -56,7 +56,7 @@ import {
   PieChartIcon,
   Activity
 } from "lucide-react";
-import { useCurrentUser, useTasks, useDeals, useMeetings, useNotifications, useUsers, useUpdateTask, useUserPreferences, useSaveUserPreferences, useCalendarEvents } from "@/lib/api";
+import { useCurrentUser, useTasks, useDealsListing, useMeetings, useNotifications, useUsers, useUpdateTask, useUserPreferences, useSaveUserPreferences, useCalendarEvents } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import type { UserPreferences, Deal } from "@shared/schema";
 import { Link, useLocation } from "wouter";
@@ -68,7 +68,7 @@ import type { PodTeamMember, Task } from "@shared/schema";
 export default function EmployeeHome() {
   const { data: currentUser } = useCurrentUser();
   const { data: allTasks = [] } = useTasks();
-  const { data: allDeals = [] } = useDeals();
+  const { data: allDeals = [] } = useDealsListing();
   const { data: meetings = [] } = useMeetings();
   const { data: notifications = [] } = useNotifications();
   const { data: users = [] } = useUsers();

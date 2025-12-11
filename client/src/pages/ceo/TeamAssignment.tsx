@@ -24,7 +24,7 @@ import {
   Upload
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import { useCurrentUser, useUsers, useDeals, useTasks, useCreateTask, useCreateTaskAttachment, useUpdateDeal } from "@/lib/api";
+import { useCurrentUser, useUsers, useDealsListing, useTasks, useCreateTask, useCreateTaskAttachment, useUpdateDeal } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Deal, User } from "@shared/schema";
@@ -48,7 +48,7 @@ export default function TeamAssignment() {
   const searchString = useSearch();
   const { data: currentUser } = useCurrentUser();
   const { data: users = [], isLoading: usersLoading } = useUsers();
-  const { data: deals = [], isLoading: dealsLoading } = useDeals();
+  const { data: deals = [], isLoading: dealsLoading } = useDealsListing();
   const { data: tasks = [] } = useTasks();
   const createTask = useCreateTask();
   const createAttachment = useCreateTaskAttachment();
