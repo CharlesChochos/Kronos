@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
+import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -13,6 +14,32 @@ declare module "http" {
     rawBody: unknown;
   }
 }
+
+// Security headers - protect against common web vulnerabilities
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      connectSrc: [
+        "'self'",
+        "wss:",
+        "ws:",
+        "https://www.googleapis.com",
+        "https://api.openai.com",
+        "https://api.resend.com",
+      ],
+      frameSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Required for some external resources
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
 
 // Enable gzip compression for all responses
 app.use(compression());

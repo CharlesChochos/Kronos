@@ -42,6 +42,11 @@ export async function registerRoutes(
   // Session configuration with PostgreSQL store
   // By default, sessions expire when browser closes (no maxAge)
   // Only persist sessions when user checks "Stay connected"
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret && process.env.NODE_ENV === "production") {
+    console.error("[SECURITY WARNING] SESSION_SECRET is not set! Using insecure fallback. Set SESSION_SECRET environment variable.");
+  }
+  
   app.use(
     session({
       store: new PgSession({
@@ -49,13 +54,15 @@ export async function registerRoutes(
         tableName: 'sessions',
         createTableIfMissing: true,
       }),
-      secret: process.env.SESSION_SECRET || "kronos-secret-key-change-in-production",
+      secret: sessionSecret || "kronos-dev-secret-change-in-production",
+      name: 'kronos.sid', // Custom session cookie name (don't reveal tech stack)
       resave: false,
       saveUninitialized: false,
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: 'strict', // Stricter CSRF protection
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours max session lifetime
         // No maxAge set by default = session cookie that expires on browser close
       },
     })
@@ -129,90 +136,9 @@ export async function registerRoutes(
     return userWithoutPassword;
   };
 
-  // Health check endpoint for debugging database connectivity (no auth required)
-  app.get("/api/health/db", async (req, res) => {
-    try {
-      // Try a simple database query
-      const users = await storage.getAllUsers();
-      const deals = await storage.getAllDeals();
-      res.json({
-        status: "ok",
-        database: "connected",
-        usersCount: users.length,
-        dealsCount: deals.length,
-        env: {
-          hasProductionDbUrl: !!process.env.PRODUCTION_DATABASE_URL,
-          hasDatabaseUrl: !!process.env.DATABASE_URL,
-          nodeEnv: process.env.NODE_ENV,
-          replitDeployment: process.env.REPLIT_DEPLOYMENT,
-        }
-      });
-    } catch (error) {
-      console.error("[Health Check] Database error:", error);
-      res.status(500).json({
-        status: "error",
-        database: "disconnected",
-        error: error instanceof Error ? error.message : String(error),
-        env: {
-          hasProductionDbUrl: !!process.env.PRODUCTION_DATABASE_URL,
-          hasDatabaseUrl: !!process.env.DATABASE_URL,
-          nodeEnv: process.env.NODE_ENV,
-          replitDeployment: process.env.REPLIT_DEPLOYMENT,
-        }
-      });
-    }
-  });
-
-  // Test deals endpoint for debugging (no auth required - TEMPORARY)
-  app.get("/api/health/deals", async (req, res) => {
-    try {
-      console.log("[Health Check] Fetching deals...");
-      const startTime = Date.now();
-      const deals = await storage.getAllDeals();
-      const duration = Date.now() - startTime;
-      console.log(`[Health Check] Fetched ${deals.length} deals in ${duration}ms`);
-      // Return minimal data to avoid timeout
-      const minimalDeals = deals.map(d => ({ id: d.id, name: d.name, stage: d.stage }));
-      res.json({ count: deals.length, duration, deals: minimalDeals });
-    } catch (error) {
-      console.error("[Health Check] Deals error:", error);
-      res.status(500).json({
-        error: "Failed to fetch deals",
-        details: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      });
-    }
-  });
-
-  // Session debug endpoint (no auth required - TEMPORARY)
-  app.get("/api/health/session", async (req, res) => {
-    try {
-      const sessionInfo = {
-        hasSession: !!req.session,
-        sessionID: req.sessionID ? req.sessionID.substring(0, 8) + '...' : null,
-        isAuthenticated: req.isAuthenticated ? req.isAuthenticated() : false,
-        hasUser: !!req.user,
-        userId: req.user ? (req.user as any).id?.substring(0, 8) + '...' : null,
-        userName: req.user ? (req.user as any).name : null,
-        cookie: req.session?.cookie ? {
-          maxAge: req.session.cookie.maxAge,
-          secure: req.session.cookie.secure,
-          httpOnly: req.session.cookie.httpOnly,
-          sameSite: req.session.cookie.sameSite,
-        } : null,
-        env: {
-          nodeEnv: process.env.NODE_ENV,
-          replitDeployment: process.env.REPLIT_DEPLOYMENT,
-        }
-      };
-      res.json(sessionInfo);
-    } catch (error) {
-      console.error("[Health Check] Session error:", error);
-      res.status(500).json({
-        error: "Failed to get session info",
-        details: error instanceof Error ? error.message : String(error),
-      });
-    }
+  // Simple health check - only returns basic status (no sensitive data)
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
   // Middleware to check authentication
