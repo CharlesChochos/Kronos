@@ -1073,27 +1073,41 @@ export default function Dashboard() {
             <CardDescription>Investment Banking sector breakdown ({ibActiveDeals.length} active deals, ${ibActiveValue.toLocaleString()}M)</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[220px] w-full">
-              <RechartsPieChart>
-                <Pie
-                  data={ibDealsBySector}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={90}
-                  paddingAngle={2}
-                  dataKey="count"
-                  nameKey="sector"
-                  label={({ sector, count }) => count > 0 ? `${sector}: ${count}` : ''}
-                  labelLine={false}
-                >
-                  {ibDealsBySector.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={`hsl(217, 91%, ${60 - index * 8}%)`} />
-                  ))}
-                </Pie>
-                <ChartTooltip content={<ChartTooltipContent />} />
-              </RechartsPieChart>
-            </ChartContainer>
+            <div className="flex flex-col lg:flex-row items-center gap-4">
+              <ChartContainer config={chartConfig} className="h-[180px] w-full lg:w-1/2">
+                <RechartsPieChart>
+                  <Pie
+                    data={ibDealsBySector}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={75}
+                    paddingAngle={2}
+                    dataKey="count"
+                    nameKey="sector"
+                  >
+                    {ibDealsBySector.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={`hsl(217, 91%, ${60 - index * 8}%)`} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                </RechartsPieChart>
+              </ChartContainer>
+              <div className="flex-1 grid grid-cols-2 gap-2 w-full lg:w-1/2">
+                {ibDealsBySector.filter(s => s.count > 0).map((entry, index) => (
+                  <div key={entry.sector} className="flex items-center gap-2 p-2 bg-secondary/30 rounded-lg">
+                    <div 
+                      className="w-3 h-3 rounded-full flex-shrink-0" 
+                      style={{ backgroundColor: `hsl(217, 91%, ${60 - index * 8}%)` }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-medium truncate">{entry.sector}</div>
+                      <div className="text-sm font-bold text-blue-400">{entry.count} deals</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -1107,27 +1121,41 @@ export default function Dashboard() {
             <CardDescription>Asset Management sector breakdown ({amActiveDeals.length} active deals, ${amActiveValue.toLocaleString()}M)</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[220px] w-full">
-              <RechartsPieChart>
-                <Pie
-                  data={amDealsBySector}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={90}
-                  paddingAngle={2}
-                  dataKey="count"
-                  nameKey="sector"
-                  label={({ sector, count }) => count > 0 ? `${sector}: ${count}` : ''}
-                  labelLine={false}
-                >
-                  {amDealsBySector.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={`hsl(160, 84%, ${50 - index * 8}%)`} />
-                  ))}
-                </Pie>
-                <ChartTooltip content={<ChartTooltipContent />} />
-              </RechartsPieChart>
-            </ChartContainer>
+            <div className="flex flex-col lg:flex-row items-center gap-4">
+              <ChartContainer config={chartConfig} className="h-[180px] w-full lg:w-1/2">
+                <RechartsPieChart>
+                  <Pie
+                    data={amDealsBySector}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={75}
+                    paddingAngle={2}
+                    dataKey="count"
+                    nameKey="sector"
+                  >
+                    {amDealsBySector.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={`hsl(160, 84%, ${50 - index * 8}%)`} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                </RechartsPieChart>
+              </ChartContainer>
+              <div className="flex-1 grid grid-cols-2 gap-2 w-full lg:w-1/2">
+                {amDealsBySector.filter(s => s.count > 0).map((entry, index) => (
+                  <div key={entry.sector} className="flex items-center gap-2 p-2 bg-secondary/30 rounded-lg">
+                    <div 
+                      className="w-3 h-3 rounded-full flex-shrink-0" 
+                      style={{ backgroundColor: `hsl(160, 84%, ${50 - index * 8}%)` }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-medium truncate">{entry.sector}</div>
+                      <div className="text-sm font-bold text-emerald-400">{entry.count} deals</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
