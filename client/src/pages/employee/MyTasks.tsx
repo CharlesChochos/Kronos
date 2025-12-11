@@ -70,17 +70,31 @@ const formatDueDateTime = (dueDate: string) => {
   }
 };
 
-// Check if task is overdue
+// Check if task is overdue - properly handles datetime comparison
 const isTaskOverdue = (dueDate: string, status: string) => {
   if (!dueDate || status === 'Completed' || status === 'Overdue') return false;
   try {
     const now = new Date();
     let dueDateTime: Date;
+    
     if (dueDate.includes('T')) {
+      // Has time component - parse the full datetime
+      // Handle both ISO format (2024-12-11T14:00:00) and combined format (2024-12-11T14:00)
       dueDateTime = new Date(dueDate);
+      
+      // If the parsed date is invalid, try parsing as local time
+      if (isNaN(dueDateTime.getTime())) {
+        const [datePart, timePart] = dueDate.split('T');
+        const [year, month, day] = datePart.split('-').map(Number);
+        const [hours, minutes] = timePart.split(':').map(Number);
+        dueDateTime = new Date(year, month - 1, day, hours, minutes || 0);
+      }
     } else {
-      dueDateTime = new Date(dueDate + 'T23:59:59');
+      // Date only - treat as end of day (23:59:59) in local timezone
+      const [year, month, day] = dueDate.split('-').map(Number);
+      dueDateTime = new Date(year, month - 1, day, 23, 59, 59);
     }
+    
     return dueDateTime < now;
   } catch {
     return false;
@@ -101,28 +115,65 @@ type AppSuggestion = {
   icon: string;
   description: string;
   url?: string;
+  localProtocol?: string;
+  macFallback?: string;
+  winFallback?: string;
   action: 'open' | 'create' | 'edit';
 };
 
+// Detect user's operating system
+const getOS = (): 'mac' | 'windows' | 'other' => {
+  const platform = navigator.platform.toLowerCase();
+  const userAgent = navigator.userAgent.toLowerCase();
+  if (platform.includes('mac') || userAgent.includes('mac')) return 'mac';
+  if (platform.includes('win') || userAgent.includes('win')) return 'windows';
+  return 'other';
+};
+
+
 const APP_CATALOG: Record<string, AppSuggestion> = {
-  'excel': { name: 'Excel Online', icon: '📊', description: 'Create or edit spreadsheets', url: 'https://www.office.com/launch/excel', action: 'create' },
-  'word': { name: 'Word Online', icon: '📄', description: 'Create or edit documents', url: 'https://www.office.com/launch/word', action: 'create' },
-  'powerpoint': { name: 'PowerPoint Online', icon: '📽️', description: 'Create presentations', url: 'https://www.office.com/launch/powerpoint', action: 'create' },
+  'excel': { 
+    name: 'Spreadsheet', 
+    icon: '📊', 
+    description: 'Create or edit spreadsheets', 
+    localProtocol: 'ms-excel:', 
+    macFallback: 'https://www.icloud.com/numbers',
+    url: 'https://www.office.com/launch/excel', 
+    action: 'create' 
+  },
+  'word': { 
+    name: 'Word Processor', 
+    icon: '📄', 
+    description: 'Create or edit documents', 
+    localProtocol: 'ms-word:', 
+    macFallback: 'https://www.icloud.com/pages',
+    url: 'https://www.office.com/launch/word', 
+    action: 'create' 
+  },
+  'powerpoint': { 
+    name: 'Presentations', 
+    icon: '📽️', 
+    description: 'Create presentations', 
+    localProtocol: 'ms-powerpoint:', 
+    macFallback: 'https://www.icloud.com/keynote',
+    url: 'https://www.office.com/launch/powerpoint', 
+    action: 'create' 
+  },
   'google_docs': { name: 'Google Docs', icon: '📝', description: 'Create or edit documents', url: 'https://docs.google.com/document/create', action: 'create' },
   'google_sheets': { name: 'Google Sheets', icon: '📈', description: 'Create or edit spreadsheets', url: 'https://docs.google.com/spreadsheets/create', action: 'create' },
   'google_slides': { name: 'Google Slides', icon: '🎞️', description: 'Create presentations', url: 'https://docs.google.com/presentation/create', action: 'create' },
   'email': { name: 'Email Client', icon: '✉️', description: 'Send emails', url: 'mailto:', action: 'open' },
-  'calendar': { name: 'Calendar', icon: '📅', description: 'Schedule meetings', url: 'https://calendar.google.com', action: 'open' },
+  'calendar': { name: 'Calendar', icon: '📅', description: 'Schedule meetings', localProtocol: 'webcal:', url: 'https://calendar.google.com', action: 'open' },
   'pdf_editor': { name: 'PDF Editor', icon: '📕', description: 'Edit PDF documents', url: 'https://www.adobe.com/acrobat/online/pdf-editor.html', action: 'edit' },
   'bloomberg': { name: 'Bloomberg', icon: '💹', description: 'Financial data & analysis', url: 'https://www.bloomberg.com', action: 'open' },
   'pitchbook': { name: 'PitchBook', icon: '📊', description: 'Deal & investor data', url: 'https://pitchbook.com', action: 'open' },
   'capital_iq': { name: 'Capital IQ', icon: '📈', description: 'Financial research', url: 'https://www.capitaliq.com', action: 'open' },
   'factset': { name: 'FactSet', icon: '📉', description: 'Financial data platform', url: 'https://www.factset.com', action: 'open' },
   'docusign': { name: 'DocuSign', icon: '✍️', description: 'Electronic signatures', url: 'https://www.docusign.com', action: 'open' },
-  'zoom': { name: 'Zoom', icon: '🎥', description: 'Video meetings', url: 'https://zoom.us', action: 'open' },
-  'teams': { name: 'Microsoft Teams', icon: '💬', description: 'Team collaboration', url: 'https://teams.microsoft.com', action: 'open' },
-  'slack': { name: 'Slack', icon: '💼', description: 'Team messaging', url: 'https://slack.com', action: 'open' },
-  'notion': { name: 'Notion', icon: '📓', description: 'Notes & documentation', url: 'https://www.notion.so', action: 'open' },
+  'zoom': { name: 'Zoom', icon: '🎥', description: 'Video meetings', localProtocol: 'zoommtg:', url: 'https://zoom.us', action: 'open' },
+  'teams': { name: 'Microsoft Teams', icon: '💬', description: 'Team collaboration', localProtocol: 'msteams:', url: 'https://teams.microsoft.com', action: 'open' },
+  'slack': { name: 'Slack', icon: '💼', description: 'Team messaging', localProtocol: 'slack:', url: 'https://slack.com', action: 'open' },
+  'notion': { name: 'Notion', icon: '📓', description: 'Notes & documentation', localProtocol: 'notion:', url: 'https://www.notion.so', action: 'open' },
 };
 
 type MyTasksProps = {
@@ -185,6 +236,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
   const [workingTask, setWorkingTask] = useState<Task | null>(null);
   const [showSendWorkModal, setShowSendWorkModal] = useState(false);
   const [completedWorkNotes, setCompletedWorkNotes] = useState("");
+  const [sendWorkAttachments, setSendWorkAttachments] = useState<UploadedFile[]>([]);
   
   // Flagged tasks - persisted to user_preferences.settings.flaggedTasks
   const [flaggedTasks, setFlaggedTasks] = useState<Record<string, string>>({});
@@ -632,20 +684,64 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
     return uniqueApps.slice(0, 6); // Max 6 apps
   };
   
-  const openApp = (app: AppSuggestion, task: Task) => {
-    if (!app.url) {
-      toast.error(`Unable to open ${app.name}`);
-      return;
-    }
+  const openAppForTask = (app: AppSuggestion, task: Task) => {
+    const os = getOS();
     
     // Set this task as the working task
     setWorkingTask(task);
     setShowAIModal(false);
     
-    // Open the app in a new tab
-    window.open(app.url, '_blank');
+    // Try local protocol handler first for specific apps
+    if (app.localProtocol) {
+      // For protocol handlers, we use window.location.href and catch errors
+      // Show a toast with instructions
+      toast.info(`Opening ${app.name}...`, { 
+        description: 'If the app doesn\'t open, it may not be installed. Falling back to web version.',
+        duration: 3000
+      });
+      
+      // Try protocol handler with timeout fallback
+      const protocolUrl = app.localProtocol;
+      const startTime = Date.now();
+      
+      // Use an iframe to test protocol handler (doesn't navigate away)
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+      
+      try {
+        if (iframe.contentWindow) {
+          iframe.contentWindow.location.href = protocolUrl;
+        }
+      } catch {
+        // Protocol failed, continue to fallback
+      }
+      
+      // After short delay, open web fallback
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+        // If on Mac and there's a Mac fallback, use it
+        if (os === 'mac' && app.macFallback) {
+          window.open(app.macFallback, '_blank');
+        } else if (app.url) {
+          window.open(app.url, '_blank');
+        }
+      }, 500);
+    } else {
+      // No protocol handler, use OS-specific fallback or default URL
+      if (os === 'mac' && app.macFallback) {
+        window.open(app.macFallback, '_blank');
+      } else if (os === 'windows' && app.winFallback) {
+        window.open(app.winFallback, '_blank');
+      } else if (app.url) {
+        window.open(app.url, '_blank');
+      } else {
+        toast.error(`Unable to open ${app.name}`);
+        return;
+      }
+    }
     
-    toast.success(`Opening ${app.name}. Swipe left on the task when ready to send your work.`, {
+    toast.success(`Working on task. Swipe left on the task when ready to send your work.`, {
       duration: 5000,
     });
   };
@@ -667,10 +763,22 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
       const currentDescription = selectedTask.description || '';
       const workNote = completedWorkNotes ? `\n\n--- Work Completed ---\n${completedWorkNotes}` : '';
       
+      // Combine existing attachments with new ones
+      const existingAttachments = (selectedTask.attachments as any[]) || [];
+      const newAttachments = sendWorkAttachments.map(f => ({
+        id: f.id,
+        filename: f.filename,
+        url: f.url,
+        size: f.size,
+        uploadedAt: f.uploadedAt,
+      }));
+      const allAttachments = [...existingAttachments, ...newAttachments];
+      
       await updateTask.mutateAsync({ 
         id: selectedTask.id, 
         assignedTo: forwardToUser,
         description: currentDescription + workNote,
+        attachments: allAttachments,
         status: 'Pending'
       });
       
@@ -680,6 +788,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
       setSelectedTask(null);
       setForwardToUser("");
       setCompletedWorkNotes("");
+      setSendWorkAttachments([]);
     } catch (error: any) {
       toast.error(error.message || "Failed to send work");
     }
@@ -1488,7 +1597,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                         key={i} 
                         variant="outline" 
                         className="h-auto py-3 px-4 flex flex-col items-start gap-1 hover:bg-primary/10 hover:border-primary/30 transition-all"
-                        onClick={() => selectedTask && openApp(app, selectedTask)}
+                        onClick={() => selectedTask && openAppForTask(app, selectedTask)}
                         data-testid={`button-open-app-${i}`}
                       >
                         <div className="flex items-center gap-2 w-full">
@@ -1518,7 +1627,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
 
       {/* Send Work Modal */}
       <Dialog open={showSendWorkModal} onOpenChange={setShowSendWorkModal}>
-        <DialogContent className="bg-card border-border max-w-md">
+        <DialogContent className="bg-card border-border max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Send className="w-5 h-5 text-primary" />
@@ -1529,20 +1638,92 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <p className="text-xs text-blue-400">
+                <strong>Tip:</strong> If you created files in an external app, save them to your computer first, 
+                then upload them below using the attachment button. The recipient will receive the task with your files and notes.
+              </p>
+            </div>
+            
             <div className="space-y-2">
               <Label>Work Notes (Optional)</Label>
               <Textarea
                 placeholder="Describe what you completed, any notes for the recipient..."
                 value={completedWorkNotes}
                 onChange={(e) => setCompletedWorkNotes(e.target.value)}
-                rows={4}
+                rows={3}
                 className="resize-none"
                 data-testid="textarea-work-notes"
               />
             </div>
             
             <div className="space-y-2">
-              <Label>Send To</Label>
+              <Label>Attach Completed Files (Optional)</Label>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.multiple = true;
+                    input.onchange = async (e) => {
+                      const files = (e.target as HTMLInputElement).files;
+                      if (!files) return;
+                      for (const file of Array.from(files)) {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        try {
+                          const response = await fetch('/api/upload', {
+                            method: 'POST',
+                            body: formData,
+                          });
+                          if (response.ok) {
+                            const uploaded = await response.json();
+                            setSendWorkAttachments(prev => [...prev, uploaded]);
+                            toast.success(`Attached: ${file.name}`);
+                          }
+                        } catch {
+                          toast.error(`Failed to upload ${file.name}`);
+                        }
+                      }
+                    };
+                    input.click();
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload Files
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {sendWorkAttachments.length > 0 ? `${sendWorkAttachments.length} file(s) attached` : 'No files attached'}
+                </span>
+              </div>
+              {sendWorkAttachments.length > 0 && (
+                <div className="space-y-1 mt-2">
+                  {sendWorkAttachments.map((file, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2 bg-secondary/30 rounded text-sm">
+                      <div className="flex items-center gap-2">
+                        <Paperclip className="w-3 h-3" />
+                        <span className="truncate max-w-48">{file.filename}</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => setSendWorkAttachments(prev => prev.filter((_, i) => i !== idx))}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Send To *</Label>
               <Select value={forwardToUser} onValueChange={setForwardToUser}>
                 <SelectTrigger data-testid="select-send-to">
                   <SelectValue placeholder="Select team member" />
@@ -1566,6 +1747,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
               setShowSendWorkModal(false);
               setCompletedWorkNotes("");
               setForwardToUser("");
+              setSendWorkAttachments([]);
             }}>
               Cancel
             </Button>
