@@ -31,7 +31,7 @@ export interface IStorage {
   // Deal operations
   getDeal(id: string): Promise<Deal | undefined>;
   getAllDeals(): Promise<Deal[]>;
-  getDealsListing(): Promise<Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt' | 'podTeam' | 'attachments'>[]>;
+  getDealsListing(): Promise<Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt' | 'podTeam'>[]>;
   createDeal(deal: InsertDeal): Promise<Deal>;
   updateDeal(id: string, updates: Partial<InsertDeal>): Promise<Deal | undefined>;
   deleteDeal(id: string): Promise<void>;
@@ -370,8 +370,8 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(schema.deals);
   }
 
-  async getDealsListing(): Promise<Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt' | 'podTeam' | 'attachments'>[]> {
-    // Return essential fields for listing - includes podTeam for filtering and attachments for document display
+  async getDealsListing(): Promise<Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt' | 'podTeam'>[]> {
+    // Return essential fields for listing - includes podTeam for filtering, excludes very large JSON fields like attachments
     return await db.select({
       id: schema.deals.id,
       name: schema.deals.name,
@@ -388,7 +388,6 @@ export class DatabaseStorage implements IStorage {
       description: schema.deals.description,
       createdAt: schema.deals.createdAt,
       podTeam: schema.deals.podTeam,
-      attachments: schema.deals.attachments,
     }).from(schema.deals);
   }
 

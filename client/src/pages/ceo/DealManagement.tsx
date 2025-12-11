@@ -1189,6 +1189,12 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const [editingClientContact, setEditingClientContact] = useState(false);
   const [clientContactForm, setClientContactForm] = useState({ name: '', email: '', phone: '', role: '' });
   
+  // Fetch the FULL deal data (with attachments) when a deal is selected
+  const { data: fullDealData } = useDeal(selectedDeal?.id || '');
+  
+  // Use fullDealData for attachments display (includes large fields excluded from listing)
+  const selectedDealWithAttachments = fullDealData || selectedDeal;
+  
   // Fetch fees for the selected deal
   const { data: selectedDealFees = [] } = useDealFees(selectedDeal?.id || '');
   // Fetch ALL stage pod members for the selected deal (across all stages)
@@ -3575,7 +3581,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium">Deal Documents</h4>
                     <Badge variant="secondary">
-                      {((selectedDeal.attachments as any[] || [])).length} files
+                      {((selectedDealWithAttachments?.attachments as any[] || [])).length} files
                     </Badge>
                   </div>
 
@@ -3599,7 +3605,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       const files = Array.from(e.dataTransfer.files);
                       if (files.length === 0) return;
                       
-                      const existingAttachments = (selectedDeal.attachments as any[] || []);
+                      const existingAttachments = (selectedDealWithAttachments?.attachments as any[] || []);
                       const uploadedAttachments: any[] = [];
                       
                       for (const file of files) {
@@ -3649,7 +3655,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                         const files = Array.from(e.target.files || []);
                         if (files.length === 0) return;
                         
-                        const existingAttachments = (selectedDeal.attachments as any[] || []);
+                        const existingAttachments = (selectedDealWithAttachments?.attachments as any[] || []);
                         const uploadedAttachments: any[] = [];
                         
                         // Upload each file to the server using FormData
@@ -3728,7 +3734,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
 
                   <ScrollArea className="h-[300px]">
                     <div className="space-y-2">
-                      {((selectedDeal.attachments as any[] || [])).map((doc: any) => (
+                      {((selectedDealWithAttachments?.attachments as any[] || [])).map((doc: any) => (
                         <div key={doc.id} className="p-3 bg-secondary/30 rounded-lg flex items-center justify-between group">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center">
@@ -3784,7 +3790,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                               size="icon" 
                               className="h-8 w-8 text-red-400 hover:text-red-300"
                               onClick={async () => {
-                                const updatedAttachments = (selectedDeal.attachments as any[] || [])
+                                const updatedAttachments = (selectedDealWithAttachments?.attachments as any[] || [])
                                   .filter((a: any) => a.id !== doc.id);
                                 try {
                                   await updateDeal.mutateAsync({
@@ -3804,7 +3810,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                           </div>
                         </div>
                       ))}
-                      {((selectedDeal.attachments as any[] || [])).length === 0 && (
+                      {((selectedDealWithAttachments?.attachments as any[] || [])).length === 0 && (
                         <div className="text-center py-8 text-muted-foreground text-sm">
                           No documents uploaded yet
                         </div>
