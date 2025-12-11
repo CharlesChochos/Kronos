@@ -2616,8 +2616,12 @@ export function useCreateStageDocument() {
       if (!res.ok) throw new Error("Failed to create stage document");
       return res.json() as Promise<StageDocumentType>;
     },
-    onSuccess: (_, vars) => {
+    onSuccess: (result, vars) => {
+      // Invalidate both the specific stage query and all stage-documents for this deal
+      queryClient.invalidateQueries({ queryKey: ["stage-documents", vars.dealId, vars.doc.stage] });
       queryClient.invalidateQueries({ queryKey: ["stage-documents", vars.dealId] });
+      // Also invalidate documents query for document library
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
   });
 }
