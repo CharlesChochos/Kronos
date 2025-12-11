@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearch } from "wouter";
 import { Layout } from "@/components/layout/Layout";
@@ -1193,6 +1194,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
   const deleteTask = useDeleteTask();
 
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [stageFilter, setStageFilter] = useState<string | null>(null);
   const [showNewDealModal, setShowNewDealModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -1417,14 +1419,14 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
 
   const filteredDeals = useMemo(() => {
     return deals.filter(deal => {
-      const matchesSearch = !searchQuery || 
-        deal.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        deal.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        deal.sector.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = !debouncedSearchQuery || 
+        deal.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        deal.client.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        deal.sector.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
       const matchesStage = !stageFilter || deal.stage === stageFilter;
       return matchesSearch && matchesStage;
     });
-  }, [deals, searchQuery, stageFilter]);
+  }, [deals, debouncedSearchQuery, stageFilter]);
 
   const getStageIndex = (stage: string) => DEAL_STAGES.indexOf(stage);
   const getStageProgress = (stage: string) => Math.round(((getStageIndex(stage) + 1) / DEAL_STAGES.length) * 100);

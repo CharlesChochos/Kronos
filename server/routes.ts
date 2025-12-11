@@ -1050,15 +1050,40 @@ export async function registerRoutes(
   // ===== DEAL ROUTES =====
   
   // Lightweight deals listing - returns only essential fields (no large JSON fields)
-  // Use this for deal list views to reduce payload size
+  // Supports optional pagination with ?page=1&limit=50
   app.get("/api/deals/listing", requireAuth, requireInternal, async (req, res) => {
     try {
       const startTime = Date.now();
-      console.log("[API] Fetching deals listing (lightweight)...");
+      const page = parseInt(req.query.page as string) || undefined;
+      const limit = parseInt(req.query.limit as string) || undefined;
+      
+      console.log(`[API] Fetching deals listing (lightweight)${page ? ` page=${page} limit=${limit}` : ''}...`);
       const deals = await storage.getDealsListing();
+      
+      // Apply pagination if requested
+      let paginatedDeals = deals;
+      if (page && limit) {
+        const startIdx = (page - 1) * limit;
+        paginatedDeals = deals.slice(startIdx, startIdx + limit);
+      }
+      
       const duration = Date.now() - startTime;
-      console.log(`[API] Fetched ${deals.length} deals (listing) in ${duration}ms`);
-      res.json(deals);
+      console.log(`[API] Fetched ${paginatedDeals.length} of ${deals.length} deals (listing) in ${duration}ms`);
+      
+      // Return with pagination metadata when paginated
+      if (page && limit) {
+        res.json({
+          data: paginatedDeals,
+          pagination: {
+            page,
+            limit,
+            total: deals.length,
+            totalPages: Math.ceil(deals.length / limit),
+          },
+        });
+      } else {
+        res.json(deals);
+      }
     } catch (error) {
       console.error("[API] Failed to fetch deals listing:", error);
       res.status(500).json({ error: "Failed to fetch deals", details: error instanceof Error ? error.message : String(error) });
