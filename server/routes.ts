@@ -166,8 +166,14 @@ export async function registerRoutes(
   // Test deals endpoint for debugging (no auth required - TEMPORARY)
   app.get("/api/health/deals", async (req, res) => {
     try {
+      console.log("[Health Check] Fetching deals...");
+      const startTime = Date.now();
       const deals = await storage.getAllDeals();
-      res.json(deals);
+      const duration = Date.now() - startTime;
+      console.log(`[Health Check] Fetched ${deals.length} deals in ${duration}ms`);
+      // Return minimal data to avoid timeout
+      const minimalDeals = deals.map(d => ({ id: d.id, name: d.name, stage: d.stage }));
+      res.json({ count: deals.length, duration, deals: minimalDeals });
     } catch (error) {
       console.error("[Health Check] Deals error:", error);
       res.status(500).json({
