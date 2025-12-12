@@ -15,7 +15,7 @@ console.log(`[Storage] DATABASE_URL exists: ${!!process.env.DATABASE_URL}`);
 console.log(`[Storage] Using PRODUCTION_DATABASE_URL: ${!!process.env.PRODUCTION_DATABASE_URL}`);
 
 const sql = neon(databaseUrl);
-const db = drizzle(sql, { schema });
+export const db = drizzle(sql, { schema });
 
 export interface IStorage {
   // User operations

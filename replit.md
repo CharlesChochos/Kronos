@@ -30,11 +30,16 @@ The frontend is built with React 18, TypeScript, and Vite. It utilizes `shadcn/u
 - **Object Storage:** Integration with Replit Object Storage for large file uploads (up to 500MB) using presigned URLs and owner-scoped access control.
 - **AI Assistant:** An integrated AI assistant powered by OpenAI (gpt-5 model via Replit AI Integrations) provides role-appropriate context from platform data (deals, tasks, users, documents). It supports persistent conversation history and automatic title generation.
 - **Audit Logging:** A system-wide audit trail logs authentication, user management, deal, task, and document operations, accessible to CEOs with filtering and export capabilities.
+- **Workflow Automation:** Automated deal ingestion from Gmail, AI-powered team assignment based on personality profiles, and milestone/task generation. The system includes:
+  - Gmail integration for scanning deal-related emails
+  - Personality questionnaire system for team matching
+  - AI-driven task suggestions with accept/reject workflow
+  - Automated milestone creation based on deal stage
 
 ## System Design Choices
 
 - **Data Persistence:** PostgreSQL database managed via Neon serverless driver.
-- **Schema Design:** Comprehensive schema includes tables for Users (with roles, job titles, performance metrics, 2FA fields), Deals (stage, value, client, sector), Tasks (assignments, priority, due dates), Meetings, Notifications, Investor Matches, User Preferences (for UI state), Deal Templates, Calendar Events, Task Attachments, Documents (with file data, categories, tags), Messages, Conversations, and Conversation Members. A dedicated `audit_logs_table` tracks system events.
+- **Schema Design:** Comprehensive schema includes tables for Users (with roles, job titles, performance metrics, 2FA fields), Deals (stage, value, client, sector), Tasks (assignments, priority, due dates), Meetings, Notifications, Investor Matches, User Preferences (for UI state), Deal Templates, Calendar Events, Task Attachments, Documents (with file data, categories, tags), Messages, Conversations, and Conversation Members. A dedicated `audit_logs_table` tracks system events. Additional automation tables: `personality_profiles` (for team matching), `email_deals` (tracks processed emails), `milestones` (deal stage milestones), `ai_task_suggestions` (AI-generated task recommendations), `deal_ai_context` (AI learning context), and `workflow_settings` (automation configuration).
 - **User Preferences Persistence:** UI state is saved to the `user_preferences` table, with debounced saves and conflict resolution for concurrent updates.
 - **Security:** Invite-only registration, user suspension, and robust role-based access control.
 

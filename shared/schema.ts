@@ -1081,3 +1081,146 @@ export const insertGoogleCalendarTokenSchema = createInsertSchema(googleCalendar
 
 export type InsertGoogleCalendarToken = z.infer<typeof insertGoogleCalendarTokenSchema>;
 export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;
+
+// Personality Profiles table - stores questionnaire results for team matching
+export const personalityProfiles = pgTable("personality_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  workStyle: text("work_style"), // analytical, creative, collaborative, independent
+  communicationStyle: text("communication_style"), // direct, diplomatic, detailed, concise
+  riskTolerance: text("risk_tolerance"), // conservative, moderate, aggressive
+  decisionMaking: text("decision_making"), // data-driven, intuitive, consultative
+  strengths: jsonb("strengths").default([]).$type<string[]>(),
+  preferredDealTypes: jsonb("preferred_deal_types").default([]).$type<string[]>(),
+  preferredSectors: jsonb("preferred_sectors").default([]).$type<string[]>(),
+  experienceLevel: text("experience_level"), // junior, mid, senior, expert
+  leadershipStyle: text("leadership_style"), // directive, coaching, supportive, delegating
+  workloadCapacity: integer("workload_capacity").default(5), // max concurrent deals
+  availability: text("availability").default('full-time'), // full-time, part-time, limited
+  timezone: text("timezone"),
+  rawResponses: jsonb("raw_responses").default({}), // original questionnaire answers
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPersonalityProfileSchema = createInsertSchema(personalityProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPersonalityProfile = z.infer<typeof insertPersonalityProfileSchema>;
+export type PersonalityProfile = typeof personalityProfiles.$inferSelect;
+
+// Email Deals table - tracks deals extracted from emails
+export const emailDeals = pgTable("email_deals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  emailId: text("email_id").notNull(), // Gmail message ID
+  threadId: text("thread_id").notNull(), // Gmail thread ID
+  subject: text("subject").notNull(),
+  sender: text("sender").notNull(),
+  receivedAt: timestamp("received_at").notNull(),
+  extractedData: jsonb("extracted_data").default({}), // AI-extracted deal details
+  dealId: varchar("deal_id").references(() => deals.id), // linked deal if created
+  status: text("status").notNull().default('pending'), // pending, processed, ignored, error
+  processingNotes: text("processing_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEmailDealSchema = createInsertSchema(emailDeals).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertEmailDeal = z.infer<typeof insertEmailDealSchema>;
+export type EmailDeal = typeof emailDeals.$inferSelect;
+
+// Milestones table - big picture tasks for deals
+export const milestones = pgTable("milestones", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  stage: text("stage").notNull(), // Origination, Structuring, Diligence, Legal, Close
+  order: integer("order").default(0),
+  status: text("status").notNull().default('pending'), // pending, in-progress, completed
+  dueDate: text("due_date"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMilestoneSchema = createInsertSchema(milestones).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
+export type Milestone = typeof milestones.$inferSelect;
+
+// AI Task Suggestions table - AI-generated task adjustments
+export const aiTaskSuggestions = pgTable("ai_task_suggestions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id),
+  taskId: varchar("task_id").references(() => tasks.id),
+  userId: varchar("user_id").references(() => users.id), // suggested for this user
+  suggestionType: text("suggestion_type").notNull(), // reassign, reschedule, reprioritize, new_task, modify
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  reasoning: text("reasoning"), // AI explanation for the suggestion
+  suggestedChanges: jsonb("suggested_changes").default({}), // specific changes to apply
+  status: text("status").notNull().default('pending'), // pending, accepted, rejected, expired
+  priority: text("priority").default('medium'), // low, medium, high
+  respondedBy: varchar("responded_by").references(() => users.id),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAiTaskSuggestionSchema = createInsertSchema(aiTaskSuggestions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAiTaskSuggestion = z.infer<typeof insertAiTaskSuggestionSchema>;
+export type AiTaskSuggestion = typeof aiTaskSuggestions.$inferSelect;
+
+// Deal AI Context table - stores context fed to AI for each deal
+export const dealAiContext = pgTable("deal_ai_context", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  contextType: text("context_type").notNull(), // email, document, meeting_notes, task_update, milestone
+  content: text("content").notNull(),
+  summary: text("summary"), // AI-generated summary
+  sourceId: text("source_id"), // reference to original source
+  metadata: jsonb("metadata").default({}),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDealAiContextSchema = createInsertSchema(dealAiContext).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDealAiContext = z.infer<typeof insertDealAiContextSchema>;
+export type DealAiContext = typeof dealAiContext.$inferSelect;
+
+// Workflow Automation Settings table
+export const workflowSettings = pgTable("workflow_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  settingKey: text("setting_key").notNull().unique(),
+  settingValue: jsonb("setting_value").default({}),
+  description: text("description"),
+  updatedBy: varchar("updated_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertWorkflowSettingSchema = createInsertSchema(workflowSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertWorkflowSetting = z.infer<typeof insertWorkflowSettingSchema>;
+export type WorkflowSetting = typeof workflowSettings.$inferSelect;
