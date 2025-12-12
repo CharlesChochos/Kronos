@@ -32,7 +32,8 @@ import {
   Pencil, Trash2, Eye, Users, Phone, Mail, MessageSquare, Plus, X, 
   Building2, TrendingUp, FileText, Clock, CheckCircle2, ChevronRight,
   UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload, GitCompare, ArrowUpDown, BarChart3,
-  Mic, MicOff, Play, Pause, Square, Volume2, Download, UserCircle, ExternalLink
+  Mic, MicOff, Play, Pause, Square, Volume2, Download, UserCircle, ExternalLink,
+  Sparkles, Target, Zap
 } from "lucide-react";
 import { 
   useCurrentUser, useDealsListing, useDeal, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks, useCreateDealFee,
@@ -43,7 +44,10 @@ import {
   useCustomSectors, useCreateCustomSector,
   useDealFees, type DealFeeType,
   useCreateDocument,
-  useAllInvestors
+  useAllInvestors,
+  useAutoAssignTeam,
+  useGenerateMilestones,
+  useGenerateAISuggestions
 } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -1176,6 +1180,11 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const createTaskComment = useCreateTaskComment();
   const createTask = useCreateTask();
   const deleteTask = useDeleteTask();
+  
+  // Automation hooks
+  const autoAssignTeam = useAutoAssignTeam();
+  const generateMilestones = useGenerateMilestones();
+  const generateAISuggestions = useGenerateAISuggestions();
 
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -2360,6 +2369,46 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => openEditModal(deal)}>
                         <Pencil className="w-4 h-4 mr-2" /> Edit Deal
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={async () => {
+                          try {
+                            await autoAssignTeam.mutateAsync(deal.id);
+                            toast.success("Team auto-assigned successfully");
+                          } catch (error: any) {
+                            toast.error(error.message || "Failed to auto-assign team");
+                          }
+                        }}
+                        data-testid={`menu-auto-assign-${deal.id}`}
+                      >
+                        <Users className="w-4 h-4 mr-2" /> Auto-Assign Team
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={async () => {
+                          try {
+                            await generateMilestones.mutateAsync({ dealId: deal.id });
+                            toast.success("Milestones generated successfully");
+                          } catch (error: any) {
+                            toast.error(error.message || "Failed to generate milestones");
+                          }
+                        }}
+                        data-testid={`menu-milestones-${deal.id}`}
+                      >
+                        <Target className="w-4 h-4 mr-2" /> Generate Milestones
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={async () => {
+                          try {
+                            await generateAISuggestions.mutateAsync(deal.id);
+                            toast.success("AI suggestions generated");
+                          } catch (error: any) {
+                            toast.error(error.message || "Failed to generate suggestions");
+                          }
+                        }}
+                        data-testid={`menu-ai-suggestions-${deal.id}`}
+                      >
+                        <Sparkles className="w-4 h-4 mr-2" /> AI Suggestions
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem 

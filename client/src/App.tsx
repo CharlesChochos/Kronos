@@ -46,6 +46,7 @@ const PortalLogin = lazy(() => import("@/pages/portal/PortalLogin"));
 const PortalRegister = lazy(() => import("@/pages/portal/PortalRegister"));
 const PortalDashboard = lazy(() => import("@/pages/portal/PortalDashboard"));
 const PersonalityQuestionnaire = lazy(() => import("@/pages/shared/PersonalityQuestionnaire"));
+const WorkflowAutomation = lazy(() => import("@/pages/ceo/WorkflowAutomation"));
 
 // Wrapper components to ensure props are passed correctly with wouter
 const CeoDealManagement = () => <DealManagement role="CEO" />;
@@ -215,6 +216,9 @@ function Router() {
         </Route>
         <Route path="/ceo/tasks">
           {() => <ProtectedRoute component={CeoMyTasks} />}
+        </Route>
+        <Route path="/ceo/automation">
+          {() => <ProtectedRoute component={WorkflowAutomation} />}
         </Route>
         
         {/* Employee Routes */}
