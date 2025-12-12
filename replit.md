@@ -1,6 +1,6 @@
 # Overview
 
-Kronos is a full-stack investment banking operations platform built with a React/Vite frontend and Express backend. The application provides role-based interfaces for CEOs and employees to manage deals, tasks, documents, investor matching, and team assignments. It uses a PostgreSQL database via Neon for data persistence and implements session-based authentication with Passport.js.
+Kronos is a full-stack investment banking operations platform designed to streamline deal management, task assignments, document handling, investor matching, and team collaboration. It provides role-based interfaces for CEOs and employees, aiming to enhance operational efficiency and strategic decision-making within investment banking firms. The platform is built with a React/Vite frontend and an Express backend, leveraging a PostgreSQL database (Neon) and session-based authentication.
 
 # User Preferences
 
@@ -8,242 +8,44 @@ Preferred communication style: Simple, everyday language.
 
 # System Architecture
 
-## Frontend Architecture
+## UI/UX Decisions
 
-**Framework & Build Tool**
-- React 18 with TypeScript running on Vite for development and production builds
-- Client-side routing implemented with Wouter (lightweight alternative to React Router)
-- Component library based on shadcn/ui (Radix UI primitives with Tailwind CSS styling)
-- Uses the "new-york" style variant for shadcn components
+The frontend is built with React 18, TypeScript, and Vite. It utilizes `shadcn/ui` with the "new-york" style variant for a consistent design system. Styling is managed with Tailwind CSS, featuring a custom fintech-focused navy blue color scheme and dark mode support. The font stack includes Inter, Plus Jakarta Sans, and Space Mono. Role-based layouts ensure tailored experiences for CEOs and employees, with protected routes and reusable UI components.
 
-**State Management**
-- TanStack Query (React Query) v5 for server state management and API caching
-- Query client configured with infinite stale time and disabled refetching on window focus
-- No global client state management library - relies on server state and local component state
+## Technical Implementations
 
-**Styling & Design System**
-- Tailwind CSS with custom theme configuration
-- Custom fintech-focused navy blue color scheme defined in `index.css`
-- Uses CSS custom properties for theming with dark mode support
-- Font stack: Inter, Plus Jakarta Sans, and Space Mono
+### Frontend
+- **State Management:** TanStack Query (React Query) v5 for server state and caching.
+- **Routing:** `wouter` for client-side routing.
+- **Form Handling:** `react-hook-form` with Zod for validation.
+- **Notifications:** `sonner` for toast notifications.
+- **Icons:** `lucide-react`.
 
-**Component Architecture**
-- Role-based layouts with separate CEO and Employee views
-- Protected routes using custom `ProtectedRoute` wrapper component
-- Shared `Layout` component with sidebar navigation and header
-- Reusable UI components from shadcn/ui library in `/components/ui`
+### Backend
+- **Server:** Express.js with TypeScript and Node.js.
+- **Authentication:** Passport.js with LocalStrategy for email/password, `express-session` for session management, and `bcryptjs` for password hashing. Two-factor authentication (TOTP-based) is implemented using `otplib` and `qrcode`.
+- **API:** RESTful API endpoints with request logging and JSON body parsing.
+- **Database ORM:** Drizzle ORM for type-safe PostgreSQL queries.
+- **Type Safety:** Zod schemas and shared TypeScript types between frontend and backend.
+- **Object Storage:** Integration with Replit Object Storage for large file uploads (up to 500MB) using presigned URLs and owner-scoped access control.
+- **AI Assistant:** An integrated AI assistant powered by OpenAI (gpt-5 model via Replit AI Integrations) provides role-appropriate context from platform data (deals, tasks, users, documents). It supports persistent conversation history and automatic title generation.
+- **Audit Logging:** A system-wide audit trail logs authentication, user management, deal, task, and document operations, accessible to CEOs with filtering and export capabilities.
 
-## Backend Architecture
+## System Design Choices
 
-**Server Framework**
-- Express.js with TypeScript running on Node.js
-- HTTP server wrapped with native Node.js `http.createServer`
-- Development mode uses Vite middleware for hot module replacement
-- Production build bundles server code with esbuild
+- **Data Persistence:** PostgreSQL database managed via Neon serverless driver.
+- **Schema Design:** Comprehensive schema includes tables for Users (with roles, job titles, performance metrics, 2FA fields), Deals (stage, value, client, sector), Tasks (assignments, priority, due dates), Meetings, Notifications, Investor Matches, User Preferences (for UI state), Deal Templates, Calendar Events, Task Attachments, Documents (with file data, categories, tags), Messages, Conversations, and Conversation Members. A dedicated `audit_logs_table` tracks system events.
+- **User Preferences Persistence:** UI state is saved to the `user_preferences` table, with debounced saves and conflict resolution for concurrent updates.
+- **Security:** Invite-only registration, user suspension, and robust role-based access control.
 
-**Authentication & Session Management**
-- Passport.js with LocalStrategy for email/password authentication
-- Session management using express-session with in-memory store (default)
-- Bcrypt for password hashing (10 salt rounds)
-- Session cookies configured for 1 week expiration
-- Session secret from environment variable with fallback default
+# External Dependencies
 
-**API Architecture**
-- RESTful API endpoints under `/api` prefix
-- Request logging middleware that captures method, path, status, and duration
-- JSON body parsing with raw body preservation for webhook validation
-- Protected endpoints check for authenticated user session
-
-**Database Layer**
-- Drizzle ORM for type-safe database queries
-- Repository pattern implemented via `IStorage` interface and `DatabaseStorage` class
-- Database operations abstracted into methods for users, deals, and tasks
-- Schema definitions in shared folder for type sharing between client/server
-
-## Data Storage
-
-**Database**
-- PostgreSQL via Neon serverless driver
-- Connection via `DATABASE_URL` environment variable
-- Drizzle Kit for schema migrations (output to `/migrations` folder)
-
-**Schema Design**
-- **Users table**: Authentication, roles (CEO/Associate/Director/Managing Director/Analyst), jobTitle (Junior Analyst/Analyst/Associate/Senior Associate/VP/Other), performance metrics (score, active deals, completed tasks), status (active/pending/suspended), 2FA fields (twoFactorEnabled, twoFactorSecret)
-- **Deals table**: Deal information including stage, value, client, sector, lead, progress percentage, status, and description
-- **Tasks table**: Task assignments with references to users and deals, priority levels, due dates, status tracking, and dealStage for per-stage organization
-- **Meetings table**: Meeting scheduling with title, date/time, attendees, location, deal association, and description
-- **Notifications table**: User notifications with type (info/success/warning/alert), title, message, read status, and link reference
-- **investor_matches table**: Stores investor match/reject decisions per user with status (matched/rejected/pending)
-- **user_preferences table**: Dashboard widgets, sidebar collapsed state, theme, market symbols, compliance defaults, and settings (employeeHome, flaggedTasks, sidebarCategories, unreadMessageCount)
-- **deal_templates table**: Document templates with category, description, sections, and sector-specific tags
-- **calendar_events table**: Capital raising events with investor, deal, status, location, and notes
-- **task_attachments table**: File metadata for task attachments (filename, URL, size, type)
-- **documents table**: Document storage with file data (base64), filename, category, deal association, tags, uploadedBy, isArchived
-- **messages table**: Chat messages with content, attachments (jsonb), reactions (jsonb with emoji, userId, userName, createdAt), replyToMessageId for threaded replies
-- **conversations table**: Chat conversations with name, isGroup flag, createdBy
-- **conversation_members table**: Tracks conversation membership with lastReadAt for unread counts
-
-**Type Safety**
-- Zod schemas generated from Drizzle table definitions
-- Shared TypeScript types between frontend and backend
-- Insert schemas omit auto-generated fields (id, createdAt)
-
-## External Dependencies
-
-**Database & ORM**
-- `@neondatabase/serverless` - Neon PostgreSQL serverless driver
-- `drizzle-orm` - TypeScript ORM for database operations
-- `drizzle-kit` - CLI tool for schema migrations
-
-**Authentication**
-- `passport` - Authentication middleware
-- `passport-local` - Username/password authentication strategy
-- `bcryptjs` - Password hashing
-- `express-session` - Session management middleware
-
-**Frontend Libraries**
-- `@tanstack/react-query` - Server state management
-- `wouter` - Lightweight routing
-- `@radix-ui/*` - Headless UI component primitives
-- `tailwindcss` - Utility-first CSS framework
-- `@tailwindcss/vite` - Vite plugin for Tailwind
-- `react-hook-form` + `@hookform/resolvers` - Form handling
-- `zod` - Schema validation
-- `sonner` - Toast notifications
-- `lucide-react` - Icon library
-
-**Build & Development Tools**
-- `vite` - Build tool and dev server
-- `@vitejs/plugin-react` - React plugin for Vite
-- `esbuild` - JavaScript bundler for server production build
-- `tsx` - TypeScript execution for development
-- `@replit/vite-plugin-*` - Replit-specific development plugins
-
-**Utility Libraries**
-- `clsx` + `tailwind-merge` - Conditional className utilities
-- `class-variance-authority` - Component variant management
-- `date-fns` - Date formatting and manipulation
-- `nanoid` - Unique ID generation
-
-**Notes on Architecture**
-- The application is designed to run on Replit with environment-specific plugins for development
-- Custom Vite plugin (`vite-plugin-meta-images`) updates OpenGraph meta tags with deployment URLs
-- Session storage is in-memory by default but includes `connect-pg-simple` for PostgreSQL session store option
-- The build process separates client (Vite) and server (esbuild) builds with selective dependency bundling for server cold-start optimization
-
-**User Preferences Persistence Pattern**
-- All user-specific UI state is persisted to the `user_preferences` table (no localStorage)
-- Components use `useUserPreferences` hook to load and `useSaveUserPreferences` to save
-- Debounced saves prevent excessive database writes
-- To avoid race conditions with concurrent saves, components fetch fresh preferences via `queryClient.getQueryData<UserPreferences>(['userPreferences'])` immediately before mutation
-- Settings are merged with existing settings to preserve other components' data
-
-## Email Integration
-
-**Resend Email Service**
-- Uses Replit Connectors for secure API key management (no hardcoded secrets)
-- Meeting invites are sent automatically when scheduling meetings with external participants
-- Email service preserves organizer's local timezone for accurate meeting time display
-- Beautifully formatted HTML emails with Kronos branding
-- Graceful error handling - meeting creation succeeds even if email fails
-
-## AI Assistant (Kronos)
-
-**Overview**
-- Platform-wide AI assistant accessible via floating button in the bottom-right corner
-- Available to both CEOs and employees with role-appropriate context
-- Powered by OpenAI via Replit AI Integrations (gpt-5 model)
-
-**Database Schema**
-- **assistant_conversations table**: Stores conversation metadata (userId, title, createdAt)
-- **assistant_messages table**: Stores individual messages with role, content, and optional context
-
-**Features**
-- Persistent conversation history with ability to create multiple conversations
-- Context enrichment with platform data (deals, tasks, users, documents)
-- Role-based access filtering (CEOs see all data, employees see their assigned items)
-- Automatic conversation title generation based on first message
-- Markdown rendering for formatted responses
-
-**API Endpoints**
-- `GET /api/assistant/conversations` - List user's conversations
-- `POST /api/assistant/conversations` - Create new conversation
-- `DELETE /api/assistant/conversations/:id` - Delete conversation
-- `GET /api/assistant/conversations/:id/messages` - Get conversation messages
-- `POST /api/assistant/conversations/:id/messages` - Send message and get AI response
-
-**Frontend Component**
-- `ReaperAssistant.tsx` - Slide-out panel with conversation management (displays as "Kronos" to users)
-- Integrated globally via Layout component
-- Auto-selects most recent conversation when opened
-
-## Two-Factor Authentication (2FA)
-
-**Overview**
-- TOTP-based two-factor authentication using otplib and qrcode libraries
-- Optional 2FA that can be enabled/disabled from user account settings
-- QR code generation for authenticator app setup (Google Authenticator, Authy, etc.)
-
-**Implementation Details**
-- Backend routes: `/api/auth/2fa/setup` (generate secret + QR), `/api/auth/2fa/verify` (confirm setup), `/api/auth/2fa/disable` (turn off), `/api/auth/2fa/status` (check status)
-- Login flow: After password verification, if 2FA enabled, user is prompted for TOTP code via `/api/auth/2fa/login-verify`
-- Secrets stored securely in users table (twoFactorSecret column)
-- Frontend UI integrated into Layout.tsx account settings Security tab
-
-**Security Features**
-- Invite-only registration: New users assigned 'pending' status, require CEO approval
-- User suspension: Suspended users have sessions invalidated and cannot authenticate
-- Role management: CEOs can modify user roles and status via User Management page
-
-## Document Management
-
-**Overview**
-- Centralized document library for storing, organizing, and sharing deal-related documents
-- Accessible via Document Library navigation in both CEO and Employee sidebars
-- Full CRUD operations with file upload, search, filtering, and download
-
-**Features**
-- File upload with base64 encoding for database storage
-- Category-based organization (Contracts, Financial Documents, Legal, Presentations, Reports, Other)
-- Deal association for linking documents to specific deals
-- Tag support for enhanced searchability
-- Search and filter by filename, category, deal, or tags
-- Archive/unarchive functionality
-- Download capability for retrieving stored documents
-
-**API Endpoints**
-- `GET /api/documents` - List all accessible documents
-- `GET /api/documents/:id` - Get single document details
-- `GET /api/documents/deal/:dealId` - Get documents by deal
-- `POST /api/documents` - Upload new document
-- `PATCH /api/documents/:id` - Update document metadata
-- `DELETE /api/documents/:id` - Delete document
-
-## Audit Logging
-
-**Overview**
-- Platform-wide audit logging system for tracking all important user actions and system events
-- Accessible via Audit Logs page in CEO sidebar under Administration section
-- Logs authentication events, deal/task CRUD, document operations, and user management actions
-
-**Database Schema**
-- **audit_logs_table**: Stores audit entries with userId, userName, action, entityType, entityId, entityName, details (jsonb), ipAddress, userAgent, and createdAt timestamp
-
-**Tracked Events**
-- Authentication: login, login_2fa, 2fa_enabled, 2fa_disabled, user_signup
-- User Management: user_approved, user_rejected, user_suspended, user_reactivated, role_changed
-- Deals: deal_created, deal_updated, deal_deleted
-- Tasks: task_created, task_updated, task_completed, task_deleted
-- Documents: document_created, document_updated, document_archived
-- Investors: investor_created, investor_updated, investor_deactivated
-
-**Features**
-- Filterable by user, entity type, and search query
-- Summary statistics (total events, active users, auth events, today's events)
-- Detailed view for individual log entries showing all captured data
-- CSV export with proper escaping for compliance reporting
-- CEO-only access for security
-
-**API Endpoints**
-- `GET /api/audit-logs` - List all audit logs (CEO only)
-- `GET /api/audit-logs/:entityType/:entityId` - Get audit logs for specific entity
+- **Database:** Neon (PostgreSQL serverless driver)
+- **ORM:** `drizzle-orm`, `drizzle-kit`
+- **Authentication:** `passport`, `passport-local`, `bcryptjs`, `express-session`, `otplib`, `qrcode`
+- **Frontend Libraries:** `@tanstack/react-query`, `wouter`, `@radix-ui/*`, `tailwindcss`, `react-hook-form`, `zod`, `sonner`, `lucide-react`
+- **Build Tools:** `vite`, `@vitejs/plugin-react`, `esbuild`, `tsx`
+- **Utilities:** `clsx`, `tailwind-merge`, `class-variance-authority`, `date-fns`, `nanoid`
+- **Email Service:** Resend (via Replit Connectors)
+- **AI Integration:** OpenAI (via Replit AI Integrations)
+- **Object Storage:** Replit Object Storage
