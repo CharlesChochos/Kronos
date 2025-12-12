@@ -1571,7 +1571,7 @@ export default function EmployeeHome() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{member.name}</p>
-                              <p className="text-xs text-muted-foreground truncate">{member.role}</p>
+                              <p className="text-xs text-muted-foreground truncate">{member.jobTitle || member.role}</p>
                             </div>
                           </div>
                         ))}

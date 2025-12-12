@@ -1051,7 +1051,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                                 </div>
                                 <div>
                                   <p className="text-sm font-medium">{member.name}</p>
-                                  <p className="text-xs text-muted-foreground">{member.role}</p>
+                                  <p className="text-xs text-muted-foreground">{member.jobTitle || member.role}</p>
                                 </div>
                               </div>
                               <Button

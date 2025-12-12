@@ -1431,7 +1431,7 @@ export function ReaperAssistant() {
                               </div>
                               <div>
                                 <div className="font-medium">{member.name}</div>
-                                <div className="text-xs text-muted-foreground">{member.role}</div>
+                                <div className="text-xs text-muted-foreground">{member.jobTitle || member.role}</div>
                               </div>
                             </button>
                           ))}

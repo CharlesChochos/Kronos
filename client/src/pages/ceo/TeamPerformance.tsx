@@ -52,11 +52,68 @@ export default function TeamPerformance() {
   const [timeframe, setTimeframe] = useState<string>("month");
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
 
+  // Helper to get date range based on timeframe
+  const getTimeframeRange = (tf: string) => {
+    const now = new Date();
+    let start: Date;
+    switch (tf) {
+      case 'week':
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+        break;
+      case 'month':
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'quarter':
+        const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
+        start = new Date(now.getFullYear(), quarterMonth, 1);
+        break;
+      case 'year':
+        start = new Date(now.getFullYear(), 0, 1);
+        break;
+      default:
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+    return { start, end: now };
+  };
+
   const teamMembers = useMemo(() => {
-    return users.filter(u => u.accessLevel !== 'admin').map(user => {
-      const userTasks = tasks.filter(t => t.assignedTo === user.id);
-      const completedTasks = userTasks.filter(t => t.status === 'Completed');
-      const userDeals = deals.filter(d => d.lead === user.name || d.podTeam?.some(p => p.name === user.name));
+    const { start, end } = getTimeframeRange(timeframe);
+    
+    // Helper to check if a date is within the timeframe
+    const isInTimeframe = (dateStr: string | Date | null | undefined) => {
+      if (!dateStr) return false;
+      const date = new Date(dateStr);
+      return date >= start && date <= end;
+    };
+    
+    return users
+      .filter(u => u.accessLevel !== 'admin' && u.status === 'active')
+      .map(user => {
+      // Filter user's tasks to those created or due within the timeframe
+      const userTasks = tasks.filter(t => {
+        if (t.assignedTo !== user.id) return false;
+        // Include tasks that are due within the timeframe OR were completed within timeframe
+        const dueInRange = isInTimeframe(t.dueDate);
+        const completedInRange = t.completedAt && isInTimeframe(t.completedAt);
+        return dueInRange || completedInRange;
+      });
+      
+      // Filter tasks completed within the timeframe
+      const completedTasks = userTasks.filter(t => {
+        if (t.status !== 'Completed') return false;
+        if (!t.completedAt) return true;
+        return isInTimeframe(t.completedAt);
+      });
+      
+      // Filter deals that were created within the timeframe
+      const userDeals = deals.filter(d => {
+        const isUsersDeal = d.lead === user.name || (d as any).podTeam?.some((p: any) => p.name === user.name);
+        if (!isUsersDeal) return false;
+        // Include deals that were created within timeframe
+        // If no createdAt, include the deal for backward compatibility
+        if (!d.createdAt) return true;
+        return isInTimeframe(d.createdAt);
+      });
       
       const taskCompletionRate = userTasks.length > 0 
         ? Math.round((completedTasks.length / userTasks.length) * 100) 
@@ -90,7 +147,7 @@ export default function TeamPerformance() {
         pipelineValue: userDeals.reduce((sum, d) => sum + d.value, 0),
       };
     });
-  }, [users, deals, tasks]);
+  }, [users, deals, tasks, timeframe]);
 
   const teamStats = useMemo(() => {
     const totalTasks = teamMembers.reduce((sum, m) => sum + m.totalTasks, 0);
@@ -300,7 +357,7 @@ export default function TeamPerformance() {
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{member.name}</p>
-                      <p className="text-xs text-muted-foreground">{member.role}</p>
+                      <p className="text-xs text-muted-foreground">{member.jobTitle || member.role}</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <Star className="w-4 h-4 text-yellow-500" />

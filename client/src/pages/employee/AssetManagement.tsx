@@ -99,7 +99,7 @@ function DealStageTeamCount({ dealId, stage }: { dealId: string; stage: string }
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate">{member.userName || 'Unknown'}</div>
-                      <div className="text-xs text-muted-foreground truncate">{member.role}</div>
+                      <div className="text-xs text-muted-foreground truncate">{member.jobTitle || member.role}</div>
                     </div>
                   </div>
                 ))}
@@ -161,7 +161,7 @@ function DealTotalTeamCount({ dealId, podTeam = [] }: { dealId: string; podTeam?
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate">{member.userName || 'Unknown'}</div>
-                      <div className="text-xs text-muted-foreground truncate">{member.role}</div>
+                      <div className="text-xs text-muted-foreground truncate">{member.jobTitle || member.role}</div>
                     </div>
                   </div>
                 ))}
@@ -604,7 +604,7 @@ function StageWorkSection({
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm truncate">{member.userName || 'Unknown'}</div>
-                          <div className="text-xs text-muted-foreground truncate">{member.role}</div>
+                          <div className="text-xs text-muted-foreground truncate">{member.jobTitle || member.role}</div>
                         </div>
                       </div>
                     ))}

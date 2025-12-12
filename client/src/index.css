@@ -3,8 +3,60 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Light theme (default when dark mode is OFF) */
 @theme inline {
-  /* Fintech Navy Theme */
+  --color-background: hsl(210 20% 98%); /* Light gray-white */
+  --color-foreground: hsl(222 47% 11%); /* Dark navy text */
+
+  --color-card: hsl(0 0% 100%); /* White cards */
+  --color-card-foreground: hsl(222 47% 11%);
+
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(222 47% 11%);
+
+  --color-primary: hsl(217 91% 50%); /* Bright Blue */
+  --color-primary-foreground: hsl(0 0% 100%);
+
+  --color-secondary: hsl(210 20% 93%);
+  --color-secondary-foreground: hsl(222 47% 11%);
+
+  --color-muted: hsl(210 20% 93%);
+  --color-muted-foreground: hsl(215 16% 47%);
+
+  --color-accent: hsl(43 96% 56%); /* Gold/Yellow */
+  --color-accent-foreground: hsl(222 47% 11%);
+
+  --color-destructive: hsl(0 72% 51%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+
+  --color-border: hsl(214 32% 91%);
+  --color-input: hsl(214 32% 91%);
+  --color-ring: hsl(217 91% 50%);
+
+  --color-chart-1: hsl(210 100% 50%);  /* Blue */
+  --color-chart-2: hsl(45 100% 50%);   /* Gold */
+  --color-chart-3: hsl(160 84% 39%);   /* Green */
+  --color-chart-4: hsl(280 85% 55%);   /* Purple */
+  --color-chart-5: hsl(350 92% 52%);   /* Red */
+
+  --color-sidebar: hsl(0 0% 100%); /* White sidebar */
+  --color-sidebar-foreground: hsl(222 47% 11%);
+  --color-sidebar-primary: hsl(217 91% 50%);
+  --color-sidebar-primary-foreground: hsl(0 0% 100%);
+  --color-sidebar-accent: hsl(210 20% 96%);
+  --color-sidebar-accent-foreground: hsl(222 47% 11%);
+  --color-sidebar-border: hsl(214 32% 91%);
+  --color-sidebar-ring: hsl(217 91% 50%);
+
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'Space Mono', monospace;
+
+  --radius: 0.5rem;
+}
+
+/* Dark theme (when .dark class is present) */
+.dark {
   --color-background: hsl(222 47% 11%); /* Deep Navy #0f172a */
   --color-foreground: hsl(210 40% 98%); /* White-ish */
 
@@ -47,12 +99,6 @@
   --color-sidebar-accent-foreground: hsl(210 40% 98%);
   --color-sidebar-border: hsl(217 33% 20%);
   --color-sidebar-ring: hsl(217 91% 60%);
-
-  --font-sans: 'Inter', sans-serif;
-  --font-display: 'Plus Jakarta Sans', sans-serif;
-  --font-mono: 'Space Mono', monospace;
-
-  --radius: 0.5rem;
 }
 
 @layer base {
@@ -211,19 +257,30 @@
   bottom: 0;
 }
 
-/* Custom Scrollbar for dark theme */
+/* Custom Scrollbar - adapts to theme */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: hsl(222 47% 11%);
+  background: var(--color-background);
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(217 33% 25%);
+  background: var(--color-border);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted-foreground);
+}
+
+/* Dark scrollbar */
+.dark ::-webkit-scrollbar-track {
+  background: hsl(222 47% 11%);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: hsl(217 33% 25%);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
   background: hsl(217 33% 35%);
 }
 
