@@ -192,20 +192,20 @@ export function useUpdateDeal() {
       return res.json();
     },
     onMutate: async ({ id, ...updates }) => {
-      await queryClient.cancelQueries({ queryKey: ["deal", id] });
-      const previousDeal = queryClient.getQueryData<Deal>(["deal", id]);
+      await queryClient.cancelQueries({ queryKey: ["deals", id] });
+      const previousDeal = queryClient.getQueryData<Deal>(["deals", id]);
       if (previousDeal) {
-        queryClient.setQueryData<Deal>(["deal", id], { ...previousDeal, ...updates });
+        queryClient.setQueryData<Deal>(["deals", id], { ...previousDeal, ...updates });
       }
       return { previousDeal, id };
     },
     onError: (err, vars, context) => {
       if (context?.previousDeal) {
-        queryClient.setQueryData(["deal", context.id], context.previousDeal);
+        queryClient.setQueryData(["deals", context.id], context.previousDeal);
       }
     },
     onSettled: (_, __, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["deal", vars.id] });
+      queryClient.invalidateQueries({ queryKey: ["deals", vars.id] });
       queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
     },
   });
