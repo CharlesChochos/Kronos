@@ -17,6 +17,7 @@ import * as path from "path";
 import * as crypto from "crypto";
 import multer from "multer";
 import * as XLSX from "xlsx";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 // PostgreSQL session store
 const PgSession = connectPgSimple(session);
@@ -442,7 +443,7 @@ export async function registerRoutes(
   const upload = multer({
     storage: memoryStorage,
     limits: {
-      fileSize: 50 * 1024 * 1024, // 50MB max for base64 storage
+      fileSize: 500 * 1024 * 1024, // 500MB max file size
     },
     fileFilter: (_req, file, cb) => {
       const allowedExtensions = [
@@ -530,6 +531,72 @@ export async function registerRoutes(
       res.json({ message: "File deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete file" });
+    }
+  });
+
+  // ===== OBJECT STORAGE ROUTES (for large file uploads up to 500MB) =====
+  
+  // Get presigned upload URL for object storage
+  app.post("/api/objects/upload", requireAuth, async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const { filename } = req.body;
+      const result = await objectStorageService.getObjectEntityUploadURL(filename);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ error: error.message || "Failed to get upload URL" });
+    }
+  });
+
+  // Confirm upload and set ACL policy
+  app.put("/api/objects/confirm", requireAuth, async (req, res) => {
+    try {
+      const { objectPath, filename, size, type } = req.body;
+      const currentUser = req.user as any;
+      
+      if (!objectPath) {
+        return res.status(400).json({ error: "objectPath is required" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      
+      // Set ACL policy - make files accessible to authenticated users
+      try {
+        await objectStorageService.trySetObjectEntityAclPolicy(objectPath, {
+          owner: currentUser.id,
+          visibility: "public", // Allow all authenticated users to view
+        });
+      } catch (aclError) {
+        console.error("Error setting ACL policy:", aclError);
+        // Continue even if ACL fails - file was uploaded successfully
+      }
+
+      res.json({
+        success: true,
+        objectPath,
+        filename,
+        size,
+        type,
+      });
+    } catch (error: any) {
+      console.error("Error confirming upload:", error);
+      res.status(500).json({ error: error.message || "Failed to confirm upload" });
+    }
+  });
+
+  // Serve object storage files
+  app.get("/objects/:objectPath(*)", requireAuth, async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error serving object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      res.status(500).json({ error: "Failed to serve file" });
     }
   });
 
