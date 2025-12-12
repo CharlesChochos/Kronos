@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { usePersonalityProfile, useSavePersonalityProfile } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { CheckCircle, ChevronLeft, ChevronRight, Loader2, Pencil } from "lucide-react";
+import { CheckCircle, ChevronLeft, ChevronRight, Loader2, Pencil, ArrowRight } from "lucide-react";
 
 interface Props {
   role: "CEO" | "Employee";
@@ -48,11 +49,13 @@ const getDefaultAnswers = () => ({
 });
 
 export default function PersonalityQuestionnaire({ role }: Props) {
+  const [, setLocation] = useLocation();
   const { data: existingProfile, isLoading } = usePersonalityProfile();
   const saveProfile = useSavePersonalityProfile();
   
   const [currentStep, setCurrentStep] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
+  const [justCompleted, setJustCompleted] = useState(false);
   const [answers, setAnswers] = useState<Record<string, any>>(getDefaultAnswers());
   
   useEffect(() => {
@@ -98,8 +101,17 @@ export default function PersonalityQuestionnaire({ role }: Props) {
       });
       toast.success("Profile saved successfully!");
       setIsEditing(false);
+      setJustCompleted(true);
     } catch (error) {
       toast.error("Failed to save profile");
+    }
+  };
+  
+  const goToDashboard = () => {
+    if (role === "CEO") {
+      setLocation("/ceo/dashboard");
+    } else {
+      setLocation("/employee/home");
     }
   };
 
@@ -111,7 +123,7 @@ export default function PersonalityQuestionnaire({ role }: Props) {
     );
   }
 
-  if (existingProfile?.completedAt && !isEditing) {
+  if ((existingProfile?.completedAt || justCompleted) && !isEditing) {
     return (
       <div className="container max-w-2xl mx-auto py-12 px-4" data-testid="questionnaire-completed">
         <Card>
@@ -119,45 +131,58 @@ export default function PersonalityQuestionnaire({ role }: Props) {
             <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
               <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
             </div>
-            <CardTitle>Profile Complete</CardTitle>
+            <CardTitle>{justCompleted ? "Welcome to Kronos!" : "Profile Complete"}</CardTitle>
             <CardDescription>
-              Your personality profile has been saved and will be used for optimal team matching.
+              {justCompleted 
+                ? "Your profile has been saved. You're all set to start working on deals!"
+                : "Your personality profile has been saved and will be used for optimal team matching."
+              }
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-2 text-sm">
               <div className="flex justify-between py-2 border-b">
                 <span className="text-muted-foreground">Work Style</span>
-                <span className="font-medium capitalize">{existingProfile.workStyle}</span>
+                <span className="font-medium capitalize">{answers.workStyle || existingProfile?.workStyle}</span>
               </div>
               <div className="flex justify-between py-2 border-b">
                 <span className="text-muted-foreground">Communication Style</span>
-                <span className="font-medium capitalize">{existingProfile.communicationStyle}</span>
+                <span className="font-medium capitalize">{answers.communicationStyle || existingProfile?.communicationStyle}</span>
               </div>
               <div className="flex justify-between py-2 border-b">
                 <span className="text-muted-foreground">Experience Level</span>
-                <span className="font-medium capitalize">{existingProfile.experienceLevel}</span>
+                <span className="font-medium capitalize">{answers.experienceLevel || existingProfile?.experienceLevel}</span>
               </div>
               <div className="flex justify-between py-2 border-b">
                 <span className="text-muted-foreground">Preferred Deal Types</span>
-                <span className="font-medium">{existingProfile.preferredDealTypes?.join(", ") || "Not set"}</span>
+                <span className="font-medium">{(answers.preferredDealTypes?.length > 0 ? answers.preferredDealTypes : existingProfile?.preferredDealTypes)?.join(", ") || "Not set"}</span>
               </div>
               <div className="flex justify-between py-2">
                 <span className="text-muted-foreground">Key Strengths</span>
-                <span className="font-medium">{existingProfile.strengths?.slice(0, 3).join(", ") || "Not set"}</span>
+                <span className="font-medium">{(answers.strengths?.length > 0 ? answers.strengths : existingProfile?.strengths)?.slice(0, 3).join(", ") || "Not set"}</span>
               </div>
             </div>
-            <Button 
-              onClick={() => {
-                setCurrentStep(0);
-                setIsEditing(true);
-              }} 
-              variant="outline" 
-              className="w-full"
-              data-testid="button-update-profile"
-            >
-              <Pencil className="h-4 w-4 mr-2" /> Update Profile
-            </Button>
+            {justCompleted ? (
+              <Button 
+                onClick={goToDashboard}
+                className="w-full"
+                data-testid="button-go-to-dashboard"
+              >
+                Go to Dashboard <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            ) : (
+              <Button 
+                onClick={() => {
+                  setCurrentStep(0);
+                  setIsEditing(true);
+                }} 
+                variant="outline" 
+                className="w-full"
+                data-testid="button-update-profile"
+              >
+                <Pencil className="h-4 w-4 mr-2" /> Update Profile
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -217,10 +217,11 @@ export default function AuthPage() {
       const firstName = values.name.split(' ')[0];
       setWelcomeName(firstName);
       
+      // Redirect new users to personality questionnaire first
       if (result?.accessLevel === 'admin') {
-        setRedirectPath("/ceo/dashboard");
+        setRedirectPath("/ceo/profile-questionnaire");
       } else {
-        setRedirectPath("/employee/home");
+        setRedirectPath("/employee/profile-questionnaire");
       }
       
       sessionStorage.setItem('welcomePending', 'true');
