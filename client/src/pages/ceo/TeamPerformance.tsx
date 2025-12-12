@@ -144,7 +144,7 @@ export default function TeamPerformance() {
       const tasksWithCompletionDate = displayCompletedTasks.filter(t => t.completedAt).length;
       const onTimeRate = tasksWithCompletionDate > 0
         ? Math.round((onTimeCompletions / tasksWithCompletionDate) * 100)
-        : 100; // Default to 100% if no data
+        : 0; // Default to 0% if no completed tasks
       
       const activeDeals = displayDeals.filter(d => d.status === 'Active').length;
       const closedDeals = displayDeals.filter(d => d.status === 'Closed').length;
@@ -185,43 +185,130 @@ export default function TeamPerformance() {
     return { totalTasks, completedTasks, activeDeals, avgCompletionRate };
   }, [teamMembers]);
 
-  // Monthly performance is calculated from actual task and deal data
-  const monthlyPerformance = useMemo(() => {
+  // Performance trends calculated based on timeframe
+  const performanceTrends = useMemo(() => {
     const now = new Date();
-    const months: { month: string; tasks: number; deals: number; revenue: number }[] = [];
+    const data: { period: string; tasks: number; deals: number; revenue: number }[] = [];
     
-    // Generate data for last 6 months based on actual tasks and deals
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
-      const monthName = date.toLocaleString('default', { month: 'short' });
+    // Generate data points based on selected timeframe
+    if (timeframe === 'week') {
+      // Last 7 days
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+        const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
+        const dayName = date.toLocaleString('default', { weekday: 'short' });
+        
+        const dayTasks = tasks.filter(t => {
+          if (t.status !== 'Completed' || !t.completedAt) return false;
+          const completedDate = new Date(t.completedAt);
+          return completedDate.toDateString() === date.toDateString();
+        }).length;
+        
+        const dayDeals = deals.filter(d => {
+          if (d.status !== 'Closed') return false;
+          const createdAt = d.createdAt ? new Date(d.createdAt) : null;
+          return createdAt && createdAt.toDateString() === date.toDateString();
+        }).length;
+        
+        const dayRevenue = deals.filter(d => {
+          if (d.status !== 'Closed') return false;
+          const createdAt = d.createdAt ? new Date(d.createdAt) : null;
+          return createdAt && createdAt.toDateString() === date.toDateString();
+        }).reduce((sum, d) => sum + d.value, 0);
+        
+        data.push({ period: dayName, tasks: dayTasks, deals: dayDeals, revenue: dayRevenue });
+      }
+    } else if (timeframe === 'month') {
+      // Weeks of current month - cover entire month (up to 5 weeks for 31-day months)
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const weeksNeeded = Math.ceil(daysInMonth / 7);
       
-      // Count completed tasks in this month
-      const monthTasks = tasks.filter(t => {
-        if (t.status !== 'Completed' || !t.completedAt) return false;
-        const completedDate = new Date(t.completedAt);
-        return completedDate >= date && completedDate <= monthEnd;
-      }).length;
-      
-      // Count closed deals in this month (using createdAt as proxy since no updatedAt)
-      const monthDeals = deals.filter(d => {
-        if (d.status !== 'Closed') return false;
-        const createdAt = d.createdAt ? new Date(d.createdAt) : null;
-        return createdAt && createdAt >= date && createdAt <= monthEnd;
-      }).length;
-      
-      // Calculate revenue from closed deals
-      const monthRevenue = deals.filter(d => {
-        if (d.status !== 'Closed') return false;
-        const createdAt = d.createdAt ? new Date(d.createdAt) : null;
-        return createdAt && createdAt >= date && createdAt <= monthEnd;
-      }).reduce((sum, d) => sum + d.value, 0);
-      
-      months.push({ month: monthName, tasks: monthTasks, deals: monthDeals, revenue: monthRevenue });
+      for (let week = 0; week < weeksNeeded; week++) {
+        const weekStartDay = 1 + (week * 7);
+        const weekEndDay = Math.min((week + 1) * 7, daysInMonth);
+        const weekStart = new Date(monthStart.getFullYear(), monthStart.getMonth(), weekStartDay);
+        const weekEnd = new Date(monthStart.getFullYear(), monthStart.getMonth(), weekEndDay, 23, 59, 59);
+        
+        const weekTasks = tasks.filter(t => {
+          if (t.status !== 'Completed' || !t.completedAt) return false;
+          const completedDate = new Date(t.completedAt);
+          return completedDate >= weekStart && completedDate <= weekEnd;
+        }).length;
+        
+        const weekDeals = deals.filter(d => {
+          if (d.status !== 'Closed') return false;
+          const createdAt = d.createdAt ? new Date(d.createdAt) : null;
+          return createdAt && createdAt >= weekStart && createdAt <= weekEnd;
+        }).length;
+        
+        const weekRevenue = deals.filter(d => {
+          if (d.status !== 'Closed') return false;
+          const createdAt = d.createdAt ? new Date(d.createdAt) : null;
+          return createdAt && createdAt >= weekStart && createdAt <= weekEnd;
+        }).reduce((sum, d) => sum + d.value, 0);
+        
+        data.push({ period: `Week ${week + 1}`, tasks: weekTasks, deals: weekDeals, revenue: weekRevenue });
+      }
+    } else if (timeframe === 'quarter') {
+      // All 3 months of current quarter (always show all 3)
+      const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
+      for (let i = 0; i < 3; i++) {
+        const monthStart = new Date(now.getFullYear(), quarterMonth + i, 1);
+        const monthEnd = new Date(now.getFullYear(), quarterMonth + i + 1, 0, 23, 59, 59);
+        const monthName = monthStart.toLocaleString('default', { month: 'short' });
+        
+        const monthTasks = tasks.filter(t => {
+          if (t.status !== 'Completed' || !t.completedAt) return false;
+          const completedDate = new Date(t.completedAt);
+          return completedDate >= monthStart && completedDate <= monthEnd;
+        }).length;
+        
+        const monthDeals = deals.filter(d => {
+          if (d.status !== 'Closed') return false;
+          const createdAt = d.createdAt ? new Date(d.createdAt) : null;
+          return createdAt && createdAt >= monthStart && createdAt <= monthEnd;
+        }).length;
+        
+        const monthRevenue = deals.filter(d => {
+          if (d.status !== 'Closed') return false;
+          const createdAt = d.createdAt ? new Date(d.createdAt) : null;
+          return createdAt && createdAt >= monthStart && createdAt <= monthEnd;
+        }).reduce((sum, d) => sum + d.value, 0);
+        
+        data.push({ period: monthName, tasks: monthTasks, deals: monthDeals, revenue: monthRevenue });
+      }
+    } else {
+      // Year - always show all 12 months
+      for (let i = 0; i < 12; i++) {
+        const monthStart = new Date(now.getFullYear(), i, 1);
+        const monthEnd = new Date(now.getFullYear(), i + 1, 0, 23, 59, 59);
+        const monthName = monthStart.toLocaleString('default', { month: 'short' });
+        
+        const monthTasks = tasks.filter(t => {
+          if (t.status !== 'Completed' || !t.completedAt) return false;
+          const completedDate = new Date(t.completedAt);
+          return completedDate >= monthStart && completedDate <= monthEnd;
+        }).length;
+        
+        const monthDeals = deals.filter(d => {
+          if (d.status !== 'Closed') return false;
+          const createdAt = d.createdAt ? new Date(d.createdAt) : null;
+          return createdAt && createdAt >= monthStart && createdAt <= monthEnd;
+        }).length;
+        
+        const monthRevenue = deals.filter(d => {
+          if (d.status !== 'Closed') return false;
+          const createdAt = d.createdAt ? new Date(d.createdAt) : null;
+          return createdAt && createdAt >= monthStart && createdAt <= monthEnd;
+        }).reduce((sum, d) => sum + d.value, 0);
+        
+        data.push({ period: monthName, tasks: monthTasks, deals: monthDeals, revenue: monthRevenue });
+      }
     }
     
-    return months;
-  }, [tasks, deals]);
+    return data;
+  }, [tasks, deals, timeframe]);
 
   const leaderboard = useMemo(() => {
     return [...teamMembers]
@@ -331,19 +418,19 @@ export default function TeamPerformance() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Monthly Performance Chart */}
+          {/* Performance Trends Chart */}
           <Card className="lg:col-span-2 bg-card border-border">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-primary" />
-                Monthly Performance Trends
+                Performance Trends ({timeframe === 'week' ? 'This Week' : timeframe === 'month' ? 'This Month' : timeframe === 'quarter' ? 'This Quarter' : 'This Year'})
               </CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={monthlyPerformance}>
+                <BarChart data={performanceTrends}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" />
+                  <XAxis dataKey="period" stroke="hsl(var(--muted-foreground))" />
                   <YAxis stroke="hsl(var(--muted-foreground))" />
                   <Tooltip 
                     contentStyle={{ 
