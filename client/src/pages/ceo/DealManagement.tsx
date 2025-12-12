@@ -3592,7 +3592,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     maxNumberOfFiles={20}
                     maxFileSize={500 * 1024 * 1024}
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,.mp4,.mov,.avi,.mp3,.wav,image/*,video/*,audio/*"
-                    onComplete={async (files: UploadedFile[]) => {
+                    onComplete={(files: UploadedFile[]) => {
                       const existingAttachments = (selectedDealWithAttachments?.attachments as any[] || []);
                       const newAttachments = files.map(f => ({
                         id: f.id,
@@ -3604,36 +3604,26 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                         uploadedAt: new Date().toISOString(),
                       }));
                       
-                      try {
-                        await updateDeal.mutateAsync({
-                          id: selectedDeal.id,
-                          attachments: [...existingAttachments, ...newAttachments],
+                      updateDeal.mutate({
+                        id: selectedDeal.id,
+                        attachments: [...existingAttachments, ...newAttachments],
+                      });
+                      
+                      newAttachments.forEach(doc => {
+                        createDocument.mutate({
+                          title: doc.filename,
+                          type: doc.type || 'application/octet-stream',
+                          category: 'Other',
+                          filename: doc.filename,
+                          originalName: doc.filename,
+                          mimeType: doc.type,
+                          size: doc.size,
+                          content: doc.objectPath,
+                          dealId: selectedDeal.id,
+                          dealName: selectedDeal.name,
+                          tags: ['Deal Document'],
                         });
-                        
-                        // Also add documents to the Document Library
-                        for (const doc of newAttachments) {
-                          try {
-                            await createDocument.mutateAsync({
-                              title: doc.filename,
-                              type: doc.type || 'application/octet-stream',
-                              category: 'Other',
-                              filename: doc.filename,
-                              originalName: doc.filename,
-                              mimeType: doc.type,
-                              size: doc.size,
-                              content: doc.objectPath,
-                              dealId: selectedDeal.id,
-                              dealName: selectedDeal.name,
-                              tags: ['Deal Document'],
-                            });
-                          } catch (docError) {
-                            console.error('Error adding to document library:', docError);
-                          }
-                        }
-                      } catch (error: any) {
-                        console.error('Error saving files to deal:', error);
-                        toast.error(error.message || "Failed to save files to deal");
-                      }
+                      });
                     }}
                     buttonVariant="outline"
                   >
@@ -3703,18 +3693,13 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                               variant="ghost" 
                               size="icon" 
                               className="h-8 w-8 text-red-400 hover:text-red-300"
-                              onClick={async () => {
+                              onClick={() => {
                                 const updatedAttachments = (selectedDealWithAttachments?.attachments as any[] || [])
                                   .filter((a: any) => a.id !== doc.id);
-                                try {
-                                  await updateDeal.mutateAsync({
-                                    id: selectedDeal.id,
-                                    attachments: updatedAttachments,
-                                  });
-                                  toast.success("Document removed");
-                                } catch (error) {
-                                  toast.error("Failed to remove document");
-                                }
+                                updateDeal.mutate({
+                                  id: selectedDeal.id,
+                                  attachments: updatedAttachments,
+                                });
                               }}
                               title="Delete"
                               data-testid={`button-delete-doc-${doc.id}`}

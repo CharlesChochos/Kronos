@@ -651,7 +651,7 @@ function StageWorkSection({
             <ObjectUploader
               maxFiles={10}
               maxSizeBytes={500 * 1024 * 1024}
-              onComplete={async (uploadedFiles: UploadedFile[]) => {
+              onComplete={(uploadedFiles: UploadedFile[]) => {
                 const categoryMap: Record<string, string> = {
                   'General': 'Other',
                   'Financial': 'Financial Documents',
@@ -660,51 +660,39 @@ function StageWorkSection({
                   'Presentation': 'Presentations'
                 };
                 
-                let uploadedCount = 0;
-                for (const file of uploadedFiles) {
-                  try {
-                    await createStageDocument.mutateAsync({
-                      dealId,
-                      doc: {
-                        stage: activeStageTab,
-                        title: file.filename,
-                        filename: file.filename,
-                        url: file.objectPath,
-                        mimeType: file.type,
-                        size: file.size,
-                      }
-                    });
-                    
-                    try {
-                      await createDocument.mutateAsync({
-                        title: file.filename,
-                        filename: `[${dealName}] ${file.filename}`,
-                        content: file.objectPath,
-                        category: categoryMap[documentCategory] || 'Other',
-                        dealId: dealId,
-                        tags: [activeStageTab, 'Stage Work'],
-                        type: 'stage_document',
-                        uploadedBy: currentUser?.id,
-                        originalName: file.filename,
-                        mimeType: file.type,
-                        size: file.size,
-                      });
-                    } catch (archiveError) {
-                      console.error('Failed to archive document (non-critical):', archiveError);
+                uploadedFiles.forEach(file => {
+                  createStageDocument.mutate({
+                    dealId,
+                    doc: {
+                      stage: activeStageTab,
+                      title: file.filename,
+                      filename: file.filename,
+                      url: file.objectPath,
+                      mimeType: file.type,
+                      size: file.size,
                     }
-                    uploadedCount++;
-                  } catch (error) {
-                    console.error(`Failed to save ${file.filename}:`, error);
-                  }
+                  });
+                  
+                  createDocument.mutate({
+                    title: file.filename,
+                    filename: `[${dealName}] ${file.filename}`,
+                    content: file.objectPath,
+                    category: categoryMap[documentCategory] || 'Other',
+                    dealId: dealId,
+                    tags: [activeStageTab, 'Stage Work'],
+                    type: 'stage_document',
+                    uploadedBy: currentUser?.id,
+                    originalName: file.filename,
+                    mimeType: file.type,
+                    size: file.size,
+                  });
+                });
+                
+                if (onAuditEntry && uploadedFiles.length > 0) {
+                  onAuditEntry('Documents Uploaded', `${uploadedFiles.length} document(s) uploaded to ${activeStageTab} stage`);
                 }
                 
-                if (onAuditEntry && uploadedCount > 0) {
-                  await onAuditEntry('Documents Uploaded', `${uploadedCount} document(s) uploaded to ${activeStageTab} stage`);
-                }
-                
-                if (uploadedCount > 0) {
-                  toast.success(`${uploadedCount} document(s) uploaded successfully`);
-                }
+                toast.success(`${uploadedFiles.length} document(s) uploaded`);
                 setShowAddDocument(false);
               }}
             />

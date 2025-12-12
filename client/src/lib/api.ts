@@ -191,11 +191,22 @@ export function useUpdateDeal() {
       }
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["deals"] });
+    onMutate: async ({ id, ...updates }) => {
+      await queryClient.cancelQueries({ queryKey: ["deal", id] });
+      const previousDeal = queryClient.getQueryData<Deal>(["deal", id]);
+      if (previousDeal) {
+        queryClient.setQueryData<Deal>(["deal", id], { ...previousDeal, ...updates });
+      }
+      return { previousDeal, id };
+    },
+    onError: (err, vars, context) => {
+      if (context?.previousDeal) {
+        queryClient.setQueryData(["deal", context.id], context.previousDeal);
+      }
+    },
+    onSettled: (_, __, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["deal", vars.id] });
       queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
