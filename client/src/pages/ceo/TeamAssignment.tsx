@@ -103,6 +103,8 @@ export default function TeamAssignment() {
   };
 
   const filteredUsers = users.filter(user => {
+    // Only show active users
+    if (user.status !== 'active') return false;
     // Filter by availability
     if (filterAvailability && getUserAvailability(user.id) !== filterAvailability) return false;
     // Filter by search query
@@ -352,28 +354,28 @@ export default function TeamAssignment() {
                       className={cn("w-full justify-start", filterAvailability === null && "bg-accent text-accent-foreground")}
                       onClick={() => setFilterAvailability(null)}
                     >
-                        <Users className="w-4 h-4 mr-2" /> All Teams ({users.length})
+                        <Users className="w-4 h-4 mr-2" /> All Teams ({users.filter(u => u.status === 'active').length})
                     </Button>
                     <Button 
                       variant={filterAvailability === 'Available' ? "secondary" : "ghost"} 
                       className="w-full justify-start hover:bg-secondary/50"
                       onClick={() => setFilterAvailability('Available')}
                     >
-                        <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div> Available ({users.filter(u => getUserAvailability(u.id) === 'Available').length})
+                        <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div> Available ({users.filter(u => u.status === 'active' && getUserAvailability(u.id) === 'Available').length})
                     </Button>
                     <Button 
                       variant={filterAvailability === 'Light' ? "secondary" : "ghost"} 
                       className="w-full justify-start hover:bg-secondary/50"
                       onClick={() => setFilterAvailability('Light')}
                     >
-                        <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2"></div> Light Load ({users.filter(u => getUserAvailability(u.id) === 'Light').length})
+                        <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2"></div> Light Load ({users.filter(u => u.status === 'active' && getUserAvailability(u.id) === 'Light').length})
                     </Button>
                     <Button 
                       variant={filterAvailability === 'Busy' ? "secondary" : "ghost"} 
                       className="w-full justify-start hover:bg-secondary/50"
                       onClick={() => setFilterAvailability('Busy')}
                     >
-                         <div className="w-2 h-2 rounded-full bg-red-500 mr-2"></div> Busy ({users.filter(u => getUserAvailability(u.id) === 'Busy').length})
+                         <div className="w-2 h-2 rounded-full bg-red-500 mr-2"></div> Busy ({users.filter(u => u.status === 'active' && getUserAvailability(u.id) === 'Busy').length})
                     </Button>
                     
                     <div className="pt-4 border-t border-border">

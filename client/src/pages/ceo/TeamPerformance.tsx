@@ -90,7 +90,7 @@ export default function TeamPerformance() {
     };
     
     return users
-      .filter(u => u.accessLevel !== 'admin' && u.status === 'active')
+      .filter(u => u.status === 'active')
       .map(user => {
       // Get ALL user's tasks (for base counts)
       const allUserTasks = tasks.filter(t => t.assignedTo === user.id);
