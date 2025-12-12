@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import {
   Users,
   TrendingUp,
@@ -21,7 +22,8 @@ import {
   Briefcase,
   ArrowUpRight,
   ArrowDownRight,
-  Calendar
+  Calendar,
+  Search
 } from "lucide-react";
 import { useCurrentUser, useUsers, useDealsListing, useTasks } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -51,6 +53,7 @@ export default function TeamPerformance() {
   
   const [timeframe, setTimeframe] = useState<string>("month");
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
+  const [memberSearch, setMemberSearch] = useState<string>("");
 
   // Helper to get date range based on timeframe
   const getTimeframeRange = (tf: string) => {
@@ -89,62 +92,84 @@ export default function TeamPerformance() {
     return users
       .filter(u => u.accessLevel !== 'admin' && u.status === 'active')
       .map(user => {
-      // Filter user's tasks to those created or due within the timeframe
-      const userTasks = tasks.filter(t => {
-        if (t.assignedTo !== user.id) return false;
-        // Include tasks that are due within the timeframe OR were completed within timeframe
-        const dueInRange = isInTimeframe(t.dueDate);
+      // Get ALL user's tasks (for base counts)
+      const allUserTasks = tasks.filter(t => t.assignedTo === user.id);
+      const allUserCompletedTasks = allUserTasks.filter(t => t.status === 'Completed');
+      
+      // Get ALL user's deals
+      const allUserDeals = deals.filter(d => 
+        d.lead === user.name || (d as any).podTeam?.some((p: any) => p.name === user.name)
+      );
+      
+      // Filter tasks for the timeframe (completed within timeframe)
+      const timeframeCompletedTasks = allUserCompletedTasks.filter(t => {
+        if (!t.completedAt) return false;
+        return isInTimeframe(t.completedAt);
+      });
+      
+      // Filter deals created within the timeframe
+      const timeframeDeals = allUserDeals.filter(d => {
+        if (!d.createdAt) return false;
+        return isInTimeframe(d.createdAt);
+      });
+      
+      // Filter tasks that have activity within the timeframe (due or completed in timeframe)
+      const timeframeTasks = allUserTasks.filter(t => {
+        const dueInRange = t.dueDate && isInTimeframe(t.dueDate);
         const completedInRange = t.completedAt && isInTimeframe(t.completedAt);
         return dueInRange || completedInRange;
       });
       
-      // Filter tasks completed within the timeframe
-      const completedTasks = userTasks.filter(t => {
-        if (t.status !== 'Completed') return false;
-        if (!t.completedAt) return true;
-        return isInTimeframe(t.completedAt);
-      });
+      // Use timeframe data when available, fall back to all-time if no data in timeframe
+      const hasTimeframeData = timeframeTasks.length > 0 || timeframeDeals.length > 0;
+      const displayTasks = hasTimeframeData ? timeframeTasks : allUserTasks;
+      const displayCompletedTasks = hasTimeframeData ? timeframeCompletedTasks : allUserCompletedTasks;
+      const displayDeals = hasTimeframeData ? timeframeDeals : allUserDeals;
       
-      // Filter deals that were created within the timeframe
-      const userDeals = deals.filter(d => {
-        const isUsersDeal = d.lead === user.name || (d as any).podTeam?.some((p: any) => p.name === user.name);
-        if (!isUsersDeal) return false;
-        // Include deals that were created within timeframe
-        // If no createdAt, include the deal for backward compatibility
-        if (!d.createdAt) return true;
-        return isInTimeframe(d.createdAt);
-      });
-      
-      const taskCompletionRate = userTasks.length > 0 
-        ? Math.round((completedTasks.length / userTasks.length) * 100) 
+      const taskCompletionRate = displayTasks.length > 0 
+        ? Math.round((displayCompletedTasks.length / displayTasks.length) * 100) 
         : 0;
       
-      const avgDealValue = userDeals.length > 0
-        ? Math.round(userDeals.reduce((sum, d) => sum + d.value, 0) / userDeals.length)
+      const avgDealValue = displayDeals.length > 0
+        ? Math.round(displayDeals.reduce((sum, d) => sum + d.value, 0) / displayDeals.length)
         : 0;
       
-      const onTimeCompletions = completedTasks.filter(t => {
+      const onTimeCompletions = displayCompletedTasks.filter(t => {
+        if (!t.dueDate || !t.completedAt) return false;
         const dueDate = new Date(t.dueDate);
-        const completedDate = t.completedAt ? new Date(t.completedAt) : null;
-        if (!completedDate) return false;
+        const completedDate = new Date(t.completedAt);
         return completedDate <= dueDate;
       }).length;
       
-      const tasksWithCompletionDate = completedTasks.filter(t => t.completedAt).length;
+      const tasksWithCompletionDate = displayCompletedTasks.filter(t => t.completedAt).length;
       const onTimeRate = tasksWithCompletionDate > 0
         ? Math.round((onTimeCompletions / tasksWithCompletionDate) * 100)
-        : taskCompletionRate;
+        : 100; // Default to 100% if no data
+      
+      const activeDeals = displayDeals.filter(d => d.status === 'Active').length;
+      const closedDeals = displayDeals.filter(d => d.status === 'Closed').length;
+      const pipelineValue = displayDeals.reduce((sum, d) => sum + d.value, 0);
+      
+      // Calculate a dynamic performance score based on actual metrics
+      // Weighted: Task Completion (30%), On-Time Rate (30%), Completed Tasks (20%), Deal Activity (20%)
+      const taskWeight = taskCompletionRate * 0.3;
+      const onTimeWeight = onTimeRate * 0.3;
+      const completedWeight = Math.min(displayCompletedTasks.length * 5, 100) * 0.2; // 5 points per task, max 100
+      const dealWeight = Math.min((activeDeals + closedDeals) * 10, 100) * 0.2; // 10 points per deal, max 100
+      const calculatedScore = Math.round(taskWeight + onTimeWeight + completedWeight + dealWeight);
 
       return {
         ...user,
         taskCompletionRate,
         avgDealValue,
         onTimeRate,
-        totalTasks: userTasks.length,
-        completedTasks: completedTasks.length,
-        activeDeals: userDeals.filter(d => d.status === 'Active').length,
-        closedDeals: userDeals.filter(d => d.status === 'Closed').length,
-        pipelineValue: userDeals.reduce((sum, d) => sum + d.value, 0),
+        totalTasks: displayTasks.length,
+        completedTasks: displayCompletedTasks.length,
+        activeDeals,
+        closedDeals,
+        pipelineValue,
+        calculatedScore, // Dynamic score based on performance
+        hasTimeframeData, // Flag to indicate if data is from timeframe or all-time
       };
     });
   }, [users, deals, tasks, timeframe]);
@@ -200,9 +225,20 @@ export default function TeamPerformance() {
 
   const leaderboard = useMemo(() => {
     return [...teamMembers]
-      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .sort((a, b) => b.calculatedScore - a.calculatedScore)
       .slice(0, 5);
   }, [teamMembers]);
+  
+  // Filtered team members based on search
+  const filteredTeamMembers = useMemo(() => {
+    if (!memberSearch.trim()) return teamMembers;
+    const searchLower = memberSearch.toLowerCase();
+    return teamMembers.filter(m => 
+      m.name.toLowerCase().includes(searchLower) ||
+      (m.jobTitle?.toLowerCase() || '').includes(searchLower) ||
+      (m.email?.toLowerCase() || '').includes(searchLower)
+    );
+  }, [teamMembers, memberSearch]);
 
   const roleDistribution = useMemo(() => {
     const roles: Record<string, number> = {};
@@ -219,9 +255,9 @@ export default function TeamPerformance() {
   const selectedMemberRadar = selectedMemberData ? [
     { metric: 'Task Completion', value: selectedMemberData.taskCompletionRate },
     { metric: 'On-Time Delivery', value: selectedMemberData.onTimeRate },
-    { metric: 'Deal Activity', value: Math.min(selectedMemberData.activeDeals * 20, 100) },
+    { metric: 'Deal Activity', value: Math.min((selectedMemberData.activeDeals + selectedMemberData.closedDeals) * 10, 100) },
     { metric: 'Pipeline Value', value: Math.min(selectedMemberData.pipelineValue / 10, 100) },
-    { metric: 'Score', value: selectedMemberData.score || 0 },
+    { metric: 'Overall Score', value: selectedMemberData.calculatedScore },
   ] : [];
 
   return (
@@ -361,7 +397,7 @@ export default function TeamPerformance() {
                     </div>
                     <div className="flex items-center gap-1">
                       <Star className="w-4 h-4 text-yellow-500" />
-                      <span className="font-medium">{member.score || 0}</span>
+                      <span className="font-medium">{member.calculatedScore}</span>
                     </div>
                   </div>
                 ))}
@@ -372,15 +408,25 @@ export default function TeamPerformance() {
 
         {/* Team Members Grid */}
         <Card className="bg-card border-border">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="flex items-center gap-2">
               <Users className="w-5 h-5 text-primary" />
-              Team Members
+              Team Members ({filteredTeamMembers.length})
             </CardTitle>
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search members..."
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-members"
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {teamMembers.map(member => (
+              {filteredTeamMembers.map(member => (
                 <Card 
                   key={member.id} 
                   className={cn(
@@ -403,7 +449,7 @@ export default function TeamPerformance() {
                       </div>
                       <div className="flex items-center gap-1">
                         <Star className="w-4 h-4 text-yellow-500" />
-                        <span className="font-medium text-sm">{member.score || 0}</span>
+                        <span className="font-medium text-sm">{member.calculatedScore}</span>
                       </div>
                     </div>
                     
