@@ -713,7 +713,7 @@ function StageWorkSection({
                       variant="ghost" 
                       size="icon" 
                       className="h-6 w-6"
-                      onClick={() => deleteStageDocument.mutate(doc.id)}
+                      onClick={() => deleteStageDocument.mutate({ id: doc.id, dealId, stage: activeStageTab })}
                       title="Delete"
                       data-testid={`delete-doc-${doc.id}`}
                     >

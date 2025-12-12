@@ -89,10 +89,28 @@ export class ObjectStorageService {
       const [metadata] = await file.getMetadata();
       const aclPolicy = await getObjectAclPolicy(file);
       const isPublic = aclPolicy?.visibility === "public";
+      const contentType = metadata.contentType || "application/octet-stream";
+      
+      const inlineTypesExact = [
+        'application/pdf',
+        'application/json',
+      ];
+      const inlinePrefixes = [
+        'image/',
+        'video/',
+        'audio/',
+        'text/',
+      ];
+      
+      const isInlineType = inlineTypesExact.includes(contentType) || inlinePrefixes.some(prefix => contentType.startsWith(prefix));
+      const disposition = isInlineType ? 'inline' : 'attachment';
+      const filename = file.name.split('/').pop() || 'file';
+      
       res.set({
-        "Content-Type": metadata.contentType || "application/octet-stream",
+        "Content-Type": contentType,
         "Content-Length": metadata.size,
         "Cache-Control": `${isPublic ? "public" : "private"}, max-age=${cacheTtlSec}`,
+        "Content-Disposition": `${disposition}; filename="${encodeURIComponent(filename)}"`,
       });
       const stream = file.createReadStream();
       stream.on("error", (err) => {

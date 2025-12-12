@@ -2616,12 +2616,31 @@ export function useCreateStageDocument() {
       if (!res.ok) throw new Error("Failed to create stage document");
       return res.json() as Promise<StageDocumentType>;
     },
-    onSuccess: (result, vars) => {
-      // Invalidate both the specific stage query and all stage-documents for this deal
+    onMutate: async ({ dealId, doc }) => {
+      await queryClient.cancelQueries({ queryKey: ["stage-documents", dealId, doc.stage] });
+      const previousDocs = queryClient.getQueryData<StageDocumentType[]>(["stage-documents", dealId, doc.stage]);
+      const optimisticDoc: StageDocumentType = {
+        id: `temp-${Date.now()}`,
+        dealId,
+        documentId: null,
+        uploadedBy: null,
+        uploaderName: null,
+        createdAt: new Date().toISOString(),
+        ...doc,
+      };
+      queryClient.setQueryData<StageDocumentType[]>(
+        ["stage-documents", dealId, doc.stage],
+        (old) => [...(old || []), optimisticDoc]
+      );
+      return { previousDocs };
+    },
+    onError: (err, vars, context) => {
+      if (context?.previousDocs) {
+        queryClient.setQueryData(["stage-documents", vars.dealId, vars.doc.stage], context.previousDocs);
+      }
+    },
+    onSettled: (_, __, vars) => {
       queryClient.invalidateQueries({ queryKey: ["stage-documents", vars.dealId, vars.doc.stage] });
-      queryClient.invalidateQueries({ queryKey: ["stage-documents", vars.dealId] });
-      // Also invalidate documents query for document library
-      queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
   });
 }
@@ -2629,13 +2648,34 @@ export function useCreateStageDocument() {
 export function useDeleteStageDocument() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, dealId, stage }: { id: string; dealId?: string; stage?: string }) => {
       const res = await fetch(`/api/stage-documents/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete stage document");
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["stage-documents"] });
+    onMutate: async ({ id, dealId, stage }) => {
+      if (dealId && stage) {
+        await queryClient.cancelQueries({ queryKey: ["stage-documents", dealId, stage] });
+        const previousDocs = queryClient.getQueryData<StageDocumentType[]>(["stage-documents", dealId, stage]);
+        queryClient.setQueryData<StageDocumentType[]>(
+          ["stage-documents", dealId, stage],
+          (old) => (old || []).filter(doc => doc.id !== id)
+        );
+        return { previousDocs, dealId, stage };
+      }
+      return {};
+    },
+    onError: (err, vars, context) => {
+      if (context?.previousDocs && context?.dealId && context?.stage) {
+        queryClient.setQueryData(["stage-documents", context.dealId, context.stage], context.previousDocs);
+      }
+    },
+    onSettled: (_, __, vars) => {
+      if (vars.dealId && vars.stage) {
+        queryClient.invalidateQueries({ queryKey: ["stage-documents", vars.dealId, vars.stage] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["stage-documents"] });
+      }
     },
   });
 }
