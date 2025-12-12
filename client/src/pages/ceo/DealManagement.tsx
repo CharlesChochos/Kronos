@@ -52,6 +52,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isToday, isBefore, isAfter, parseISO } from "date-fns";
 import type { Deal, PodTeamMember, TaggedInvestor, AuditEntry } from "@shared/schema";
+import { ObjectUploader, type UploadedFile } from "@/components/ObjectUploader";
 import {
   RadarChart,
   PolarGrid,
@@ -3587,152 +3588,61 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     </Badge>
                   </div>
 
-                  <div 
-                    className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer"
-                    onClick={() => document.getElementById('deal-document-upload')?.click()}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      e.currentTarget.classList.add('border-primary', 'bg-primary/5');
-                    }}
-                    onDragLeave={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
-                    }}
-                    onDrop={async (e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
-                      const files = Array.from(e.dataTransfer.files);
-                      if (files.length === 0) return;
-                      
+                  <ObjectUploader
+                    maxNumberOfFiles={20}
+                    maxFileSize={500 * 1024 * 1024}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,.mp4,.mov,.avi,.mp3,.wav,image/*,video/*,audio/*"
+                    onComplete={async (files: UploadedFile[]) => {
                       const existingAttachments = (selectedDealWithAttachments?.attachments as any[] || []);
-                      const uploadedAttachments: any[] = [];
+                      const newAttachments = files.map(f => ({
+                        id: f.id,
+                        filename: f.filename,
+                        url: f.objectPath,
+                        objectPath: f.objectPath,
+                        size: f.size,
+                        type: f.type,
+                        uploadedAt: new Date().toISOString(),
+                      }));
                       
-                      for (const file of files) {
-                        try {
-                          const formData = new FormData();
-                          formData.append('file', file);
-                          
-                          const response = await fetch('/api/upload', {
-                            method: 'POST',
-                            credentials: 'include',
-                            body: formData,
-                          });
-                          
-                          if (response.ok) {
-                            const uploadedFile = await response.json();
-                            uploadedAttachments.push(uploadedFile);
-                          } else {
-                            const error = await response.json();
-                            throw new Error(error.error || 'Upload failed');
+                      try {
+                        await updateDeal.mutateAsync({
+                          id: selectedDeal.id,
+                          attachments: [...existingAttachments, ...newAttachments],
+                        });
+                        
+                        // Also add documents to the Document Library
+                        for (const doc of newAttachments) {
+                          try {
+                            await createDocument.mutateAsync({
+                              title: doc.filename,
+                              type: doc.type || 'application/octet-stream',
+                              category: 'Other',
+                              filename: doc.filename,
+                              originalName: doc.filename,
+                              mimeType: doc.type,
+                              size: doc.size,
+                              content: doc.objectPath,
+                              dealId: selectedDeal.id,
+                              dealName: selectedDeal.name,
+                              tags: ['Deal Document'],
+                            });
+                          } catch (docError) {
+                            console.error('Error adding to document library:', docError);
                           }
-                        } catch (error: any) {
-                          toast.error(`Failed to upload ${file.name}: ${error.message || 'Unknown error'}`);
                         }
-                      }
-                      
-                      if (uploadedAttachments.length > 0) {
-                        try {
-                          await updateDeal.mutateAsync({
-                            id: selectedDeal.id,
-                            attachments: [...existingAttachments, ...uploadedAttachments],
-                          });
-                          toast.success(`${uploadedAttachments.length} file(s) uploaded successfully`);
-                        } catch (error: any) {
-                          console.error('Error saving files to deal:', error);
-                          toast.error(error.message || "Failed to save files to deal");
-                        }
+                      } catch (error: any) {
+                        console.error('Error saving files to deal:', error);
+                        toast.error(error.message || "Failed to save files to deal");
                       }
                     }}
+                    buttonVariant="outline"
                   >
-                    <input 
-                      type="file" 
-                      id="deal-document-upload" 
-                      className="hidden" 
-                      multiple 
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,image/*"
-                      onChange={async (e) => {
-                        const files = Array.from(e.target.files || []);
-                        if (files.length === 0) return;
-                        
-                        const existingAttachments = (selectedDealWithAttachments?.attachments as any[] || []);
-                        const uploadedAttachments: any[] = [];
-                        
-                        // Upload each file to the server using FormData
-                        for (const file of files) {
-                          try {
-                            const formData = new FormData();
-                            formData.append('file', file);
-                            
-                            const response = await fetch('/api/upload', {
-                              method: 'POST',
-                              credentials: 'include',
-                              body: formData,
-                            });
-                            
-                            if (response.ok) {
-                              const uploadedFile = await response.json();
-                              uploadedAttachments.push(uploadedFile);
-                            } else {
-                              const error = await response.json();
-                              throw new Error(error.error || 'Upload failed');
-                            }
-                          } catch (error: any) {
-                            console.error('Error uploading file:', error);
-                            toast.error(`Failed to upload ${file.name}: ${error.message || 'Unknown error'}`);
-                          }
-                        }
-                        
-                        if (uploadedAttachments.length > 0) {
-                          try {
-                            await updateDeal.mutateAsync({
-                              id: selectedDeal.id,
-                              attachments: [...existingAttachments, ...uploadedAttachments],
-                            });
-                            
-                            // Also add documents to the Document Library
-                            for (const doc of uploadedAttachments) {
-                              try {
-                                await createDocument.mutateAsync({
-                                  title: doc.filename,
-                                  type: doc.type || 'application/octet-stream',
-                                  category: 'Other',
-                                  filename: doc.filename,
-                                  originalName: doc.filename,
-                                  mimeType: doc.type,
-                                  size: doc.size,
-                                  content: doc.url,
-                                  dealId: selectedDeal.id,
-                                  dealName: selectedDeal.name,
-                                  tags: ['deal-attachment'],
-                                });
-                              } catch (docError) {
-                                console.error('Failed to add to document library:', docError);
-                              }
-                            }
-                            
-                            toast.success(`${uploadedAttachments.length} file(s) uploaded successfully`);
-                          } catch (error: any) {
-                            console.error('Error saving files to deal:', error);
-                            toast.error(error.message || "Failed to save files to deal");
-                          }
-                        }
-                        
-                        // Reset the input
-                        e.target.value = '';
-                      }}
-                      data-testid="input-document-upload"
-                    />
-                    <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      Drag & drop or click to upload
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      PDF, Word, Excel, PowerPoint, images (max 10MB)
-                    </p>
-                  </div>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Files (up to 500MB)
+                  </ObjectUploader>
+                  <p className="text-xs text-muted-foreground">
+                    Supports documents, images, videos, and audio files
+                  </p>
 
                   <ScrollArea className="h-[300px]">
                     <div className="space-y-2">
@@ -3755,11 +3665,12 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                               size="icon" 
                               className="h-8 w-8"
                               onClick={() => {
-                                if (doc.contentUnavailable || (doc.url?.startsWith('/uploads/') && !doc.url?.startsWith('data:'))) {
+                                const fileUrl = doc.objectPath || doc.url;
+                                if (doc.contentUnavailable || (!fileUrl?.startsWith('/objects/') && !fileUrl?.startsWith('data:'))) {
                                   toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
                                   return;
                                 }
-                                window.open(doc.url, '_blank');
+                                window.open(fileUrl, '_blank');
                               }}
                               title="View"
                               data-testid={`button-view-doc-${doc.id}`}
@@ -3771,12 +3682,13 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                               size="icon" 
                               className="h-8 w-8"
                               onClick={() => {
-                                if (doc.contentUnavailable || (doc.url?.startsWith('/uploads/') && !doc.url?.startsWith('data:'))) {
+                                const fileUrl = doc.objectPath || doc.url;
+                                if (doc.contentUnavailable || (!fileUrl?.startsWith('/objects/') && !fileUrl?.startsWith('data:'))) {
                                   toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
                                   return;
                                 }
                                 const link = document.createElement('a');
-                                link.href = doc.url;
+                                link.href = fileUrl;
                                 link.download = doc.filename || 'document';
                                 document.body.appendChild(link);
                                 link.click();

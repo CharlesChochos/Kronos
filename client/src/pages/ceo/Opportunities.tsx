@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import type { Deal, PodTeamMember } from "@shared/schema";
+import { ObjectUploader, type UploadedFile } from "@/components/ObjectUploader";
 
 const DIVISIONS = ['Investment Banking', 'Asset Management'];
 const BASE_SECTORS = ['Technology', 'Healthcare', 'Finance', 'Energy', 'Consumer', 'Industrial', 'Real Estate', 'Other'];
@@ -46,7 +47,9 @@ type OpportunityAttachment = {
   id: string;
   filename: string;
   url: string;
+  objectPath?: string;
   size: number;
+  type?: string;
   uploadedAt: string;
 };
 
@@ -641,59 +644,38 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                 <Paperclip className="w-4 h-4" />
                 Attachments
               </Label>
-              <div 
-              className="mt-2 border border-dashed border-border rounded-lg p-4"
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                e.currentTarget.classList.add('border-primary', 'bg-primary/5');
-              }}
-              onDragLeave={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                  const input = fileInputRef.current;
-                  if (input) {
-                    const dataTransfer = new DataTransfer();
-                    Array.from(files).forEach(file => dataTransfer.items.add(file));
-                    input.files = dataTransfer.files;
-                    input.dispatchEvent(new Event('change', { bubbles: true }));
-                  }
-                }
-              }}
-            >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => handleFileUpload(e, false)}
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,image/*"
-                />
-                <div className="text-center">
-                  <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    Upload File
-                  </Button>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Drag & drop or click - PDF, Word, Excel, images
-                  </p>
-                </div>
+              <div className="mt-2 space-y-3">
+                <ObjectUploader
+                  maxNumberOfFiles={10}
+                  maxFileSize={500 * 1024 * 1024}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,.mp4,.mov,.avi,.mp3,.wav,image/*,video/*,audio/*"
+                  onComplete={(files: UploadedFile[]) => {
+                    const newAttachments: OpportunityAttachment[] = files.map(f => ({
+                      id: f.id,
+                      filename: f.filename,
+                      url: f.objectPath,
+                      objectPath: f.objectPath,
+                      size: f.size,
+                      type: f.type,
+                      uploadedAt: new Date().toISOString(),
+                    }));
+                    setNewOpportunity(prev => ({
+                      ...prev,
+                      attachments: [...prev.attachments, ...newAttachments]
+                    }));
+                  }}
+                  buttonVariant="outline"
+                  buttonSize="sm"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Files (up to 500MB)
+                </ObjectUploader>
+                <p className="text-xs text-muted-foreground">
+                  Supports documents, images, videos, and audio files
+                </p>
                 
                 {newOpportunity.attachments.length > 0 && (
-                  <div className="mt-4 space-y-2">
+                  <div className="space-y-2">
                     {newOpportunity.attachments.map((file) => (
                       <div key={file.id} className="flex items-center justify-between p-2 bg-secondary/50 rounded-lg">
                         <div className="flex items-center gap-2 min-w-0">

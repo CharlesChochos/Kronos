@@ -46,3 +46,7 @@ integrations = ["resend:1.0.0", "javascript_openai_ai_integrations:1.0.0", "goog
 
 [userenv.production]
 PRODUCTION_URL = "https://kronos--chochoscharles0.replit.app"
+
+[userenv.shared]
+PRIVATE_OBJECT_DIR = "/kronos-uploads"
+PUBLIC_OBJECT_SEARCH_PATHS = "/kronos-uploads/public"

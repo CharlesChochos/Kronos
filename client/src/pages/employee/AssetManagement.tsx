@@ -52,6 +52,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isToday, isBefore, isAfter, parseISO } from "date-fns";
 import type { Deal, PodTeamMember, TaggedInvestor, AuditEntry } from "@shared/schema";
+import { ObjectUploader, type UploadedFile } from "@/components/ObjectUploader";
 import {
   RadarChart,
   PolarGrid,
