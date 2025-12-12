@@ -636,24 +636,6 @@ function StageWorkSection({
         
         {showAddDocument && (
           <div className="p-3 bg-secondary/30 rounded-lg space-y-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              onChange={(e) => {
-                const files = e.target.files;
-                if (files && files.length > 0) {
-                  setDocumentFiles(Array.from(files));
-                }
-              }}
-              className="w-full text-sm file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-              data-testid="input-file-upload"
-            />
-            {documentFiles.length > 0 && (
-              <div className="text-xs text-muted-foreground">
-                Selected: {documentFiles.length} file(s) - {documentFiles.map(f => f.name).join(', ')}
-              </div>
-            )}
             <Select value={documentCategory} onValueChange={setDocumentCategory}>
               <SelectTrigger className="h-8 text-sm" data-testid="select-document-category">
                 <SelectValue />
@@ -666,12 +648,67 @@ function StageWorkSection({
                 <SelectItem value="Presentation">Presentation</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleAddDocument} className="flex-1" disabled={documentFiles.length === 0} data-testid="button-upload-document">
-                Upload
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => { setShowAddDocument(false); setDocumentFiles([]); setDocumentTitle(''); }}>Cancel</Button>
-            </div>
+            <ObjectUploader
+              maxFiles={10}
+              maxSizeBytes={500 * 1024 * 1024}
+              onComplete={async (uploadedFiles: UploadedFile[]) => {
+                const categoryMap: Record<string, string> = {
+                  'General': 'Other',
+                  'Financial': 'Financial Documents',
+                  'Legal': 'Legal',
+                  'Technical': 'Reports',
+                  'Presentation': 'Presentations'
+                };
+                
+                let uploadedCount = 0;
+                for (const file of uploadedFiles) {
+                  try {
+                    await createStageDocument.mutateAsync({
+                      dealId,
+                      doc: {
+                        stage: activeStageTab,
+                        title: file.filename,
+                        filename: file.filename,
+                        url: file.objectPath,
+                        mimeType: file.type,
+                        size: file.size,
+                      }
+                    });
+                    
+                    try {
+                      await createDocument.mutateAsync({
+                        title: file.filename,
+                        filename: `[${dealName}] ${file.filename}`,
+                        content: file.objectPath,
+                        category: categoryMap[documentCategory] || 'Other',
+                        dealId: dealId,
+                        tags: [activeStageTab, 'Stage Work'],
+                        type: 'stage_document',
+                        uploadedBy: currentUser?.id,
+                        originalName: file.filename,
+                        mimeType: file.type,
+                        size: file.size,
+                      });
+                    } catch (archiveError) {
+                      console.error('Failed to archive document (non-critical):', archiveError);
+                    }
+                    uploadedCount++;
+                  } catch (error) {
+                    console.error(`Failed to save ${file.filename}:`, error);
+                  }
+                }
+                
+                if (onAuditEntry && uploadedCount > 0) {
+                  await onAuditEntry('Documents Uploaded', `${uploadedCount} document(s) uploaded to ${activeStageTab} stage`);
+                }
+                
+                if (uploadedCount > 0) {
+                  toast.success(`${uploadedCount} document(s) uploaded successfully`);
+                }
+                setShowAddDocument(false);
+              }}
+            />
+            <Button size="sm" variant="outline" onClick={() => { setShowAddDocument(false); setDocumentFiles([]); setDocumentTitle(''); }}>Cancel</Button>
           </div>
         )}
         
@@ -715,9 +752,7 @@ function StageWorkSection({
                             const link = document.createElement('a');
                             link.href = downloadUrl;
                             link.download = doc.filename || doc.title || 'document';
-                            document.body.appendChild(link);
                             link.click();
-                            document.body.removeChild(link);
                           }
                         }}
                         title="Download"
