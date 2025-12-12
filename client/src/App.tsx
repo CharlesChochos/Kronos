@@ -45,8 +45,6 @@ const AssetManagement = lazy(() => import("@/pages/employee/AssetManagement"));
 const PortalLogin = lazy(() => import("@/pages/portal/PortalLogin"));
 const PortalRegister = lazy(() => import("@/pages/portal/PortalRegister"));
 const PortalDashboard = lazy(() => import("@/pages/portal/PortalDashboard"));
-const PersonalityQuestionnaire = lazy(() => import("@/pages/shared/PersonalityQuestionnaire"));
-const WorkflowAutomation = lazy(() => import("@/pages/ceo/WorkflowAutomation"));
 
 // Wrapper components to ensure props are passed correctly with wouter
 const CeoDealManagement = () => <DealManagement role="CEO" />;
@@ -69,8 +67,6 @@ const EmployeeDocumentGenerator = () => <DocumentManagement role="Employee" defa
 const CeoDocumentLibrary = () => <DocumentManagement role="CEO" defaultTab="library" />;
 const EmployeeDocumentLibrary = () => <DocumentManagement role="Employee" defaultTab="library" />;
 const CeoMyTasks = () => <MyTasks role="CEO" />;
-const CeoPersonalityQuestionnaire = () => <PersonalityQuestionnaire role="CEO" />;
-const EmployeePersonalityQuestionnaire = () => <PersonalityQuestionnaire role="Employee" />;
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { data: user, isLoading } = useCurrentUser();
@@ -217,9 +213,6 @@ function Router() {
         <Route path="/ceo/tasks">
           {() => <ProtectedRoute component={CeoMyTasks} />}
         </Route>
-        <Route path="/ceo/automation">
-          {() => <ProtectedRoute component={WorkflowAutomation} />}
-        </Route>
         
         {/* Employee Routes */}
         <Route path="/employee/home">
@@ -263,14 +256,6 @@ function Router() {
         </Route>
         <Route path="/employee/audit-logs">
           {() => <ProtectedRoute component={() => <AuditLogs role="Employee" />} />}
-        </Route>
-        <Route path="/employee/profile-questionnaire">
-          {() => <ProtectedRoute component={EmployeePersonalityQuestionnaire} />}
-        </Route>
-        
-        {/* CEO Profile Route */}
-        <Route path="/ceo/profile-questionnaire">
-          {() => <ProtectedRoute component={CeoPersonalityQuestionnaire} />}
         </Route>
         
         {/* External Portal Routes */}

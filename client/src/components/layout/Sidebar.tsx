@@ -22,8 +22,7 @@ import {
   Database,
   FileStack,
   FolderOpen,
-  ClipboardList,
-  Zap
+  ClipboardList
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPreferences, useSaveUserPreferences, useCurrentUser } from "@/lib/api";
@@ -176,7 +175,6 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
       category: "Administration",
       links: [
         { icon: Shield, label: "User Management", path: "/ceo/admin" },
-        { icon: Zap, label: "Automation", path: "/ceo/automation" },
         { icon: ClipboardList, label: "Audit Logs", path: "/ceo/audit-logs" },
         { icon: FileStack, label: "Templates", path: "/ceo/deal-templates" },
         { icon: FolderOpen, label: "Document Library", path: "/ceo/document-library" },
