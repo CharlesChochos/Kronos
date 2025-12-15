@@ -43,7 +43,8 @@ import {
   useCustomSectors, useCreateCustomSector,
   useDealFees, type DealFeeType,
   useCreateDocument,
-  useAllInvestors
+  useAllInvestors,
+  useDealNotes, useCreateDealNote, type DealNoteType
 } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -197,6 +198,156 @@ function DealTotalTeamCountNumber({ dealId, podTeam = [] }: { dealId: string; po
   
   return <>{distinctCount}</>;
 }
+
+function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[] }) {
+  const { data: notes = [], isLoading } = useDealNotes(dealId);
+  const createDealNote = useCreateDealNote();
+  const [newNote, setNewNote] = useState("");
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [cursorPosition, setCursorPosition] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const filteredUsers = useMemo(() => {
+    if (!mentionQuery) return allUsers.slice(0, 5);
+    return allUsers.filter(u => 
+      u.name.toLowerCase().includes(mentionQuery.toLowerCase())
+    ).slice(0, 5);
+  }, [allUsers, mentionQuery]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    const position = e.target.selectionStart || 0;
+    setNewNote(value);
+    setCursorPosition(position);
+
+    const textBeforeCursor = value.slice(0, position);
+    const atMatch = textBeforeCursor.match(/@(\w*)$/);
+    if (atMatch) {
+      setShowMentions(true);
+      setMentionQuery(atMatch[1]);
+    } else {
+      setShowMentions(false);
+      setMentionQuery("");
+    }
+  };
+
+  const insertMention = (userName: string) => {
+    const textBeforeCursor = newNote.slice(0, cursorPosition);
+    const textAfterCursor = newNote.slice(cursorPosition);
+    const beforeAt = textBeforeCursor.replace(/@\w*$/, '');
+    const newText = `${beforeAt}@${userName} ${textAfterCursor}`;
+    setNewNote(newText);
+    setShowMentions(false);
+    setMentionQuery("");
+    textareaRef.current?.focus();
+  };
+
+  const handleSubmit = async () => {
+    if (!newNote.trim()) return;
+    try {
+      await createDealNote.mutateAsync({ dealId, content: newNote.trim() });
+      setNewNote("");
+      toast.success("Note added");
+    } catch {
+      toast.error("Failed to add note");
+    }
+  };
+
+  const renderContentWithMentions = (content: string) => {
+    const parts = content.split(/(@\w+)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('@')) {
+        return <span key={i} className="text-emerald-400 font-medium">{part}</span>;
+      }
+      return part;
+    });
+  };
+
+  if (isLoading) {
+    return <div className="text-center py-8 text-muted-foreground">Loading notes...</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="font-medium flex items-center gap-2">
+          <MessageSquare className="w-4 h-4" />
+          Deal Notes
+        </h4>
+        <Badge variant="secondary">{notes.length} notes</Badge>
+      </div>
+
+      <div className="relative">
+        <Textarea
+          ref={textareaRef}
+          placeholder="Add a note... Use @ to mention team members"
+          value={newNote}
+          onChange={handleInputChange}
+          className="min-h-[80px]"
+          data-testid="input-deal-note"
+        />
+        {showMentions && filteredUsers.length > 0 && (
+          <div className="absolute bottom-full left-0 mb-1 w-64 bg-popover border rounded-md shadow-lg z-50 max-h-48 overflow-auto">
+            {filteredUsers.map(user => (
+              <button
+                key={user.id}
+                className="w-full px-3 py-2 text-left hover:bg-accent flex items-center gap-2"
+                onClick={() => insertMention(user.name)}
+              >
+                <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center text-xs">
+                  {user.name.charAt(0)}
+                </div>
+                <span className="text-sm">{user.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flex justify-end mt-2">
+          <Button 
+            size="sm" 
+            onClick={handleSubmit}
+            disabled={!newNote.trim() || createDealNote.isPending}
+            data-testid="button-submit-deal-note"
+          >
+            <Plus className="w-4 h-4 mr-1" /> Add Note
+          </Button>
+        </div>
+      </div>
+
+      <ScrollArea className="h-[300px]">
+        <div className="space-y-3">
+          {notes.map((note: DealNoteType) => (
+            <div key={note.id} className="p-3 bg-secondary/30 rounded-lg">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-sm font-medium text-emerald-400 flex-shrink-0">
+                  {note.userName?.charAt(0) || '?'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-sm">{note.userName}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(note.createdAt), 'MMM d, h:mm a')}
+                    </span>
+                  </div>
+                  <p className="text-sm mt-1 whitespace-pre-wrap">
+                    {renderContentWithMentions(note.content)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+          {notes.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              No notes yet. Add the first note above.
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
 const INVESTOR_TYPES = ['PE', 'VC', 'Strategic', 'Family Office', 'Hedge Fund', 'Sovereign Wealth'];
 const INVESTOR_STATUSES = ['Contacted', 'Interested', 'In DD', 'Term Sheet', 'Passed', 'Closed'];
 
@@ -2986,12 +3137,13 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
 
               {/* Tabs */}
               <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
-                <TabsList className="grid grid-cols-6 bg-secondary/50">
+                <TabsList className="grid grid-cols-7 bg-secondary/50">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="stages">Stage Work</TabsTrigger>
                   <TabsTrigger value="investors">Investors</TabsTrigger>
                   <TabsTrigger value="documents">Docs</TabsTrigger>
                   <TabsTrigger value="voice">Voice</TabsTrigger>
+                  <TabsTrigger value="notes">Notes</TabsTrigger>
                   <TabsTrigger value="audit">Audit</TabsTrigger>
                 </TabsList>
 
@@ -3890,6 +4042,11 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                       )}
                     </div>
                   </ScrollArea>
+                </TabsContent>
+
+                {/* Deal Notes Tab */}
+                <TabsContent value="notes" className="mt-4 space-y-4">
+                  <DealNotesSection dealId={selectedDeal.id} allUsers={allUsers} />
                 </TabsContent>
 
                 {/* Audit Trail Tab */}
