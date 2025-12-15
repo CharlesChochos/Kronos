@@ -236,7 +236,8 @@ function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[
     const textBeforeCursor = newNote.slice(0, cursorPosition);
     const textAfterCursor = newNote.slice(cursorPosition);
     const beforeAt = textBeforeCursor.replace(/@\w*$/, '');
-    const newText = `${beforeAt}@${userName} ${textAfterCursor}`;
+    const mentionName = userName.replace(/\s+/g, '');
+    const newText = `${beforeAt}@${mentionName} ${textAfterCursor}`;
     setNewNote(newText);
     setShowMentions(false);
     setMentionQuery("");
