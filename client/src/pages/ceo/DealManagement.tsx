@@ -1030,6 +1030,7 @@ function StageWorkSection({
                       taskId={task.id}
                       currentUser={currentUser}
                       createTaskComment={createTaskComment}
+                      users={allUsers}
                     />
                   )}
                 </div>
@@ -1045,14 +1046,95 @@ function StageWorkSection({
 function TaskComments({ 
   taskId,
   currentUser,
-  createTaskComment
+  createTaskComment,
+  users = []
 }: { 
   taskId: string;
   currentUser: any;
   createTaskComment: any;
+  users?: any[];
 }) {
   const { data: comments = [] } = useTaskComments(taskId);
   const [newComment, setNewComment] = useState("");
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionStartIndex, setMentionStartIndex] = useState<number | null>(null);
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  
+  const mentionableUsers = useMemo(() => {
+    const activeUsers = users.filter(u => u.status === 'active');
+    if (!mentionQuery) return activeUsers.slice(0, 5);
+    return activeUsers.filter(u => 
+      u.name.toLowerCase().includes(mentionQuery.toLowerCase())
+    ).slice(0, 5);
+  }, [users, mentionQuery]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const cursorPos = e.target.selectionStart || 0;
+    setNewComment(value);
+    
+    const textBeforeCursor = value.substring(0, cursorPos);
+    const atIndex = textBeforeCursor.lastIndexOf('@');
+    
+    if (atIndex !== -1) {
+      const charBeforeAt = atIndex > 0 ? textBeforeCursor[atIndex - 1] : ' ';
+      if (charBeforeAt === ' ' || atIndex === 0) {
+        const query = textBeforeCursor.substring(atIndex + 1);
+        if (!query.includes(' ')) {
+          setMentionQuery(query);
+          setMentionStartIndex(atIndex);
+          setShowMentionDropdown(true);
+          setSelectedMentionIndex(0);
+          return;
+        }
+      }
+    }
+    setShowMentionDropdown(false);
+    setMentionQuery("");
+    setMentionStartIndex(null);
+  };
+
+  const insertMention = (user: any) => {
+    if (mentionStartIndex === null) return;
+    const beforeMention = newComment.substring(0, mentionStartIndex);
+    const afterMention = newComment.substring(mentionStartIndex + mentionQuery.length + 1);
+    const newMessage = `${beforeMention}@${user.name} ${afterMention}`;
+    setNewComment(newMessage);
+    setShowMentionDropdown(false);
+    setMentionQuery("");
+    setMentionStartIndex(null);
+    setSelectedMentionIndex(0);
+    inputRef.current?.focus();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showMentionDropdown) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleAddComment();
+      }
+      return;
+    }
+    
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedMentionIndex(prev => 
+        prev < mentionableUsers.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedMentionIndex(prev => prev > 0 ? prev - 1 : 0);
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      if (mentionableUsers[selectedMentionIndex]) {
+        insertMention(mentionableUsers[selectedMentionIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setShowMentionDropdown(false);
+    }
+  };
   
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
@@ -1071,6 +1153,16 @@ function TaskComments({
       toast.error("Failed to add comment");
     }
   };
+
+  const renderContentWithMentions = (content: string) => {
+    const parts = content.split(/(@[A-Za-z]+(?:\s[A-Za-z]+)*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('@')) {
+        return <span key={i} className="text-primary font-medium">{part}</span>;
+      }
+      return part;
+    });
+  };
   
   return (
     <div className="p-2 border-t border-border/50 space-y-2">
@@ -1086,32 +1178,49 @@ function TaskComments({
                   {format(new Date(comment.createdAt), 'MMM d, h:mm a')}
                 </span>
               </div>
-              <p>{comment.content}</p>
+              <p>{renderContentWithMentions(comment.content)}</p>
             </div>
           ))}
         </div>
       )}
       
-      <div className="flex gap-2">
-        <Input
-          placeholder="Add a comment..."
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          className="h-7 text-xs"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleAddComment();
-            }
-          }}
-        />
-        <Button 
-          size="sm" 
-          className="h-7 px-2"
-          onClick={handleAddComment}
-        >
-          <Plus className="w-3 h-3" />
-        </Button>
+      <div className="relative">
+        <div className="flex gap-2">
+          <Input
+            ref={inputRef}
+            placeholder="Add a comment... (use @ to mention)"
+            value={newComment}
+            onChange={handleInputChange}
+            className="h-7 text-xs"
+            onKeyDown={handleKeyDown}
+          />
+          <Button 
+            size="sm" 
+            className="h-7 px-2"
+            onClick={handleAddComment}
+          >
+            <Plus className="w-3 h-3" />
+          </Button>
+        </div>
+        {showMentionDropdown && mentionableUsers.length > 0 && (
+          <div className="absolute bottom-full left-0 mb-1 w-48 bg-popover border border-border rounded-md shadow-lg z-50 max-h-32 overflow-y-auto">
+            {mentionableUsers.map((user, index) => (
+              <div
+                key={user.id}
+                className={cn(
+                  "px-2 py-1.5 text-xs cursor-pointer flex items-center gap-2",
+                  index === selectedMentionIndex ? "bg-accent" : "hover:bg-accent"
+                )}
+                onClick={() => insertMention(user)}
+              >
+                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-medium text-primary">
+                  {user.name.split(' ').map((n: string) => n[0]).join('')}
+                </div>
+                <span>{user.name}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
