@@ -25,11 +25,12 @@ import {
   Search, Plus, Lightbulb, CheckCircle, XCircle, Eye, Clock, DollarSign,
   Building2, Users, ArrowRight, Briefcase, TrendingUp, AlertTriangle,
   Upload, FileText, Paperclip, StickyNote, X, Download, Trash2, ExternalLink,
-  Pencil, Save
+  Pencil, Save, MessageSquare
 } from "lucide-react";
 import { 
   useCurrentUser, useDealsListing, useDeal, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers,
-  useCustomSectors, useCreateCustomSector, useTagDealMember, useRemoveDealMember
+  useCustomSectors, useCreateCustomSector, useTagDealMember, useRemoveDealMember,
+  useDealNotes, useCreateDealNote, type DealNoteType
 } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -63,6 +64,156 @@ type OpportunityNote = {
 type OpportunitiesProps = {
   role?: 'CEO' | 'Employee';
 };
+
+function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[] }) {
+  const { data: notes = [], isLoading } = useDealNotes(dealId);
+  const createDealNote = useCreateDealNote();
+  const [newNote, setNewNote] = useState("");
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [cursorPosition, setCursorPosition] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const filteredUsers = useMemo(() => {
+    if (!mentionQuery) return allUsers.slice(0, 5);
+    return allUsers.filter(u => 
+      u.name.toLowerCase().includes(mentionQuery.toLowerCase())
+    ).slice(0, 5);
+  }, [allUsers, mentionQuery]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    const position = e.target.selectionStart || 0;
+    setNewNote(value);
+    setCursorPosition(position);
+
+    const textBeforeCursor = value.slice(0, position);
+    const atMatch = textBeforeCursor.match(/@(\w*)$/);
+    if (atMatch) {
+      setShowMentions(true);
+      setMentionQuery(atMatch[1]);
+    } else {
+      setShowMentions(false);
+      setMentionQuery("");
+    }
+  };
+
+  const insertMention = (userName: string) => {
+    const textBeforeCursor = newNote.slice(0, cursorPosition);
+    const textAfterCursor = newNote.slice(cursorPosition);
+    const beforeAt = textBeforeCursor.replace(/@\w*$/, '');
+    const mentionName = userName.replace(/\s+/g, '');
+    const newText = `${beforeAt}@${mentionName} ${textAfterCursor}`;
+    setNewNote(newText);
+    setShowMentions(false);
+    setMentionQuery("");
+    textareaRef.current?.focus();
+  };
+
+  const handleSubmit = async () => {
+    if (!newNote.trim()) return;
+    try {
+      await createDealNote.mutateAsync({ dealId, content: newNote.trim() });
+      setNewNote("");
+      toast.success("Note added");
+    } catch {
+      toast.error("Failed to add note");
+    }
+  };
+
+  const renderContentWithMentions = (content: string) => {
+    const parts = content.split(/(@\w+)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('@')) {
+        return <span key={i} className="text-amber-500 font-medium">{part}</span>;
+      }
+      return part;
+    });
+  };
+
+  if (isLoading) {
+    return <div className="text-center py-8 text-muted-foreground">Loading notes...</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="font-medium flex items-center gap-2">
+          <MessageSquare className="w-4 h-4" />
+          Opportunity Notes
+        </h4>
+        <Badge variant="secondary">{notes.length} notes</Badge>
+      </div>
+
+      <div className="relative">
+        <Textarea
+          ref={textareaRef}
+          placeholder="Add a note... Use @ to mention team members"
+          value={newNote}
+          onChange={handleInputChange}
+          className="min-h-[80px]"
+          data-testid="input-opportunity-note"
+        />
+        {showMentions && filteredUsers.length > 0 && (
+          <div className="absolute bottom-full left-0 mb-1 w-64 bg-popover border rounded-md shadow-lg z-50 max-h-48 overflow-auto">
+            {filteredUsers.map(user => (
+              <button
+                key={user.id}
+                className="w-full px-3 py-2 text-left hover:bg-accent flex items-center gap-2"
+                onClick={() => insertMention(user.name)}
+              >
+                <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center text-xs">
+                  {user.name.charAt(0)}
+                </div>
+                <span className="text-sm">{user.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flex justify-end mt-2">
+          <Button 
+            size="sm" 
+            onClick={handleSubmit}
+            disabled={!newNote.trim() || createDealNote.isPending}
+            data-testid="button-submit-opportunity-note"
+          >
+            <Plus className="w-4 h-4 mr-1" /> Add Note
+          </Button>
+        </div>
+      </div>
+
+      <ScrollArea className="h-[300px]">
+        <div className="space-y-3">
+          {notes.map((note: DealNoteType) => (
+            <div key={note.id} className="p-3 bg-secondary/30 rounded-lg">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-sm font-medium text-amber-500 flex-shrink-0">
+                  {note.userName?.charAt(0) || '?'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-sm">{note.userName}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(note.createdAt), 'MMM d, h:mm a')}
+                    </span>
+                  </div>
+                  <p className="text-sm mt-1 whitespace-pre-wrap">
+                    {renderContentWithMentions(note.content)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+          {notes.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              No notes yet. Add the first note above.
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
 
 export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const { data: currentUser } = useCurrentUser();
@@ -1141,38 +1292,8 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                   </TabsContent>
                   
                   <TabsContent value="notes" className="space-y-4 pr-4 mt-0">
-                    <div className="flex gap-2">
-                      <Textarea
-                        value={newNote}
-                        onChange={(e) => setNewNote(e.target.value)}
-                        placeholder="Add a note..."
-                        rows={2}
-                        className="flex-1"
-                      />
-                      <Button onClick={handleAddNote} disabled={!newNote.trim()}>
-                        Add
-                      </Button>
-                    </div>
-                    
-                    {opportunityNotes.length > 0 ? (
-                      <div className="space-y-3">
-                        {opportunityNotes.map((note) => (
-                          <div key={note.id} className="p-3 bg-secondary/30 rounded-lg">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium">{note.author}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {format(new Date(note.createdAt), 'PP p')}
-                              </span>
-                            </div>
-                            <p className="text-sm whitespace-pre-wrap">{note.content}</p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <StickyNote className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">No notes yet</p>
-                      </div>
+                    {selectedOpportunity && (
+                      <DealNotesSection dealId={selectedOpportunity.id} allUsers={users} />
                     )}
                   </TabsContent>
                 </ScrollArea>
