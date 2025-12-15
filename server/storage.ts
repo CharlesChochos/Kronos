@@ -2,7 +2,7 @@ import { eq, and, desc, gt, or, ilike, count } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@shared/schema";
-import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess, DocumentTemplate, InsertDocumentTemplate, InvestorMatch, InsertInvestorMatch, UserPreferences, InsertUserPreferences, DealTemplate, InsertDealTemplate, CalendarEvent, InsertCalendarEvent, TaskAttachmentRecord, InsertTaskAttachmentRecord, ClientPortalInvite, InsertClientPortalInvite, ClientPortalMessage, InsertClientPortalMessage, ClientPortalUpdate, InsertClientPortalUpdate, DealFee, InsertDealFee, StageDocument, InsertStageDocument, StagePodMember, InsertStagePodMember, StageVoiceNote, InsertStageVoiceNote, TaskComment, InsertTaskComment } from "@shared/schema";
+import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess, DocumentTemplate, InsertDocumentTemplate, InvestorMatch, InsertInvestorMatch, UserPreferences, InsertUserPreferences, DealTemplate, InsertDealTemplate, CalendarEvent, InsertCalendarEvent, TaskAttachmentRecord, InsertTaskAttachmentRecord, ClientPortalInvite, InsertClientPortalInvite, ClientPortalMessage, InsertClientPortalMessage, ClientPortalUpdate, InsertClientPortalUpdate, DealFee, InsertDealFee, StageDocument, InsertStageDocument, StagePodMember, InsertStagePodMember, StageVoiceNote, InsertStageVoiceNote, TaskComment, InsertTaskComment, DealNote, InsertDealNote } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
 // Always prefer PRODUCTION_DATABASE_URL if set, otherwise use DATABASE_URL
@@ -300,6 +300,12 @@ export interface IStorage {
   createTaskComment(comment: InsertTaskComment): Promise<TaskComment>;
   updateTaskComment(id: string, content: string): Promise<TaskComment | undefined>;
   deleteTaskComment(id: string): Promise<void>;
+  
+  // Deal Notes operations
+  getDealNotes(dealId: string): Promise<DealNote[]>;
+  createDealNote(note: InsertDealNote): Promise<DealNote>;
+  updateDealNote(id: string, content: string): Promise<DealNote | undefined>;
+  deleteDealNote(id: string): Promise<void>;
   
   // User search for autocomplete
   searchUsers(query: string): Promise<User[]>;
@@ -1700,6 +1706,30 @@ export class DatabaseStorage implements IStorage {
   
   async deleteTaskComment(id: string): Promise<void> {
     await db.delete(schema.taskComments).where(eq(schema.taskComments.id, id));
+  }
+  
+  // Deal Notes operations
+  async getDealNotes(dealId: string): Promise<DealNote[]> {
+    return await db.select().from(schema.dealNotes)
+      .where(eq(schema.dealNotes.dealId, dealId))
+      .orderBy(desc(schema.dealNotes.createdAt));
+  }
+  
+  async createDealNote(note: InsertDealNote): Promise<DealNote> {
+    const [created] = await db.insert(schema.dealNotes).values(note).returning();
+    return created;
+  }
+  
+  async updateDealNote(id: string, content: string): Promise<DealNote | undefined> {
+    const [updated] = await db.update(schema.dealNotes)
+      .set({ content, updatedAt: new Date() })
+      .where(eq(schema.dealNotes.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteDealNote(id: string): Promise<void> {
+    await db.delete(schema.dealNotes).where(eq(schema.dealNotes.id, id));
   }
   
   // User search for autocomplete

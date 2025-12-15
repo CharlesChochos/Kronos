@@ -2909,6 +2909,81 @@ export function useDeleteTaskComment() {
   });
 }
 
+// ===== DEAL NOTES HOOKS =====
+
+export type DealNoteType = {
+  id: string;
+  dealId: string;
+  userId: string;
+  userName: string;
+  userAvatar: string | null;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function useDealNotes(dealId: string) {
+  return useQuery({
+    queryKey: ["deal-notes", dealId],
+    queryFn: async () => {
+      const res = await fetch(`/api/deals/${dealId}/notes`);
+      if (!res.ok) throw new Error("Failed to fetch deal notes");
+      return res.json() as Promise<DealNoteType[]>;
+    },
+    enabled: !!dealId,
+  });
+}
+
+export function useCreateDealNote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ dealId, content }: { dealId: string; content: string }) => {
+      const res = await fetch(`/api/deals/${dealId}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) throw new Error("Failed to create deal note");
+      return res.json() as Promise<DealNoteType>;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["deal-notes", vars.dealId] });
+    },
+  });
+}
+
+export function useUpdateDealNote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, content }: { id: string; content: string }) => {
+      const res = await fetch(`/api/deal-notes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) throw new Error("Failed to update deal note");
+      return res.json() as Promise<DealNoteType>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deal-notes"] });
+    },
+  });
+}
+
+export function useDeleteDealNote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/deal-notes/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete deal note");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deal-notes"] });
+    },
+  });
+}
+
 // ===== USER SEARCH HOOK =====
 
 export type UserSearchResult = {

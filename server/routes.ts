@@ -1583,6 +1583,54 @@ export async function registerRoutes(
     }
   });
 
+  // ===== DEAL NOTES ROUTES =====
+
+  app.get("/api/deals/:dealId/notes", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const notes = await storage.getDealNotes(req.params.dealId);
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch deal notes" });
+    }
+  });
+
+  app.post("/api/deals/:dealId/notes", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const note = await storage.createDealNote({
+        dealId: req.params.dealId,
+        userId: user.id,
+        userName: user.name,
+        userAvatar: user.avatar,
+        content: req.body.content,
+      });
+      res.json(note);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create deal note" });
+    }
+  });
+
+  app.patch("/api/deal-notes/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const note = await storage.updateDealNote(req.params.id, req.body.content);
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      res.json(note);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update deal note" });
+    }
+  });
+
+  app.delete("/api/deal-notes/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      await storage.deleteDealNote(req.params.id);
+      res.json({ message: "Note deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete deal note" });
+    }
+  });
+
   // ===== USER SEARCH ROUTE (for autocomplete) =====
 
   app.get("/api/users/search", requireAuth, requireInternal, async (req, res) => {

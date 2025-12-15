@@ -1044,6 +1044,27 @@ export const insertTaskCommentSchema = createInsertSchema(taskComments).omit({
 export type InsertTaskComment = z.infer<typeof insertTaskCommentSchema>;
 export type TaskComment = typeof taskComments.$inferSelect;
 
+// Deal Notes table - comments/notes on deals for discussion
+export const dealNotes = pgTable("deal_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  userName: text("user_name").notNull(),
+  userAvatar: text("user_avatar"),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDealNoteSchema = createInsertSchema(dealNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDealNote = z.infer<typeof insertDealNoteSchema>;
+export type DealNote = typeof dealNotes.$inferSelect;
+
 // Custom Sectors table - user-defined sectors for deals
 export const customSectors = pgTable("custom_sectors", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
