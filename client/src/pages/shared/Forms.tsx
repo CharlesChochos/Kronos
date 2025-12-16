@@ -48,10 +48,12 @@ export default function Forms() {
   const [editingTitle, setEditingTitle] = useState("");
   const [editingDescription, setEditingDescription] = useState("");
 
-  const isDimitra = currentUser?.name?.toLowerCase().includes('dimitra') || 
-                    currentUser?.email?.toLowerCase().includes('dimitra');
+  const canAccessForms = currentUser?.name?.toLowerCase().includes('dimitra') || 
+                         currentUser?.email?.toLowerCase().includes('dimitra') ||
+                         currentUser?.name?.toLowerCase().includes('charles') || 
+                         currentUser?.email?.toLowerCase().includes('charles');
 
-  if (!isDimitra) {
+  if (!canAccessForms) {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">You do not have access to this page.</p>
