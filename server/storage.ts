@@ -1,4 +1,4 @@
-import { eq, and, desc, gt, or, ilike, count } from "drizzle-orm";
+import { eq, and, desc, gt, lt, or, ilike, count, isNull } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@shared/schema";
@@ -313,6 +313,13 @@ export interface IStorage {
   // Custom Sector operations
   getAllCustomSectors(): Promise<schema.CustomSector[]>;
   createCustomSector(sector: schema.InsertCustomSector): Promise<schema.CustomSector>;
+  
+  // Pending form upload operations
+  createPendingFormUpload(upload: schema.InsertPendingFormUpload): Promise<schema.PendingFormUpload>;
+  getPendingFormUpload(shareToken: string, objectPath: string): Promise<schema.PendingFormUpload | undefined>;
+  confirmAndDeletePendingFormUpload(shareToken: string, objectPath: string): Promise<boolean>;
+  getExpiredPendingUploads(): Promise<schema.PendingFormUpload[]>;
+  deletePendingFormUpload(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1859,6 +1866,53 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.formInvitations.id, id))
       .returning();
     return updated;
+  }
+
+  // Pending form upload operations
+  async createPendingFormUpload(upload: schema.InsertPendingFormUpload): Promise<schema.PendingFormUpload> {
+    const [created] = await db.insert(schema.pendingFormUploads).values(upload).returning();
+    return created;
+  }
+
+  async getPendingFormUpload(shareToken: string, objectPath: string): Promise<schema.PendingFormUpload | undefined> {
+    const [record] = await db.select().from(schema.pendingFormUploads)
+      .where(
+        and(
+          eq(schema.pendingFormUploads.shareToken, shareToken),
+          eq(schema.pendingFormUploads.objectPath, objectPath),
+          gt(schema.pendingFormUploads.expiresAt, new Date()),
+          isNull(schema.pendingFormUploads.confirmedAt)
+        )
+      );
+    return record;
+  }
+
+  async confirmAndDeletePendingFormUpload(shareToken: string, objectPath: string): Promise<boolean> {
+    const deleted = await db.delete(schema.pendingFormUploads)
+      .where(
+        and(
+          eq(schema.pendingFormUploads.shareToken, shareToken),
+          eq(schema.pendingFormUploads.objectPath, objectPath),
+          gt(schema.pendingFormUploads.expiresAt, new Date()),
+          isNull(schema.pendingFormUploads.confirmedAt)
+        )
+      )
+      .returning();
+    return deleted.length > 0;
+  }
+
+  async getExpiredPendingUploads(): Promise<schema.PendingFormUpload[]> {
+    return await db.select().from(schema.pendingFormUploads)
+      .where(
+        and(
+          lt(schema.pendingFormUploads.expiresAt, new Date()),
+          isNull(schema.pendingFormUploads.confirmedAt)
+        )
+      );
+  }
+
+  async deletePendingFormUpload(id: string): Promise<void> {
+    await db.delete(schema.pendingFormUploads).where(eq(schema.pendingFormUploads.id, id));
   }
 }
 

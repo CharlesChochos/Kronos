@@ -1228,3 +1228,24 @@ export const insertFormInvitationSchema = createInsertSchema(formInvitations).om
 
 export type InsertFormInvitation = z.infer<typeof insertFormInvitationSchema>;
 export type FormInvitation = typeof formInvitations.$inferSelect;
+
+// Pending form upload tokens - tracks presigned uploads for cleanup
+export const pendingFormUploads = pgTable("pending_form_uploads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shareToken: text("share_token").notNull(),
+  objectPath: text("object_path").notNull(),
+  filename: text("filename").notNull(),
+  maxSize: integer("max_size").notNull().default(10485760), // 10MB default
+  confirmedAt: timestamp("confirmed_at"),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPendingFormUploadSchema = createInsertSchema(pendingFormUploads).omit({
+  id: true,
+  createdAt: true,
+  confirmedAt: true,
+});
+
+export type InsertPendingFormUpload = z.infer<typeof insertPendingFormUploadSchema>;
+export type PendingFormUpload = typeof pendingFormUploads.$inferSelect;

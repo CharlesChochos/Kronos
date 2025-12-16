@@ -1351,9 +1351,38 @@ export async function registerRoutes(
     }
   });
 
+  // Cleanup expired pending uploads (run opportunistically)
+  async function cleanupExpiredUploads() {
+    try {
+      const expiredUploads = await storage.getExpiredPendingUploads();
+      const objectStorageService = new ObjectStorageService();
+      
+      for (const upload of expiredUploads) {
+        try {
+          // Try to delete the object from storage
+          const file = await objectStorageService.getObjectEntityFile(upload.objectPath);
+          await file.delete();
+        } catch (e) {
+          // Object may not exist, that's fine
+        }
+        // Remove the tracking record
+        await storage.deletePendingFormUpload(upload.id);
+      }
+      
+      if (expiredUploads.length > 0) {
+        console.log(`Cleaned up ${expiredUploads.length} expired pending uploads`);
+      }
+    } catch (error) {
+      console.error("Error cleaning up expired uploads:", error);
+    }
+  }
+
   // Public route: Get presigned upload URL for form file attachments (no auth required)
   app.post("/api/public/forms/:shareToken/upload", uploadLimiter, async (req, res) => {
     try {
+      // Run cleanup opportunistically
+      cleanupExpiredUploads().catch(() => {});
+      
       const form = await storage.getFormByShareToken(req.params.shareToken);
       if (!form) {
         return res.status(404).json({ error: "Form not found" });
@@ -1385,6 +1414,16 @@ export async function registerRoutes(
 
       const objectStorageService = new ObjectStorageService();
       const result = await objectStorageService.getObjectEntityUploadURL(filename);
+      
+      // Track the pending upload with 1 hour expiry
+      await storage.createPendingFormUpload({
+        shareToken: req.params.shareToken,
+        objectPath: result.objectPath,
+        filename: filename || 'unknown',
+        maxSize: MAX_FILE_SIZE,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+      });
+      
       res.json(result);
     } catch (error: any) {
       console.error("Error getting public upload URL:", error);
@@ -1395,7 +1434,8 @@ export async function registerRoutes(
   // Public route: Confirm public form file upload
   app.put("/api/public/forms/:shareToken/upload/confirm", async (req, res) => {
     try {
-      const form = await storage.getFormByShareToken(req.params.shareToken);
+      const shareToken = req.params.shareToken;
+      const form = await storage.getFormByShareToken(shareToken);
       if (!form) {
         return res.status(404).json({ error: "Form not found" });
       }
@@ -1408,6 +1448,12 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Object path is required" });
       }
 
+      // Verify the pending upload record exists and is valid
+      const pendingUpload = await storage.getPendingFormUpload(shareToken, objectPath);
+      if (!pendingUpload) {
+        return res.status(400).json({ error: "Invalid or expired upload. Please try again." });
+      }
+
       const objectStorageService = new ObjectStorageService();
       
       // Verify the object actually exists and get its metadata
@@ -1415,6 +1461,8 @@ export async function registerRoutes(
       try {
         objectFile = await objectStorageService.getObjectEntityFile(objectPath);
       } catch {
+        // Clean up the pending record since the object doesn't exist
+        await storage.deletePendingFormUpload(pendingUpload.id);
         return res.status(400).json({ error: "Uploaded file not found. Please try again." });
       }
       
@@ -1426,9 +1474,10 @@ export async function registerRoutes(
       // Enforce 10MB limit server-side based on actual uploaded size
       const MAX_FILE_SIZE = 10 * 1024 * 1024;
       if (actualSize > MAX_FILE_SIZE) {
-        // Delete the oversized file
+        // Delete the oversized file and tracking record
         try {
           await objectFile.delete();
+          await storage.deletePendingFormUpload(pendingUpload.id);
         } catch (e) {
           console.error("Failed to delete oversized file:", e);
         }
@@ -1445,9 +1494,10 @@ export async function registerRoutes(
         'text/plain', 'text/csv', 'application/octet-stream'
       ];
       if (!allowedTypes.includes(actualType)) {
-        // Delete the disallowed file
+        // Delete the disallowed file and tracking record
         try {
           await objectFile.delete();
+          await storage.deletePendingFormUpload(pendingUpload.id);
         } catch (e) {
           console.error("Failed to delete disallowed file:", e);
         }
@@ -1457,6 +1507,9 @@ export async function registerRoutes(
       await objectStorageService.trySetObjectEntityAclPolicy(objectPath, { 
         visibility: 'private' 
       });
+      
+      // Delete the pending upload record (confirmation = deletion since we validated)
+      await storage.confirmAndDeletePendingFormUpload(shareToken, objectPath);
 
       res.json({ 
         success: true, 
