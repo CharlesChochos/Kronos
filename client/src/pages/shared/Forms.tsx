@@ -1367,7 +1367,7 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
           href={value.url} 
           target="_blank" 
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-3 py-2 bg-[#f5f0e8] hover:bg-[#ebe4d8] text-[#5c4f3d] rounded-lg transition-colors"
+          className="inline-flex items-center gap-2 px-3 py-2 bg-muted hover:bg-accent text-foreground rounded-lg transition-colors"
         >
           <Paperclip className="h-4 w-4" />
           <span className="font-medium">{value.filename || 'View attachment'}</span>
@@ -1385,7 +1385,7 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
               href={file.url || file} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-3 py-2 bg-[#f5f0e8] hover:bg-[#ebe4d8] text-[#5c4f3d] rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 px-3 py-2 bg-muted hover:bg-accent text-foreground rounded-lg transition-colors"
             >
               <Paperclip className="h-4 w-4" />
               <span className="font-medium">{file.filename || `File ${idx + 1}`}</span>
@@ -1410,7 +1410,7 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
       return (
         <div className="flex flex-wrap gap-2">
           {value.map((item: string, idx: number) => (
-            <Badge key={idx} variant="secondary" className="bg-[#f5f0e8] text-[#5c4f3d] hover:bg-[#ebe4d8]">
+            <Badge key={idx} variant="secondary">
               {item}
             </Badge>
           ))}
@@ -1420,7 +1420,7 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
     
     if (field?.type === 'single-select') {
       return (
-        <Badge variant="secondary" className="bg-[#f5f0e8] text-[#5c4f3d]">
+        <Badge variant="secondary">
           {String(value)}
         </Badge>
       );
@@ -1428,14 +1428,14 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
     
     if (field?.type === 'date') {
       try {
-        return <span className="text-[#3d3428]">{format(new Date(value), 'MMMM d, yyyy')}</span>;
+        return <span className="text-foreground">{format(new Date(value), 'MMMM d, yyyy')}</span>;
       } catch {
-        return <span className="text-[#3d3428]">{String(value)}</span>;
+        return <span className="text-foreground">{String(value)}</span>;
       }
     }
     
     return (
-      <p className="text-[#3d3428] whitespace-pre-wrap leading-relaxed">
+      <p className="text-foreground whitespace-pre-wrap leading-relaxed">
         {Array.isArray(value) ? value.join(', ') : String(value)}
       </p>
     );
@@ -1447,13 +1447,13 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
         <DialogHeader>
           {selectedSubmission ? (
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => setSelectedSubmission(null)} data-testid="button-back-submissions" className="hover:bg-[#f5f0e8]">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedSubmission(null)} data-testid="button-back-submissions">
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Back
               </Button>
               <Separator orientation="vertical" className="h-6" />
               <div>
-                <DialogTitle className="text-[#3d3428]">Submission Details</DialogTitle>
+                <DialogTitle>Submission Details</DialogTitle>
                 <DialogDescription>
                   View complete form responses
                 </DialogDescription>
@@ -1461,7 +1461,7 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
             </div>
           ) : (
             <>
-              <DialogTitle className="text-[#3d3428]">Submissions for "{form.title}"</DialogTitle>
+              <DialogTitle>Submissions for "{form.title}"</DialogTitle>
               <DialogDescription>
                 {submissions?.length || 0} response{submissions?.length !== 1 ? 's' : ''} received
               </DialogDescription>
@@ -1472,18 +1472,18 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
         <ScrollArea className="flex-1 pr-4">
           {selectedSubmission ? (
             <div className="py-4 space-y-6">
-              <div className="bg-gradient-to-r from-[#f5f0e8] to-[#faf7f2] rounded-xl p-6 border border-[#e8e0d4]">
+              <div className="bg-gradient-to-r from-muted to-muted/50 rounded-xl p-6 border border-border">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-[#5c4f3d] flex items-center justify-center">
-                      <User className="h-6 w-6 text-white" />
+                    <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
+                      <User className="h-6 w-6 text-primary-foreground" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-[#3d3428]">
+                      <h3 className="text-lg font-semibold text-foreground">
                         {selectedSubmission.submitterName || 'Anonymous'}
                       </h3>
-                      <p className="text-[#8b7355]">{selectedSubmission.submitterEmail || 'No email provided'}</p>
-                      <div className="flex items-center gap-2 mt-2 text-sm text-[#8b7355]">
+                      <p className="text-muted-foreground">{selectedSubmission.submitterEmail || 'No email provided'}</p>
+                      <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
                         <Clock className="h-4 w-4" />
                         <span>{format(new Date(selectedSubmission.createdAt), 'MMMM d, yyyy \'at\' h:mm a')}</span>
                       </div>
@@ -1494,7 +1494,6 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
                     size="sm" 
                     onClick={() => handleDownloadPDF(selectedSubmission)} 
                     data-testid="button-download-submission-detail"
-                    className="border-[#5c4f3d] text-[#5c4f3d] hover:bg-[#5c4f3d] hover:text-white"
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Download PDF
@@ -1503,7 +1502,7 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
               </div>
               
               <div className="space-y-4">
-                <h4 className="text-sm font-semibold text-[#8b7355] uppercase tracking-wide">Form Responses</h4>
+                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Form Responses</h4>
                 
                 <div className="grid gap-4">
                   {selectedSubmission.responses.map((resp: any, i: number) => {
@@ -1512,15 +1511,15 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
                     return (
                       <div 
                         key={i} 
-                        className="bg-white border border-[#e8e0d4] rounded-xl p-5 hover:shadow-sm transition-shadow"
+                        className="bg-card border border-border rounded-xl p-5 hover:shadow-sm transition-shadow"
                         data-testid={`response-field-${i}`}
                       >
                         <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-[#f5f0e8] flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <span className="text-sm font-semibold text-[#8b7355]">{i + 1}</span>
+                          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-sm font-semibold text-muted-foreground">{i + 1}</span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <Label className="text-sm font-medium text-[#8b7355] block mb-2">
+                            <Label className="text-sm font-medium text-muted-foreground block mb-2">
                               {field?.label || resp.fieldId}
                             </Label>
                             <div className="mt-1">
@@ -1537,7 +1536,7 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
           ) : isLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
-                <div className="animate-spin w-8 h-8 border-2 border-[#5c4f3d] border-t-transparent rounded-full mx-auto mb-3"></div>
+                <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-3"></div>
                 <p className="text-muted-foreground">Loading submissions...</p>
               </div>
             </div>
@@ -1546,27 +1545,27 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
               {submissions.map((sub) => (
                 <Card 
                   key={sub.id} 
-                  className="cursor-pointer hover:shadow-md hover:border-[#d4cbc0] transition-all bg-white border-[#e8e0d4]"
+                  className="cursor-pointer hover:shadow-md hover:border-primary/50 transition-all"
                   onClick={() => setSelectedSubmission(sub)}
                   data-testid={`card-submission-${sub.id}`}
                 >
                   <CardContent className="py-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-[#f5f0e8] flex items-center justify-center">
-                          <User className="h-5 w-5 text-[#8b7355]" />
+                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                          <User className="h-5 w-5 text-muted-foreground" />
                         </div>
                         <div>
-                          <p className="font-medium text-[#3d3428]">{sub.submitterName || 'Anonymous'}</p>
-                          <p className="text-sm text-[#8b7355]">{sub.submitterEmail || 'No email'}</p>
+                          <p className="font-medium text-foreground">{sub.submitterName || 'Anonymous'}</p>
+                          <p className="text-sm text-muted-foreground">{sub.submitterEmail || 'No email'}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <p className="text-sm text-[#8b7355]">
+                          <p className="text-sm text-muted-foreground">
                             {format(new Date(sub.createdAt), 'MMM d, yyyy')}
                           </p>
-                          <p className="text-xs text-[#a09080]">
+                          <p className="text-xs text-muted-foreground/70">
                             {format(new Date(sub.createdAt), 'h:mm a')}
                           </p>
                         </div>
@@ -1576,7 +1575,6 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
                             size="sm"
                             onClick={(e) => { e.stopPropagation(); setSelectedSubmission(sub); }}
                             data-testid={`button-view-submission-${sub.id}`}
-                            className="hover:bg-[#f5f0e8] text-[#5c4f3d]"
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             View
@@ -1586,7 +1584,6 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
                             size="sm"
                             onClick={(e) => { e.stopPropagation(); handleDownloadPDF(sub); }}
                             data-testid={`button-download-submission-${sub.id}`}
-                            className="hover:bg-[#f5f0e8] text-[#5c4f3d]"
                           >
                             <Download className="h-4 w-4" />
                           </Button>
@@ -1599,11 +1596,11 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
             </div>
           ) : (
             <div className="text-center py-16">
-              <div className="w-16 h-16 rounded-full bg-[#f5f0e8] flex items-center justify-center mx-auto mb-4">
-                <FileText className="h-8 w-8 text-[#8b7355]" />
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                <FileText className="h-8 w-8 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-medium text-[#3d3428] mb-2">No submissions yet</h3>
-              <p className="text-[#8b7355]">Share this form to start collecting responses</p>
+              <h3 className="text-lg font-medium text-foreground mb-2">No submissions yet</h3>
+              <p className="text-muted-foreground">Share this form to start collecting responses</p>
             </div>
           )}
         </ScrollArea>
