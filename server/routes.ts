@@ -1560,6 +1560,208 @@ export async function registerRoutes(
     }
   });
 
+  // ===== TASK TEMPLATES ROUTES (HR/Admin only) =====
+  
+  // Get all task templates
+  app.get("/api/task-templates", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const templates = await storage.getAllTaskTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error('Error fetching task templates:', error);
+      res.status(500).json({ error: "Failed to fetch task templates" });
+    }
+  });
+
+  // Get single task template
+  app.get("/api/task-templates/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const template = await storage.getTaskTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error('Error fetching task template:', error);
+      res.status(500).json({ error: "Failed to fetch task template" });
+    }
+  });
+
+  // Create task template
+  app.post("/api/task-templates", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const { name, description, category, sections } = req.body;
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ error: "Template name is required" });
+      }
+      const template = await storage.createTaskTemplate({
+        name: name.trim(),
+        description: description || null,
+        category: category || 'HR',
+        sections: sections || [],
+        createdBy: user.id,
+      });
+      res.json(template);
+    } catch (error) {
+      console.error('Error creating task template:', error);
+      res.status(500).json({ error: "Failed to create task template" });
+    }
+  });
+
+  // Update task template
+  app.put("/api/task-templates/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const template = await storage.getTaskTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      const { name, description, category, sections, isArchived } = req.body;
+      const updated = await storage.updateTaskTemplate(req.params.id, {
+        name: name !== undefined ? name : template.name,
+        description: description !== undefined ? description : template.description,
+        category: category !== undefined ? category : template.category,
+        sections: sections !== undefined ? sections : template.sections,
+        isArchived: isArchived !== undefined ? isArchived : template.isArchived,
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating task template:', error);
+      res.status(500).json({ error: "Failed to update task template" });
+    }
+  });
+
+  // Delete task template
+  app.delete("/api/task-templates/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const template = await storage.getTaskTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      await storage.deleteTaskTemplate(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting task template:', error);
+      res.status(500).json({ error: "Failed to delete task template" });
+    }
+  });
+
+  // Apply task template - creates real tasks from template
+  app.post("/api/task-templates/:id/apply", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const template = await storage.getTaskTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      
+      const { startDate, contextType, contextName, assigneeOverrides } = req.body;
+      const baseDate = startDate ? new Date(startDate) : new Date();
+      
+      const createdTasks = [];
+      const sections = template.sections || [];
+      
+      for (const section of sections) {
+        for (const templateTask of section.tasks || []) {
+          // Calculate due date based on relative days
+          let dueDate: string | undefined;
+          if (templateTask.relativeDueDays !== undefined && templateTask.relativeDueDays !== null) {
+            const due = new Date(baseDate);
+            due.setDate(due.getDate() + templateTask.relativeDueDays);
+            dueDate = due.toISOString().split('T')[0];
+          }
+          
+          // Get assignee - use override if provided, otherwise use template default
+          const assigneeId = assigneeOverrides?.[templateTask.id] || templateTask.assigneeId || null;
+          
+          const task = await storage.createTask({
+            title: templateTask.title,
+            description: templateTask.description || `From template: ${template.name} - Section: ${section.title}`,
+            dueDate,
+            priority: 'Medium',
+            status: 'To Do',
+            type: 'HR',
+            assignedTo: assigneeId,
+            assignedBy: user.id,
+          });
+          
+          createdTasks.push(task);
+          
+          // Create notification for assigned user
+          if (assigneeId) {
+            await storage.createNotification({
+              userId: assigneeId,
+              title: 'New Task Assigned',
+              message: `You have been assigned a new task: "${templateTask.title}"${contextName ? ` for ${contextName}` : ''}`,
+              type: 'info',
+              link: `/employee/tasks?taskId=${task.id}`,
+            });
+          }
+        }
+      }
+      
+      // Log template usage
+      await storage.createTaskTemplateUsage({
+        templateId: template.id,
+        templateName: template.name,
+        appliedBy: user.id,
+        contextType: contextType || null,
+        contextName: contextName || null,
+        tasksCreated: createdTasks.length,
+        startDate: baseDate.toISOString().split('T')[0],
+      });
+      
+      // Increment usage count
+      await storage.incrementTaskTemplateUsage(template.id);
+      
+      res.json({ 
+        success: true, 
+        tasksCreated: createdTasks.length,
+        tasks: createdTasks,
+      });
+    } catch (error) {
+      console.error('Error applying task template:', error);
+      res.status(500).json({ error: "Failed to apply task template" });
+    }
+  });
+
+  // Get template usage history
+  app.get("/api/task-templates/:id/usage", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const usages = await storage.getTaskTemplateUsageByTemplate(req.params.id);
+      res.json(usages);
+    } catch (error) {
+      console.error('Error fetching template usage:', error);
+      res.status(500).json({ error: "Failed to fetch template usage" });
+    }
+  });
+
   // ===== DEAL ROUTES =====
   
   // Lightweight deals listing - returns only essential fields (no large JSON fields)
