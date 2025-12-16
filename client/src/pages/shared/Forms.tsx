@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Plus, FileText, Share2, Trash2, Edit, Eye, Copy, Send, GripVertical, X, Type, Mail, List, Calendar, Hash, Paperclip, Heading, AlignLeft, Table, FileTextIcon, Image, ChevronDown, ChevronUp, GitBranch, Link, Upload } from "lucide-react";
+import { Plus, FileText, Share2, Trash2, Edit, Eye, Copy, Send, GripVertical, X, Type, Mail, List, Calendar, Hash, Paperclip, Heading, AlignLeft, Table, FileTextIcon, Image, ChevronDown, ChevronUp, GitBranch, Link, Upload, Search, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 
 const FIELD_TYPES = [
@@ -53,6 +53,7 @@ export default function Forms() {
   const [newFormDescription, setNewFormDescription] = useState("");
   const [shareEmails, setShareEmails] = useState("");
   const [shareMessage, setShareMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [editingFields, setEditingFields] = useState<FormField[]>([]);
   const [editingTitle, setEditingTitle] = useState("");
@@ -61,20 +62,42 @@ export default function Forms() {
   const [expandedFieldId, setExpandedFieldId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("build");
 
-  const canAccessForms = currentUser?.name?.toLowerCase().includes('dimitra') || 
-                         currentUser?.email?.toLowerCase().includes('dimitra') ||
-                         currentUser?.name?.toLowerCase().includes('charles') || 
-                         currentUser?.email?.toLowerCase().includes('charles');
+  // Check if user is Dimitra or Charles (admin users who can edit/manage forms)
+  const isFormAdmin = currentUser?.name?.toLowerCase().includes('dimitra') || 
+                      currentUser?.email?.toLowerCase().includes('dimitra') ||
+                      currentUser?.name?.toLowerCase().includes('charles') || 
+                      currentUser?.email?.toLowerCase().includes('charles');
 
-  if (!canAccessForms) {
-    return (
-      <Layout role={role}>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">You do not have access to this page.</p>
-        </div>
-      </Layout>
-    );
-  }
+  // Filter forms: admins see all, others see only published forms
+  // Also filter by search query
+  const filteredForms = useMemo(() => {
+    if (!forms) return [];
+    
+    let result = forms;
+    
+    // Non-admins only see published forms
+    if (!isFormAdmin) {
+      result = result.filter(f => f.status === 'published');
+    }
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(f => 
+        f.title.toLowerCase().includes(query) ||
+        (f.description && f.description.toLowerCase().includes(query))
+      );
+    }
+    
+    return result;
+  }, [forms, isFormAdmin, searchQuery]);
+
+  // Function to open form in new tab (for non-admin users)
+  const handleOpenForm = (form: Form) => {
+    if (form.shareToken) {
+      window.open(`/form/${form.shareToken}`, '_blank');
+    }
+  };
 
   const handleCreateForm = async () => {
     if (!newFormTitle.trim()) {
@@ -318,22 +341,43 @@ export default function Forms() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold" data-testid="page-title-forms">Forms</h1>
-            <p className="text-muted-foreground">Create and share forms to collect information</p>
+            <p className="text-muted-foreground">
+              {isFormAdmin ? "Create and share forms to collect information" : "View and submit forms"}
+            </p>
           </div>
-          <Button onClick={() => setShowCreateDialog(true)} data-testid="button-create-form">
-            <Plus className="h-4 w-4 mr-2" />
-            Create Form
-          </Button>
+          {isFormAdmin && (
+            <Button onClick={() => setShowCreateDialog(true)} data-testid="button-create-form">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Form
+            </Button>
+          )}
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search forms by title or description..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+            data-testid="input-search-forms"
+          />
         </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
           <p className="text-muted-foreground">Loading forms...</p>
         </div>
-      ) : forms && forms.length > 0 ? (
+      ) : filteredForms.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {forms.map((form) => (
-            <Card key={form.id} data-testid={`card-form-${form.id}`}>
+          {filteredForms.map((form) => (
+            <Card 
+              key={form.id} 
+              data-testid={`card-form-${form.id}`}
+              className={!isFormAdmin ? "cursor-pointer hover:shadow-md transition-shadow" : ""}
+              onClick={!isFormAdmin ? () => handleOpenForm(form) : undefined}
+            >
               {form.coverImage && (
                 <div className="h-32 overflow-hidden rounded-t-lg">
                   <img src={form.coverImage} alt="" className="w-full h-full object-cover" />
@@ -347,9 +391,11 @@ export default function Forms() {
                       <CardDescription className="mt-1">{form.description}</CardDescription>
                     )}
                   </div>
-                  <Badge variant={form.status === 'published' ? 'default' : 'secondary'}>
-                    {form.status}
-                  </Badge>
+                  {isFormAdmin && (
+                    <Badge variant={form.status === 'published' ? 'default' : 'secondary'}>
+                      {form.status}
+                    </Badge>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -357,41 +403,48 @@ export default function Forms() {
                   <p>{form.fields?.length || 0} fields</p>
                   <p>Created {format(new Date(form.createdAt), 'MMM d, yyyy')}</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleOpenEdit(form)} data-testid={`button-edit-form-${form.id}`}>
-                    <Edit className="h-4 w-4 mr-1" />
-                    Edit
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => handlePreview(form)} data-testid={`button-preview-form-${form.id}`}>
-                    <Eye className="h-4 w-4 mr-1" />
-                    Preview
-                  </Button>
-                  {form.status === 'draft' && (
-                    <Button variant="outline" size="sm" onClick={() => handlePublishForm(form)} data-testid={`button-publish-form-${form.id}`}>
-                      <Send className="h-4 w-4 mr-1" />
-                      Publish
+                {isFormAdmin ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleOpenEdit(form)} data-testid={`button-edit-form-${form.id}`}>
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
                     </Button>
-                  )}
-                  {form.status === 'published' && (
-                    <>
-                      <Button variant="outline" size="sm" onClick={() => handleOpenShare(form)} data-testid={`button-share-form-${form.id}`}>
-                        <Share2 className="h-4 w-4 mr-1" />
-                        Share
+                    <Button variant="outline" size="sm" onClick={() => handlePreview(form)} data-testid={`button-preview-form-${form.id}`}>
+                      <Eye className="h-4 w-4 mr-1" />
+                      Preview
+                    </Button>
+                    {form.status === 'draft' && (
+                      <Button variant="outline" size="sm" onClick={() => handlePublishForm(form)} data-testid={`button-publish-form-${form.id}`}>
+                        <Send className="h-4 w-4 mr-1" />
+                        Publish
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleCopyLink(form)} data-testid={`button-copy-link-${form.id}`}>
-                        <Copy className="h-4 w-4 mr-1" />
-                        Copy Link
-                      </Button>
-                    </>
-                  )}
-                  <Button variant="outline" size="sm" onClick={() => { setSelectedForm(form); setShowSubmissionsDialog(true); }} data-testid={`button-submissions-${form.id}`}>
-                    <FileText className="h-4 w-4 mr-1" />
-                    Submissions
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleDeleteForm(form)} className="text-destructive hover:text-destructive" data-testid={`button-delete-form-${form.id}`}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                    )}
+                    {form.status === 'published' && (
+                      <>
+                        <Button variant="outline" size="sm" onClick={() => handleOpenShare(form)} data-testid={`button-share-form-${form.id}`}>
+                          <Share2 className="h-4 w-4 mr-1" />
+                          Share
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleCopyLink(form)} data-testid={`button-copy-link-${form.id}`}>
+                          <Copy className="h-4 w-4 mr-1" />
+                          Copy Link
+                        </Button>
+                      </>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => { setSelectedForm(form); setShowSubmissionsDialog(true); }} data-testid={`button-submissions-${form.id}`}>
+                      <FileText className="h-4 w-4 mr-1" />
+                      Submissions
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleDeleteForm(form)} className="text-destructive hover:text-destructive" data-testid={`button-delete-form-${form.id}`}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center text-primary">
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    <span className="text-sm">Click to open form</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -400,12 +453,20 @@ export default function Forms() {
         <Card>
           <CardContent className="py-12 text-center">
             <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-medium mb-2">No forms yet</h3>
-            <p className="text-muted-foreground mb-4">Create your first form to start collecting information</p>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Form
-            </Button>
+            <h3 className="text-lg font-medium mb-2">
+              {searchQuery ? "No forms found" : (isFormAdmin ? "No forms yet" : "No published forms available")}
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              {searchQuery 
+                ? "Try adjusting your search terms" 
+                : (isFormAdmin ? "Create your first form to start collecting information" : "Check back later for new forms")}
+            </p>
+            {isFormAdmin && !searchQuery && (
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Form
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

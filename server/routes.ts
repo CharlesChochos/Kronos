@@ -1169,6 +1169,9 @@ export async function registerRoutes(
       if (form.status !== 'published') {
         return res.status(400).json({ error: "Form must be published before sharing" });
       }
+      if (!form.shareToken) {
+        return res.status(400).json({ error: "Form share token not generated. Please try republishing the form." });
+      }
 
       const { emails, message } = req.body;
       if (!emails || !Array.isArray(emails) || emails.length === 0) {
@@ -1198,10 +1201,10 @@ export async function registerRoutes(
         });
 
         if (platformUser) {
-          // Create task for platform user
+          // Create task for platform user with the form link
           const task = await storage.createTask({
             title: `Complete form: ${form.title}`,
-            description: `You've been asked to complete a form. ${message ? `Message: ${message}` : ''}`,
+            description: `You've been asked to complete a form.${message ? ` Message: ${message}` : ''}\n\nClick here to complete the form: ${formLink}`,
             dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 1 week from now
             priority: 'Medium',
             status: 'To Do',

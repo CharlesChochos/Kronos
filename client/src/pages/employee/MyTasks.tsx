@@ -113,6 +113,32 @@ type UploadedFile = {
   uploadedAt: string;
 };
 
+// Helper to render text with clickable links
+const renderTextWithLinks = (text: string) => {
+  if (!text) return null;
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary hover:underline inline-flex items-center gap-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+          <ExternalLink className="w-3 h-3 inline" />
+        </a>
+      );
+    }
+    return <span key={index}>{part}</span>;
+  });
+};
+
 type AppSuggestion = {
   name: string;
   icon: string;
@@ -1588,7 +1614,9 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
               
               <div>
                 <Label className="text-xs text-muted-foreground">Description</Label>
-                <p className="text-sm mt-1">{selectedTask.description || 'No description provided'}</p>
+                <p className="text-sm mt-1 whitespace-pre-wrap">
+                  {selectedTask.description ? renderTextWithLinks(selectedTask.description) : 'No description provided'}
+                </p>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
