@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
+import { Layout } from "@/components/layout/Layout";
 import { useForms, useCreateForm, useUpdateForm, useDeleteForm, usePublishForm, useShareForm, useFormSubmissions, useCurrentUser, type Form, type FormField } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +28,9 @@ const FIELD_TYPES = [
 ] as const;
 
 export default function Forms() {
+  const [location] = useLocation();
+  const role: 'CEO' | 'Employee' = location.startsWith('/ceo') ? 'CEO' : 'Employee';
+  
   const { data: currentUser } = useCurrentUser();
   const { data: forms, isLoading } = useForms();
   const createForm = useCreateForm();
@@ -55,9 +60,11 @@ export default function Forms() {
 
   if (!canAccessForms) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">You do not have access to this page.</p>
-      </div>
+      <Layout role={role}>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">You do not have access to this page.</p>
+        </div>
+      </Layout>
     );
   }
 
@@ -197,17 +204,18 @@ export default function Forms() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold" data-testid="page-title-forms">Forms</h1>
-          <p className="text-muted-foreground">Create and share forms to collect information</p>
+    <Layout role={role}>
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold" data-testid="page-title-forms">Forms</h1>
+            <p className="text-muted-foreground">Create and share forms to collect information</p>
+          </div>
+          <Button onClick={() => setShowCreateDialog(true)} data-testid="button-create-form">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Form
+          </Button>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} data-testid="button-create-form">
-          <Plus className="h-4 w-4 mr-2" />
-          Create Form
-        </Button>
-      </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
@@ -492,7 +500,8 @@ export default function Forms() {
         onOpenChange={setShowSubmissionsDialog}
         form={selectedForm}
       />
-    </div>
+      </div>
+    </Layout>
   );
 }
 
