@@ -3030,13 +3030,48 @@ export function useUserSearch(query: string) {
 
 // ===== FORMS API =====
 
+// Branching condition - show field when another field has specific value
+export interface FormBranchCondition {
+  fieldId: string;
+  operator: 'equals' | 'not_equals' | 'contains';
+  value: string;
+}
+
+// Table column definition
+export interface FormTableColumn {
+  id: string;
+  header: string;
+}
+
+// Table cell
+export interface FormTableCell {
+  value: string;
+}
+
+// Content block for rich text
+export interface FormContentBlock {
+  type: 'paragraph' | 'heading' | 'list' | 'link';
+  text?: string;
+  items?: string[];
+  url?: string;
+  linkText?: string;
+}
+
 export interface FormField {
   id: string;
-  type: 'text' | 'email' | 'single-select' | 'multi-select' | 'date' | 'number' | 'file' | 'heading';
+  type: 'text' | 'email' | 'single-select' | 'multi-select' | 'date' | 'number' | 'file' | 'heading' | 'textarea' | 'table' | 'content';
   label: string;
   required: boolean;
   options?: string[];
   description?: string;
+  placeholder?: string;
+  // Branching support
+  showWhen?: FormBranchCondition;
+  // Table support
+  tableColumns?: FormTableColumn[];
+  tableRows?: FormTableCell[][];
+  // Rich content support
+  contentBlocks?: FormContentBlock[];
 }
 
 export interface Form {
@@ -3115,7 +3150,7 @@ export function useCreateForm() {
 export function useUpdateForm() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; title?: string; description?: string; fields?: FormField[]; status?: string }) => {
+    mutationFn: async ({ id, ...data }: { id: string; title?: string; description?: string; coverImage?: string | null; fields?: FormField[]; status?: string }) => {
       const res = await fetch(`/api/forms/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

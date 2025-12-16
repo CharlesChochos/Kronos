@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
-import { useForms, useCreateForm, useUpdateForm, useDeleteForm, usePublishForm, useShareForm, useFormSubmissions, useCurrentUser, type Form, type FormField } from "@/lib/api";
+import { useForms, useCreateForm, useUpdateForm, useDeleteForm, usePublishForm, useShareForm, useFormSubmissions, useCurrentUser, type Form, type FormField, type FormBranchCondition, type FormTableColumn, type FormTableCell, type FormContentBlock } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,19 +12,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Plus, FileText, Share2, Trash2, Edit, Eye, Copy, Send, GripVertical, X, Type, Mail, List, Calendar, Hash, Paperclip, Heading } from "lucide-react";
+import { Plus, FileText, Share2, Trash2, Edit, Eye, Copy, Send, GripVertical, X, Type, Mail, List, Calendar, Hash, Paperclip, Heading, AlignLeft, Table, FileTextIcon, Image, ChevronDown, ChevronUp, GitBranch, Link } from "lucide-react";
 import { format } from "date-fns";
 
 const FIELD_TYPES = [
-  { value: 'text', label: 'Text', icon: Type },
-  { value: 'email', label: 'Email', icon: Mail },
-  { value: 'single-select', label: 'Single Select', icon: List },
-  { value: 'multi-select', label: 'Multi Select', icon: List },
-  { value: 'date', label: 'Date', icon: Calendar },
-  { value: 'number', label: 'Number', icon: Hash },
-  { value: 'file', label: 'File Upload', icon: Paperclip },
-  { value: 'heading', label: 'Section Heading', icon: Heading },
+  { value: 'heading', label: 'Section Heading', icon: Heading, category: 'layout' },
+  { value: 'content', label: 'Rich Content', icon: FileTextIcon, category: 'layout' },
+  { value: 'text', label: 'Short Text', icon: Type, category: 'input' },
+  { value: 'textarea', label: 'Long Text', icon: AlignLeft, category: 'input' },
+  { value: 'email', label: 'Email', icon: Mail, category: 'input' },
+  { value: 'single-select', label: 'Dropdown', icon: List, category: 'input' },
+  { value: 'multi-select', label: 'Multi Select', icon: List, category: 'input' },
+  { value: 'date', label: 'Date', icon: Calendar, category: 'input' },
+  { value: 'number', label: 'Number', icon: Hash, category: 'input' },
+  { value: 'file', label: 'File Upload', icon: Paperclip, category: 'input' },
+  { value: 'table', label: 'Info Table', icon: Table, category: 'layout' },
 ] as const;
 
 export default function Forms() {
@@ -43,6 +47,7 @@ export default function Forms() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showSubmissionsDialog, setShowSubmissionsDialog] = useState(false);
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [selectedForm, setSelectedForm] = useState<Form | null>(null);
   const [newFormTitle, setNewFormTitle] = useState("");
   const [newFormDescription, setNewFormDescription] = useState("");
@@ -52,6 +57,9 @@ export default function Forms() {
   const [editingFields, setEditingFields] = useState<FormField[]>([]);
   const [editingTitle, setEditingTitle] = useState("");
   const [editingDescription, setEditingDescription] = useState("");
+  const [editingCoverImage, setEditingCoverImage] = useState("");
+  const [expandedFieldId, setExpandedFieldId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("build");
 
   const canAccessForms = currentUser?.name?.toLowerCase().includes('dimitra') || 
                          currentUser?.email?.toLowerCase().includes('dimitra') ||
@@ -86,7 +94,9 @@ export default function Forms() {
       setSelectedForm(form);
       setEditingTitle(form.title);
       setEditingDescription(form.description || "");
+      setEditingCoverImage(form.coverImage || "");
       setEditingFields(form.fields || []);
+      setActiveTab("build");
       setShowEditDialog(true);
     } catch (error: any) {
       toast.error(error.message);
@@ -97,7 +107,9 @@ export default function Forms() {
     setSelectedForm(form);
     setEditingTitle(form.title);
     setEditingDescription(form.description || "");
+    setEditingCoverImage(form.coverImage || "");
     setEditingFields(form.fields || []);
+    setActiveTab("build");
     setShowEditDialog(true);
   };
 
@@ -108,6 +120,7 @@ export default function Forms() {
         id: selectedForm.id,
         title: editingTitle,
         description: editingDescription,
+        coverImage: editingCoverImage || null,
         fields: editingFields,
       });
       toast.success("Form saved successfully");
@@ -174,15 +187,36 @@ export default function Forms() {
     toast.success("Link copied to clipboard");
   };
 
+  const handlePreview = (form: Form) => {
+    setSelectedForm(form);
+    setShowPreviewDialog(true);
+  };
+
   const addField = (type: FormField['type']) => {
     const newField: FormField = {
       id: `field_${Date.now()}`,
       type,
-      label: type === 'heading' ? 'Section Title' : `New ${type} field`,
-      required: false,
+      label: type === 'heading' ? 'Section Title' : 
+             type === 'content' ? 'Information Block' :
+             type === 'table' ? 'Reference Table' :
+             `New ${type} field`,
+      required: type === 'heading' || type === 'content' || type === 'table' ? false : false,
       options: type === 'single-select' || type === 'multi-select' ? ['Option 1', 'Option 2'] : undefined,
+      description: undefined,
+      placeholder: undefined,
+      tableColumns: type === 'table' ? [
+        { id: 'col1', header: 'Column 1' },
+        { id: 'col2', header: 'Column 2' },
+      ] : undefined,
+      tableRows: type === 'table' ? [
+        [{ value: 'Row 1 Cell 1' }, { value: 'Row 1 Cell 2' }],
+      ] : undefined,
+      contentBlocks: type === 'content' ? [
+        { type: 'paragraph', text: 'Enter your information content here.' }
+      ] : undefined,
     };
     setEditingFields([...editingFields, newField]);
+    setExpandedFieldId(newField.id);
   };
 
   const updateField = (index: number, updates: Partial<FormField>) => {
@@ -201,6 +235,81 @@ export default function Forms() {
     const [removed] = updated.splice(from, 1);
     updated.splice(to, 0, removed);
     setEditingFields(updated);
+  };
+
+  const getSelectableFieldsForBranching = (currentFieldIndex: number) => {
+    return editingFields
+      .slice(0, currentFieldIndex)
+      .filter(f => f.type === 'single-select' || f.type === 'multi-select');
+  };
+
+  const addTableColumn = (fieldIndex: number) => {
+    const field = editingFields[fieldIndex];
+    if (!field.tableColumns) return;
+    const newColId = `col_${Date.now()}`;
+    const newColumns = [...field.tableColumns, { id: newColId, header: `Column ${field.tableColumns.length + 1}` }];
+    const newRows = (field.tableRows || []).map(row => [...row, { value: '' }]);
+    updateField(fieldIndex, { tableColumns: newColumns, tableRows: newRows });
+  };
+
+  const removeTableColumn = (fieldIndex: number, colIndex: number) => {
+    const field = editingFields[fieldIndex];
+    if (!field.tableColumns || field.tableColumns.length <= 1) return;
+    const newColumns = field.tableColumns.filter((_, i) => i !== colIndex);
+    const newRows = (field.tableRows || []).map(row => row.filter((_, i) => i !== colIndex));
+    updateField(fieldIndex, { tableColumns: newColumns, tableRows: newRows });
+  };
+
+  const addTableRow = (fieldIndex: number) => {
+    const field = editingFields[fieldIndex];
+    const colCount = field.tableColumns?.length || 2;
+    const newRow = Array(colCount).fill(null).map(() => ({ value: '' }));
+    updateField(fieldIndex, { tableRows: [...(field.tableRows || []), newRow] });
+  };
+
+  const removeTableRow = (fieldIndex: number, rowIndex: number) => {
+    const field = editingFields[fieldIndex];
+    if (!field.tableRows || field.tableRows.length <= 1) return;
+    updateField(fieldIndex, { tableRows: field.tableRows.filter((_, i) => i !== rowIndex) });
+  };
+
+  const updateTableCell = (fieldIndex: number, rowIndex: number, colIndex: number, value: string) => {
+    const field = editingFields[fieldIndex];
+    if (!field.tableRows) return;
+    const newRows = field.tableRows.map((row, ri) => 
+      ri === rowIndex ? row.map((cell, ci) => ci === colIndex ? { value } : cell) : row
+    );
+    updateField(fieldIndex, { tableRows: newRows });
+  };
+
+  const updateTableHeader = (fieldIndex: number, colIndex: number, header: string) => {
+    const field = editingFields[fieldIndex];
+    if (!field.tableColumns) return;
+    const newColumns = field.tableColumns.map((col, i) => i === colIndex ? { ...col, header } : col);
+    updateField(fieldIndex, { tableColumns: newColumns });
+  };
+
+  const addContentBlock = (fieldIndex: number, type: 'paragraph' | 'heading' | 'list' | 'link') => {
+    const field = editingFields[fieldIndex];
+    const newBlock: FormContentBlock = type === 'list' 
+      ? { type: 'list', items: ['Item 1', 'Item 2'] }
+      : type === 'link'
+      ? { type: 'link', linkText: 'Click here', url: 'https://' }
+      : { type, text: type === 'heading' ? 'Section Heading' : 'Enter text here...' };
+    updateField(fieldIndex, { contentBlocks: [...(field.contentBlocks || []), newBlock] });
+  };
+
+  const updateContentBlock = (fieldIndex: number, blockIndex: number, updates: Partial<FormContentBlock>) => {
+    const field = editingFields[fieldIndex];
+    if (!field.contentBlocks) return;
+    const newBlocks = field.contentBlocks.map((block, i) => i === blockIndex ? { ...block, ...updates } : block);
+    updateField(fieldIndex, { contentBlocks: newBlocks });
+  };
+
+  const removeContentBlock = (fieldIndex: number, blockIndex: number) => {
+    const field = editingFields[fieldIndex];
+    if (!field.contentBlocks || field.contentBlocks.length <= 1) return;
+    updateField(fieldIndex, { contentBlocks: field.contentBlocks.filter((_, i) => i !== blockIndex) });
   };
 
   return (
@@ -225,6 +334,11 @@ export default function Forms() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {forms.map((form) => (
             <Card key={form.id} data-testid={`card-form-${form.id}`}>
+              {form.coverImage && (
+                <div className="h-32 overflow-hidden rounded-t-lg">
+                  <img src={form.coverImage} alt="" className="w-full h-full object-cover" />
+                </div>
+              )}
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -248,9 +362,13 @@ export default function Forms() {
                     <Edit className="h-4 w-4 mr-1" />
                     Edit
                   </Button>
+                  <Button variant="outline" size="sm" onClick={() => handlePreview(form)} data-testid={`button-preview-form-${form.id}`}>
+                    <Eye className="h-4 w-4 mr-1" />
+                    Preview
+                  </Button>
                   {form.status === 'draft' && (
                     <Button variant="outline" size="sm" onClick={() => handlePublishForm(form)} data-testid={`button-publish-form-${form.id}`}>
-                      <Eye className="h-4 w-4 mr-1" />
+                      <Send className="h-4 w-4 mr-1" />
                       Publish
                     </Button>
                   )}
@@ -330,111 +448,153 @@ export default function Forms() {
       </Dialog>
 
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Form</DialogTitle>
-            <DialogDescription>Add and configure form fields</DialogDescription>
+            <DialogDescription>Design your form with fields, content, and conditional logic</DialogDescription>
           </DialogHeader>
-          <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label htmlFor="edit-title">Title</Label>
-                <Input
-                  id="edit-title"
-                  value={editingTitle}
-                  onChange={(e) => setEditingTitle(e.target.value)}
-                  data-testid="input-edit-title"
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-description">Description</Label>
-                <Input
-                  id="edit-description"
-                  value={editingDescription}
-                  onChange={(e) => setEditingDescription(e.target.value)}
-                  data-testid="input-edit-description"
-                />
-              </div>
-            </div>
+          
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="mb-4">
+              <TabsTrigger value="build">Build</TabsTrigger>
+              <TabsTrigger value="settings">Settings</TabsTrigger>
+              <TabsTrigger value="preview">Preview</TabsTrigger>
+            </TabsList>
 
-            <div>
-              <Label className="mb-3 block">Add Field</Label>
-              <div className="flex flex-wrap gap-2">
-                {FIELD_TYPES.map((ft) => (
-                  <Button key={ft.value} variant="outline" size="sm" onClick={() => addField(ft.value)} data-testid={`button-add-field-${ft.value}`}>
-                    <ft.icon className="h-4 w-4 mr-1" />
-                    {ft.label}
-                  </Button>
-                ))}
+            <TabsContent value="settings" className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="edit-title">Form Title</Label>
+                  <Input
+                    id="edit-title"
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    data-testid="input-edit-title"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-description">Description</Label>
+                  <Input
+                    id="edit-description"
+                    value={editingDescription}
+                    onChange={(e) => setEditingDescription(e.target.value)}
+                    data-testid="input-edit-description"
+                  />
+                </div>
               </div>
-            </div>
+              <div>
+                <Label htmlFor="edit-cover-image">Cover Image URL</Label>
+                <Input
+                  id="edit-cover-image"
+                  value={editingCoverImage}
+                  onChange={(e) => setEditingCoverImage(e.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                  data-testid="input-edit-cover-image"
+                />
+                <p className="text-sm text-muted-foreground mt-1">Add a header image to your form (optional)</p>
+                {editingCoverImage && (
+                  <div className="mt-3 h-32 overflow-hidden rounded-lg border">
+                    <img src={editingCoverImage} alt="Cover preview" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                  </div>
+                )}
+              </div>
+            </TabsContent>
 
-            <div className="space-y-4">
-              <Label>Form Fields ({editingFields.length})</Label>
-              {editingFields.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8 border rounded-md">
-                  No fields yet. Click a field type above to add one.
-                </p>
-              ) : (
-                editingFields.map((field, index) => (
-                  <Card key={field.id} className="p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex flex-col gap-1">
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => moveField(index, index - 1)} disabled={index === 0}>
-                          <GripVertical className="h-4 w-4 rotate-180" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => moveField(index, index + 1)} disabled={index === editingFields.length - 1}>
-                          <GripVertical className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="flex-1 space-y-3">
-                        <div className="flex items-center gap-3">
-                          <Badge variant="outline">{field.type}</Badge>
-                          <Input
-                            value={field.label}
-                            onChange={(e) => updateField(index, { label: e.target.value })}
-                            placeholder="Field label"
-                            className="flex-1"
-                            data-testid={`input-field-label-${index}`}
-                          />
-                          {field.type !== 'heading' && (
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                checked={field.required}
-                                onCheckedChange={(checked) => updateField(index, { required: checked })}
-                                data-testid={`switch-required-${index}`}
-                              />
-                              <Label className="text-sm">Required</Label>
-                            </div>
-                          )}
-                        </div>
-                        {(field.type === 'single-select' || field.type === 'multi-select') && (
-                          <div>
-                            <Label className="text-sm">Options (comma-separated)</Label>
-                            <Input
-                              value={field.options?.join(', ') || ''}
-                              onChange={(e) => updateField(index, { options: e.target.value.split(',').map(o => o.trim()).filter(Boolean) })}
-                              placeholder="Option 1, Option 2, Option 3"
-                              data-testid={`input-field-options-${index}`}
-                            />
-                          </div>
-                        )}
-                      </div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeField(index)} data-testid={`button-remove-field-${index}`}>
-                        <X className="h-4 w-4" />
+            <TabsContent value="build" className="space-y-6">
+              <div>
+                <Label className="mb-3 block">Add Field</Label>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Layout Elements</p>
+                  <div className="flex flex-wrap gap-2">
+                    {FIELD_TYPES.filter(ft => ft.category === 'layout').map((ft) => (
+                      <Button key={ft.value} variant="outline" size="sm" onClick={() => addField(ft.value)} data-testid={`button-add-field-${ft.value}`}>
+                        <ft.icon className="h-4 w-4 mr-1" />
+                        {ft.label}
                       </Button>
-                    </div>
-                  </Card>
-                ))
-              )}
-            </div>
-          </div>
+                    ))}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-3">Input Fields</p>
+                  <div className="flex flex-wrap gap-2">
+                    {FIELD_TYPES.filter(ft => ft.category === 'input').map((ft) => (
+                      <Button key={ft.value} variant="outline" size="sm" onClick={() => addField(ft.value)} data-testid={`button-add-field-${ft.value}`}>
+                        <ft.icon className="h-4 w-4 mr-1" />
+                        {ft.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <Label>Form Fields ({editingFields.length})</Label>
+                {editingFields.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8 border rounded-md">
+                    No fields yet. Click a field type above to add one.
+                  </p>
+                ) : (
+                  editingFields.map((field, index) => (
+                    <FieldEditor
+                      key={field.id}
+                      field={field}
+                      index={index}
+                      totalFields={editingFields.length}
+                      isExpanded={expandedFieldId === field.id}
+                      onToggleExpand={() => setExpandedFieldId(expandedFieldId === field.id ? null : field.id)}
+                      onUpdate={(updates) => updateField(index, updates)}
+                      onRemove={() => removeField(index)}
+                      onMoveUp={() => moveField(index, index - 1)}
+                      onMoveDown={() => moveField(index, index + 1)}
+                      selectableFields={getSelectableFieldsForBranching(index)}
+                      onAddTableColumn={() => addTableColumn(index)}
+                      onRemoveTableColumn={(colIdx) => removeTableColumn(index, colIdx)}
+                      onAddTableRow={() => addTableRow(index)}
+                      onRemoveTableRow={(rowIdx) => removeTableRow(index, rowIdx)}
+                      onUpdateTableCell={(rowIdx, colIdx, val) => updateTableCell(index, rowIdx, colIdx, val)}
+                      onUpdateTableHeader={(colIdx, header) => updateTableHeader(index, colIdx, header)}
+                      onAddContentBlock={(type) => addContentBlock(index, type)}
+                      onUpdateContentBlock={(blockIdx, updates) => updateContentBlock(index, blockIdx, updates)}
+                      onRemoveContentBlock={(blockIdx) => removeContentBlock(index, blockIdx)}
+                    />
+                  ))
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="preview" className="space-y-6">
+              <FormPreview
+                title={editingTitle}
+                description={editingDescription}
+                coverImage={editingCoverImage}
+                fields={editingFields}
+              />
+            </TabsContent>
+          </Tabs>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
             <Button onClick={handleSaveForm} disabled={updateForm.isPending} data-testid="button-save-form">
               {updateForm.isPending ? "Saving..." : "Save Form"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Form Preview</DialogTitle>
+            <DialogDescription>This is how your form will appear to respondents</DialogDescription>
+          </DialogHeader>
+          {selectedForm && (
+            <FormPreview
+              title={selectedForm.title}
+              description={selectedForm.description || ""}
+              coverImage={selectedForm.coverImage || ""}
+              fields={selectedForm.fields}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
@@ -502,6 +662,481 @@ export default function Forms() {
       />
       </div>
     </Layout>
+  );
+}
+
+interface FieldEditorProps {
+  field: FormField;
+  index: number;
+  totalFields: number;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onUpdate: (updates: Partial<FormField>) => void;
+  onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  selectableFields: FormField[];
+  onAddTableColumn: () => void;
+  onRemoveTableColumn: (colIndex: number) => void;
+  onAddTableRow: () => void;
+  onRemoveTableRow: (rowIndex: number) => void;
+  onUpdateTableCell: (rowIndex: number, colIndex: number, value: string) => void;
+  onUpdateTableHeader: (colIndex: number, header: string) => void;
+  onAddContentBlock: (type: 'paragraph' | 'heading' | 'list' | 'link') => void;
+  onUpdateContentBlock: (blockIndex: number, updates: Partial<FormContentBlock>) => void;
+  onRemoveContentBlock: (blockIndex: number) => void;
+}
+
+function FieldEditor({
+  field, index, totalFields, isExpanded, onToggleExpand, onUpdate, onRemove, onMoveUp, onMoveDown,
+  selectableFields, onAddTableColumn, onRemoveTableColumn, onAddTableRow, onRemoveTableRow,
+  onUpdateTableCell, onUpdateTableHeader, onAddContentBlock, onUpdateContentBlock, onRemoveContentBlock
+}: FieldEditorProps) {
+  const fieldType = FIELD_TYPES.find(ft => ft.value === field.type);
+  const Icon = fieldType?.icon || Type;
+  const isLayoutField = field.type === 'heading' || field.type === 'content' || field.type === 'table';
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex flex-col gap-1">
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onMoveUp} disabled={index === 0}>
+            <ChevronUp className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onMoveDown} disabled={index === totalFields - 1}>
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="flex-1 space-y-3">
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="gap-1">
+              <Icon className="h-3 w-3" />
+              {fieldType?.label || field.type}
+            </Badge>
+            <Input
+              value={field.label}
+              onChange={(e) => onUpdate({ label: e.target.value })}
+              placeholder="Field label"
+              className="flex-1"
+              data-testid={`input-field-label-${index}`}
+            />
+            {!isLayoutField && (
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={field.required}
+                  onCheckedChange={(checked) => onUpdate({ required: checked })}
+                  data-testid={`switch-required-${index}`}
+                />
+                <Label className="text-sm">Required</Label>
+              </div>
+            )}
+            <Button variant="ghost" size="sm" onClick={onToggleExpand}>
+              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </div>
+
+          {isExpanded && (
+            <div className="space-y-4 pt-3 border-t">
+              {!isLayoutField && (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label className="text-sm">Description / Help Text</Label>
+                      <Input
+                        value={field.description || ''}
+                        onChange={(e) => onUpdate({ description: e.target.value })}
+                        placeholder="Add help text for this field"
+                        data-testid={`input-field-description-${index}`}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Placeholder</Label>
+                      <Input
+                        value={field.placeholder || ''}
+                        onChange={(e) => onUpdate({ placeholder: e.target.value })}
+                        placeholder="Placeholder text"
+                        data-testid={`input-field-placeholder-${index}`}
+                      />
+                    </div>
+                  </div>
+
+                  {selectableFields.length > 0 && (
+                    <div className="p-3 bg-muted/50 rounded-md">
+                      <div className="flex items-center gap-2 mb-2">
+                        <GitBranch className="h-4 w-4 text-muted-foreground" />
+                        <Label className="text-sm font-medium">Conditional Logic</Label>
+                      </div>
+                      <div className="grid gap-2 md:grid-cols-3">
+                        <Select
+                          value={field.showWhen?.fieldId || 'none'}
+                          onValueChange={(val) => {
+                            if (val === 'none') {
+                              onUpdate({ showWhen: undefined });
+                            } else {
+                              onUpdate({ showWhen: { fieldId: val, operator: 'equals', value: '' } });
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Show when..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Always show</SelectItem>
+                            {selectableFields.map(f => (
+                              <SelectItem key={f.id} value={f.id}>{f.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {field.showWhen && (
+                          <>
+                            <Select
+                              value={field.showWhen.operator}
+                              onValueChange={(val: 'equals' | 'not_equals' | 'contains') => onUpdate({ showWhen: { ...field.showWhen!, operator: val } })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="equals">Equals</SelectItem>
+                                <SelectItem value="not_equals">Not Equals</SelectItem>
+                                <SelectItem value="contains">Contains</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              value={field.showWhen.value}
+                              onChange={(e) => onUpdate({ showWhen: { ...field.showWhen!, value: e.target.value } })}
+                              placeholder="Value"
+                            />
+                          </>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        This field will only be shown when the selected condition is met.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {(field.type === 'single-select' || field.type === 'multi-select') && (
+                <div>
+                  <Label className="text-sm">Options (comma-separated)</Label>
+                  <Input
+                    value={field.options?.join(', ') || ''}
+                    onChange={(e) => onUpdate({ options: e.target.value.split(',').map(o => o.trim()).filter(Boolean) })}
+                    placeholder="Option 1, Option 2, Option 3"
+                    data-testid={`input-field-options-${index}`}
+                  />
+                </div>
+              )}
+
+              {field.type === 'table' && (
+                <div className="space-y-3">
+                  <Label className="text-sm">Table Configuration</Label>
+                  <div className="border rounded-md overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted">
+                        <tr>
+                          {field.tableColumns?.map((col, ci) => (
+                            <th key={col.id} className="p-2 border-r last:border-r-0">
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  value={col.header}
+                                  onChange={(e) => onUpdateTableHeader(ci, e.target.value)}
+                                  className="h-7 text-xs"
+                                />
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => onRemoveTableColumn(ci)}>
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </th>
+                          ))}
+                          <th className="p-2 w-12">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onAddTableColumn}>
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {field.tableRows?.map((row, ri) => (
+                          <tr key={ri} className="border-t">
+                            {row.map((cell, ci) => (
+                              <td key={ci} className="p-2 border-r last:border-r-0">
+                                <Input
+                                  value={cell.value}
+                                  onChange={(e) => onUpdateTableCell(ri, ci, e.target.value)}
+                                  className="h-7 text-xs"
+                                />
+                              </td>
+                            ))}
+                            <td className="p-2 w-12">
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => onRemoveTableRow(ri)}>
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={onAddTableRow}>
+                    <Plus className="h-3 w-3 mr-1" /> Add Row
+                  </Button>
+                </div>
+              )}
+
+              {field.type === 'content' && (
+                <div className="space-y-3">
+                  <Label className="text-sm">Content Blocks</Label>
+                  {field.contentBlocks?.map((block, bi) => (
+                    <div key={bi} className="flex gap-2 items-start">
+                      <Badge variant="secondary" className="mt-2">{block.type}</Badge>
+                      <div className="flex-1">
+                        {block.type === 'list' ? (
+                          <Textarea
+                            value={block.items?.join('\n') || ''}
+                            onChange={(e) => onUpdateContentBlock(bi, { items: e.target.value.split('\n').filter(Boolean) })}
+                            placeholder="One item per line"
+                            rows={3}
+                          />
+                        ) : block.type === 'link' ? (
+                          <div className="space-y-2">
+                            <Input
+                              value={block.linkText || ''}
+                              onChange={(e) => onUpdateContentBlock(bi, { linkText: e.target.value })}
+                              placeholder="Link text"
+                            />
+                            <Input
+                              value={block.url || ''}
+                              onChange={(e) => onUpdateContentBlock(bi, { url: e.target.value })}
+                              placeholder="https://..."
+                            />
+                          </div>
+                        ) : (
+                          <Textarea
+                            value={block.text || ''}
+                            onChange={(e) => onUpdateContentBlock(bi, { text: e.target.value })}
+                            placeholder="Enter text..."
+                            rows={block.type === 'heading' ? 1 : 3}
+                          />
+                        )}
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onRemoveContentBlock(bi)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => onAddContentBlock('paragraph')}>
+                      <AlignLeft className="h-3 w-3 mr-1" /> Paragraph
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => onAddContentBlock('heading')}>
+                      <Heading className="h-3 w-3 mr-1" /> Heading
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => onAddContentBlock('list')}>
+                      <List className="h-3 w-3 mr-1" /> List
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => onAddContentBlock('link')}>
+                      <Link className="h-3 w-3 mr-1" /> Link
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={onRemove} data-testid={`button-remove-field-${index}`}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+interface FormPreviewProps {
+  title: string;
+  description: string;
+  coverImage: string;
+  fields: FormField[];
+}
+
+function FormPreview({ title, description, coverImage, fields }: FormPreviewProps) {
+  const [formValues, setFormValues] = useState<Record<string, string | string[]>>({});
+
+  const shouldShowField = (field: FormField): boolean => {
+    if (!field.showWhen) return true;
+    const triggerValue = formValues[field.showWhen.fieldId];
+    const conditionValue = field.showWhen.value;
+    
+    switch (field.showWhen.operator) {
+      case 'equals':
+        return triggerValue === conditionValue || (Array.isArray(triggerValue) && triggerValue.includes(conditionValue));
+      case 'not_equals':
+        return triggerValue !== conditionValue && (!Array.isArray(triggerValue) || !triggerValue.includes(conditionValue));
+      case 'contains':
+        return Array.isArray(triggerValue) ? triggerValue.includes(conditionValue) : String(triggerValue || '').includes(conditionValue);
+      default:
+        return true;
+    }
+  };
+
+  const visibleFields = fields.filter(shouldShowField);
+
+  return (
+    <div className="bg-background border rounded-lg overflow-hidden">
+      {coverImage && (
+        <div className="h-40 overflow-hidden">
+          <img src={coverImage} alt="" className="w-full h-full object-cover" />
+        </div>
+      )}
+      <div className="p-6 space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold">{title || "Untitled Form"}</h2>
+          {description && <p className="text-muted-foreground mt-1">{description}</p>}
+        </div>
+
+        {visibleFields.map((field) => (
+          <div key={field.id} className="space-y-2">
+            {field.type === 'heading' && (
+              <h3 className="text-lg font-semibold pt-4 border-t">{field.label}</h3>
+            )}
+
+            {field.type === 'content' && (
+              <div className="prose prose-sm max-w-none">
+                <h4 className="font-medium text-base">{field.label}</h4>
+                {field.contentBlocks?.map((block, bi) => (
+                  <div key={bi}>
+                    {block.type === 'heading' && <h5 className="font-semibold">{block.text}</h5>}
+                    {block.type === 'paragraph' && <p className="text-muted-foreground">{block.text}</p>}
+                    {block.type === 'list' && (
+                      <ul className="list-disc pl-5 text-muted-foreground">
+                        {block.items?.map((item, ii) => <li key={ii}>{item}</li>)}
+                      </ul>
+                    )}
+                    {block.type === 'link' && (
+                      <a href={block.url} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                        {block.linkText}
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {field.type === 'table' && (
+              <div>
+                <Label className="font-medium">{field.label}</Label>
+                <div className="border rounded-md overflow-x-auto mt-2">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted">
+                      <tr>
+                        {field.tableColumns?.map((col) => (
+                          <th key={col.id} className="p-3 text-left font-medium border-r last:border-r-0">
+                            {col.header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {field.tableRows?.map((row, ri) => (
+                        <tr key={ri} className="border-t">
+                          {row.map((cell, ci) => (
+                            <td key={ci} className="p-3 border-r last:border-r-0">
+                              {cell.value}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {field.type !== 'heading' && field.type !== 'content' && field.type !== 'table' && (
+              <div>
+                <Label className="font-medium">
+                  {field.label}
+                  {field.required && <span className="text-destructive ml-1">*</span>}
+                </Label>
+                {field.description && (
+                  <p className="text-sm text-muted-foreground">{field.description}</p>
+                )}
+                <div className="mt-1">
+                  {(field.type === 'text' || field.type === 'email' || field.type === 'number') && (
+                    <Input
+                      type={field.type}
+                      placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+                      value={String(formValues[field.id] || '')}
+                      onChange={(e) => setFormValues({ ...formValues, [field.id]: e.target.value })}
+                    />
+                  )}
+                  {field.type === 'textarea' && (
+                    <Textarea
+                      placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+                      value={String(formValues[field.id] || '')}
+                      onChange={(e) => setFormValues({ ...formValues, [field.id]: e.target.value })}
+                    />
+                  )}
+                  {field.type === 'date' && (
+                    <Input
+                      type="date"
+                      value={String(formValues[field.id] || '')}
+                      onChange={(e) => setFormValues({ ...formValues, [field.id]: e.target.value })}
+                    />
+                  )}
+                  {field.type === 'single-select' && (
+                    <Select
+                      value={String(formValues[field.id] || '')}
+                      onValueChange={(val) => setFormValues({ ...formValues, [field.id]: val })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={field.placeholder || "Select an option"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {field.options?.map((opt) => (
+                          <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {field.type === 'multi-select' && (
+                    <div className="space-y-2">
+                      {field.options?.map((opt) => {
+                        const selected = Array.isArray(formValues[field.id]) && formValues[field.id].includes(opt);
+                        return (
+                          <div key={opt} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={(e) => {
+                                const current = Array.isArray(formValues[field.id]) ? formValues[field.id] as string[] : [];
+                                setFormValues({
+                                  ...formValues,
+                                  [field.id]: e.target.checked ? [...current, opt] : current.filter(v => v !== opt)
+                                });
+                              }}
+                              className="h-4 w-4"
+                            />
+                            <span>{opt}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {field.type === 'file' && (
+                    <Input type="file" />
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+
+        <Button className="w-full" disabled>Submit (Preview Mode)</Button>
+      </div>
+    </div>
   );
 }
 

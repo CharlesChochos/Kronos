@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
 import { usePublicForm, useSubmitPublicForm, type FormField } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -27,11 +27,31 @@ export default function PublicForm() {
     setResponses(prev => ({ ...prev, [fieldId]: value }));
   };
 
+  const shouldShowField = (field: FormField): boolean => {
+    if (!field.showWhen) return true;
+    const triggerValue = responses[field.showWhen.fieldId];
+    const conditionValue = field.showWhen.value;
+    
+    switch (field.showWhen.operator) {
+      case 'equals':
+        return triggerValue === conditionValue || (Array.isArray(triggerValue) && triggerValue.includes(conditionValue));
+      case 'not_equals':
+        return triggerValue !== conditionValue && (!Array.isArray(triggerValue) || !triggerValue.includes(conditionValue));
+      case 'contains':
+        return Array.isArray(triggerValue) ? triggerValue.includes(conditionValue) : String(triggerValue || '').includes(conditionValue);
+      default:
+        return true;
+    }
+  };
+
+  const visibleFields = useMemo(() => {
+    return (form?.fields || []).filter(shouldShowField);
+  }, [form?.fields, responses]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const fields = form?.fields || [];
-    const requiredFields = fields.filter(f => f.required && f.type !== 'heading');
+    const requiredFields = visibleFields.filter(f => f.required && f.type !== 'heading' && f.type !== 'content' && f.type !== 'table');
     for (const field of requiredFields) {
       const value = responses[field.id];
       if (!value || (Array.isArray(value) && value.length === 0)) {
@@ -138,7 +158,7 @@ export default function PublicForm() {
                 </div>
               </div>
 
-              {form.fields && form.fields.map((field) => (
+              {visibleFields.map((field) => (
                 <FieldRenderer
                   key={field.id}
                   field={field}
@@ -179,6 +199,65 @@ function FieldRenderer({ field, value, onChange }: { field: FormField; value: an
     );
   }
 
+  if (field.type === 'content') {
+    return (
+      <div className="py-2">
+        <h4 className="font-medium text-base mb-2">{field.label}</h4>
+        <div className="prose prose-sm max-w-none text-muted-foreground">
+          {field.contentBlocks?.map((block, bi) => (
+            <div key={bi}>
+              {block.type === 'heading' && <h5 className="font-semibold text-foreground">{block.text}</h5>}
+              {block.type === 'paragraph' && <p>{block.text}</p>}
+              {block.type === 'list' && (
+                <ul className="list-disc pl-5">
+                  {block.items?.map((item, ii) => <li key={ii}>{item}</li>)}
+                </ul>
+              )}
+              {block.type === 'link' && (
+                <a href={block.url} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:no-underline">
+                  {block.linkText}
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (field.type === 'table') {
+    return (
+      <div className="py-2">
+        <Label className="font-medium">{field.label}</Label>
+        {field.description && <p className="text-muted-foreground text-sm mt-1 mb-2">{field.description}</p>}
+        <div className="border rounded-md overflow-x-auto mt-2">
+          <table className="w-full text-sm">
+            <thead className="bg-muted">
+              <tr>
+                {field.tableColumns?.map((col) => (
+                  <th key={col.id} className="p-3 text-left font-medium border-r last:border-r-0">
+                    {col.header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {field.tableRows?.map((row, ri) => (
+                <tr key={ri} className="border-t">
+                  {row.map((cell, ci) => (
+                    <td key={ci} className="p-3 border-r last:border-r-0">
+                      {cell.value}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   const labelElement = (
     <Label htmlFor={field.id} className="flex items-center gap-1">
       {field.label}
@@ -186,16 +265,39 @@ function FieldRenderer({ field, value, onChange }: { field: FormField; value: an
     </Label>
   );
 
+  const descriptionElement = field.description ? (
+    <p className="text-sm text-muted-foreground mt-1">{field.description}</p>
+  ) : null;
+
   switch (field.type) {
     case 'text':
       return (
         <div>
           {labelElement}
+          {descriptionElement}
+          <Input
+            id={field.id}
+            value={value || ''}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+            className="mt-1"
+            data-testid={`input-${field.id}`}
+          />
+        </div>
+      );
+
+    case 'textarea':
+      return (
+        <div>
+          {labelElement}
+          {descriptionElement}
           <Textarea
             id={field.id}
             value={value || ''}
             onChange={(e) => onChange(e.target.value)}
-            placeholder={`Enter ${field.label.toLowerCase()}`}
+            placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+            className="mt-1"
+            rows={4}
             data-testid={`input-${field.id}`}
           />
         </div>
@@ -205,12 +307,14 @@ function FieldRenderer({ field, value, onChange }: { field: FormField; value: an
       return (
         <div>
           {labelElement}
+          {descriptionElement}
           <Input
             id={field.id}
             type="email"
             value={value || ''}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="Enter email address"
+            placeholder={field.placeholder || "Enter email address"}
+            className="mt-1"
             data-testid={`input-${field.id}`}
           />
         </div>
@@ -220,12 +324,14 @@ function FieldRenderer({ field, value, onChange }: { field: FormField; value: an
       return (
         <div>
           {labelElement}
+          {descriptionElement}
           <Input
             id={field.id}
             type="number"
             value={value || ''}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="Enter number"
+            placeholder={field.placeholder || "Enter number"}
+            className="mt-1"
             data-testid={`input-${field.id}`}
           />
         </div>
@@ -235,11 +341,13 @@ function FieldRenderer({ field, value, onChange }: { field: FormField; value: an
       return (
         <div>
           {labelElement}
+          {descriptionElement}
           <Input
             id={field.id}
             type="date"
             value={value || ''}
             onChange={(e) => onChange(e.target.value)}
+            className="mt-1"
             data-testid={`input-${field.id}`}
           />
         </div>
@@ -249,9 +357,10 @@ function FieldRenderer({ field, value, onChange }: { field: FormField; value: an
       return (
         <div>
           {labelElement}
+          {descriptionElement}
           <Select value={value || ''} onValueChange={onChange}>
-            <SelectTrigger data-testid={`select-${field.id}`}>
-              <SelectValue placeholder="Select an option" />
+            <SelectTrigger className="mt-1" data-testid={`select-${field.id}`}>
+              <SelectValue placeholder={field.placeholder || "Select an option"} />
             </SelectTrigger>
             <SelectContent>
               {field.options?.map((opt) => (
@@ -267,6 +376,7 @@ function FieldRenderer({ field, value, onChange }: { field: FormField; value: an
       return (
         <div>
           {labelElement}
+          {descriptionElement}
           <div className="space-y-2 mt-2">
             {field.options?.map((opt) => (
               <div key={opt} className="flex items-center gap-2">
@@ -293,7 +403,8 @@ function FieldRenderer({ field, value, onChange }: { field: FormField; value: an
       return (
         <div>
           {labelElement}
-          <div className="border-2 border-dashed rounded-lg p-6 text-center">
+          {descriptionElement}
+          <div className="border-2 border-dashed rounded-lg p-6 text-center mt-1">
             <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">File upload coming soon</p>
           </div>

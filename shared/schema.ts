@@ -1103,22 +1103,58 @@ export const insertGoogleCalendarTokenSchema = createInsertSchema(googleCalendar
 export type InsertGoogleCalendarToken = z.infer<typeof insertGoogleCalendarTokenSchema>;
 export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;
 
-// Form Field Type
-export type FormFieldType = 'text' | 'email' | 'single_select' | 'multi_select' | 'date' | 'number' | 'attachment' | 'heading';
+// Form Field Type - includes new types for tables and rich content
+export type FormFieldType = 'text' | 'email' | 'single_select' | 'multi_select' | 'date' | 'number' | 'attachment' | 'heading' | 'textarea' | 'table' | 'content';
 
 export type FormFieldOption = {
   id: string;
   label: string;
 };
 
+// Branching condition - show field when another field has specific value
+export type FormBranchCondition = {
+  fieldId: string;       // The field to check
+  operator: 'equals' | 'not_equals' | 'contains';
+  value: string;         // The value to match
+};
+
+// Table cell for static table data
+export type FormTableCell = {
+  value: string;
+};
+
+// Table column definition
+export type FormTableColumn = {
+  id: string;
+  header: string;
+};
+
+// Content block for rich text (markdown-like)
+export type FormContentBlock = {
+  type: 'paragraph' | 'heading' | 'list' | 'link';
+  text?: string;
+  items?: string[];      // For list type
+  url?: string;          // For link type
+  linkText?: string;     // For link type
+};
+
 export type FormField = {
   id: string;
   type: FormFieldType;
   label: string;
-  description?: string;
+  description?: string;            // Help text below label
+  placeholder?: string;            // Placeholder text for input fields
   required: boolean;
-  options?: FormFieldOption[]; // For single_select and multi_select
+  options?: FormFieldOption[];     // For single_select and multi_select
   order: number;
+  // Branching support
+  showWhen?: FormBranchCondition;  // Only show this field when condition is met
+  branchFields?: FormField[];      // Nested fields to show based on this field's value (legacy)
+  // Table support
+  tableColumns?: FormTableColumn[];  // Column definitions for table type
+  tableRows?: FormTableCell[][];     // Row data for table type
+  // Rich content support
+  contentBlocks?: FormContentBlock[];  // For content type
 };
 
 // Forms table - stores form definitions
