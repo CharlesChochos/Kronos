@@ -3269,6 +3269,21 @@ export function useDeleteForm() {
   });
 }
 
+export function useUnpublishForm() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/forms/${id}/unpublish`, { method: "POST" });
+      if (!res.ok) throw new Error("Failed to unpublish form");
+      return res.json() as Promise<Form>;
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ["forms"] });
+      queryClient.invalidateQueries({ queryKey: ["forms", id] });
+    },
+  });
+}
+
 export function useShareForm() {
   return useMutation({
     mutationFn: async ({ id, emails, message }: { id: string; emails: string[]; message?: string }) => {

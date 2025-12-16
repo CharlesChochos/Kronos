@@ -1130,6 +1130,34 @@ export async function registerRoutes(
     }
   });
 
+  // Unpublish a form (revert to draft) - Dimitra or Charles only
+  app.post("/api/forms/:id/unpublish", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const form = await storage.getForm(req.params.id);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (form.createdBy !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      if (form.status !== 'published') {
+        return res.status(400).json({ error: "Form is not published" });
+      }
+      // Revert to draft status, keep the shareToken in case they want to republish
+      const updated = await storage.updateForm(req.params.id, {
+        status: 'draft',
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error unpublishing form:', error);
+      res.status(500).json({ error: "Failed to unpublish form" });
+    }
+  });
+
   // Delete a form (Dimitra only)
   app.delete("/api/forms/:id", requireAuth, requireInternal, async (req, res) => {
     try {

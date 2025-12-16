@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
-import { useForms, useCreateForm, useUpdateForm, useDeleteForm, usePublishForm, useShareForm, useFormSubmissions, useCurrentUser, type Form, type FormField, type FormBranchCondition, type FormTableColumn, type FormTableCell, type FormContentBlock } from "@/lib/api";
+import { useForms, useCreateForm, useUpdateForm, useDeleteForm, usePublishForm, useUnpublishForm, useShareForm, useFormSubmissions, useCurrentUser, type Form, type FormField, type FormBranchCondition, type FormTableColumn, type FormTableCell, type FormContentBlock } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,6 +43,7 @@ export default function Forms() {
   const updateForm = useUpdateForm();
   const deleteForm = useDeleteForm();
   const publishForm = usePublishForm();
+  const unpublishForm = useUnpublishForm();
   const shareForm = useShareForm();
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -159,6 +160,16 @@ export default function Forms() {
     try {
       await publishForm.mutateAsync(form.id);
       toast.success("Form published successfully");
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleUnpublishForm = async (form: Form) => {
+    if (!confirm(`Are you sure you want to revert "${form.title}" to draft? The share link will stop working until you publish again.`)) return;
+    try {
+      await unpublishForm.mutateAsync(form.id);
+      toast.success("Form reverted to draft");
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -430,6 +441,10 @@ export default function Forms() {
                         <Button variant="outline" size="sm" onClick={() => handleCopyLink(form)} data-testid={`button-copy-link-${form.id}`}>
                           <Copy className="h-4 w-4 mr-1" />
                           Copy Link
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleUnpublishForm(form)} className="text-amber-600 hover:text-amber-700" data-testid={`button-unpublish-form-${form.id}`}>
+                          <ChevronLeft className="h-4 w-4 mr-1" />
+                          Revert to Draft
                         </Button>
                       </>
                     )}
