@@ -1249,3 +1249,70 @@ export const insertPendingFormUploadSchema = createInsertSchema(pendingFormUploa
 
 export type InsertPendingFormUpload = z.infer<typeof insertPendingFormUploadSchema>;
 export type PendingFormUpload = typeof pendingFormUploads.$inferSelect;
+
+// ================================
+// HR Task Templates
+// ================================
+
+// Template Task type - defines tasks within a section
+export type TemplateTask = {
+  id: string;
+  title: string;
+  description?: string;
+  assigneeId?: string; // User ID for default assignee
+  relativeDueDays?: number; // Days after template application
+  position: number;
+};
+
+// Template Section type - groups tasks
+export type TemplateSection = {
+  id: string;
+  title: string;
+  position: number;
+  tasks: TemplateTask[];
+};
+
+// Task Templates table - reusable task templates for HR
+export const taskTemplates = pgTable("task_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull().default('HR'), // HR, Onboarding, General
+  sections: jsonb("sections").default([]).$type<TemplateSection[]>(),
+  isArchived: boolean("is_archived").default(false),
+  usageCount: integer("usage_count").default(0),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTaskTemplateSchema = createInsertSchema(taskTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  usageCount: true,
+});
+
+export type InsertTaskTemplate = z.infer<typeof insertTaskTemplateSchema>;
+export type TaskTemplate = typeof taskTemplates.$inferSelect;
+
+// Task Template Usage Log - tracks when templates are applied
+export const taskTemplateUsage = pgTable("task_template_usage", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id").references(() => taskTemplates.id).notNull(),
+  templateName: text("template_name").notNull(), // Snapshot at time of use
+  appliedBy: varchar("applied_by").references(() => users.id).notNull(),
+  contextType: text("context_type"), // e.g., 'onboarding', 'project'
+  contextName: text("context_name"), // e.g., 'New Hire: John Smith'
+  tasksCreated: integer("tasks_created").default(0),
+  startDate: text("start_date").notNull(), // ISO date string for due date calculation
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTaskTemplateUsageSchema = createInsertSchema(taskTemplateUsage).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTaskTemplateUsage = z.infer<typeof insertTaskTemplateUsageSchema>;
+export type TaskTemplateUsage = typeof taskTemplateUsage.$inferSelect;
