@@ -34,7 +34,8 @@ The frontend is built with React 18, TypeScript, and Vite. It utilizes `shadcn/u
 ## System Design Choices
 
 - **Data Persistence:** PostgreSQL database managed via Neon serverless driver.
-- **Schema Design:** Comprehensive schema includes tables for Users (with roles, job titles, performance metrics, 2FA fields), Deals (stage, value, client, sector), Tasks (assignments, priority, due dates), Meetings, Notifications, Investor Matches, User Preferences (for UI state), Deal Templates, Calendar Events, Task Attachments, Documents (with file data, categories, tags), Messages, Conversations, and Conversation Members. A dedicated `audit_logs_table` tracks system events.
+- **Schema Design:** Comprehensive schema includes tables for Users (with roles, job titles, performance metrics, 2FA fields), Deals (stage, value, client, sector), Tasks (assignments, priority, due dates), Meetings, Notifications, Investor Matches, User Preferences (for UI state), Deal Templates, Calendar Events, Task Attachments, Documents (with file data, categories, tags), Messages, Conversations, and Conversation Members. A dedicated `audit_logs_table` tracks system events. Task Templates feature includes `taskTemplates`, `taskTemplateSections`, `taskTemplateTasks`, and `taskTemplateUsageLog` tables.
+- **HR Task Templates:** Asana-inspired task templates system allowing HR administrators (Dimitra and Charles only) to create reusable templates with sections, tasks, assignees, and relative due dates. Templates can be applied to create real tasks with computed due dates based on a start date.
 - **User Preferences Persistence:** UI state is saved to the `user_preferences` table, with debounced saves and conflict resolution for concurrent updates.
 - **Security:** Invite-only registration, user suspension, and robust role-based access control.
 
