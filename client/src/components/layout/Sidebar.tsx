@@ -128,8 +128,11 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
 
   // Check if user is an admin - for showing Asset Management in CEO view
   const isAdmin = currentUser?.accessLevel === 'admin';
-  const isDimitra = currentUser?.name?.toLowerCase().includes('dimitra') || 
-                    currentUser?.email?.toLowerCase().includes('dimitra');
+  const canAccessForms = currentUser?.name?.toLowerCase().includes('dimitra') || 
+                         currentUser?.email?.toLowerCase().includes('dimitra') ||
+                         currentUser?.name?.toLowerCase().includes('charles') || 
+                         currentUser?.email?.toLowerCase().includes('charles');
+  const isDimitra = canAccessForms;
 
   // CEO grouped links - ordered: Dashboard, My Tasks, Opportunities, Deal Management, Asset Management (admin only), Documents
   const ceoGroups: CategoryGroup[] = [

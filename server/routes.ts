@@ -1009,10 +1009,15 @@ export async function registerRoutes(
 
   // ===== FORMS ROUTES =====
   
-  // Helper: Check if user is Dimitra (the only user who can manage forms)
-  const isDimitraUser = (user: any): boolean => {
-    return user && (user.name?.toLowerCase().includes('dimitra') || user.email?.toLowerCase().includes('dimitra'));
+  // Helper: Check if user can access forms (Dimitra or Charles)
+  const canAccessForms = (user: any): boolean => {
+    if (!user) return false;
+    const name = user.name?.toLowerCase() || '';
+    const email = user.email?.toLowerCase() || '';
+    return name.includes('dimitra') || email.includes('dimitra') || 
+           name.includes('charles') || email.includes('charles');
   };
+  const isDimitraUser = canAccessForms;
 
   // Get all forms created by the current user (Dimitra only)
   app.get("/api/forms", requireAuth, requireInternal, async (req, res) => {
