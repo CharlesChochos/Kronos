@@ -8,7 +8,7 @@ import connectPgSimple from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import { insertUserSchema, insertDealSchema, insertTaskSchema, insertMeetingSchema, insertNotificationSchema, insertAssistantConversationSchema, insertAssistantMessageSchema, insertTimeEntrySchema, insertTimeOffRequestSchema, insertAuditLogSchema, insertInvestorSchema, insertInvestorInteractionSchema, insertOkrSchema, insertStakeholderSchema, insertAnnouncementSchema, insertPollSchema, insertMentorshipPairingSchema, insertClientPortalAccessSchema, insertDocumentTemplateSchema, insertInvestorMatchSchema, insertUserPreferencesSchema, insertDealTemplateSchema, insertCalendarEventSchema, insertTaskAttachmentRecordSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
-import { sendMeetingInvite, sendPasswordResetEmail, sendUserInviteEmail, sendExternalWorkEmail } from "./email";
+import { sendMeetingInvite, sendPasswordResetEmail, sendUserInviteEmail, sendExternalWorkEmail, sendFormInvitationEmail } from "./email";
 import { validateBody, loginSchema, signupSchema, forgotPasswordSchema, resetPasswordSchema } from "./validation";
 import { generalLimiter, authLimiter, strictLimiter, uploadLimiter, aiLimiter, preferencesLimiter } from "./rateLimiter";
 import OpenAI from "openai";
@@ -1004,6 +1004,327 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Error resending invite:', error);
       res.status(500).json({ error: "Failed to resend invite" });
+    }
+  });
+
+  // ===== FORMS ROUTES =====
+  
+  // Helper: Check if user is Dimitra (the only user who can manage forms)
+  const isDimitraUser = (user: any): boolean => {
+    return user && (user.name?.toLowerCase().includes('dimitra') || user.email?.toLowerCase().includes('dimitra'));
+  };
+
+  // Get all forms created by the current user (Dimitra only)
+  app.get("/api/forms", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const forms = await storage.getFormsByCreator(user.id);
+      res.json(forms);
+    } catch (error) {
+      console.error('Error fetching forms:', error);
+      res.status(500).json({ error: "Failed to fetch forms" });
+    }
+  });
+
+  // Get a single form by ID
+  app.get("/api/forms/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const form = await storage.getForm(req.params.id);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      // Only allow creator to view unpublished forms
+      if (form.status !== 'published' && form.createdBy !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      res.json(form);
+    } catch (error) {
+      console.error('Error fetching form:', error);
+      res.status(500).json({ error: "Failed to fetch form" });
+    }
+  });
+
+  // Create a new form (Dimitra only)
+  app.post("/api/forms", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const { title, description, fields } = req.body;
+      if (!title) {
+        return res.status(400).json({ error: "Form title is required" });
+      }
+      const form = await storage.createForm({
+        title,
+        description: description || null,
+        fields: fields || [],
+        createdBy: user.id,
+        status: 'draft',
+      });
+      res.json(form);
+    } catch (error) {
+      console.error('Error creating form:', error);
+      res.status(500).json({ error: "Failed to create form" });
+    }
+  });
+
+  // Update a form (Dimitra only)
+  app.patch("/api/forms/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const form = await storage.getForm(req.params.id);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (form.createdBy !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const updated = await storage.updateForm(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating form:', error);
+      res.status(500).json({ error: "Failed to update form" });
+    }
+  });
+
+  // Publish a form and generate share token
+  app.post("/api/forms/:id/publish", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const form = await storage.getForm(req.params.id);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (form.createdBy !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      // Generate unique share token
+      const shareToken = `form_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const updated = await storage.updateForm(req.params.id, {
+        status: 'published',
+        shareToken,
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error publishing form:', error);
+      res.status(500).json({ error: "Failed to publish form" });
+    }
+  });
+
+  // Delete a form (Dimitra only)
+  app.delete("/api/forms/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const form = await storage.getForm(req.params.id);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (form.createdBy !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      await storage.deleteForm(req.params.id);
+      res.json({ message: "Form deleted successfully" });
+    } catch (error) {
+      console.error('Error deleting form:', error);
+      res.status(500).json({ error: "Failed to delete form" });
+    }
+  });
+
+  // Share a form with users/emails
+  app.post("/api/forms/:id/share", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const form = await storage.getForm(req.params.id);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (form.createdBy !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      if (form.status !== 'published') {
+        return res.status(400).json({ error: "Form must be published before sharing" });
+      }
+
+      const { emails, message } = req.body;
+      if (!emails || !Array.isArray(emails) || emails.length === 0) {
+        return res.status(400).json({ error: "At least one email is required" });
+      }
+
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPLIT_DOMAINS
+          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+          : 'http://localhost:5000';
+      const formLink = `${baseUrl}/form/${form.shareToken}`;
+
+      const allUsers = await storage.getAllUsers();
+      const results = [];
+
+      for (const email of emails) {
+        // Check if email belongs to a platform user
+        const platformUser = allUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+        
+        // Create invitation record
+        const invitation = await storage.createFormInvitation({
+          formId: form.id,
+          email,
+          userId: platformUser?.id || null,
+          message: message || null,
+        });
+
+        if (platformUser) {
+          // Create task for platform user
+          const task = await storage.createTask({
+            title: `Complete form: ${form.title}`,
+            description: `You've been asked to complete a form. ${message ? `Message: ${message}` : ''}`,
+            dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 1 week from now
+            priority: 'Medium',
+            status: 'To Do',
+            assignedTo: platformUser.id,
+            dealId: null,
+          });
+
+          // Create notification
+          await storage.createNotification({
+            userId: platformUser.id,
+            title: 'New Form to Complete',
+            message: `${user.name} has shared a form with you: "${form.title}"`,
+            type: 'info',
+            link: `/employee/tasks?taskId=${task.id}`,
+          });
+
+          results.push({ email, status: 'task_created', userId: platformUser.id });
+        } else {
+          // Send email to external user
+          try {
+            await sendFormInvitationEmail({
+              email,
+              formTitle: form.title,
+              senderName: user.name,
+              formLink,
+              message: message || undefined,
+            });
+            results.push({ email, status: 'email_sent' });
+          } catch (emailError) {
+            console.error('Error sending form invitation email:', emailError);
+            results.push({ email, status: 'email_failed' });
+          }
+        }
+      }
+
+      res.json({ success: true, results, formLink });
+    } catch (error) {
+      console.error('Error sharing form:', error);
+      res.status(500).json({ error: "Failed to share form" });
+    }
+  });
+
+  // Get form submissions (Dimitra only)
+  app.get("/api/forms/:id/submissions", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const form = await storage.getForm(req.params.id);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (form.createdBy !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const submissions = await storage.getFormSubmissions(req.params.id);
+      res.json(submissions);
+    } catch (error) {
+      console.error('Error fetching submissions:', error);
+      res.status(500).json({ error: "Failed to fetch submissions" });
+    }
+  });
+
+  // Public route: Get form by share token (no auth required)
+  app.get("/api/public/forms/:shareToken", async (req, res) => {
+    try {
+      const form = await storage.getFormByShareToken(req.params.shareToken);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (form.status !== 'published') {
+        return res.status(404).json({ error: "Form not available" });
+      }
+      // Return only necessary fields for public view
+      res.json({
+        id: form.id,
+        title: form.title,
+        description: form.description,
+        coverImage: form.coverImage,
+        fields: form.fields,
+      });
+    } catch (error) {
+      console.error('Error fetching public form:', error);
+      res.status(500).json({ error: "Failed to fetch form" });
+    }
+  });
+
+  // Public route: Submit a form (no auth required)
+  app.post("/api/public/forms/:shareToken/submit", async (req, res) => {
+    try {
+      const form = await storage.getFormByShareToken(req.params.shareToken);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (form.status !== 'published') {
+        return res.status(404).json({ error: "Form not available" });
+      }
+
+      const { responses, submitterName, submitterEmail } = req.body;
+      if (!responses || !Array.isArray(responses)) {
+        return res.status(400).json({ error: "Form responses are required" });
+      }
+
+      // Get form creator (Dimitra) to create task for her
+      const creator = await storage.getUser(form.createdBy);
+      if (!creator) {
+        return res.status(500).json({ error: "Form creator not found" });
+      }
+
+      // Create a task for Dimitra with the form submission
+      const task = await storage.createTask({
+        title: `Form Submission: ${form.title}`,
+        description: `A new submission has been received for "${form.title}".\n\nSubmitter: ${submitterName || 'Anonymous'}\nEmail: ${submitterEmail || 'Not provided'}`,
+        dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days from now
+        priority: 'Medium',
+        status: 'To Do',
+        assignedTo: creator.id,
+        dealId: null,
+      });
+
+      // Create the form submission record
+      const submission = await storage.createFormSubmission({
+        formId: form.id,
+        formTitle: form.title,
+        submitterName: submitterName || null,
+        submitterEmail: submitterEmail || null,
+        submitterId: null,
+        responses,
+        taskId: task.id,
+        status: 'pending',
+      });
+
+      // Create notification for Dimitra
+      await storage.createNotification({
+        userId: creator.id,
+        title: 'New Form Submission',
+        message: `Someone submitted the form "${form.title}"`,
+        type: 'info',
+        link: `/employee/tasks?taskId=${task.id}`,
+      });
+
+      res.json({ success: true, message: "Form submitted successfully" });
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      res.status(500).json({ error: "Failed to submit form" });
     }
   });
 

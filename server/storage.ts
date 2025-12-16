@@ -1778,6 +1778,88 @@ export class DatabaseStorage implements IStorage {
   async deleteGoogleCalendarToken(userId: string): Promise<void> {
     await db.delete(schema.googleCalendarTokens).where(eq(schema.googleCalendarTokens.userId, userId));
   }
+
+  // Forms operations
+  async getForm(id: string): Promise<schema.Form | undefined> {
+    const [form] = await db.select().from(schema.forms).where(eq(schema.forms.id, id));
+    return form;
+  }
+
+  async getFormByShareToken(shareToken: string): Promise<schema.Form | undefined> {
+    const [form] = await db.select().from(schema.forms).where(eq(schema.forms.shareToken, shareToken));
+    return form;
+  }
+
+  async getFormsByCreator(createdBy: string): Promise<schema.Form[]> {
+    return await db.select().from(schema.forms)
+      .where(eq(schema.forms.createdBy, createdBy))
+      .orderBy(schema.forms.createdAt);
+  }
+
+  async createForm(form: schema.InsertForm): Promise<schema.Form> {
+    const [created] = await db.insert(schema.forms).values(form).returning();
+    return created;
+  }
+
+  async updateForm(id: string, updates: Partial<schema.InsertForm>): Promise<schema.Form | undefined> {
+    const [updated] = await db.update(schema.forms)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.forms.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteForm(id: string): Promise<void> {
+    // Delete related records first
+    await db.delete(schema.formInvitations).where(eq(schema.formInvitations.formId, id));
+    await db.delete(schema.formSubmissions).where(eq(schema.formSubmissions.formId, id));
+    await db.delete(schema.forms).where(eq(schema.forms.id, id));
+  }
+
+  // Form Submissions operations
+  async getFormSubmission(id: string): Promise<schema.FormSubmission | undefined> {
+    const [submission] = await db.select().from(schema.formSubmissions).where(eq(schema.formSubmissions.id, id));
+    return submission;
+  }
+
+  async getFormSubmissions(formId: string): Promise<schema.FormSubmission[]> {
+    return await db.select().from(schema.formSubmissions)
+      .where(eq(schema.formSubmissions.formId, formId))
+      .orderBy(schema.formSubmissions.createdAt);
+  }
+
+  async createFormSubmission(submission: schema.InsertFormSubmission): Promise<schema.FormSubmission> {
+    const [created] = await db.insert(schema.formSubmissions).values(submission).returning();
+    return created;
+  }
+
+  async updateFormSubmission(id: string, updates: Partial<schema.InsertFormSubmission>): Promise<schema.FormSubmission | undefined> {
+    const [updated] = await db.update(schema.formSubmissions)
+      .set(updates)
+      .where(eq(schema.formSubmissions.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Form Invitations operations
+  async getFormInvitations(formId: string): Promise<schema.FormInvitation[]> {
+    return await db.select().from(schema.formInvitations)
+      .where(eq(schema.formInvitations.formId, formId))
+      .orderBy(schema.formInvitations.createdAt);
+  }
+
+  async createFormInvitation(invitation: schema.InsertFormInvitation): Promise<schema.FormInvitation> {
+    const [created] = await db.insert(schema.formInvitations).values(invitation).returning();
+    return created;
+  }
+
+  async updateFormInvitation(id: string, updates: Partial<schema.InsertFormInvitation>): Promise<schema.FormInvitation | undefined> {
+    const [updated] = await db.update(schema.formInvitations)
+      .set(updates)
+      .where(eq(schema.formInvitations.id, id))
+      .returning();
+    return updated;
+  }
 }
 
 export const storage = new DatabaseStorage();

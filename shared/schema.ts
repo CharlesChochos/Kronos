@@ -1102,3 +1102,93 @@ export const insertGoogleCalendarTokenSchema = createInsertSchema(googleCalendar
 
 export type InsertGoogleCalendarToken = z.infer<typeof insertGoogleCalendarTokenSchema>;
 export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;
+
+// Form Field Type
+export type FormFieldType = 'text' | 'email' | 'single_select' | 'multi_select' | 'date' | 'number' | 'attachment' | 'heading';
+
+export type FormFieldOption = {
+  id: string;
+  label: string;
+};
+
+export type FormField = {
+  id: string;
+  type: FormFieldType;
+  label: string;
+  description?: string;
+  required: boolean;
+  options?: FormFieldOption[]; // For single_select and multi_select
+  order: number;
+};
+
+// Forms table - stores form definitions
+export const forms = pgTable("forms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  coverImage: text("cover_image"),
+  fields: jsonb("fields").default([]).$type<FormField[]>(),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  shareToken: text("share_token").unique(), // Unique token for public access
+  status: text("status").notNull().default('draft'), // draft, published
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFormSchema = createInsertSchema(forms).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertForm = z.infer<typeof insertFormSchema>;
+export type Form = typeof forms.$inferSelect;
+
+// Form Submission Response type
+export type FormSubmissionResponse = {
+  fieldId: string;
+  fieldLabel: string;
+  fieldType: FormFieldType;
+  value: string | string[] | null; // string for most, array for multi_select
+};
+
+// Form Submissions table - stores submitted form responses
+export const formSubmissions = pgTable("form_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  formId: varchar("form_id").references(() => forms.id).notNull(),
+  formTitle: text("form_title").notNull(), // Snapshot of form title at submission time
+  submitterName: text("submitter_name"),
+  submitterEmail: text("submitter_email"),
+  submitterId: varchar("submitter_id").references(() => users.id), // If submitter is a platform user
+  responses: jsonb("responses").default([]).$type<FormSubmissionResponse[]>(),
+  taskId: varchar("task_id").references(() => tasks.id), // Created task for Dimitra
+  status: text("status").notNull().default('pending'), // pending, reviewed, completed
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
+export type FormSubmission = typeof formSubmissions.$inferSelect;
+
+// Form Invitations table - tracks who forms are shared with
+export const formInvitations = pgTable("form_invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  formId: varchar("form_id").references(() => forms.id).notNull(),
+  email: text("email").notNull(),
+  userId: varchar("user_id").references(() => users.id), // If invitee is a platform user
+  message: text("message"), // Custom message for the invitation
+  status: text("status").notNull().default('pending'), // pending, completed
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFormInvitationSchema = createInsertSchema(formInvitations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFormInvitation = z.infer<typeof insertFormInvitationSchema>;
+export type FormInvitation = typeof formInvitations.$inferSelect;

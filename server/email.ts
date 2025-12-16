@@ -730,3 +730,94 @@ Kronos - Investment Banking Operations Platform
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
+
+export interface FormInvitationData {
+  email: string;
+  formTitle: string;
+  senderName: string;
+  formLink: string;
+  message?: string;
+}
+
+export async function sendFormInvitationEmail(data: FormInvitationData): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { client, fromEmail } = await getUncachableResendClient();
+    
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #1a1a2e; background: #f5f5f5; margin: 0; padding: 20px; }
+            .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 30px; text-align: center; }
+            .header h1 { margin: 0; font-size: 24px; }
+            .content { padding: 30px; }
+            .message { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6; }
+            .cta-button { display: inline-block; background: #3b82f6; color: white !important; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 20px 0; }
+            .cta-button:hover { background: #2563eb; }
+            .footer { padding: 20px 30px; background: #f8f9fa; text-align: center; font-size: 12px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Form Request</h1>
+            </div>
+            <div class="content">
+              <p>Hello,</p>
+              <p><strong>${data.senderName}</strong> has requested you to complete a form:</p>
+              <h2 style="color: #1a1a2e;">${data.formTitle}</h2>
+              ${data.message ? `<div class="message"><strong>Message:</strong><br>${data.message}</div>` : ''}
+              <p>Please click the button below to access and complete the form:</p>
+              <div style="text-align: center;">
+                <a href="${data.formLink}" class="cta-button">Complete Form</a>
+              </div>
+              <p style="font-size: 12px; color: #666; margin-top: 20px;">
+                If the button doesn't work, copy and paste this link into your browser:<br>
+                <a href="${data.formLink}" style="color: #3b82f6;">${data.formLink}</a>
+              </p>
+            </div>
+            <div class="footer">
+              <p>Kronos - Investment Banking Operations Platform</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const emailText = `
+Form Request: ${data.formTitle}
+
+Hello,
+
+${data.senderName} has requested you to complete a form: ${data.formTitle}
+
+${data.message ? `Message: ${data.message}\n` : ''}
+Please click the link below to access and complete the form:
+${data.formLink}
+
+---
+Kronos - Investment Banking Operations Platform
+    `.trim();
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      to: data.email,
+      subject: `Form Request: ${data.formTitle}`,
+      html: emailHtml,
+      text: emailText,
+    });
+
+    if (result.error) {
+      console.error('Error sending form invitation email:', result.error);
+      return { success: false, error: result.error.message };
+    }
+
+    console.log(`Successfully sent form invitation email to: ${data.email}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('Failed to send form invitation email:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
