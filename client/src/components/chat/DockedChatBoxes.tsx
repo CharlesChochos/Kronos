@@ -40,13 +40,23 @@ type Conversation = {
   unreadCount: number;
 };
 
+type MessageReaction = {
+  emoji: string;
+  userId: string;
+  userName: string;
+  createdAt: string;
+};
+
 type Message = {
   id: string;
   senderId: string;
   senderName: string;
   content: string;
   createdAt: string;
+  reactions?: MessageReaction[];
 };
+
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🎉', '🔥', '👏', '💯', '✅'];
 
 type OpenChat = {
   conversationId: string;
@@ -434,6 +444,21 @@ function ChatBox({
     },
   });
 
+  const addReactionMutation = useMutation({
+    mutationFn: async ({ messageId, emoji }: { messageId: string; emoji: string }) => {
+      const res = await fetch(`/api/chat/conversations/${conversationId}/messages/${messageId}/reactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji }),
+      });
+      if (!res.ok) throw new Error("Failed to add reaction");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/chat/conversations/${conversationId}/messages`] });
+    },
+  });
+
   useEffect(() => {
     if (!isMinimized && endRef.current) {
       endRef.current.scrollIntoView({ behavior: "smooth" });
@@ -470,33 +495,94 @@ function ChatBox({
                 No messages yet. Say hello! 👋
               </div>
             ) : (
-              messages.map((msg) => (
-                <div 
-                  key={msg.id}
-                  className={cn(
-                    "mb-3 max-w-[85%]",
-                    msg.senderId === currentUser?.id ? "ml-auto" : ""
-                  )}
-                >
-                  <div className={cn(
-                    "rounded-2xl px-3 py-2 text-sm",
-                    msg.senderId === currentUser?.id 
-                      ? "bg-blue-600 text-white rounded-br-sm" 
-                      : "bg-gray-100 dark:bg-secondary text-gray-900 dark:text-foreground rounded-bl-sm"
-                  )}>
-                    {msg.senderId !== currentUser?.id && (
-                      <div className="text-xs font-medium mb-1 text-gray-500 dark:text-muted-foreground">{msg.senderName}</div>
+              messages.map((msg) => {
+                const groupedReactions = (msg.reactions || []).reduce((acc, r) => {
+                  if (!acc[r.emoji]) acc[r.emoji] = [];
+                  acc[r.emoji].push(r);
+                  return acc;
+                }, {} as Record<string, MessageReaction[]>);
+
+                return (
+                  <div 
+                    key={msg.id}
+                    className={cn(
+                      "mb-3 max-w-[85%] group",
+                      msg.senderId === currentUser?.id ? "ml-auto" : ""
                     )}
-                    {msg.content}
+                  >
+                    <div className="relative">
+                      <div className={cn(
+                        "rounded-2xl px-3 py-2 text-sm",
+                        msg.senderId === currentUser?.id 
+                          ? "bg-blue-600 text-white rounded-br-sm" 
+                          : "bg-gray-100 dark:bg-secondary text-gray-900 dark:text-foreground rounded-bl-sm"
+                      )}>
+                        {msg.senderId !== currentUser?.id && (
+                          <div className="text-xs font-medium mb-1 text-gray-500 dark:text-muted-foreground">{msg.senderName}</div>
+                        )}
+                        {msg.content}
+                      </div>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button 
+                            className={cn(
+                              "absolute -bottom-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-card border border-gray-200 dark:border-border rounded-full p-1 shadow-sm hover:bg-gray-50 dark:hover:bg-secondary",
+                              msg.senderId === currentUser?.id ? "right-0" : "left-0"
+                            )}
+                          >
+                            <Smile className="w-3.5 h-3.5 text-gray-500" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-1" align={msg.senderId === currentUser?.id ? "end" : "start"} side="top">
+                          <div className="flex gap-1">
+                            {QUICK_REACTIONS.map((emoji) => (
+                              <button
+                                key={emoji}
+                                className="w-7 h-7 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-secondary rounded text-base transition-colors"
+                                onClick={() => addReactionMutation.mutate({ messageId: msg.id, emoji })}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    {Object.keys(groupedReactions).length > 0 && (
+                      <div className={cn(
+                        "flex flex-wrap gap-1 mt-1",
+                        msg.senderId === currentUser?.id ? "justify-end" : ""
+                      )}>
+                        {Object.entries(groupedReactions).map(([emoji, reactions]) => {
+                          const hasUserReacted = reactions.some(r => r.userId === currentUser?.id);
+                          return (
+                            <button
+                              key={emoji}
+                              onClick={() => addReactionMutation.mutate({ messageId: msg.id, emoji })}
+                              className={cn(
+                                "flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border transition-colors",
+                                hasUserReacted 
+                                  ? "bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700" 
+                                  : "bg-gray-100 dark:bg-secondary border-gray-200 dark:border-border hover:bg-gray-200 dark:hover:bg-secondary/80"
+                              )}
+                              title={reactions.map(r => r.userName).join(', ')}
+                            >
+                              <span>{emoji}</span>
+                              <span className="text-gray-600 dark:text-muted-foreground">{reactions.length}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div className={cn(
+                      "text-[10px] text-gray-400 mt-0.5 px-1",
+                      msg.senderId === currentUser?.id ? "text-right" : ""
+                    )}>
+                      {format(new Date(msg.createdAt), 'h:mm a')}
+                    </div>
                   </div>
-                  <div className={cn(
-                    "text-[10px] text-gray-400 mt-0.5 px-1",
-                    msg.senderId === currentUser?.id ? "text-right" : ""
-                  )}>
-                    {format(new Date(msg.createdAt), 'h:mm a')}
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
             <div ref={endRef} />
           </ScrollArea>
