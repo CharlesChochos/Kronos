@@ -43,6 +43,9 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
+  const seenNotificationIdsRef = useRef<Set<string>>(new Set());
+  const notificationMountTimeRef = useRef(Date.now());
   const logoutMutation = useLogout();
   const { data: currentUser } = useCurrentUser();
   const markNotificationRead = useMarkNotificationRead();
@@ -309,6 +312,40 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
   const { data: users = [] } = useUsers();
   const unreadCount = notifications.filter((n: any) => !n.read).length;
   const unreadNotifications = notifications.filter((n: any) => !n.read);
+  
+  // Initialize notification sound
+  useEffect(() => {
+    notificationAudioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQYAJ5rk/+WxOgAAU+b/+9BQAABU7f/61VcAAFLr//bQVAAAT+f/9MxQAABM4//xyEsAAEne/+7ERAD/Rdn/7MBAAP9C1f/qvDsA/z/R/+i4NgD/PNT/57Q0AP8x0P/krS8A/yjM/+KnKgD/H8j/4KElAP8Vw//enhsA/wzA/92VFgD/A73/25ERAP/6uv/ajw0A//a4/9mMCAD/8rb/2IoDAP/vsf/YhP//+6uu/9eA+//+q6z/1n73//+oqv/Ueu7/');
+    notificationAudioRef.current.volume = 0.7;
+  }, []);
+  
+  // Play sound for new direct notifications
+  useEffect(() => {
+    if (!currentUser || notifications.length === 0) return;
+    
+    const directNotificationTypes = ['task_assigned', 'task_mentioned', 'deal_assigned', 'message', 'mention', 'assigned', 'task'];
+    
+    notifications.forEach((notification: any) => {
+      if (seenNotificationIdsRef.current.has(notification.id)) return;
+      
+      const notificationTime = new Date(notification.createdAt).getTime();
+      const isRecent = notificationTime > notificationMountTimeRef.current - 5000;
+      
+      const notificationType = notification.type?.toLowerCase() || '';
+      const notificationTitle = notification.title?.toLowerCase() || '';
+      const isDirectNotification = directNotificationTypes.some(type => 
+        notificationType.includes(type) || notificationTitle.includes(type)
+      ) || notificationTitle.includes('assigned') || notificationTitle.includes('mentioned');
+      
+      seenNotificationIdsRef.current.add(notification.id);
+      
+      if (isRecent && isDirectNotification && !notification.read) {
+        if (notificationAudioRef.current) {
+          notificationAudioRef.current.play().catch(() => {});
+        }
+      }
+    });
+  }, [notifications, currentUser]);
   
   const handleLogout = async () => {
     try {
