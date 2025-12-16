@@ -14,9 +14,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Plus, FileText, Share2, Trash2, Edit, Eye, Copy, Send, GripVertical, X, Type, Mail, List, Calendar, Hash, Paperclip, Heading, AlignLeft, Table, FileTextIcon, Image, ChevronDown, ChevronUp, GitBranch, Link, Upload, Search, ExternalLink, Download, ChevronLeft } from "lucide-react";
+import { Plus, FileText, Share2, Trash2, Edit, Eye, Copy, Send, GripVertical, X, Type, Mail, List, Calendar, Hash, Paperclip, Heading, AlignLeft, Table, FileTextIcon, Image, ChevronDown, ChevronUp, GitBranch, Link, Upload, Search, ExternalLink, Download, ChevronLeft, User, Clock } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
+import jsPDF from "jspdf";
 
 const FIELD_TYPES = [
   { value: 'heading', label: 'Section Heading', icon: Heading, category: 'layout' },
@@ -1218,31 +1219,143 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
 
   if (!form) return null;
 
-  const handleDownloadSubmission = (submission: any) => {
-    const data = {
-      formTitle: form.title,
-      submitterName: submission.submitterName || 'Anonymous',
-      submitterEmail: submission.submitterEmail || 'No email',
-      submittedAt: format(new Date(submission.createdAt), 'MMM d, yyyy h:mm a'),
-      responses: submission.responses.map((resp: any) => {
-        const field = form.fields.find(f => f.id === resp.fieldId);
-        return {
-          question: field?.label || resp.fieldId,
-          answer: Array.isArray(resp.value) ? resp.value.join(', ') : String(resp.value)
-        };
-      })
-    };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${form.title.replace(/[^a-z0-9]/gi, '_')}_submission_${submission.id}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success('Submission downloaded');
+  const handleDownloadPDF = (submission: any) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    const maxWidth = pageWidth - margin * 2;
+    let yPos = 20;
+
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(form.title, margin, yPos);
+    yPos += 12;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text('Form Submission Report', margin, yPos);
+    yPos += 15;
+
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 10;
+
+    doc.setFontSize(11);
+    doc.setTextColor(60, 60, 60);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Submitted By:', margin, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(submission.submitterName || 'Anonymous', margin + 35, yPos);
+    yPos += 7;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Email:', margin, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(submission.submitterEmail || 'Not provided', margin + 35, yPos);
+    yPos += 7;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Date:', margin, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(format(new Date(submission.createdAt), 'MMMM d, yyyy \'at\' h:mm a'), margin + 35, yPos);
+    yPos += 15;
+
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 12;
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(40, 40, 40);
+    doc.text('Responses', margin, yPos);
+    yPos += 10;
+
+    let attachmentCount = 0;
+    const attachments: { label: string; url: string; filename: string }[] = [];
+
+    submission.responses.forEach((resp: any) => {
+      const field = form.fields.find(f => f.id === resp.fieldId);
+      const isFile = field?.type === 'file';
+      
+      if (yPos > 260) {
+        doc.addPage();
+        yPos = 20;
+      }
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(80, 80, 80);
+      doc.text(field?.label || resp.fieldId, margin, yPos);
+      yPos += 6;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(40, 40, 40);
+
+      if (isFile) {
+        const files = Array.isArray(resp.value) ? resp.value : [resp.value];
+        files.forEach((file: any) => {
+          if (file && (file.url || typeof file === 'string')) {
+            attachmentCount++;
+            const filename = file.filename || `Attachment ${attachmentCount}`;
+            const url = file.url || file;
+            attachments.push({ label: field?.label || 'File', url, filename });
+            doc.text(`[Attachment ${attachmentCount}] ${filename}`, margin + 5, yPos);
+            yPos += 5;
+          }
+        });
+      } else {
+        const value = Array.isArray(resp.value) ? resp.value.join(', ') : String(resp.value || 'No response');
+        const lines = doc.splitTextToSize(value, maxWidth - 5);
+        lines.forEach((line: string) => {
+          if (yPos > 280) {
+            doc.addPage();
+            yPos = 20;
+          }
+          doc.text(line, margin + 5, yPos);
+          yPos += 5;
+        });
+      }
+      yPos += 8;
+    });
+
+    if (attachments.length > 0) {
+      if (yPos > 240) {
+        doc.addPage();
+        yPos = 20;
+      }
+      yPos += 5;
+      doc.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 10;
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('File Attachments', margin, yPos);
+      yPos += 8;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+      attachments.forEach((att, i) => {
+        if (yPos > 280) {
+          doc.addPage();
+          yPos = 20;
+        }
+        doc.text(`${i + 1}. ${att.filename}`, margin, yPos);
+        yPos += 4;
+        doc.setTextColor(0, 100, 200);
+        const urlLines = doc.splitTextToSize(att.url, maxWidth - 10);
+        urlLines.forEach((line: string) => {
+          doc.text(line, margin + 5, yPos);
+          yPos += 4;
+        });
+        doc.setTextColor(60, 60, 60);
+        yPos += 3;
+      });
+    }
+
+    const filename = `${form.title.replace(/[^a-z0-9]/gi, '_')}_${submission.submitterName?.replace(/[^a-z0-9]/gi, '_') || 'submission'}.pdf`;
+    doc.save(filename);
+    toast.success('PDF downloaded successfully');
   };
 
   const renderFileValue = (value: any) => {
@@ -1254,29 +1367,29 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
           href={value.url} 
           target="_blank" 
           rel="noopener noreferrer"
-          className="text-primary hover:underline inline-flex items-center gap-1"
+          className="inline-flex items-center gap-2 px-3 py-2 bg-[#f5f0e8] hover:bg-[#ebe4d8] text-[#5c4f3d] rounded-lg transition-colors"
         >
-          <Paperclip className="h-3 w-3" />
-          {value.filename || 'Attached file'}
-          <ExternalLink className="h-3 w-3" />
+          <Paperclip className="h-4 w-4" />
+          <span className="font-medium">{value.filename || 'View attachment'}</span>
+          <ExternalLink className="h-3 w-3 ml-1" />
         </a>
       );
     }
     
     if (Array.isArray(value)) {
       return (
-        <div className="space-y-1">
+        <div className="flex flex-wrap gap-2">
           {value.map((file: any, idx: number) => (
             <a 
               key={idx}
               href={file.url || file} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-primary hover:underline inline-flex items-center gap-1 block"
+              className="inline-flex items-center gap-2 px-3 py-2 bg-[#f5f0e8] hover:bg-[#ebe4d8] text-[#5c4f3d] rounded-lg transition-colors"
             >
-              <Paperclip className="h-3 w-3" />
-              {file.filename || `File ${idx + 1}`}
-              <ExternalLink className="h-3 w-3" />
+              <Paperclip className="h-4 w-4" />
+              <span className="font-medium">{file.filename || `File ${idx + 1}`}</span>
+              <ExternalLink className="h-3 w-3 ml-1" />
             </a>
           ))}
         </div>
@@ -1286,26 +1399,69 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
     return String(value);
   };
 
+  const renderResponseValue = (field: FormField | undefined, value: any) => {
+    if (!value && value !== 0) return <span className="text-muted-foreground italic">No response</span>;
+    
+    if (field?.type === 'file') {
+      return renderFileValue(value);
+    }
+    
+    if (field?.type === 'multi-select' && Array.isArray(value)) {
+      return (
+        <div className="flex flex-wrap gap-2">
+          {value.map((item: string, idx: number) => (
+            <Badge key={idx} variant="secondary" className="bg-[#f5f0e8] text-[#5c4f3d] hover:bg-[#ebe4d8]">
+              {item}
+            </Badge>
+          ))}
+        </div>
+      );
+    }
+    
+    if (field?.type === 'single-select') {
+      return (
+        <Badge variant="secondary" className="bg-[#f5f0e8] text-[#5c4f3d]">
+          {String(value)}
+        </Badge>
+      );
+    }
+    
+    if (field?.type === 'date') {
+      try {
+        return <span className="text-[#3d3428]">{format(new Date(value), 'MMMM d, yyyy')}</span>;
+      } catch {
+        return <span className="text-[#3d3428]">{String(value)}</span>;
+      }
+    }
+    
+    return (
+      <p className="text-[#3d3428] whitespace-pre-wrap leading-relaxed">
+        {Array.isArray(value) ? value.join(', ') : String(value)}
+      </p>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={(open) => { onOpenChange(open); if (!open) setSelectedSubmission(null); }}>
       <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           {selectedSubmission ? (
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setSelectedSubmission(null)} data-testid="button-back-submissions">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedSubmission(null)} data-testid="button-back-submissions" className="hover:bg-[#f5f0e8]">
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Back
               </Button>
+              <Separator orientation="vertical" className="h-6" />
               <div>
-                <DialogTitle>Submission Details</DialogTitle>
+                <DialogTitle className="text-[#3d3428]">Submission Details</DialogTitle>
                 <DialogDescription>
-                  From {selectedSubmission.submitterName || 'Anonymous'} on {format(new Date(selectedSubmission.createdAt), 'MMM d, yyyy h:mm a')}
+                  View complete form responses
                 </DialogDescription>
               </div>
             </div>
           ) : (
             <>
-              <DialogTitle>Submissions for "{form.title}"</DialogTitle>
+              <DialogTitle className="text-[#3d3428]">Submissions for "{form.title}"</DialogTitle>
               <DialogDescription>
                 {submissions?.length || 0} response{submissions?.length !== 1 ? 's' : ''} received
               </DialogDescription>
@@ -1315,67 +1471,112 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
         
         <ScrollArea className="flex-1 pr-4">
           {selectedSubmission ? (
-            <div className="space-y-6 py-4">
-              <div className="flex items-center justify-between bg-muted/50 p-4 rounded-lg">
-                <div>
-                  <p className="font-medium text-lg">{selectedSubmission.submitterName || 'Anonymous'}</p>
-                  <p className="text-sm text-muted-foreground">{selectedSubmission.submitterEmail || 'No email provided'}</p>
+            <div className="py-4 space-y-6">
+              <div className="bg-gradient-to-r from-[#f5f0e8] to-[#faf7f2] rounded-xl p-6 border border-[#e8e0d4]">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-[#5c4f3d] flex items-center justify-center">
+                      <User className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-[#3d3428]">
+                        {selectedSubmission.submitterName || 'Anonymous'}
+                      </h3>
+                      <p className="text-[#8b7355]">{selectedSubmission.submitterEmail || 'No email provided'}</p>
+                      <div className="flex items-center gap-2 mt-2 text-sm text-[#8b7355]">
+                        <Clock className="h-4 w-4" />
+                        <span>{format(new Date(selectedSubmission.createdAt), 'MMMM d, yyyy \'at\' h:mm a')}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleDownloadPDF(selectedSubmission)} 
+                    data-testid="button-download-submission-detail"
+                    className="border-[#5c4f3d] text-[#5c4f3d] hover:bg-[#5c4f3d] hover:text-white"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download PDF
+                  </Button>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => handleDownloadSubmission(selectedSubmission)} data-testid="button-download-submission-detail">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
               </div>
               
               <div className="space-y-4">
-                {selectedSubmission.responses.map((resp: any, i: number) => {
-                  const field = form.fields.find(f => f.id === resp.fieldId);
-                  const isFile = field?.type === 'file';
-                  
-                  return (
-                    <div key={i} className="border rounded-lg p-4">
-                      <Label className="text-sm font-medium text-muted-foreground">{field?.label || resp.fieldId}</Label>
-                      <div className="mt-2">
-                        {isFile ? (
-                          renderFileValue(resp.value)
-                        ) : (
-                          <p className="text-sm whitespace-pre-wrap">
-                            {Array.isArray(resp.value) ? resp.value.join(', ') : String(resp.value || 'No response')}
-                          </p>
-                        )}
+                <h4 className="text-sm font-semibold text-[#8b7355] uppercase tracking-wide">Form Responses</h4>
+                
+                <div className="grid gap-4">
+                  {selectedSubmission.responses.map((resp: any, i: number) => {
+                    const field = form.fields.find(f => f.id === resp.fieldId);
+                    
+                    return (
+                      <div 
+                        key={i} 
+                        className="bg-white border border-[#e8e0d4] rounded-xl p-5 hover:shadow-sm transition-shadow"
+                        data-testid={`response-field-${i}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-[#f5f0e8] flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-sm font-semibold text-[#8b7355]">{i + 1}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <Label className="text-sm font-medium text-[#8b7355] block mb-2">
+                              {field?.label || resp.fieldId}
+                            </Label>
+                            <div className="mt-1">
+                              {renderResponseValue(field, resp.value)}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           ) : isLoading ? (
-            <p className="text-center py-8 text-muted-foreground">Loading submissions...</p>
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin w-8 h-8 border-2 border-[#5c4f3d] border-t-transparent rounded-full mx-auto mb-3"></div>
+                <p className="text-muted-foreground">Loading submissions...</p>
+              </div>
+            </div>
           ) : submissions && submissions.length > 0 ? (
             <div className="space-y-3 py-4">
               {submissions.map((sub) => (
                 <Card 
                   key={sub.id} 
-                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  className="cursor-pointer hover:shadow-md hover:border-[#d4cbc0] transition-all bg-white border-[#e8e0d4]"
                   onClick={() => setSelectedSubmission(sub)}
                   data-testid={`card-submission-${sub.id}`}
                 >
                   <CardContent className="py-4">
                     <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <p className="font-medium">{sub.submitterName || 'Anonymous'}</p>
-                        <p className="text-sm text-muted-foreground">{sub.submitterEmail || 'No email'}</p>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-[#f5f0e8] flex items-center justify-center">
+                          <User className="h-5 w-5 text-[#8b7355]" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-[#3d3428]">{sub.submitterName || 'Anonymous'}</p>
+                          <p className="text-sm text-[#8b7355]">{sub.submitterEmail || 'No email'}</p>
+                        </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <p className="text-sm text-muted-foreground">
-                          {format(new Date(sub.createdAt), 'MMM d, yyyy h:mm a')}
-                        </p>
+                        <div className="text-right">
+                          <p className="text-sm text-[#8b7355]">
+                            {format(new Date(sub.createdAt), 'MMM d, yyyy')}
+                          </p>
+                          <p className="text-xs text-[#a09080]">
+                            {format(new Date(sub.createdAt), 'h:mm a')}
+                          </p>
+                        </div>
                         <div className="flex items-center gap-1">
                           <Button 
                             variant="ghost" 
                             size="sm"
                             onClick={(e) => { e.stopPropagation(); setSelectedSubmission(sub); }}
                             data-testid={`button-view-submission-${sub.id}`}
+                            className="hover:bg-[#f5f0e8] text-[#5c4f3d]"
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             View
@@ -1383,30 +1584,26 @@ function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpen
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={(e) => { e.stopPropagation(); handleDownloadSubmission(sub); }}
+                            onClick={(e) => { e.stopPropagation(); handleDownloadPDF(sub); }}
                             data-testid={`button-download-submission-${sub.id}`}
+                            className="hover:bg-[#f5f0e8] text-[#5c4f3d]"
                           >
                             <Download className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
                     </div>
-                    <div className="mt-2 text-sm text-muted-foreground line-clamp-1">
-                      {sub.responses.slice(0, 2).map((resp: any, i: number) => {
-                        const field = form.fields.find(f => f.id === resp.fieldId);
-                        const value = Array.isArray(resp.value) ? resp.value.join(', ') : String(resp.value);
-                        return `${field?.label || resp.fieldId}: ${value.substring(0, 30)}${value.length > 30 ? '...' : ''}`;
-                      }).join(' | ')}
-                    </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">No submissions yet</p>
-              <p className="text-sm text-muted-foreground mt-1">Share this form to start collecting responses</p>
+            <div className="text-center py-16">
+              <div className="w-16 h-16 rounded-full bg-[#f5f0e8] flex items-center justify-center mx-auto mb-4">
+                <FileText className="h-8 w-8 text-[#8b7355]" />
+              </div>
+              <h3 className="text-lg font-medium text-[#3d3428] mb-2">No submissions yet</h3>
+              <p className="text-[#8b7355]">Share this form to start collecting responses</p>
             </div>
           )}
         </ScrollArea>
