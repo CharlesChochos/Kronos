@@ -32,10 +32,10 @@ import {
   Pencil, Trash2, Eye, Users, Phone, Mail, MessageSquare, Plus, X, 
   Building2, TrendingUp, FileText, Clock, CheckCircle2, ChevronRight,
   UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload, GitCompare, ArrowUpDown, BarChart3,
-  Mic, MicOff, Play, Pause, Square, Volume2, Download, UserCircle, ExternalLink
+  Mic, MicOff, Play, Pause, Square, Volume2, Download, UserCircle, ExternalLink, ArrowLeftCircle
 } from "lucide-react";
 import { 
-  useCurrentUser, useDealsListing, useDeal, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers, useTasks, useCreateDealFee,
+  useCurrentUser, useDealsListing, useDeal, useCreateDeal, useUpdateDeal, useDeleteDeal, useMoveDealToOpportunity, useUsers, useTasks, useCreateDealFee,
   useStageDocuments, useCreateStageDocument, useDeleteStageDocument,
   useStagePodMembers, useCreateStagePodMember, useDeleteStagePodMember,
   useStageVoiceNotes, useCreateStageVoiceNote, useDeleteStageVoiceNote,
@@ -1420,6 +1420,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const createDeal = useCreateDeal();
   const updateDeal = useUpdateDeal();
   const deleteDeal = useDeleteDeal();
+  const moveDealToOpportunity = useMoveDealToOpportunity();
   const createDealFee = useCreateDealFee();
   const createDocument = useCreateDocument();
   
@@ -3049,14 +3050,50 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     <SheetTitle className="text-2xl">{selectedDeal.name}</SheetTitle>
                     <SheetDescription>{selectedDeal.client} • {selectedDeal.sector}</SheetDescription>
                   </div>
-                  <Badge className={cn(
-                    "px-3 py-1",
-                    selectedDeal.status === 'Active' ? "bg-green-500/20 text-green-400" :
-                    selectedDeal.status === 'On Hold' ? "bg-yellow-500/20 text-yellow-400" :
-                    "bg-gray-500/20 text-gray-400"
-                  )}>
-                    {selectedDeal.status}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" size="sm" data-testid="button-move-to-opportunities">
+                          <ArrowLeftCircle className="w-4 h-4 mr-2" />
+                          Move to Opportunities
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Move to Opportunities?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will move "{selectedDeal.name}" back to the Opportunities page. The deal stage will be reset to "Origination".
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => {
+                              moveDealToOpportunity.mutate(selectedDeal.id, {
+                                onSuccess: () => {
+                                  toast.success('Deal moved to Opportunities');
+                                  setSelectedDeal(null);
+                                },
+                                onError: (error) => {
+                                  toast.error(error.message || 'Failed to move deal');
+                                },
+                              });
+                            }}
+                          >
+                            Move to Opportunities
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                    <Badge className={cn(
+                      "px-3 py-1",
+                      selectedDeal.status === 'Active' ? "bg-green-500/20 text-green-400" :
+                      selectedDeal.status === 'On Hold' ? "bg-yellow-500/20 text-yellow-400" :
+                      "bg-gray-500/20 text-gray-400"
+                    )}>
+                      {selectedDeal.status}
+                    </Badge>
+                  </div>
                 </div>
               </SheetHeader>
 

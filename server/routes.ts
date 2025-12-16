@@ -1206,6 +1206,49 @@ export async function registerRoutes(
     }
   });
 
+  // Move deal back to Opportunities
+  app.patch("/api/deals/:id/move-to-opportunity", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const deal = await storage.getDeal(req.params.id);
+      
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+      
+      // Only allow admins or assigned users to move deals
+      if (user.accessLevel !== 'admin') {
+        const podTeam = (deal as any).podTeam || [];
+        const isAssigned = podTeam.some((member: any) => 
+          (user.id && (member.userId === user.id || member.id === user.id)) ||
+          (user.email && member.email === user.email) ||
+          (user.name && member.name === user.name)
+        );
+        
+        if (!isAssigned) {
+          return res.status(403).json({ error: "You can only move deals you're assigned to" });
+        }
+      }
+      
+      const previousType = deal.dealType;
+      const updatedDeal = await storage.updateDeal(req.params.id, {
+        dealType: 'Opportunity',
+        stage: 'Origination',
+        status: 'Active',
+      });
+      
+      await createAuditLog(req, 'deal_moved_to_opportunity', 'deal', deal.id, deal.name, {
+        previousDealType: previousType,
+        movedBy: user.name,
+      });
+      
+      res.json(updatedDeal);
+    } catch (error) {
+      console.error('Move to opportunity error:', error);
+      res.status(500).json({ error: "Failed to move deal to opportunities" });
+    }
+  });
+
   // ===== DEAL FEES ROUTES =====
   
   app.get("/api/deals/:dealId/fees", requireAuth, requireInternal, async (req, res) => {
@@ -1597,13 +1640,50 @@ export async function registerRoutes(
   app.post("/api/deals/:dealId/notes", requireAuth, requireInternal, async (req, res) => {
     try {
       const user = req.user as any;
+      const dealId = req.params.dealId;
+      const content = req.body.content;
+      
       const note = await storage.createDealNote({
-        dealId: req.params.dealId,
+        dealId,
         userId: user.id,
         userName: user.name,
         userAvatar: user.avatar,
-        content: req.body.content,
+        content,
       });
+      
+      // Parse @mentions and create notifications
+      const mentionMatches = content.match(/@(\w+)/g);
+      if (mentionMatches) {
+        const allUsers = await storage.getAllUsers();
+        const deal = await storage.getDeal(dealId);
+        const dealName = deal?.name || 'a deal';
+        const uniqueMentions = [...new Set(mentionMatches)];
+        
+        for (const mention of uniqueMentions) {
+          const mentionName = mention.slice(1).toLowerCase();
+          const mentionedUser = allUsers.find(u => 
+            u.name.replace(/\s+/g, '').toLowerCase() === mentionName
+          );
+          
+          if (mentionedUser && mentionedUser.id !== user.id) {
+            let notificationLink = `/ceo/deal-management?dealId=${dealId}`;
+            if (deal?.dealType === 'Opportunity') {
+              notificationLink = `/ceo/opportunities?dealId=${dealId}`;
+            } else if (deal?.dealType === 'Asset Management') {
+              notificationLink = `/employee/asset-management?dealId=${dealId}`;
+            }
+            
+            await storage.createNotification({
+              userId: mentionedUser.id,
+              title: 'You were mentioned',
+              message: `${user.name} mentioned you in a note on "${dealName}"`,
+              type: 'info',
+              link: notificationLink,
+            });
+          }
+        }
+      }
+      
       res.json(note);
     } catch (error) {
       res.status(500).json({ error: "Failed to create deal note" });

@@ -230,6 +230,26 @@ export function useDeleteDeal() {
   });
 }
 
+export function useMoveDealToOpportunity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (dealId: string) => {
+      const res = await fetch(`/api/deals/${dealId}/move-to-opportunity`, {
+        method: "PATCH",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Failed to move deal" }));
+        throw new Error(errorData.error || "Failed to move deal to opportunities");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
+    },
+  });
+}
+
 // Custom Sectors API
 export type CustomSector = {
   id: string;
