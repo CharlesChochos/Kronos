@@ -5,13 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   X,
   Maximize2,
   Send,
-  MessageSquare,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Smile
 } from "lucide-react";
 import { useCurrentUser } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -53,15 +54,27 @@ type OpenChat = {
 };
 
 const MAX_OPEN_CHATS = 3;
+const STORAGE_KEY = 'kronos_open_chats';
 
-// Global audio context to handle browser autoplay restrictions
+const EMOJI_CATEGORIES = {
+  'Smileys': ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🫡', '🤐', '🤨', '😐', '😑', '😶', '🫥', '😏', '😒', '🙄', '😬', '😮‍💨', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐'],
+  'Gestures': ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🫰', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '🫵', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '🫶', '👐', '🤲', '🤝', '🙏', '✍️', '💪', '🦾', '🦿'],
+  'Hearts': ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❤️‍🔥', '❤️‍🩹', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '♥️', '💋', '💌', '💐', '🌹', '🌷', '🌸'],
+  'Reactions': ['🎉', '🎊', '🎁', '🏆', '🥇', '🥈', '🥉', '⭐', '🌟', '✨', '💫', '🔥', '💥', '💢', '💯', '✅', '❌', '⚠️', '🚨', '💡', '📌', '📍', '🎯', '🔔', '🔕', '📣', '📢', '💬', '💭', '🗯️', '👁️‍🗨️'],
+  'Work': ['📊', '📈', '📉', '📋', '📁', '📂', '🗂️', '📅', '📆', '🗓️', '📇', '🗃️', '🗄️', '📑', '📄', '📃', '📝', '✏️', '✒️', '🖊️', '🖋️', '📧', '📨', '📩', '📤', '📥', '📦', '💼', '🗑️', '🔍', '🔎', '💻', '🖥️', '⌨️', '🖱️', '📱', '☎️', '📞'],
+  'Time': ['⏰', '⏱️', '⏲️', '🕐', '🕑', '🕒', '🕓', '🕔', '🕕', '🕖', '🕗', '🕘', '🕙', '🕚', '🕛', '📅', '📆', '🗓️', '⌛', '⏳', '🌅', '🌄', '🌃', '🌆', '🌇', '🌉', '🌙', '🌛', '🌜', '☀️', '🌤️', '⛅', '🌥️', '☁️'],
+  'Symbols': ['✓', '✔️', '☑️', '✅', '❎', '❌', '⭕', '❗', '❓', '❕', '❔', '‼️', '⁉️', '💲', '💱', '©️', '®️', '™️', '🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚫', '⚪', '🟤', '🔶', '🔷', '🔸', '🔹', '🔺', '🔻', '▪️', '▫️', '◾', '◽', '◼️', '◻️', '⬛', '⬜'],
+  'Animals': ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🙈', '🙉', '🙊', '🐔', '🐧', '🐦', '🐤', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🪱', '🐛', '🦋', '🐌', '🐞', '🐜', '🪰', '🪲', '🪳', '🦟', '🦗', '🕷️', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋', '🦈', '🐊'],
+  'Food': ['🍕', '🍔', '🍟', '🌭', '🍿', '🧂', '🥓', '🥚', '🍳', '🧇', '🥞', '🧈', '🍞', '🥐', '🥖', '🥨', '🧀', '🥗', '🥙', '🥪', '🌮', '🌯', '🫔', '🥫', '🍝', '🍜', '🍲', '🍛', '🍣', '🍱', '🥟', '🦪', '🍤', '🍙', '🍚', '🍘', '🍥', '🥠', '🥮', '🍡', '🍧', '🍨', '🍦', '🥧', '🧁', '🍰', '🎂', '🍮', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🌰', '🥜', '🍯', '🥛', '🍼', '☕', '🫖', '🍵', '🧃', '🥤', '🧋', '🍶', '🍺', '🍻', '🥂', '🍷', '🥃', '🍸', '🍹', '🧉', '🍾']
+};
+
 let audioUnlocked = false;
 let notificationAudio: HTMLAudioElement | null = null;
 
 const initAudio = () => {
   if (!notificationAudio) {
-    notificationAudio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQYAJ5rk/+WxOgAAU+b/+9BQAABU7f/61VcAAFLr//bQVAAAT+f/9MxQAABM4//xyEsAAEne/+7ERAD/Rdn/7MBAAP9C1f/qvDsA/z/R/+i4NgD/PNT/57Q0AP8x0P/krS8A/yjM/+KnKgD/H8j/4KElAP8Vw//enhsA/wzA/92VFgD/A73/25ERAP/6uv/ajw0A//a4/9mMCAD/8rb/2IoDAP/vsf/YhP//+6uu/9eA+//+q6z/1n73//+oqv/Ueu7/');
-    notificationAudio.volume = 0.7;
+    notificationAudio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAADhAC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAA4T/////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//tQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
+    notificationAudio.volume = 0.5;
   }
 };
 
@@ -72,7 +85,6 @@ const playNotificationSound = () => {
   }
 };
 
-// Unlock audio on first user interaction
 if (typeof window !== 'undefined') {
   const unlockAudio = () => {
     initAudio();
@@ -90,12 +102,28 @@ if (typeof window !== 'undefined') {
   document.addEventListener('keydown', unlockAudio);
 }
 
+const saveOpenChats = (chats: OpenChat[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
+  } catch {}
+};
+
+const loadOpenChats = (): OpenChat[] => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch {}
+  return [];
+};
+
 export function DockedChatBoxes() {
   const [, setLocation] = useLocation();
   const { data: currentUser } = useCurrentUser();
   const queryClient = useQueryClient();
   
-  const [openChats, setOpenChats] = useState<OpenChat[]>([]);
+  const [openChats, setOpenChats] = useState<OpenChat[]>(() => loadOpenChats());
   const [messageInputs, setMessageInputs] = useState<Record<string, string>>({});
   const [showMessagingMenu, setShowMessagingMenu] = useState(false);
   const lastSeenMessagesRef = useRef<Record<string, string>>({});
@@ -104,6 +132,10 @@ export function DockedChatBoxes() {
   useEffect(() => {
     initAudio();
   }, []);
+
+  useEffect(() => {
+    saveOpenChats(openChats);
+  }, [openChats]);
   
   const { data: conversations = [] } = useQuery<Conversation[]>({
     queryKey: ["/api/chat/conversations"],
@@ -129,7 +161,6 @@ export function DockedChatBoxes() {
     setShowMessagingMenu(false);
   }, []);
 
-  // Auto-open chat for new messages
   useEffect(() => {
     if (!currentUser || conversations.length === 0) return;
     
@@ -197,7 +228,6 @@ export function DockedChatBoxes() {
 
   return (
     <div className="fixed bottom-0 right-0 flex items-end z-50" data-testid="docked-chat-boxes">
-      {/* Open chat boxes - positioned to the left of the messaging button */}
       <div className="flex items-end gap-1 mr-1">
         {openChats.map((chat) => (
           <ChatBox
@@ -218,7 +248,6 @@ export function DockedChatBoxes() {
         ))}
       </div>
       
-      {/* Messaging button - always on the far right */}
       <div className="relative mr-4 mb-0">
         {showMessagingMenu && (
           <Card className="absolute bottom-12 right-0 w-80 shadow-2xl border border-gray-300 dark:border-border overflow-hidden animate-in slide-in-from-bottom-2 duration-200">
@@ -314,6 +343,42 @@ export function DockedChatBoxes() {
   );
 }
 
+function EmojiPicker({ onSelect }: { onSelect: (emoji: string) => void }) {
+  const [activeCategory, setActiveCategory] = useState('Smileys');
+  const categories = Object.keys(EMOJI_CATEGORIES);
+  
+  return (
+    <div className="w-72">
+      <div className="flex gap-1 p-2 border-b overflow-x-auto">
+        {categories.map(cat => (
+          <Button
+            key={cat}
+            variant={activeCategory === cat ? "default" : "ghost"}
+            size="sm"
+            className="text-xs px-2 py-1 h-7 shrink-0"
+            onClick={() => setActiveCategory(cat)}
+          >
+            {cat}
+          </Button>
+        ))}
+      </div>
+      <ScrollArea className="h-48 p-2">
+        <div className="grid grid-cols-8 gap-1">
+          {EMOJI_CATEGORIES[activeCategory as keyof typeof EMOJI_CATEGORIES].map((emoji, i) => (
+            <button
+              key={i}
+              className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-secondary rounded text-lg transition-colors"
+              onClick={() => onSelect(emoji)}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
 function ChatBox({
   conversationId,
   isMinimized,
@@ -342,6 +407,7 @@ function ChatBox({
   queryClient: any;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
   const conversation = conversations.find(c => c.id === conversationId);
   
@@ -379,6 +445,11 @@ function ChatBox({
     sendMessageMutation.mutate({ conversationId, content: messageInput.trim() });
   };
 
+  const handleEmojiSelect = (emoji: string) => {
+    setMessageInput(messageInput + emoji);
+    setShowEmojiPicker(false);
+  };
+
   if (!conversation) return null;
 
   const convName = getConversationName(conversation);
@@ -391,13 +462,12 @@ function ChatBox({
       )}
       data-testid={`docked-chat-${conversationId}`}
     >
-      {/* Chat content - above the header bar */}
       {!isMinimized && (
         <div className="bg-white dark:bg-card">
           <ScrollArea className="h-80 p-3">
             {messages.length === 0 ? (
               <div className="text-center py-8 text-gray-400 text-sm">
-                No messages yet. Say hello!
+                No messages yet. Say hello! 👋
               </div>
             ) : (
               messages.map((msg) => (
@@ -430,7 +500,22 @@ function ChatBox({
             )}
             <div ref={endRef} />
           </ScrollArea>
-          <div className="p-2 border-t border-gray-200 dark:border-border flex gap-2 bg-white dark:bg-card">
+          <div className="p-2 border-t border-gray-200 dark:border-border flex gap-1 bg-white dark:bg-card">
+            <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-9 w-9 shrink-0"
+                  data-testid={`button-emoji-${conversationId}`}
+                >
+                  <Smile className="w-5 h-5 text-gray-500" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start" side="top">
+                <EmojiPicker onSelect={handleEmojiSelect} />
+              </PopoverContent>
+            </Popover>
             <Input
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
@@ -452,7 +537,6 @@ function ChatBox({
         </div>
       )}
       
-      {/* Header bar - at the bottom, LinkedIn style */}
       <div 
         className="px-3 py-2 bg-white dark:bg-card border-t border-gray-200 dark:border-border flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-secondary"
         onClick={onToggleMinimize}
