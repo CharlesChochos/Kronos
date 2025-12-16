@@ -207,11 +207,84 @@ export function ObjectUploader({
     throw lastError || new Error("Failed to upload after multiple attempts. Please try again.");
   };
 
+  const uploadWithFallback = async (pendingFile: PendingFile): Promise<UploadedFile | null> => {
+    const formData = new FormData();
+    formData.append('file', pendingFile.file);
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const progress = Math.round((e.loaded / e.total) * 100);
+          setPendingFiles(prev => prev.map(f => 
+            f.id === pendingFile.id ? { ...f, progress, status: 'uploading', error: undefined } : f
+          ));
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const result = JSON.parse(xhr.responseText);
+            const objectPath = `/uploads/${result.filename}`;
+            
+            setPendingFiles(prev => prev.map(f => 
+              f.id === pendingFile.id ? { ...f, progress: 100, status: 'success', objectPath, error: undefined } : f
+            ));
+
+            resolve({
+              id: pendingFile.id,
+              filename: pendingFile.file.name,
+              objectPath,
+              size: pendingFile.file.size,
+              type: pendingFile.file.type,
+            });
+          } catch {
+            reject(new Error('Failed to parse upload response'));
+          }
+        } else if (xhr.status === 401) {
+          triggerSessionExpired();
+          reject(new Error("Your session has expired. Please log in again."));
+        } else {
+          reject(new Error(getUploadErrorMessage(xhr.status, `Upload failed (${xhr.status})`)));
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        reject(new Error('Network error. Please check your internet connection and try again.'));
+      });
+
+      xhr.addEventListener('timeout', () => {
+        reject(new Error('Upload timed out. Please try again with a stable connection.'));
+      });
+
+      xhr.timeout = 300000;
+      xhr.open('POST', '/api/upload');
+      xhr.send(formData);
+    });
+  };
+
   const uploadFile = async (pendingFile: PendingFile): Promise<UploadedFile | null> => {
     try {
-      const result = await uploadFileWithRetry(pendingFile);
-      if (!result) {
-        throw new Error('Failed to prepare upload');
+      let result: { uploadURL: string; objectPath: string } | null = null;
+      let useObjectStorage = true;
+
+      try {
+        result = await uploadFileWithRetry(pendingFile);
+      } catch (error: any) {
+        if (error.message?.includes('temporarily unavailable') || 
+            error.message?.includes('500') ||
+            error.message?.includes('Failed to sign object URL')) {
+          console.log('Object storage unavailable, falling back to base64 upload');
+          useObjectStorage = false;
+        } else {
+          throw error;
+        }
+      }
+      
+      if (!useObjectStorage || !result) {
+        return await uploadWithFallback(pendingFile);
       }
       
       const { uploadURL, objectPath } = result;
