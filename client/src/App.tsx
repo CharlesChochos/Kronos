@@ -3,10 +3,11 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useCurrentUser } from "@/lib/api";
+import { useCurrentUser, onSessionExpired } from "@/lib/api";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { useEffect, lazy, Suspense } from "react";
+import { useEffect, lazy, Suspense, useCallback, useRef } from "react";
 import { DashboardProvider } from "@/contexts/DashboardContext";
+import { toast } from "sonner";
 
 // Loading component for lazy-loaded routes
 const PageLoader = () => (
@@ -124,8 +125,33 @@ function PortalProtectedRoute({ component: Component }: { component: React.Compo
 }
 
 function Router() {
-  const { data: user } = useCurrentUser();
+  const { data: user, refetch } = useCurrentUser();
   const [location, setLocation] = useLocation();
+  const sessionExpiredHandled = useRef(false);
+
+  const handleSessionExpired = useCallback(() => {
+    if (sessionExpiredHandled.current) return;
+    if (location === "/" || location === "/auth" || location.startsWith("/portal/login") || location.startsWith("/form/")) return;
+    
+    sessionExpiredHandled.current = true;
+    
+    toast.error("Your session has expired. Please log in again.", {
+      duration: 5000,
+      id: "session-expired",
+    });
+    
+    queryClient.clear();
+    
+    setTimeout(() => {
+      setLocation("/");
+      sessionExpiredHandled.current = false;
+    }, 500);
+  }, [location, setLocation]);
+
+  useEffect(() => {
+    const unsubscribe = onSessionExpired(handleSessionExpired);
+    return unsubscribe;
+  }, [handleSessionExpired]);
 
   useEffect(() => {
     const welcomePending = sessionStorage.getItem('welcomePending');

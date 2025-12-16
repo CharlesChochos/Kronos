@@ -3,7 +3,30 @@ import type { User, Deal, Task, InsertUser, Meeting, Notification, TimeEntry, In
 
 export type { User, Deal, Task, Meeting, Notification };
 
-// Generic API request helper
+// Session expiration event system
+let sessionExpiredCallbacks: Array<() => void> = [];
+
+export function onSessionExpired(callback: () => void) {
+  sessionExpiredCallbacks.push(callback);
+  return () => {
+    sessionExpiredCallbacks = sessionExpiredCallbacks.filter(cb => cb !== callback);
+  };
+}
+
+export function triggerSessionExpired() {
+  sessionExpiredCallbacks.forEach(cb => cb());
+}
+
+// Check for session expiration (401) and handle it globally
+function handleSessionExpiration(res: Response): boolean {
+  if (res.status === 401) {
+    triggerSessionExpired();
+    return true;
+  }
+  return false;
+}
+
+// Generic API request helper with session handling
 export async function apiRequest(method: string, url: string, body?: any): Promise<Response> {
   const res = await fetch(url, {
     method,
@@ -11,9 +34,60 @@ export async function apiRequest(method: string, url: string, body?: any): Promi
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
+    if (handleSessionExpiration(res)) {
+      throw new Error("Your session has expired. Please log in again.");
+    }
     throw new Error(`API request failed: ${res.status}`);
   }
   return res;
+}
+
+// Helper to make API calls with retry logic for transient failures
+export async function apiRequestWithRetry(
+  method: string, 
+  url: string, 
+  body?: any, 
+  maxRetries: number = 3
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      
+      if (res.ok) {
+        return res;
+      }
+      
+      if (handleSessionExpiration(res)) {
+        throw new Error("Your session has expired. Please log in again.");
+      }
+      
+      // Don't retry 4xx errors (except 408 timeout and 429 rate limit)
+      if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
+        throw new Error(`API request failed: ${res.status}`);
+      }
+      
+      lastError = new Error(`API request failed: ${res.status}`);
+    } catch (error: any) {
+      lastError = error;
+      // Check if it's a network error (worth retrying)
+      if (error.name !== 'TypeError' && !error.message.includes('network')) {
+        throw error;
+      }
+    }
+    
+    // Wait before retrying with exponential backoff
+    if (attempt < maxRetries - 1) {
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+    }
+  }
+  
+  throw lastError || new Error("API request failed after retries");
 }
 
 // Auth API

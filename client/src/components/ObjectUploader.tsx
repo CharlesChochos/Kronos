@@ -3,8 +3,16 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { X, Upload, FileIcon, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { X, Upload, FileIcon, CheckCircle, AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { triggerSessionExpired } from "@/lib/api";
+
+class NonRetryableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NonRetryableError';
+  }
+}
 
 interface UploadedFile {
   id: string;
@@ -121,22 +129,93 @@ export function ObjectUploader({
     setPendingFiles(prev => prev.filter(f => f.id !== id));
   }, []);
 
+  const getUploadErrorMessage = (status: number, defaultMessage: string): string => {
+    switch (status) {
+      case 401:
+        return "Your session has expired. Please log in again to upload files.";
+      case 403:
+        return "You don't have permission to upload files. Please contact an administrator.";
+      case 413:
+        return "The file is too large. Please try a smaller file.";
+      case 500:
+      case 502:
+      case 503:
+        return "The server is temporarily unavailable. Please try again in a moment.";
+      default:
+        return defaultMessage;
+    }
+  };
+
+  const isRetryableError = (status: number): boolean => {
+    return status === 408 || status === 429 || status >= 500;
+  };
+
+  const uploadFileWithRetry = async (
+    pendingFile: PendingFile, 
+    maxRetries: number = 3
+  ): Promise<{ uploadURL: string; objectPath: string } | null> => {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          setPendingFiles(prev => prev.map(f => 
+            f.id === pendingFile.id ? { ...f, progress: attempt * 10, error: undefined } : f
+          ));
+        }
+
+        const urlResponse = await fetch('/api/objects/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: pendingFile.file.name }),
+        });
+
+        if (urlResponse.ok) {
+          return await urlResponse.json();
+        }
+
+        if (urlResponse.status === 401) {
+          triggerSessionExpired();
+          throw new NonRetryableError("Your session has expired. Please log in again.");
+        }
+
+        const errorMessage = getUploadErrorMessage(urlResponse.status, 'Failed to prepare upload');
+        
+        if (!isRetryableError(urlResponse.status)) {
+          throw new NonRetryableError(errorMessage);
+        }
+
+        lastError = new Error(errorMessage);
+      } catch (error: any) {
+        if (error instanceof NonRetryableError) {
+          throw error;
+        }
+        
+        lastError = error;
+      }
+      
+      if (attempt < maxRetries - 1) {
+        const waitTime = Math.pow(2, attempt) * 1000;
+        toast.info(`Retrying upload... (attempt ${attempt + 2}/${maxRetries})`, {
+          duration: waitTime - 200,
+          id: `retry-${pendingFile.id}`,
+        });
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+    
+    throw lastError || new Error("Failed to upload after multiple attempts. Please try again.");
+  };
+
   const uploadFile = async (pendingFile: PendingFile): Promise<UploadedFile | null> => {
     try {
-      // Get presigned URL
-      const urlResponse = await fetch('/api/objects/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: pendingFile.file.name }),
-      });
-
-      if (!urlResponse.ok) {
-        throw new Error('Failed to get upload URL');
+      const result = await uploadFileWithRetry(pendingFile);
+      if (!result) {
+        throw new Error('Failed to prepare upload');
       }
+      
+      const { uploadURL, objectPath } = result;
 
-      const { uploadURL, objectPath } = await urlResponse.json();
-
-      // Upload file using XMLHttpRequest for progress tracking
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         
@@ -144,7 +223,7 @@ export function ObjectUploader({
           if (e.lengthComputable) {
             const progress = Math.round((e.loaded / e.total) * 100);
             setPendingFiles(prev => prev.map(f => 
-              f.id === pendingFile.id ? { ...f, progress, status: 'uploading' } : f
+              f.id === pendingFile.id ? { ...f, progress, status: 'uploading', error: undefined } : f
             ));
           }
         });
@@ -153,20 +232,24 @@ export function ObjectUploader({
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve();
           } else {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
+            reject(new Error(getUploadErrorMessage(xhr.status, `Upload failed (${xhr.status})`)));
           }
         });
 
         xhr.addEventListener('error', () => {
-          reject(new Error('Upload failed'));
+          reject(new Error('Network error. Please check your internet connection and try again.'));
         });
 
+        xhr.addEventListener('timeout', () => {
+          reject(new Error('Upload timed out. Please try again with a stable connection.'));
+        });
+
+        xhr.timeout = 300000;
         xhr.open('PUT', uploadURL);
         xhr.setRequestHeader('Content-Type', pendingFile.file.type || 'application/octet-stream');
         xhr.send(pendingFile.file);
       });
 
-      // Confirm upload
       const confirmResponse = await fetch('/api/objects/confirm', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -179,11 +262,15 @@ export function ObjectUploader({
       });
 
       if (!confirmResponse.ok) {
-        throw new Error('Failed to confirm upload');
+        if (confirmResponse.status === 401) {
+          triggerSessionExpired();
+          throw new Error("Your session has expired. Please log in again.");
+        }
+        throw new Error(getUploadErrorMessage(confirmResponse.status, 'Failed to complete upload'));
       }
 
       setPendingFiles(prev => prev.map(f => 
-        f.id === pendingFile.id ? { ...f, progress: 100, status: 'success', objectPath } : f
+        f.id === pendingFile.id ? { ...f, progress: 100, status: 'success', objectPath, error: undefined } : f
       ));
 
       return {
@@ -194,15 +281,16 @@ export function ObjectUploader({
         type: pendingFile.file.type,
       };
     } catch (error: any) {
+      const errorMessage = error.message || 'Upload failed. Please try again.';
       setPendingFiles(prev => prev.map(f => 
-        f.id === pendingFile.id ? { ...f, status: 'error', error: error.message } : f
+        f.id === pendingFile.id ? { ...f, status: 'error', error: errorMessage } : f
       ));
       return null;
     }
   };
 
   const handleUpload = async () => {
-    const filesToUpload = pendingFiles.filter(f => f.status === 'pending');
+    const filesToUpload = pendingFiles.filter(f => f.status === 'pending' || f.status === 'error');
     if (filesToUpload.length === 0) {
       toast.error('No files to upload');
       return;
@@ -213,7 +301,64 @@ export function ObjectUploader({
 
     for (const file of filesToUpload) {
       setPendingFiles(prev => prev.map(f => 
-        f.id === file.id ? { ...f, status: 'uploading' } : f
+        f.id === file.id ? { ...f, status: 'uploading', progress: 0, error: undefined } : f
+      ));
+
+      const result = await uploadFile(file);
+      if (result) {
+        uploadedFiles.push(result);
+      }
+    }
+
+    setIsUploading(false);
+
+    const errorCount = pendingFiles.filter(f => f.status === 'error').length;
+    
+    if (uploadedFiles.length > 0) {
+      onComplete?.(uploadedFiles);
+      if (errorCount > 0) {
+        toast.success(`${uploadedFiles.length} file(s) uploaded. ${errorCount} failed - you can retry them.`);
+      } else {
+        toast.success(`${uploadedFiles.length} file(s) uploaded successfully`);
+        setTimeout(() => {
+          setShowModal(false);
+          setPendingFiles([]);
+        }, 1000);
+      }
+    } else {
+      toast.error('Upload failed. Please check the errors and try again.');
+      onError?.(new Error('All uploads failed'));
+    }
+  };
+
+  const retryFailedFile = async (fileId: string) => {
+    const file = pendingFiles.find(f => f.id === fileId);
+    if (!file || file.status !== 'error') return;
+
+    setIsUploading(true);
+    setPendingFiles(prev => prev.map(f => 
+      f.id === fileId ? { ...f, status: 'uploading', progress: 0, error: undefined } : f
+    ));
+
+    const result = await uploadFile(file);
+    setIsUploading(false);
+
+    if (result) {
+      onComplete?.([result]);
+      toast.success(`${file.file.name} uploaded successfully`);
+    }
+  };
+
+  const retryAllFailed = async () => {
+    const failedFiles = pendingFiles.filter(f => f.status === 'error');
+    if (failedFiles.length === 0) return;
+
+    setIsUploading(true);
+    const uploadedFiles: UploadedFile[] = [];
+
+    for (const file of failedFiles) {
+      setPendingFiles(prev => prev.map(f => 
+        f.id === file.id ? { ...f, status: 'uploading', progress: 0, error: undefined } : f
       ));
 
       const result = await uploadFile(file);
@@ -226,15 +371,7 @@ export function ObjectUploader({
 
     if (uploadedFiles.length > 0) {
       onComplete?.(uploadedFiles);
-      toast.success(`${uploadedFiles.length} file(s) uploaded successfully`);
-      
-      // Close modal and clear files after successful upload
-      setTimeout(() => {
-        setShowModal(false);
-        setPendingFiles([]);
-      }, 1000);
-    } else {
-      onError?.(new Error('All uploads failed'));
+      toast.success(`${uploadedFiles.length} file(s) uploaded on retry`);
     }
   };
 
@@ -258,6 +395,7 @@ export function ObjectUploader({
   const pendingCount = pendingFiles.filter(f => f.status === 'pending').length;
   const uploadingCount = pendingFiles.filter(f => f.status === 'uploading').length;
   const successCount = pendingFiles.filter(f => f.status === 'success').length;
+  const errorCount = pendingFiles.filter(f => f.status === 'error').length;
 
   return (
     <>
@@ -356,6 +494,31 @@ export function ObjectUploader({
                       <X className="h-4 w-4" />
                     </Button>
                   )}
+                  {pf.status === 'error' && !isUploading && (
+                    <div className="flex gap-1 flex-shrink-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => retryFailedFile(pf.id)}
+                        title="Retry upload"
+                        data-testid={`button-retry-file-${pf.id}`}
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => removeFile(pf.id)}
+                        data-testid={`button-remove-failed-file-${pf.id}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -365,6 +528,7 @@ export function ObjectUploader({
             <div className="text-sm text-muted-foreground">
               {pendingFiles.length} file(s) selected
               {successCount > 0 && ` • ${successCount} uploaded`}
+              {errorCount > 0 && <span className="text-destructive"> • {errorCount} failed</span>}
             </div>
             <div className="flex gap-2">
               <Button 
@@ -374,8 +538,20 @@ export function ObjectUploader({
                 disabled={isUploading}
                 data-testid="button-cancel-upload"
               >
-                {successCount > 0 && pendingCount === 0 ? 'Done' : 'Cancel'}
+                {successCount > 0 && pendingCount === 0 && errorCount === 0 ? 'Done' : 'Cancel'}
               </Button>
+              {errorCount > 0 && !isUploading && (
+                <Button 
+                  type="button"
+                  variant="secondary"
+                  onClick={retryAllFailed}
+                  disabled={isUploading}
+                  data-testid="button-retry-all-failed"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry {errorCount} Failed
+                </Button>
+              )}
               {pendingCount > 0 && (
                 <Button 
                   type="button"
