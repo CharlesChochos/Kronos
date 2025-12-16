@@ -1666,11 +1666,11 @@ export async function registerRoutes(
           );
           
           if (mentionedUser && mentionedUser.id !== user.id) {
-            let notificationLink = `/ceo/deal-management?dealId=${dealId}`;
+            let notificationLink = `/ceo/deal-management?id=${dealId}`;
             if (deal?.dealType === 'Opportunity') {
-              notificationLink = `/ceo/opportunities?dealId=${dealId}`;
+              notificationLink = `/ceo/opportunities?id=${dealId}`;
             } else if (deal?.dealType === 'Asset Management') {
-              notificationLink = `/employee/asset-management?dealId=${dealId}`;
+              notificationLink = `/employee/asset-management?id=${dealId}`;
             }
             
             await storage.createNotification({

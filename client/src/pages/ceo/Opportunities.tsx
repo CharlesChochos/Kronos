@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -216,6 +217,8 @@ function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[
 }
 
 export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
+  const [location] = useLocation();
+  const searchString = typeof window !== 'undefined' ? window.location.search : '';
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [], isLoading } = useDealsListing();
   const { data: users = [] } = useUsers();
@@ -284,6 +287,21 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const opportunities = useMemo(() => {
     return deals.filter((deal: Deal) => (deal as any).dealType === 'Opportunity');
   }, [deals]);
+
+  // Handle URL query parameter for selecting a specific opportunity
+  useEffect(() => {
+    if (searchString && opportunities.length > 0) {
+      const params = new URLSearchParams(searchString);
+      const opportunityId = params.get('id');
+      if (opportunityId) {
+        const opportunity = opportunities.find((d: Deal) => d.id === opportunityId);
+        if (opportunity) {
+          setSelectedOpportunity(opportunity);
+          setShowOpportunityDetail(true);
+        }
+      }
+    }
+  }, [searchString, opportunities]);
   
   // Apply search filter
   const filteredOpportunities = useMemo(() => {
