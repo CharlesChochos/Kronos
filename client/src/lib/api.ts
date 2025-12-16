@@ -3257,3 +3257,166 @@ export function useSubmitPublicForm() {
     },
   });
 }
+
+// ===== TASK TEMPLATES =====
+
+export interface TemplateTask {
+  id: string;
+  title: string;
+  description?: string;
+  assigneeId?: string;
+  relativeDueDays?: number;
+  position: number;
+}
+
+export interface TemplateSection {
+  id: string;
+  title: string;
+  position: number;
+  tasks: TemplateTask[];
+}
+
+export interface TaskTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string;
+  sections: TemplateSection[];
+  isArchived: boolean | null;
+  usageCount: number | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskTemplateUsage {
+  id: string;
+  templateId: string;
+  templateName: string;
+  appliedBy: string;
+  contextType: string | null;
+  contextName: string | null;
+  tasksCreated: number | null;
+  startDate: string;
+  createdAt: string;
+}
+
+export function useTaskTemplates() {
+  return useQuery({
+    queryKey: ["task-templates"],
+    queryFn: async () => {
+      const res = await fetch("/api/task-templates");
+      if (!res.ok) {
+        if (res.status === 403) return [];
+        throw new Error("Failed to fetch task templates");
+      }
+      return res.json() as Promise<TaskTemplate[]>;
+    },
+  });
+}
+
+export function useTaskTemplate(id: string | undefined) {
+  return useQuery({
+    queryKey: ["task-templates", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/task-templates/${id}`);
+      if (!res.ok) throw new Error("Failed to fetch task template");
+      return res.json() as Promise<TaskTemplate>;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useCreateTaskTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { name: string; description?: string; category?: string; sections?: TemplateSection[] }) => {
+      const res = await fetch("/api/task-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create task template");
+      }
+      return res.json() as Promise<TaskTemplate>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task-templates"] });
+    },
+  });
+}
+
+export function useUpdateTaskTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: { id: string; name?: string; description?: string; category?: string; sections?: TemplateSection[]; isArchived?: boolean }) => {
+      const res = await fetch(`/api/task-templates/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update task template");
+      return res.json() as Promise<TaskTemplate>;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["task-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["task-templates", vars.id] });
+    },
+  });
+}
+
+export function useDeleteTaskTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/task-templates/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete task template");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task-templates"] });
+    },
+  });
+}
+
+export function useApplyTaskTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, startDate, contextType, contextName, assigneeOverrides }: {
+      id: string;
+      startDate?: string;
+      contextType?: string;
+      contextName?: string;
+      assigneeOverrides?: Record<string, string>;
+    }) => {
+      const res = await fetch(`/api/task-templates/${id}/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startDate, contextType, contextName, assigneeOverrides }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to apply task template");
+      }
+      return res.json() as Promise<{ success: boolean; tasksCreated: number; tasks: any[] }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["task-templates"] });
+    },
+  });
+}
+
+export function useTaskTemplateUsage(templateId: string | undefined) {
+  return useQuery({
+    queryKey: ["task-template-usage", templateId],
+    queryFn: async () => {
+      const res = await fetch(`/api/task-templates/${templateId}/usage`);
+      if (!res.ok) throw new Error("Failed to fetch template usage");
+      return res.json() as Promise<TaskTemplateUsage[]>;
+    },
+    enabled: !!templateId,
+  });
+}

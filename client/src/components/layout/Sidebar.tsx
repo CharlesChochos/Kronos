@@ -184,7 +184,10 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
         { icon: ClipboardList, label: "Audit Logs", path: "/ceo/audit-logs" },
         { icon: FileStack, label: "Templates", path: "/ceo/deal-templates" },
         { icon: FolderOpen, label: "Document Library", path: "/ceo/document-library" },
-        ...(isDimitra ? [{ icon: ClipboardCheck, label: "Forms", path: "/ceo/forms" }] : []),
+        ...(isDimitra ? [
+          { icon: ClipboardCheck, label: "Forms", path: "/ceo/forms" },
+          { icon: FileStack, label: "HR Templates", path: "/ceo/task-templates" },
+        ] : []),
       ]
     }
   ];
@@ -242,6 +245,7 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
       category: "Administration",
       links: [
         { icon: ClipboardCheck, label: "Forms", path: "/employee/forms" },
+        { icon: FileStack, label: "HR Templates", path: "/employee/task-templates" },
       ]
     }] : [])
   ];
