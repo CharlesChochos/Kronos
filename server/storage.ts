@@ -320,6 +320,18 @@ export interface IStorage {
   confirmAndDeletePendingFormUpload(shareToken: string, objectPath: string): Promise<boolean>;
   getExpiredPendingUploads(): Promise<schema.PendingFormUpload[]>;
   deletePendingFormUpload(id: string): Promise<void>;
+  
+  // Task Template operations
+  getTaskTemplate(id: string): Promise<schema.TaskTemplate | undefined>;
+  getAllTaskTemplates(): Promise<schema.TaskTemplate[]>;
+  createTaskTemplate(template: schema.InsertTaskTemplate): Promise<schema.TaskTemplate>;
+  updateTaskTemplate(id: string, updates: Partial<schema.InsertTaskTemplate>): Promise<schema.TaskTemplate | undefined>;
+  deleteTaskTemplate(id: string): Promise<void>;
+  incrementTaskTemplateUsage(id: string): Promise<void>;
+  
+  // Task Template Usage operations
+  createTaskTemplateUsage(usage: schema.InsertTaskTemplateUsage): Promise<schema.TaskTemplateUsage>;
+  getTaskTemplateUsageByTemplate(templateId: string): Promise<schema.TaskTemplateUsage[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1913,6 +1925,56 @@ export class DatabaseStorage implements IStorage {
 
   async deletePendingFormUpload(id: string): Promise<void> {
     await db.delete(schema.pendingFormUploads).where(eq(schema.pendingFormUploads.id, id));
+  }
+
+  // Task Template operations
+  async getTaskTemplate(id: string): Promise<schema.TaskTemplate | undefined> {
+    const [template] = await db.select().from(schema.taskTemplates).where(eq(schema.taskTemplates.id, id));
+    return template;
+  }
+
+  async getAllTaskTemplates(): Promise<schema.TaskTemplate[]> {
+    return await db.select().from(schema.taskTemplates)
+      .where(eq(schema.taskTemplates.isArchived, false))
+      .orderBy(desc(schema.taskTemplates.createdAt));
+  }
+
+  async createTaskTemplate(template: schema.InsertTaskTemplate): Promise<schema.TaskTemplate> {
+    const [created] = await db.insert(schema.taskTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateTaskTemplate(id: string, updates: Partial<schema.InsertTaskTemplate>): Promise<schema.TaskTemplate | undefined> {
+    const [updated] = await db.update(schema.taskTemplates)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.taskTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTaskTemplate(id: string): Promise<void> {
+    await db.delete(schema.taskTemplates).where(eq(schema.taskTemplates.id, id));
+  }
+
+  async incrementTaskTemplateUsage(id: string): Promise<void> {
+    const template = await this.getTaskTemplate(id);
+    if (template) {
+      await db.update(schema.taskTemplates)
+        .set({ usageCount: (template.usageCount || 0) + 1 })
+        .where(eq(schema.taskTemplates.id, id));
+    }
+  }
+
+  // Task Template Usage operations
+  async createTaskTemplateUsage(usage: schema.InsertTaskTemplateUsage): Promise<schema.TaskTemplateUsage> {
+    const [created] = await db.insert(schema.taskTemplateUsage).values(usage).returning();
+    return created;
+  }
+
+  async getTaskTemplateUsageByTemplate(templateId: string): Promise<schema.TaskTemplateUsage[]> {
+    return await db.select().from(schema.taskTemplateUsage)
+      .where(eq(schema.taskTemplateUsage.templateId, templateId))
+      .orderBy(desc(schema.taskTemplateUsage.createdAt));
   }
 }
 
