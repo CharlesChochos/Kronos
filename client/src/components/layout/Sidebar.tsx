@@ -22,7 +22,8 @@ import {
   Database,
   FileStack,
   FolderOpen,
-  ClipboardList
+  ClipboardList,
+  ClipboardCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPreferences, useSaveUserPreferences, useCurrentUser } from "@/lib/api";
@@ -127,6 +128,8 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
 
   // Check if user is an admin - for showing Asset Management in CEO view
   const isAdmin = currentUser?.accessLevel === 'admin';
+  const isDimitra = currentUser?.name?.toLowerCase().includes('dimitra') || 
+                    currentUser?.email?.toLowerCase().includes('dimitra');
 
   // CEO grouped links - ordered: Dashboard, My Tasks, Opportunities, Deal Management, Asset Management (admin only), Documents
   const ceoGroups: CategoryGroup[] = [
@@ -178,6 +181,7 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
         { icon: ClipboardList, label: "Audit Logs", path: "/ceo/audit-logs" },
         { icon: FileStack, label: "Templates", path: "/ceo/deal-templates" },
         { icon: FolderOpen, label: "Document Library", path: "/ceo/document-library" },
+        ...(isDimitra ? [{ icon: ClipboardCheck, label: "Forms", path: "/ceo/forms" }] : []),
       ]
     }
   ];
@@ -230,7 +234,13 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
       links: [
         { icon: ClipboardList, label: "My Activity Log", path: "/employee/audit-logs" },
       ]
-    }
+    },
+    ...(isDimitra ? [{
+      category: "Administration",
+      links: [
+        { icon: ClipboardCheck, label: "Forms", path: "/employee/forms" },
+      ]
+    }] : [])
   ];
 
   // Use the role prop to determine navigation (supports preview mode for admins)

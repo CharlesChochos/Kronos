@@ -3027,3 +3027,198 @@ export function useUserSearch(query: string) {
     enabled: query.length >= 2,
   });
 }
+
+// ===== FORMS API =====
+
+export interface FormField {
+  id: string;
+  type: 'text' | 'email' | 'single-select' | 'multi-select' | 'date' | 'number' | 'file' | 'heading';
+  label: string;
+  required: boolean;
+  options?: string[];
+  description?: string;
+}
+
+export interface Form {
+  id: string;
+  title: string;
+  description: string | null;
+  coverImage: string | null;
+  fields: FormField[];
+  status: 'draft' | 'published' | 'archived';
+  shareToken: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FormSubmission {
+  id: string;
+  formId: string;
+  formTitle: string;
+  submitterName: string | null;
+  submitterEmail: string | null;
+  submitterId: string | null;
+  responses: Array<{ fieldId: string; value: any }>;
+  taskId: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export function useForms() {
+  return useQuery({
+    queryKey: ["forms"],
+    queryFn: async () => {
+      const res = await fetch("/api/forms");
+      if (!res.ok) {
+        if (res.status === 403) return [];
+        throw new Error("Failed to fetch forms");
+      }
+      return res.json() as Promise<Form[]>;
+    },
+  });
+}
+
+export function useForm(id: string | undefined) {
+  return useQuery({
+    queryKey: ["forms", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/forms/${id}`);
+      if (!res.ok) throw new Error("Failed to fetch form");
+      return res.json() as Promise<Form>;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useCreateForm() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { title: string; description?: string; fields?: FormField[] }) => {
+      const res = await fetch("/api/forms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create form");
+      }
+      return res.json() as Promise<Form>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["forms"] });
+    },
+  });
+}
+
+export function useUpdateForm() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: { id: string; title?: string; description?: string; fields?: FormField[]; status?: string }) => {
+      const res = await fetch(`/api/forms/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update form");
+      return res.json() as Promise<Form>;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["forms"] });
+      queryClient.invalidateQueries({ queryKey: ["forms", vars.id] });
+    },
+  });
+}
+
+export function usePublishForm() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/forms/${id}/publish`, { method: "POST" });
+      if (!res.ok) throw new Error("Failed to publish form");
+      return res.json() as Promise<Form>;
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ["forms"] });
+      queryClient.invalidateQueries({ queryKey: ["forms", id] });
+    },
+  });
+}
+
+export function useDeleteForm() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/forms/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete form");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["forms"] });
+    },
+  });
+}
+
+export function useShareForm() {
+  return useMutation({
+    mutationFn: async ({ id, emails, message }: { id: string; emails: string[]; message?: string }) => {
+      const res = await fetch(`/api/forms/${id}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emails, message }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to share form");
+      }
+      return res.json() as Promise<{ success: boolean; results: any[]; formLink: string }>;
+    },
+  });
+}
+
+export function useFormSubmissions(formId: string | undefined) {
+  return useQuery({
+    queryKey: ["form-submissions", formId],
+    queryFn: async () => {
+      const res = await fetch(`/api/forms/${formId}/submissions`);
+      if (!res.ok) throw new Error("Failed to fetch submissions");
+      return res.json() as Promise<FormSubmission[]>;
+    },
+    enabled: !!formId,
+  });
+}
+
+export function usePublicForm(shareToken: string | undefined) {
+  return useQuery({
+    queryKey: ["public-form", shareToken],
+    queryFn: async () => {
+      const res = await fetch(`/api/public/forms/${shareToken}`);
+      if (!res.ok) throw new Error("Failed to fetch form");
+      return res.json() as Promise<Partial<Form>>;
+    },
+    enabled: !!shareToken,
+  });
+}
+
+export function useSubmitPublicForm() {
+  return useMutation({
+    mutationFn: async ({ shareToken, responses, submitterName, submitterEmail }: {
+      shareToken: string;
+      responses: Array<{ fieldId: string; value: any }>;
+      submitterName?: string;
+      submitterEmail?: string;
+    }) => {
+      const res = await fetch(`/api/public/forms/${shareToken}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ responses, submitterName, submitterEmail }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to submit form");
+      }
+      return res.json();
+    },
+  });
+}

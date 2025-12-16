@@ -1029,16 +1029,19 @@ export async function registerRoutes(
     }
   });
 
-  // Get a single form by ID
+  // Get a single form by ID (Dimitra only)
   app.get("/api/forms/:id", requireAuth, requireInternal, async (req, res) => {
     try {
       const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const form = await storage.getForm(req.params.id);
       if (!form) {
         return res.status(404).json({ error: "Form not found" });
       }
-      // Only allow creator to view unpublished forms
-      if (form.status !== 'published' && form.createdBy !== user.id) {
+      // Only allow creator to view their own forms
+      if (form.createdBy !== user.id) {
         return res.status(403).json({ error: "Access denied" });
       }
       res.json(form);
@@ -1077,6 +1080,9 @@ export async function registerRoutes(
   app.patch("/api/forms/:id", requireAuth, requireInternal, async (req, res) => {
     try {
       const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const form = await storage.getForm(req.params.id);
       if (!form) {
         return res.status(404).json({ error: "Form not found" });
@@ -1096,6 +1102,9 @@ export async function registerRoutes(
   app.post("/api/forms/:id/publish", requireAuth, requireInternal, async (req, res) => {
     try {
       const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const form = await storage.getForm(req.params.id);
       if (!form) {
         return res.status(404).json({ error: "Form not found" });
@@ -1120,6 +1129,9 @@ export async function registerRoutes(
   app.delete("/api/forms/:id", requireAuth, requireInternal, async (req, res) => {
     try {
       const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const form = await storage.getForm(req.params.id);
       if (!form) {
         return res.status(404).json({ error: "Form not found" });
@@ -1139,6 +1151,9 @@ export async function registerRoutes(
   app.post("/api/forms/:id/share", requireAuth, requireInternal, async (req, res) => {
     try {
       const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const form = await storage.getForm(req.params.id);
       if (!form) {
         return res.status(404).json({ error: "Form not found" });
@@ -1228,6 +1243,9 @@ export async function registerRoutes(
   app.get("/api/forms/:id/submissions", requireAuth, requireInternal, async (req, res) => {
     try {
       const user = req.user as any;
+      if (!isDimitraUser(user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const form = await storage.getForm(req.params.id);
       if (!form) {
         return res.status(404).json({ error: "Form not found" });
