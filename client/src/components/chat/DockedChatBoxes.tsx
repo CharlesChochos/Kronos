@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   X,
-  Minus,
   Maximize2,
   Send,
-  MessageSquare
+  MessageSquare,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
-import { useCurrentUser, useUsers } from "@/lib/api";
+import { useCurrentUser } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -51,26 +52,57 @@ type OpenChat = {
   isMinimized: boolean;
 };
 
-const CHAT_BOX_WIDTH = 320;
-const CHAT_BOX_GAP = 8;
-const MAX_OPEN_CHATS = 4;
+const MAX_OPEN_CHATS = 3;
+
+// Global audio context to handle browser autoplay restrictions
+let audioUnlocked = false;
+let notificationAudio: HTMLAudioElement | null = null;
+
+const initAudio = () => {
+  if (!notificationAudio) {
+    notificationAudio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQYAJ5rk/+WxOgAAU+b/+9BQAABU7f/61VcAAFLr//bQVAAAT+f/9MxQAABM4//xyEsAAEne/+7ERAD/Rdn/7MBAAP9C1f/qvDsA/z/R/+i4NgD/PNT/57Q0AP8x0P/krS8A/yjM/+KnKgD/H8j/4KElAP8Vw//enhsA/wzA/92VFgD/A73/25ERAP/6uv/ajw0A//a4/9mMCAD/8rb/2IoDAP/vsf/YhP//+6uu/9eA+//+q6z/1n73//+oqv/Ueu7/');
+    notificationAudio.volume = 0.7;
+  }
+};
+
+const playNotificationSound = () => {
+  if (notificationAudio && audioUnlocked) {
+    notificationAudio.currentTime = 0;
+    notificationAudio.play().catch(() => {});
+  }
+};
+
+// Unlock audio on first user interaction
+if (typeof window !== 'undefined') {
+  const unlockAudio = () => {
+    initAudio();
+    if (notificationAudio && !audioUnlocked) {
+      notificationAudio.play().then(() => {
+        notificationAudio!.pause();
+        notificationAudio!.currentTime = 0;
+        audioUnlocked = true;
+      }).catch(() => {});
+    }
+    document.removeEventListener('click', unlockAudio);
+    document.removeEventListener('keydown', unlockAudio);
+  };
+  document.addEventListener('click', unlockAudio);
+  document.addEventListener('keydown', unlockAudio);
+}
 
 export function DockedChatBoxes() {
   const [, setLocation] = useLocation();
   const { data: currentUser } = useCurrentUser();
-  const { data: allUsers = [] } = useUsers();
   const queryClient = useQueryClient();
   
   const [openChats, setOpenChats] = useState<OpenChat[]>([]);
   const [messageInputs, setMessageInputs] = useState<Record<string, string>>({});
+  const [showMessagingMenu, setShowMessagingMenu] = useState(false);
   const lastSeenMessagesRef = useRef<Record<string, string>>({});
   const mountTimeRef = useRef(Date.now());
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const messagesEndRefs = useRef<Record<string, HTMLDivElement | null>>({});
   
   useEffect(() => {
-    audioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQYAJ5rk/+WxOgAAU+b/+9BQAABU7f/61VcAAFLr//bQVAAAT+f/9MxQAABM4//xyEsAAEne/+7ERAD/Rdn/7MBAAP9C1f/qvDsA/z/R/+i4NgD/PNT/57Q0AP8x0P/krS8A/yjM/+KnKgD/H8j/4KElAP8Vw//enhsA/wzA/92VFgD/A73/25ERAP/6uv/ajw0A//a4/9mMCAD/8rb/2IoDAP/vsf/YhP//+6uu/9eA+//+q6z/1n73//+oqv/Ueu7/');
-    audioRef.current.volume = 0.7;
+    initAudio();
   }, []);
   
   const { data: conversations = [] } = useQuery<Conversation[]>({
@@ -94,8 +126,10 @@ export function DockedChatBoxes() {
       }
       return newChats;
     });
+    setShowMessagingMenu(false);
   }, []);
 
+  // Auto-open chat for new messages
   useEffect(() => {
     if (!currentUser || conversations.length === 0) return;
     
@@ -111,9 +145,7 @@ export function DockedChatBoxes() {
         if (messageTime > mountTimeRef.current - 5000 && isFromOtherUser) {
           lastSeenMessagesRef.current[conv.id] = currentTimestamp;
           openChatForConversation(conv.id, false);
-          if (audioRef.current) {
-            audioRef.current.play().catch(() => {});
-          }
+          playNotificationSound();
         } else {
           lastSeenMessagesRef.current[conv.id] = currentTimestamp;
         }
@@ -123,9 +155,7 @@ export function DockedChatBoxes() {
       if (lastSeenTimestamp !== currentTimestamp && isFromOtherUser) {
         lastSeenMessagesRef.current[conv.id] = currentTimestamp;
         openChatForConversation(conv.id, false);
-        if (audioRef.current) {
-          audioRef.current.play().catch(() => {});
-        }
+        playNotificationSound();
       }
     });
   }, [conversations, currentUser, openChatForConversation]);
@@ -160,41 +190,131 @@ export function DockedChatBoxes() {
 
   if (!currentUser) return null;
 
+  const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+  const closedConversations = conversations.filter(
+    c => !openChats.some(oc => oc.conversationId === c.id)
+  );
+
   return (
-    <div className="fixed bottom-0 right-6 flex items-end gap-2 z-40" data-testid="docked-chat-boxes">
-      {openChats.map((chat, index) => (
-        <DockedChatBox
-          key={chat.conversationId}
-          conversationId={chat.conversationId}
-          isMinimized={chat.isMinimized}
-          conversations={conversations}
-          currentUser={currentUser}
-          messageInput={messageInputs[chat.conversationId] || ""}
-          setMessageInput={(value) => setMessageInputs(prev => ({ ...prev, [chat.conversationId]: value }))}
-          onClose={() => closeChat(chat.conversationId)}
-          onToggleMinimize={() => toggleMinimize(chat.conversationId)}
-          onOpenFullChat={openFullChat}
-          getConversationName={getConversationName}
-          getInitials={getInitials}
-          queryClient={queryClient}
-          messagesEndRef={(el) => { messagesEndRefs.current[chat.conversationId] = el; }}
-        />
-      ))}
+    <div className="fixed bottom-0 right-0 flex items-end z-50" data-testid="docked-chat-boxes">
+      {/* Open chat boxes - positioned to the left of the messaging button */}
+      <div className="flex items-end gap-1 mr-1">
+        {openChats.map((chat) => (
+          <ChatBox
+            key={chat.conversationId}
+            conversationId={chat.conversationId}
+            isMinimized={chat.isMinimized}
+            conversations={conversations}
+            currentUser={currentUser}
+            messageInput={messageInputs[chat.conversationId] || ""}
+            setMessageInput={(value) => setMessageInputs(prev => ({ ...prev, [chat.conversationId]: value }))}
+            onClose={() => closeChat(chat.conversationId)}
+            onToggleMinimize={() => toggleMinimize(chat.conversationId)}
+            onOpenFullChat={openFullChat}
+            getConversationName={getConversationName}
+            getInitials={getInitials}
+            queryClient={queryClient}
+          />
+        ))}
+      </div>
       
-      <MessagingButton 
-        conversations={conversations}
-        currentUser={currentUser}
-        openChats={openChats}
-        onOpenChat={openChatForConversation}
-        onOpenFullChat={openFullChat}
-        getConversationName={getConversationName}
-        getInitials={getInitials}
-      />
+      {/* Messaging button - always on the far right */}
+      <div className="relative mr-4 mb-0">
+        {showMessagingMenu && (
+          <Card className="absolute bottom-12 right-0 w-80 shadow-2xl border border-gray-300 dark:border-border overflow-hidden animate-in slide-in-from-bottom-2 duration-200">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-border bg-white dark:bg-card flex items-center justify-between">
+              <span className="font-semibold text-gray-900 dark:text-foreground">Messaging</span>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-7 w-7"
+                onClick={openFullChat}
+              >
+                <Maximize2 className="w-4 h-4" />
+              </Button>
+            </div>
+            <ScrollArea className="h-72 bg-white dark:bg-card">
+              {closedConversations.length === 0 ? (
+                <div className="text-center py-12 text-gray-500 text-sm">
+                  No conversations
+                </div>
+              ) : (
+                closedConversations.map((conv) => (
+                  <div
+                    key={conv.id}
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-secondary/50 transition-colors border-b border-gray-100 dark:border-border/50",
+                      conv.unreadCount > 0 && "bg-blue-50/50 dark:bg-primary/5"
+                    )}
+                    onClick={() => openChatForConversation(conv.id, false)}
+                    data-testid={`list-conversation-${conv.id}`}
+                  >
+                    <div className="relative shrink-0">
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className="text-sm bg-gray-300 dark:bg-secondary text-gray-700 dark:text-foreground">
+                          {getInitials(getConversationName(conv))}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-card rounded-full" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className={cn(
+                          "text-sm truncate",
+                          conv.unreadCount > 0 ? "font-semibold text-gray-900 dark:text-foreground" : "text-gray-700 dark:text-foreground"
+                        )}>
+                          {getConversationName(conv)}
+                        </span>
+                        {conv.unreadCount > 0 && (
+                          <Badge className="h-5 min-w-[20px] px-1.5 text-[10px] bg-red-500 hover:bg-red-500">
+                            {conv.unreadCount}
+                          </Badge>
+                        )}
+                      </div>
+                      {conv.lastMessage && (
+                        <p className="text-xs text-gray-500 dark:text-muted-foreground truncate mt-0.5">
+                          {conv.lastMessage.content}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </ScrollArea>
+          </Card>
+        )}
+        
+        <div 
+          className={cn(
+            "flex items-center gap-2 px-4 py-2.5 rounded-t-lg shadow-lg cursor-pointer transition-all border border-b-0 border-gray-300 dark:border-border",
+            "bg-white dark:bg-card hover:bg-gray-50 dark:hover:bg-secondary"
+          )}
+          onClick={() => setShowMessagingMenu(!showMessagingMenu)}
+          data-testid="button-messaging-dock"
+        >
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="text-xs bg-gray-200 dark:bg-secondary">
+              {currentUser ? getInitials(currentUser.name) : "?"}
+            </AvatarFallback>
+          </Avatar>
+          <span className="font-semibold text-sm text-gray-900 dark:text-foreground">Messaging</span>
+          {totalUnread > 0 && (
+            <Badge className="h-5 min-w-[20px] px-1.5 text-[10px] bg-red-500 hover:bg-red-500">
+              {totalUnread > 9 ? '9+' : totalUnread}
+            </Badge>
+          )}
+          {showMessagingMenu ? (
+            <ChevronDown className="w-4 h-4 text-gray-600" />
+          ) : (
+            <ChevronUp className="w-4 h-4 text-gray-600" />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
-function DockedChatBox({
+function ChatBox({
   conversationId,
   isMinimized,
   conversations,
@@ -207,7 +327,6 @@ function DockedChatBox({
   getConversationName,
   getInitials,
   queryClient,
-  messagesEndRef,
 }: {
   conversationId: string;
   isMinimized: boolean;
@@ -221,7 +340,6 @@ function DockedChatBox({
   getConversationName: (conv: Conversation) => string;
   getInitials: (name: string) => string;
   queryClient: any;
-  messagesEndRef: (el: HTMLDivElement | null) => void;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
   
@@ -266,63 +384,17 @@ function DockedChatBox({
   const convName = getConversationName(conversation);
 
   return (
-    <Card 
+    <div 
       className={cn(
-        "shadow-xl border border-gray-200 dark:border-border overflow-hidden transition-all duration-200",
-        isMinimized ? "w-64" : "w-80"
+        "flex flex-col shadow-2xl border border-gray-300 dark:border-border overflow-hidden transition-all duration-200 rounded-t-lg",
+        isMinimized ? "w-56" : "w-80"
       )}
-      style={{ marginBottom: 0 }}
       data-testid={`docked-chat-${conversationId}`}
     >
-      <div 
-        className="px-3 py-2 bg-primary text-primary-foreground flex items-center justify-between cursor-pointer"
-        onClick={onToggleMinimize}
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="relative shrink-0">
-            <Avatar className="h-7 w-7">
-              <AvatarFallback className="text-xs bg-white/20 text-white">
-                {getInitials(convName)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 border-2 border-primary rounded-full" />
-          </div>
-          <span className="font-medium text-sm truncate">{convName}</span>
-        </div>
-        <div className="flex items-center gap-0.5 shrink-0">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-6 w-6 hover:bg-white/20 text-white"
-            onClick={(e) => { e.stopPropagation(); onToggleMinimize(); }}
-            data-testid={`button-minimize-chat-${conversationId}`}
-          >
-            <Minus className="w-4 h-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-6 w-6 hover:bg-white/20 text-white"
-            onClick={(e) => { e.stopPropagation(); onOpenFullChat(); }}
-            data-testid={`button-fullscreen-chat-${conversationId}`}
-          >
-            <Maximize2 className="w-3.5 h-3.5" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-6 w-6 hover:bg-white/20 text-white"
-            onClick={(e) => { e.stopPropagation(); onClose(); }}
-            data-testid={`button-close-chat-${conversationId}`}
-          >
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-      
+      {/* Chat content - above the header bar */}
       {!isMinimized && (
-        <CardContent className="p-0">
-          <ScrollArea className="h-72 p-3 bg-gray-50 dark:bg-secondary/20">
+        <div className="bg-white dark:bg-card">
+          <ScrollArea className="h-80 p-3">
             {messages.length === 0 ? (
               <div className="text-center py-8 text-gray-400 text-sm">
                 No messages yet. Say hello!
@@ -339,8 +411,8 @@ function DockedChatBox({
                   <div className={cn(
                     "rounded-2xl px-3 py-2 text-sm",
                     msg.senderId === currentUser?.id 
-                      ? "bg-primary text-primary-foreground rounded-br-sm" 
-                      : "bg-white dark:bg-card border border-gray-200 dark:border-border rounded-bl-sm"
+                      ? "bg-blue-600 text-white rounded-br-sm" 
+                      : "bg-gray-100 dark:bg-secondary text-gray-900 dark:text-foreground rounded-bl-sm"
                   )}>
                     {msg.senderId !== currentUser?.id && (
                       <div className="text-xs font-medium mb-1 text-gray-500 dark:text-muted-foreground">{msg.senderName}</div>
@@ -356,20 +428,20 @@ function DockedChatBox({
                 </div>
               ))
             )}
-            <div ref={(el) => { endRef.current = el; messagesEndRef(el); }} />
+            <div ref={endRef} />
           </ScrollArea>
           <div className="p-2 border-t border-gray-200 dark:border-border flex gap-2 bg-white dark:bg-card">
             <Input
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
               placeholder="Write a message..."
-              className="h-9 text-sm border-gray-200 dark:border-border rounded-full px-4"
+              className="h-9 text-sm border-gray-300 dark:border-border rounded-full px-4"
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
               data-testid={`input-message-${conversationId}`}
             />
             <Button 
               size="icon" 
-              className="h-9 w-9 shrink-0 rounded-full"
+              className="h-9 w-9 shrink-0 rounded-full bg-blue-600 hover:bg-blue-700"
               onClick={handleSendMessage}
               disabled={sendMessageMutation.isPending || !messageInput.trim()}
               data-testid={`button-send-${conversationId}`}
@@ -377,120 +449,50 @@ function DockedChatBox({
               <Send className="w-4 h-4" />
             </Button>
           </div>
-        </CardContent>
-      )}
-    </Card>
-  );
-}
-
-function MessagingButton({
-  conversations,
-  currentUser,
-  openChats,
-  onOpenChat,
-  onOpenFullChat,
-  getConversationName,
-  getInitials,
-}: {
-  conversations: Conversation[];
-  currentUser: any;
-  openChats: OpenChat[];
-  onOpenChat: (id: string, minimized?: boolean) => void;
-  onOpenFullChat: () => void;
-  getConversationName: (conv: Conversation) => string;
-  getInitials: (name: string) => string;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  
-  const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
-  const closedConversations = conversations.filter(
-    c => !openChats.some(oc => oc.conversationId === c.id)
-  );
-
-  return (
-    <div className="relative">
-      {isOpen && (
-        <Card className="absolute bottom-14 right-0 w-72 shadow-xl border border-gray-200 dark:border-border overflow-hidden animate-in slide-in-from-bottom-2 duration-200">
-          <div className="px-3 py-2.5 border-b border-gray-200 dark:border-border bg-primary text-primary-foreground flex items-center justify-between">
-            <span className="font-semibold text-sm">Messages</span>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-6 w-6 hover:bg-white/20 text-white"
-              onClick={onOpenFullChat}
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-          <ScrollArea className="h-64">
-            {closedConversations.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 text-sm">
-                No conversations
-              </div>
-            ) : (
-              closedConversations.map((conv) => (
-                <div
-                  key={conv.id}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-secondary/50 transition-colors border-b border-gray-100 dark:border-border/50",
-                    conv.unreadCount > 0 && "bg-blue-50/50 dark:bg-primary/5"
-                  )}
-                  onClick={() => {
-                    onOpenChat(conv.id, false);
-                    setIsOpen(false);
-                  }}
-                  data-testid={`list-conversation-${conv.id}`}
-                >
-                  <div className="relative shrink-0">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="text-sm bg-gray-200 dark:bg-secondary text-gray-700 dark:text-foreground">
-                        {getInitials(getConversationName(conv))}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-card rounded-full" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className={cn(
-                        "text-sm truncate",
-                        conv.unreadCount > 0 ? "font-semibold text-gray-900 dark:text-foreground" : "text-gray-700 dark:text-foreground"
-                      )}>
-                        {getConversationName(conv)}
-                      </span>
-                      {conv.unreadCount > 0 && (
-                        <Badge className="h-5 min-w-[20px] px-1.5 text-[10px] bg-primary">
-                          {conv.unreadCount}
-                        </Badge>
-                      )}
-                    </div>
-                    {conv.lastMessage && (
-                      <p className="text-xs text-gray-500 dark:text-muted-foreground truncate">
-                        {conv.lastMessage.content}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </ScrollArea>
-        </Card>
+        </div>
       )}
       
+      {/* Header bar - at the bottom, LinkedIn style */}
       <div 
-        className={cn(
-          "flex items-center justify-center gap-2 px-4 py-2.5 rounded-t-lg shadow-lg cursor-pointer transition-all",
-          "bg-primary text-primary-foreground hover:bg-primary/90"
-        )}
-        onClick={() => setIsOpen(!isOpen)}
-        data-testid="button-messaging-dock"
+        className="px-3 py-2 bg-white dark:bg-card border-t border-gray-200 dark:border-border flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-secondary"
+        onClick={onToggleMinimize}
       >
-        <MessageSquare className="w-5 h-5" />
-        <span className="font-semibold text-sm">Messaging</span>
-        {totalUnread > 0 && (
-          <Badge className="h-5 min-w-[20px] px-1.5 text-[10px] bg-white text-primary">
-            {totalUnread > 9 ? '9+' : totalUnread}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <div className="relative shrink-0">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="text-xs bg-gray-200 dark:bg-secondary text-gray-700 dark:text-foreground">
+                {getInitials(convName)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-card rounded-full" />
+          </div>
+          <span className="font-medium text-sm text-gray-900 dark:text-foreground truncate">{convName}</span>
+        </div>
+        <div className="flex items-center gap-0.5 shrink-0">
+          {isMinimized ? (
+            <ChevronUp className="w-4 h-4 text-gray-600" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-gray-600" />
+          )}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6 hover:bg-gray-200 dark:hover:bg-secondary"
+            onClick={(e) => { e.stopPropagation(); onOpenFullChat(); }}
+            data-testid={`button-fullscreen-chat-${conversationId}`}
+          >
+            <Maximize2 className="w-3.5 h-3.5 text-gray-600" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6 hover:bg-gray-200 dark:hover:bg-secondary"
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
+            data-testid={`button-close-chat-${conversationId}`}
+          >
+            <X className="w-4 h-4 text-gray-600" />
+          </Button>
+        </div>
       </div>
     </div>
   );
