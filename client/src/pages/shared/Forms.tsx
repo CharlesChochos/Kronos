@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Plus, FileText, Share2, Trash2, Edit, Eye, Copy, Send, GripVertical, X, Type, Mail, List, Calendar, Hash, Paperclip, Heading, AlignLeft, Table, FileTextIcon, Image, ChevronDown, ChevronUp, GitBranch, Link } from "lucide-react";
+import { Plus, FileText, Share2, Trash2, Edit, Eye, Copy, Send, GripVertical, X, Type, Mail, List, Calendar, Hash, Paperclip, Heading, AlignLeft, Table, FileTextIcon, Image, ChevronDown, ChevronUp, GitBranch, Link, Upload } from "lucide-react";
 import { format } from "date-fns";
 
 const FIELD_TYPES = [
@@ -984,55 +984,58 @@ function FormPreview({ title, description, coverImage, fields }: FormPreviewProp
   const visibleFields = fields.filter(shouldShowField);
 
   return (
-    <div className="bg-background border rounded-lg overflow-hidden">
+    <div className="bg-[#f5f0e8] rounded-lg overflow-hidden border border-[#e5ddd0]">
       {coverImage && (
-        <div className="h-40 overflow-hidden">
+        <div className="h-20 overflow-hidden">
           <img src={coverImage} alt="" className="w-full h-full object-cover" />
         </div>
       )}
-      <div className="p-6 space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold">{title || "Untitled Form"}</h2>
-          {description && <p className="text-muted-foreground mt-1">{description}</p>}
+      <div className="bg-white m-4 rounded-lg p-6 space-y-6 border border-[#e5ddd0]">
+        <div className="border-b border-[#e5ddd0] pb-4">
+          <h2 className="text-2xl font-bold text-[#3d3428]">{title || "Untitled Form"}</h2>
+          {description && <p className="text-[#6b5d4d] mt-2 leading-relaxed">{description}</p>}
         </div>
 
         {visibleFields.map((field) => (
           <div key={field.id} className="space-y-2">
             {field.type === 'heading' && (
-              <h3 className="text-lg font-semibold pt-4 border-t">{field.label}</h3>
+              <h3 className="text-lg font-semibold pt-4 border-t border-[#e5ddd0] text-[#3d3428]">{field.label}</h3>
             )}
 
             {field.type === 'content' && (
-              <div className="prose prose-sm max-w-none">
-                <h4 className="font-medium text-base">{field.label}</h4>
-                {field.contentBlocks?.map((block, bi) => (
-                  <div key={bi}>
-                    {block.type === 'heading' && <h5 className="font-semibold">{block.text}</h5>}
-                    {block.type === 'paragraph' && <p className="text-muted-foreground">{block.text}</p>}
-                    {block.type === 'list' && (
-                      <ul className="list-disc pl-5 text-muted-foreground">
-                        {block.items?.map((item, ii) => <li key={ii}>{item}</li>)}
-                      </ul>
-                    )}
-                    {block.type === 'link' && (
-                      <a href={block.url} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                        {block.linkText}
-                      </a>
-                    )}
-                  </div>
-                ))}
+              <div className="py-3 px-4 bg-[#faf7f2] rounded-md border border-[#e5ddd0]">
+                <h4 className="font-medium text-[#3d3428] mb-2">{field.label}</h4>
+                <div className="text-[#6b5d4d] text-sm space-y-2">
+                  {field.contentBlocks?.map((block, bi) => (
+                    <div key={bi}>
+                      {block.type === 'heading' && <h5 className="font-semibold text-[#3d3428]">{block.text}</h5>}
+                      {block.type === 'paragraph' && <p>{block.text}</p>}
+                      {block.type === 'list' && (
+                        <ul className="list-disc pl-5 space-y-1">
+                          {block.items?.map((item, ii) => <li key={ii}>{item}</li>)}
+                        </ul>
+                      )}
+                      {block.type === 'link' && (
+                        <a href={block.url} target="_blank" rel="noopener noreferrer" className="text-[#8b5a2b] underline hover:no-underline">
+                          {block.linkText}
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
             {field.type === 'table' && (
               <div>
-                <Label className="font-medium">{field.label}</Label>
-                <div className="border rounded-md overflow-x-auto mt-2">
+                <Label className="font-medium text-[#3d3428]">{field.label}</Label>
+                {field.description && <p className="text-[#8b7355] text-sm mt-1">{field.description}</p>}
+                <div className="border border-[#d4cbc0] rounded-md overflow-x-auto mt-2 bg-white">
                   <table className="w-full text-sm">
-                    <thead className="bg-muted">
+                    <thead className="bg-[#f5f0e8]">
                       <tr>
                         {field.tableColumns?.map((col) => (
-                          <th key={col.id} className="p-3 text-left font-medium border-r last:border-r-0">
+                          <th key={col.id} className="p-3 text-left font-medium text-[#3d3428] border-r border-[#e5ddd0] last:border-r-0">
                             {col.header}
                           </th>
                         ))}
@@ -1040,9 +1043,9 @@ function FormPreview({ title, description, coverImage, fields }: FormPreviewProp
                     </thead>
                     <tbody>
                       {field.tableRows?.map((row, ri) => (
-                        <tr key={ri} className="border-t">
+                        <tr key={ri} className="border-t border-[#e5ddd0]">
                           {row.map((cell, ci) => (
-                            <td key={ci} className="p-3 border-r last:border-r-0">
+                            <td key={ci} className="p-3 text-[#5c4f3d] border-r border-[#e5ddd0] last:border-r-0">
                               {cell.value}
                             </td>
                           ))}
@@ -1056,20 +1059,21 @@ function FormPreview({ title, description, coverImage, fields }: FormPreviewProp
 
             {field.type !== 'heading' && field.type !== 'content' && field.type !== 'table' && (
               <div>
-                <Label className="font-medium">
+                <Label className="font-medium text-[#3d3428]">
                   {field.label}
-                  {field.required && <span className="text-destructive ml-1">*</span>}
+                  {field.required && <span className="text-red-600 ml-1">*</span>}
                 </Label>
                 {field.description && (
-                  <p className="text-sm text-muted-foreground">{field.description}</p>
+                  <p className="text-sm text-[#8b7355]">{field.description}</p>
                 )}
-                <div className="mt-1">
+                <div className="mt-1.5">
                   {(field.type === 'text' || field.type === 'email' || field.type === 'number') && (
                     <Input
                       type={field.type}
                       placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
                       value={String(formValues[field.id] || '')}
                       onChange={(e) => setFormValues({ ...formValues, [field.id]: e.target.value })}
+                      className="border-[#d4cbc0] focus:border-[#8b7355] focus:ring-[#8b7355]"
                     />
                   )}
                   {field.type === 'textarea' && (
@@ -1077,6 +1081,7 @@ function FormPreview({ title, description, coverImage, fields }: FormPreviewProp
                       placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
                       value={String(formValues[field.id] || '')}
                       onChange={(e) => setFormValues({ ...formValues, [field.id]: e.target.value })}
+                      className="border-[#d4cbc0] focus:border-[#8b7355] focus:ring-[#8b7355]"
                     />
                   )}
                   {field.type === 'date' && (
@@ -1084,6 +1089,7 @@ function FormPreview({ title, description, coverImage, fields }: FormPreviewProp
                       type="date"
                       value={String(formValues[field.id] || '')}
                       onChange={(e) => setFormValues({ ...formValues, [field.id]: e.target.value })}
+                      className="border-[#d4cbc0] focus:border-[#8b7355] focus:ring-[#8b7355]"
                     />
                   )}
                   {field.type === 'single-select' && (
@@ -1091,8 +1097,8 @@ function FormPreview({ title, description, coverImage, fields }: FormPreviewProp
                       value={String(formValues[field.id] || '')}
                       onValueChange={(val) => setFormValues({ ...formValues, [field.id]: val })}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder={field.placeholder || "Select an option"} />
+                      <SelectTrigger className="border-[#d4cbc0]">
+                        <SelectValue placeholder={field.placeholder || "Choose one..."} />
                       </SelectTrigger>
                       <SelectContent>
                         {field.options?.map((opt) => (
@@ -1117,16 +1123,20 @@ function FormPreview({ title, description, coverImage, fields }: FormPreviewProp
                                   [field.id]: e.target.checked ? [...current, opt] : current.filter(v => v !== opt)
                                 });
                               }}
-                              className="h-4 w-4"
+                              className="h-4 w-4 border-[#d4cbc0] accent-[#5c4f3d]"
                             />
-                            <span>{opt}</span>
+                            <span className="text-[#5c4f3d]">{opt}</span>
                           </div>
                         );
                       })}
                     </div>
                   )}
                   {field.type === 'file' && (
-                    <Input type="file" />
+                    <div className="border-2 border-dashed border-[#d4cbc0] rounded-lg p-6 text-center cursor-pointer hover:border-[#8b7355] hover:bg-[#faf7f2] transition-colors">
+                      <Upload className="h-8 w-8 mx-auto mb-2 text-[#8b7355]" />
+                      <p className="text-sm text-[#5c4f3d] font-medium">Click to upload files</p>
+                      <p className="text-xs text-[#8b7355] mt-1">Drag and drop or click to browse</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1134,7 +1144,7 @@ function FormPreview({ title, description, coverImage, fields }: FormPreviewProp
           </div>
         ))}
 
-        <Button className="w-full" disabled>Submit (Preview Mode)</Button>
+        <Button className="w-full bg-[#5c4f3d] hover:bg-[#4a3f31] text-white" disabled>Submit (Preview Mode)</Button>
       </div>
     </div>
   );

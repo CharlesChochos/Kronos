@@ -1351,6 +1351,126 @@ export async function registerRoutes(
     }
   });
 
+  // Public route: Get presigned upload URL for form file attachments (no auth required)
+  app.post("/api/public/forms/:shareToken/upload", uploadLimiter, async (req, res) => {
+    try {
+      const form = await storage.getFormByShareToken(req.params.shareToken);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (form.status !== 'published') {
+        return res.status(404).json({ error: "Form not available" });
+      }
+
+      const { filename, size, type } = req.body;
+      
+      // Validate file size (max 10MB for public uploads)
+      const MAX_FILE_SIZE = 10 * 1024 * 1024;
+      if (size && size > MAX_FILE_SIZE) {
+        return res.status(400).json({ error: "File size exceeds 10MB limit" });
+      }
+
+      // Validate file type (allow common document/image types)
+      const allowedTypes = [
+        'application/pdf', 'application/msword', 
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        'text/plain', 'text/csv'
+      ];
+      if (type && !allowedTypes.includes(type)) {
+        return res.status(400).json({ error: "File type not allowed" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      const result = await objectStorageService.getObjectEntityUploadURL(filename);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error getting public upload URL:", error);
+      res.status(500).json({ error: error.message || "Failed to get upload URL" });
+    }
+  });
+
+  // Public route: Confirm public form file upload
+  app.put("/api/public/forms/:shareToken/upload/confirm", async (req, res) => {
+    try {
+      const form = await storage.getFormByShareToken(req.params.shareToken);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (form.status !== 'published') {
+        return res.status(404).json({ error: "Form not available" });
+      }
+
+      const { objectPath, filename } = req.body;
+      if (!objectPath) {
+        return res.status(400).json({ error: "Object path is required" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      
+      // Verify the object actually exists and get its metadata
+      let objectFile;
+      try {
+        objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+      } catch {
+        return res.status(400).json({ error: "Uploaded file not found. Please try again." });
+      }
+      
+      // Get actual file metadata from storage
+      const [metadata] = await objectFile.getMetadata();
+      const actualSize = parseInt(metadata.size as string, 10);
+      const actualType = metadata.contentType || 'application/octet-stream';
+      
+      // Enforce 10MB limit server-side based on actual uploaded size
+      const MAX_FILE_SIZE = 10 * 1024 * 1024;
+      if (actualSize > MAX_FILE_SIZE) {
+        // Delete the oversized file
+        try {
+          await objectFile.delete();
+        } catch (e) {
+          console.error("Failed to delete oversized file:", e);
+        }
+        return res.status(400).json({ error: "Uploaded file exceeds 10MB limit" });
+      }
+      
+      // Validate file type based on actual content type
+      const allowedTypes = [
+        'application/pdf', 'application/msword', 
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        'text/plain', 'text/csv', 'application/octet-stream'
+      ];
+      if (!allowedTypes.includes(actualType)) {
+        // Delete the disallowed file
+        try {
+          await objectFile.delete();
+        } catch (e) {
+          console.error("Failed to delete disallowed file:", e);
+        }
+        return res.status(400).json({ error: "File type not allowed" });
+      }
+
+      await objectStorageService.trySetObjectEntityAclPolicy(objectPath, { 
+        visibility: 'private' 
+      });
+
+      res.json({ 
+        success: true, 
+        objectPath,
+        filename,
+        size: actualSize,
+        type: actualType
+      });
+    } catch (error: any) {
+      console.error("Error confirming public upload:", error);
+      res.status(500).json({ error: error.message || "Failed to confirm upload" });
+    }
+  });
+
   // ===== CUSTOM SECTORS ROUTES =====
   
   app.get("/api/custom-sectors", requireAuth, requireInternal, async (req, res) => {
