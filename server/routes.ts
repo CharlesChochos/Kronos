@@ -1666,7 +1666,7 @@ export async function registerRoutes(
           );
           
           if (mentionedUser && mentionedUser.id !== user.id) {
-            let notificationLink = `/ceo/deal-management?id=${dealId}`;
+            let notificationLink = `/ceo/deals?id=${dealId}`;
             if (deal?.dealType === 'Opportunity') {
               notificationLink = `/ceo/opportunities?id=${dealId}`;
             } else if (deal?.dealType === 'Asset Management') {
