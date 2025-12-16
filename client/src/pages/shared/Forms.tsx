@@ -14,7 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Plus, FileText, Share2, Trash2, Edit, Eye, Copy, Send, GripVertical, X, Type, Mail, List, Calendar, Hash, Paperclip, Heading, AlignLeft, Table, FileTextIcon, Image, ChevronDown, ChevronUp, GitBranch, Link, Upload, Search, ExternalLink } from "lucide-react";
+import { Plus, FileText, Share2, Trash2, Edit, Eye, Copy, Send, GripVertical, X, Type, Mail, List, Calendar, Hash, Paperclip, Heading, AlignLeft, Table, FileTextIcon, Image, ChevronDown, ChevronUp, GitBranch, Link, Upload, Search, ExternalLink, Download, ChevronLeft } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 
 const FIELD_TYPES = [
@@ -1213,52 +1214,202 @@ function FormPreview({ title, description, coverImage, fields }: FormPreviewProp
 
 function SubmissionsDialog({ open, onOpenChange, form }: { open: boolean; onOpenChange: (open: boolean) => void; form: Form | null }) {
   const { data: submissions, isLoading } = useFormSubmissions(form?.id);
+  const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
 
   if (!form) return null;
 
+  const handleDownloadSubmission = (submission: any) => {
+    const data = {
+      formTitle: form.title,
+      submitterName: submission.submitterName || 'Anonymous',
+      submitterEmail: submission.submitterEmail || 'No email',
+      submittedAt: format(new Date(submission.createdAt), 'MMM d, yyyy h:mm a'),
+      responses: submission.responses.map((resp: any) => {
+        const field = form.fields.find(f => f.id === resp.fieldId);
+        return {
+          question: field?.label || resp.fieldId,
+          answer: Array.isArray(resp.value) ? resp.value.join(', ') : String(resp.value)
+        };
+      })
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${form.title.replace(/[^a-z0-9]/gi, '_')}_submission_${submission.id}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Submission downloaded');
+  };
+
+  const renderFileValue = (value: any) => {
+    if (!value) return null;
+    
+    if (typeof value === 'object' && value.url) {
+      return (
+        <a 
+          href={value.url} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-primary hover:underline inline-flex items-center gap-1"
+        >
+          <Paperclip className="h-3 w-3" />
+          {value.filename || 'Attached file'}
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      );
+    }
+    
+    if (Array.isArray(value)) {
+      return (
+        <div className="space-y-1">
+          {value.map((file: any, idx: number) => (
+            <a 
+              key={idx}
+              href={file.url || file} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary hover:underline inline-flex items-center gap-1 block"
+            >
+              <Paperclip className="h-3 w-3" />
+              {file.filename || `File ${idx + 1}`}
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          ))}
+        </div>
+      );
+    }
+    
+    return String(value);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(open) => { onOpenChange(open); if (!open) setSelectedSubmission(null); }}>
+      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Submissions for "{form.title}"</DialogTitle>
-          <DialogDescription>View all responses to this form</DialogDescription>
+          {selectedSubmission ? (
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedSubmission(null)} data-testid="button-back-submissions">
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+              <div>
+                <DialogTitle>Submission Details</DialogTitle>
+                <DialogDescription>
+                  From {selectedSubmission.submitterName || 'Anonymous'} on {format(new Date(selectedSubmission.createdAt), 'MMM d, yyyy h:mm a')}
+                </DialogDescription>
+              </div>
+            </div>
+          ) : (
+            <>
+              <DialogTitle>Submissions for "{form.title}"</DialogTitle>
+              <DialogDescription>
+                {submissions?.length || 0} response{submissions?.length !== 1 ? 's' : ''} received
+              </DialogDescription>
+            </>
+          )}
         </DialogHeader>
-        {isLoading ? (
-          <p className="text-center py-8 text-muted-foreground">Loading submissions...</p>
-        ) : submissions && submissions.length > 0 ? (
-          <div className="space-y-4">
-            {submissions.map((sub) => (
-              <Card key={sub.id}>
-                <CardHeader className="py-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{sub.submitterName || 'Anonymous'}</p>
-                      <p className="text-sm text-muted-foreground">{sub.submitterEmail || 'No email'}</p>
+        
+        <ScrollArea className="flex-1 pr-4">
+          {selectedSubmission ? (
+            <div className="space-y-6 py-4">
+              <div className="flex items-center justify-between bg-muted/50 p-4 rounded-lg">
+                <div>
+                  <p className="font-medium text-lg">{selectedSubmission.submitterName || 'Anonymous'}</p>
+                  <p className="text-sm text-muted-foreground">{selectedSubmission.submitterEmail || 'No email provided'}</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => handleDownloadSubmission(selectedSubmission)} data-testid="button-download-submission-detail">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+              </div>
+              
+              <div className="space-y-4">
+                {selectedSubmission.responses.map((resp: any, i: number) => {
+                  const field = form.fields.find(f => f.id === resp.fieldId);
+                  const isFile = field?.type === 'file';
+                  
+                  return (
+                    <div key={i} className="border rounded-lg p-4">
+                      <Label className="text-sm font-medium text-muted-foreground">{field?.label || resp.fieldId}</Label>
+                      <div className="mt-2">
+                        {isFile ? (
+                          renderFileValue(resp.value)
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap">
+                            {Array.isArray(resp.value) ? resp.value.join(', ') : String(resp.value || 'No response')}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(sub.createdAt), 'MMM d, yyyy h:mm a')}
-                    </p>
-                  </div>
-                </CardHeader>
-                <CardContent className="py-3">
-                  <div className="space-y-2">
-                    {sub.responses.map((resp, i) => {
-                      const field = form.fields.find(f => f.id === resp.fieldId);
-                      return (
-                        <div key={i} className="text-sm">
-                          <span className="font-medium">{field?.label || resp.fieldId}: </span>
-                          <span>{Array.isArray(resp.value) ? resp.value.join(', ') : String(resp.value)}</span>
+                  );
+                })}
+              </div>
+            </div>
+          ) : isLoading ? (
+            <p className="text-center py-8 text-muted-foreground">Loading submissions...</p>
+          ) : submissions && submissions.length > 0 ? (
+            <div className="space-y-3 py-4">
+              {submissions.map((sub) => (
+                <Card 
+                  key={sub.id} 
+                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setSelectedSubmission(sub)}
+                  data-testid={`card-submission-${sub.id}`}
+                >
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="font-medium">{sub.submitterName || 'Anonymous'}</p>
+                        <p className="text-sm text-muted-foreground">{sub.submitterEmail || 'No email'}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(sub.createdAt), 'MMM d, yyyy h:mm a')}
+                        </p>
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={(e) => { e.stopPropagation(); setSelectedSubmission(sub); }}
+                            data-testid={`button-view-submission-${sub.id}`}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={(e) => { e.stopPropagation(); handleDownloadSubmission(sub); }}
+                            data-testid={`button-download-submission-${sub.id}`}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
                         </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <p className="text-center py-8 text-muted-foreground">No submissions yet</p>
-        )}
+                      </div>
+                    </div>
+                    <div className="mt-2 text-sm text-muted-foreground line-clamp-1">
+                      {sub.responses.slice(0, 2).map((resp: any, i: number) => {
+                        const field = form.fields.find(f => f.id === resp.fieldId);
+                        const value = Array.isArray(resp.value) ? resp.value.join(', ') : String(resp.value);
+                        return `${field?.label || resp.fieldId}: ${value.substring(0, 30)}${value.length > 30 ? '...' : ''}`;
+                      }).join(' | ')}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">No submissions yet</p>
+              <p className="text-sm text-muted-foreground mt-1">Share this form to start collecting responses</p>
+            </div>
+          )}
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
