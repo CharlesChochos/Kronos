@@ -3580,9 +3580,9 @@ export function usePersonalityAssessment() {
       if (!res.ok) throw new Error("Failed to fetch personality assessment");
       return res.json() as Promise<PersonalityAssessment | null>;
     },
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Poll every 2 seconds while analyzing
-      if (data?.state?.data?.status === 'analyzing') return 2000;
+      if (query.state.data?.status === 'analyzing') return 2000;
       return false;
     },
   });
