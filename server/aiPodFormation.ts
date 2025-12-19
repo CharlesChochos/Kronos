@@ -299,6 +299,21 @@ Consider personality tag compatibility for team chemistry.
           assignmentRationale: member.rationale,
           isLead: member.position === 1 || member.userId === finalLeadUserId
         });
+        
+        // Also create stage_pod_members entry for frontend display
+        const user = await storage.getUser(member.userId);
+        if (user) {
+          await storage.createStagePodMember({
+            dealId: deal.id,
+            stage,
+            userId: member.userId,
+            userName: `${user.firstName} ${user.lastName}`,
+            role: member.role,
+            email: user.email,
+            phone: user.phone || undefined,
+            isLead: member.position === 1 || member.userId === finalLeadUserId
+          });
+        }
       }
     }
     
