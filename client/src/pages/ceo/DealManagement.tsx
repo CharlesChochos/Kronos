@@ -3498,68 +3498,70 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                 <TabsContent value="team" className="mt-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium">Pod Team Members</h4>
-                    <Badge variant="secondary">{(selectedDeal.podTeam as PodTeamMember[] || []).length} members</Badge>
+                    <Badge variant="secondary">{uniqueTeamCount} members</Badge>
                   </div>
 
-                  {/* Team Members List */}
+                  {/* Team Members List - Use stage pod members from database */}
                   <ScrollArea className="h-[200px]">
                     <div className="space-y-2">
-                      {(selectedDeal.podTeam as PodTeamMember[] || []).map((member, index) => (
-                        <div key={index} className="p-3 bg-secondary/30 rounded-lg flex items-center justify-between group">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary">
-                              {member.name.split(' ').map(n => n[0]).join('')}
+                      {allStagePodMembers.map((member: any, index: number) => {
+                        const memberName = member.userName || 'Unknown';
+                        const initials = memberName.split(' ').map((n: string) => n[0] || '').join('').slice(0, 2);
+                        return (
+                          <div key={member.id || index} className="p-3 bg-secondary/30 rounded-lg flex items-center justify-between group">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary">
+                                {initials}
+                              </div>
+                              <div>
+                                <div className="font-medium flex items-center gap-2">
+                                  {memberName}
+                                  {member.isLead && <Badge variant="secondary" className="text-xs">Lead</Badge>}
+                                </div>
+                                <div className="text-xs text-muted-foreground">{member.role} - {member.stage}</div>
+                              </div>
                             </div>
-                            <div>
-                              <div className="font-medium">{member.name}</div>
-                              <div className="text-xs text-muted-foreground">{member.role}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {member.phone && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                                <a href={`tel:${member.phone}`}><Phone className="w-4 h-4 text-green-500" /></a>
-                              </Button>
-                            )}
-                            {member.email && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                                <a href={`mailto:${member.email}`}><Mail className="w-4 h-4 text-blue-500" /></a>
-                              </Button>
-                            )}
-                            {member.slack && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                                <a href={`slack://user?team=&id=${member.slack}`}><MessageSquare className="w-4 h-4 text-purple-500" /></a>
-                              </Button>
-                            )}
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                  <X className="w-4 h-4 text-red-500" />
+                            <div className="flex items-center gap-1">
+                              {member.phone && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                  <a href={`tel:${member.phone}`}><Phone className="w-4 h-4 text-green-500" /></a>
                                 </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will remove {member.name} from the pod team. This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleRemoveTeamMember(index)}>
-                                    Remove
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                              )}
+                              {member.email && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                  <a href={`mailto:${member.email}`}><Mail className="w-4 h-4 text-blue-500" /></a>
+                                </Button>
+                              )}
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <X className="w-4 h-4 text-red-500" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will remove {memberName} from the pod team. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => deleteStagePodMember.mutate(member.id)}>
+                                      Remove
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                      {(selectedDeal.podTeam as PodTeamMember[] || []).length === 0 && (
+                        );
+                      })}
+                      {allStagePodMembers.length === 0 && (
                         <div className="text-center py-8 text-muted-foreground text-sm">
                           No team members assigned yet
                         </div>
