@@ -3501,14 +3501,15 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     <Badge variant="secondary">{uniqueTeamCount} members</Badge>
                   </div>
 
-                  {/* Team Members List - Use stage pod members from database */}
+                  {/* Team Members List - Merge stage pod members from DB with legacy podTeam JSON */}
                   <ScrollArea className="h-[200px]">
                     <div className="space-y-2">
+                      {/* First show stage_pod_members from database */}
                       {allStagePodMembers.map((member: any, index: number) => {
                         const memberName = member.userName || 'Unknown';
                         const initials = memberName.split(' ').map((n: string) => n[0] || '').join('').slice(0, 2);
                         return (
-                          <div key={member.id || index} className="p-3 bg-secondary/30 rounded-lg flex items-center justify-between group">
+                          <div key={member.id || `stage-${index}`} className="p-3 bg-secondary/30 rounded-lg flex items-center justify-between group">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary">
                                 {initials}
@@ -3561,7 +3562,36 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                           </div>
                         );
                       })}
-                      {allStagePodMembers.length === 0 && (
+                      {/* Show legacy podTeam members from deal JSON if no stage_pod_members exist */}
+                      {allStagePodMembers.length === 0 && (selectedDealWithAttachments as any)?.podTeam && ((selectedDealWithAttachments as any).podTeam as PodTeamMember[]).map((member: PodTeamMember, index: number) => {
+                        const initials = member.name.split(' ').map((n: string) => n[0] || '').join('').slice(0, 2);
+                        return (
+                          <div key={`legacy-${index}`} className="p-3 bg-secondary/30 rounded-lg flex items-center justify-between group">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary">
+                                {initials}
+                              </div>
+                              <div>
+                                <div className="font-medium">{member.name}</div>
+                                <div className="text-xs text-muted-foreground">{member.role}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {member.phone && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                  <a href={`tel:${member.phone}`}><Phone className="w-4 h-4 text-green-500" /></a>
+                                </Button>
+                              )}
+                              {member.email && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                  <a href={`mailto:${member.email}`}><Mail className="w-4 h-4 text-blue-500" /></a>
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {allStagePodMembers.length === 0 && !((selectedDealWithAttachments as any)?.podTeam?.length) && (
                         <div className="text-center py-8 text-muted-foreground text-sm">
                           No team members assigned yet
                         </div>
