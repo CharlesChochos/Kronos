@@ -161,6 +161,7 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
       links: [
         { icon: Calendar, label: "Calendar", path: "/ceo/calendar" },
         { icon: Target, label: "Goals & OKRs", path: "/ceo/okrs" },
+        { icon: FileText, label: "Resume Onboarding", path: "/ceo/resume-onboarding" },
         { icon: Brain, label: "Personality Profile", path: "/ceo/personality-assessment" },
       ]
     },
@@ -235,6 +236,7 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
       links: [
         { icon: Calendar, label: "Calendar", path: "/employee/calendar" },
         { icon: Target, label: "Goals & OKRs", path: "/employee/okrs" },
+        { icon: FileText, label: "Resume Onboarding", path: "/employee/resume-onboarding" },
         { icon: Brain, label: "Personality Profile", path: "/employee/personality-assessment" },
       ]
     },

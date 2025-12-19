@@ -50,6 +50,7 @@ const Forms = lazy(() => import("@/pages/shared/Forms"));
 const PublicForm = lazy(() => import("@/pages/shared/PublicForm"));
 const TaskTemplates = lazy(() => import("@/pages/shared/TaskTemplates"));
 const PersonalityAssessment = lazy(() => import("@/pages/shared/PersonalityAssessment"));
+const ResumeOnboarding = lazy(() => import("@/pages/shared/ResumeOnboarding"));
 
 // Wrapper components to ensure props are passed correctly with wouter
 const CeoDealManagement = () => <DealManagement role="CEO" />;
@@ -253,6 +254,9 @@ function Router() {
         <Route path="/ceo/personality-assessment">
           {() => <ProtectedRoute component={PersonalityAssessment} />}
         </Route>
+        <Route path="/ceo/resume-onboarding">
+          {() => <ProtectedRoute component={ResumeOnboarding} />}
+        </Route>
         
         {/* Employee Routes */}
         <Route path="/employee/home">
@@ -305,6 +309,9 @@ function Router() {
         </Route>
         <Route path="/employee/personality-assessment">
           {() => <ProtectedRoute component={PersonalityAssessment} />}
+        </Route>
+        <Route path="/employee/resume-onboarding">
+          {() => <ProtectedRoute component={ResumeOnboarding} />}
         </Route>
         
         {/* External Portal Routes */}

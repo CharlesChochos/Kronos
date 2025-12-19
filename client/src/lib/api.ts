@@ -3620,3 +3620,79 @@ export function useSubmitPersonalityAssessment() {
     },
   });
 }
+
+// ===== RESUME ANALYSIS =====
+
+export type OnboardingPlacement = {
+  assignedDealTeam: string;
+  primaryVertical: string;
+  secondaryVertical: string;
+  primaryDealPhase: string;
+  secondaryDealPhase: string;
+  initialSeatRecommendation: string;
+  topFiveInferredTags: string[];
+  coverageGaps: string;
+};
+
+export type ResumeAIAnalysis = {
+  candidateSnapshot: string;
+  evidenceAnchors: string;
+  transactionProfile: string;
+  roleElevationAutonomy: string;
+  dealPhaseFit: string;
+  dealTypeProficiency: string;
+  resumeInferredTags: string;
+  managerialNotes: string;
+  onboardingPlacement: OnboardingPlacement;
+  rawResponse: string;
+};
+
+export type ResumeAnalysis = {
+  id: string;
+  userId: string;
+  fileName: string;
+  fileContent: string | null;
+  aiAnalysis: ResumeAIAnalysis | null;
+  assignedDealTeam: string | null;
+  status: string; // 'pending' | 'analyzing' | 'completed' | 'failed'
+  completedAt: string | null;
+  createdAt: string;
+};
+
+export function useResumeAnalysis() {
+  return useQuery({
+    queryKey: ["resume-analysis"],
+    queryFn: async () => {
+      const res = await fetch("/api/resume/analysis");
+      if (!res.ok) throw new Error("Failed to fetch resume analysis");
+      return res.json() as Promise<ResumeAnalysis | null>;
+    },
+    refetchInterval: (query) => {
+      if (query.state.data?.status === 'analyzing') return 2000;
+      return false;
+    },
+  });
+}
+
+export function useUploadResume() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('resume', file);
+      
+      const res = await fetch("/api/resume/analyze", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to upload resume");
+      }
+      return res.json() as Promise<ResumeAnalysis>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resume-analysis"] });
+    },
+  });
+}

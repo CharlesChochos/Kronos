@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
-import { usePersonalityQuestions, usePersonalityAssessment, useSubmitPersonalityAssessment, useCurrentUser, type PersonalityScore, type AIAnalysis } from "@/lib/api";
+import { usePersonalityQuestions, usePersonalityAssessment, useSubmitPersonalityAssessment, useCurrentUser, useResumeAnalysis, type PersonalityScore, type AIAnalysis } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -64,6 +64,7 @@ export default function PersonalityAssessment() {
   const { data: currentUser } = useCurrentUser();
   const { data: questions = [], isLoading: questionsLoading } = usePersonalityQuestions();
   const { data: existingAssessment, isLoading: assessmentLoading, refetch } = usePersonalityAssessment();
+  const { data: resumeAnalysis } = useResumeAnalysis();
   const submitAssessment = useSubmitPersonalityAssessment();
   
   const [answers, setAnswers] = useState<Record<number, 'A' | 'B'>>({});
@@ -71,6 +72,13 @@ export default function PersonalityAssessment() {
   const [showResults, setShowResults] = useState(false);
   const [isRetaking, setIsRetaking] = useState(false);
   const [dealTeamStatus, setDealTeamStatus] = useState('Floater');
+  
+  // Pre-populate deal team status from resume analysis if available
+  useEffect(() => {
+    if (resumeAnalysis?.assignedDealTeam) {
+      setDealTeamStatus(resumeAnalysis.assignedDealTeam);
+    }
+  }, [resumeAnalysis?.assignedDealTeam]);
   
   const isLoading = questionsLoading || assessmentLoading;
   const isAnalyzing = existingAssessment?.status === 'analyzing';

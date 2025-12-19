@@ -18,6 +18,7 @@ import * as crypto from "crypto";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import * as pdfParse from "pdf-parse";
 
 // PostgreSQL session store
 const PgSession = connectPgSimple(session);
@@ -2206,6 +2207,302 @@ ${scoreSheet}`;
       { id: 25, question: "You'd rather be described as:", optionA: "Intense", optionB: "Precise" },
     ];
     res.json(questions);
+  });
+
+  // ===== RESUME ANALYSIS ROUTES =====
+
+  // Equiturn Onboarding Deal Team Placement Analyst prompt
+  const ONBOARDING_ANALYST_PROMPT = `You are Equiturn Onboarding Deal Team Placement Analyst. Your job is to ingest one or more uploaded resumes and produce a paper ready initial deployment profile used to place people onto Equiturn Deal Teams at onboarding. You must end with a final onboarding placement block that assigns the person to a Deal Team and tags their initial deployment seat.
+Non negotiable constraints
+Confidentiality. Treat all resumes and employee data as confidential.
+No fabrication. Do not invent credentials, employers, deal experience, dates, or outcomes.
+No questions. You must never ask the user for missing inputs. Proceed using best effort extraction and clearly labeled assumptions.
+No emojis. No tables.
+Behavioral conclusions must be evidence based. Technical competence must be grounded in resume evidence, not generic claims.
+No advancement language. This is initial placement only, not promotion or progression.
+Output must be precise, institutional, and operationally actionable.
+Primary input source
+ The uploaded resume file is the source of truth. If multiple files are uploaded, treat each as a separate candidate unless the file explicitly states it is an updated version of the same person.
+Core Equiturn Deal Team framework
+ Valid Deal Team statuses are Floater, Deal Team 10, Deal Team 8, Deal Team 2, Deal Team 4, Deal Team 6.
+ Deal Team interpretation at onboarding
+ Floater: baseline competency, deploy in bounded roles with high review cadence
+ Deal Team 10: entry level strategy developer, scoped analytical tasks, frequent review
+ Deal Team 8: mid complexity execution contributor, moderate autonomy with checkpoints
+ Deal Team 2: complex mandate lead, high autonomy with risk and quality oversight
+ Deal Team 4: highest complexity mandates, minimal supervision, governance level review
+ Deal Team 6: Zeno Citium hyper complexity standard setter, assign only with explicit internal proof in resume, otherwise output Deal Team 4 plus a DT6 gate review flag
+Resume extraction rules
+Extract candidate name. If not present, set Name not provided.
+Extract most recent title and primary function. If unclear, infer function from responsibilities and set Function inferred.
+Extract education, licenses, certifications, languages, and tools.
+Extract transaction and capital markets evidence, including deal type, size, role, and outcomes when stated.
+Extract leadership evidence, including team management, client ownership, and workstream ownership.
+Extract compliance and regulated environment signals, including broker dealer, FINRA, SEC, public company work, or regulated advisory context if stated.
+Capture evidence snippets internally, then summarize them in the output as Evidence Anchors.
+Evidence grading model
+ You must score evidence strength silently using three dimensions. Do not show numeric scoring unless asked.
+Transaction Depth: exposure to real deals and closings, not only research
+Role Elevation: did they lead, own, or sign off, versus support only
+Complexity: cross border, multi stakeholder, regulated, distressed, carve outs, structured capital, or multi workstream execution
+Deal vertical mapping from resume evidence
+ You must assign a primary and secondary vertical. Use only resume evidence.
+1. M and A buy side indicators
+ Acquisitions, diligence, underwriting, valuation, integration planning, sponsor or corporate development buy side
+2. M and A sell side indicators
+ Sell side process, CIM, buyer outreach, management presentations, data room management, bid process, negotiations
+3. ECM indicators
+ IPO, follow on, PIPE, registered offerings, S 1, prospectus, bookbuilding, syndicate, investor roadshow execution
+4. DCM indicators
+ Bonds, loans, credit facilities, leveraged finance, private credit structuring, covenants, interest coverage, ratings, lender syndication
+5. Fundraising and AUM raising indicators
+ Investor relations, LP outreach, placement, capital introductions, subscriptions, fund marketing materials, institutional allocator engagement
+Deal phase mapping from resume evidence
+ You must assign primary and secondary deal phases, and list phases in best fit order.
+ Origination indicators: sourcing, relationship development, outreach, pipeline ownership
+ Structuring indicators: modeling, term structuring, capitalization, legal documentation coordination
+ Execution indicators: diligence management, workstream coordination, third party management, timeline control
+ Closing indicators: negotiation support, definitive documentation coordination, approvals, closing deliverables
+ Integration indicators: post close operating plan, KPI build, governance cadence, reporting, value creation initiatives
+Initial archetype tag inference from resume
+ You must infer a ranked top five set of Equiturn archetype tags using only resume evidence signals. These are provisional and must be labeled as Resume Inferred Tags.
+ Canonical tags: Politician, Rainmaker, Mayor, Creative, Deal Junkie, Closer, Grandmaster, Architect, Guru, Sherpa, Firefighter, Legal, Liaison, Auditor, Regulatory, Misfit
+ Inference rules
+ Architect: repeated structuring and modeling ownership
+ Sherpa: coordination, project management, diligence control, process discipline
+ Rainmaker: sourcing, BD, relationship ownership, revenue ownership
+ Politician: stakeholder management, negotiations, executive interface
+ Closer: negotiation and closing deliverables ownership, signed outcomes stated
+ Auditor: controls, accounting rigor, reconciliation, audit exposure
+ Regulatory: regulated environments explicitly stated, filings, compliance exposure
+ Legal: contract drafting, legal workstream ownership, document negotiation coordination
+ Liaison: cross functional bridging, vendor and counsel coordination, communication cadence
+ Firefighter: turnarounds, urgent remediation, restructurings, crisis execution
+ Deal Junkie: high deal volume exposure, multiple live mandates, deal centric roles
+ Grandmaster: pattern level strategic leadership across multiple complex mandates with outcomes
+ Guru: deep technical domain expertise stated and demonstrated through repeatable outcomes
+ Mayor: internal leadership, cross team influence, enterprise wide coordination
+ Creative: narrative, positioning, messaging, deck leadership tied to outcomes
+ Misfit: nonstandard background that creates edge, only when resume shows it clearly
+Deal Team assignment rules at onboarding
+ Default posture is conservative. Assign the highest Deal Team that is clearly supported by evidence. If evidence is insufficient, default to Floater.
+ Floater assignment
+ Use when resume lacks clear deal outcomes, lacks transaction specifics, or is primarily non deal operational without deal adjacency
+ Deal Team 10 assignment
+ Use when early career, limited deal exposure, primarily analytical support, or no ownership evidence
+ Deal Team 8 assignment
+ Use when the resume shows multiple live deals, clear execution contributions, defined workstreams, and credible tools fluency
+ Deal Team 2 assignment
+ Use when the resume shows lead workstream ownership on complex mandates, repeated closings, and independent client interface
+ Deal Team 4 assignment
+ Use when the resume shows senior leadership, autonomous mandate leadership, cross border or regulated complexity, repeated high stakes outcomes
+ Deal Team 6 assignment
+ Assign only if the resume explicitly demonstrates Zeno level hyper complexity execution plus internal standard setting credentials stated in the resume. Otherwise assign Deal Team 4 and include DT6 gate review required in Data Integrity Notes.
+Mandatory output format
+ Write the output in this exact order, short paragraphs per section, no tables.
+1. Candidate Snapshot
+ Name, current or most recent title, inferred primary function, and one sentence onboarding deployment headline.
+ Include Data Integrity Notes here, listing assumptions, missing fields, and any DT6 gate review flag.
+2. Evidence Anchors
+ List the most decision relevant resume facts as short lines, such as firms, roles, deal types, stated sizes, outcomes, tools, licenses, and leadership scope.
+3. Transaction Profile
+ Summarize the deal and capital markets exposure, emphasizing closings and workstream ownership. If none stated, say explicitly that no explicit transaction outcomes were provided.
+4. Role Elevation and Autonomy
+ State whether the resume evidence supports lead ownership or support execution, and where supervision is required.
+5. Deal Phase Fit
+ List phases in best fit order, then name a primary phase and secondary phase with evidence based rationale.
+6. Deal Type Proficiency
+ State primary and secondary vertical with evidence based rationale grounded in the vertical indicators above. Include one sentence on contexts to avoid or constrain at onboarding.
+7. Resume Inferred Tags
+ Provide the top five inferred tags in rank order with one sentence of evidence rationale for the top two.
+8. Managerial Notes
+ Provide onboarding deployment instructions, review cadence, what they should own, what they must not own unsupervised, and the ideal seat on a live mandate.
+9. Final Onboarding Placement
+ A single block titled Final Onboarding Placement containing, in this order
+ A. Assigned Deal Team
+ B. Primary vertical
+ C. Secondary vertical
+ D. Primary deal phase
+ E. Secondary deal phase
+ F. Initial seat recommendation, for example origination support, structuring support, execution lead support, diligence quarterback, closing coordinator, integration liaison
+ G. Top five Resume Inferred Tags
+ H. Coverage gaps, either No material gaps observed or a short statement such as needs closer coverage or needs regulatory coverage
+Quality control pass
+ Before finalizing, run two silent checks
+Completeness check, every mandatory section present, final placement block present
+Evidence check, every major conclusion is anchored to resume evidence, and any assumption is clearly flagged in Data Integrity Notes`;
+
+  // AI Resume Analysis function
+  async function analyzeResumeWithAI(
+    resumeText: string
+  ): Promise<{ success: boolean; analysis?: any; error?: string }> {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: ONBOARDING_ANALYST_PROMPT },
+          { role: "user", content: `Please analyze the following resume and provide the onboarding placement profile:\n\n${resumeText}` }
+        ],
+        temperature: 0.3,
+        max_tokens: 4000,
+      });
+
+      const rawResponse = response.choices[0]?.message?.content || '';
+      const analysis = parseResumeAIAnalysis(rawResponse);
+      
+      return { success: true, analysis };
+    } catch (error: any) {
+      console.error('[Resume AI] Error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Parse AI response for resume analysis
+  function parseResumeAIAnalysis(rawResponse: string): any {
+    const sections: Record<string, string> = {};
+    
+    const sectionPatterns = [
+      { key: 'candidateSnapshot', pattern: /1\.\s*Candidate Snapshot\s*([\s\S]*?)(?=2\.\s*Evidence Anchors|$)/i },
+      { key: 'evidenceAnchors', pattern: /2\.\s*Evidence Anchors\s*([\s\S]*?)(?=3\.\s*Transaction Profile|$)/i },
+      { key: 'transactionProfile', pattern: /3\.\s*Transaction Profile\s*([\s\S]*?)(?=4\.\s*Role Elevation|$)/i },
+      { key: 'roleElevationAutonomy', pattern: /4\.\s*Role Elevation[^5]*([\s\S]*?)(?=5\.\s*Deal Phase Fit|$)/i },
+      { key: 'dealPhaseFit', pattern: /5\.\s*Deal Phase Fit\s*([\s\S]*?)(?=6\.\s*Deal Type Proficiency|$)/i },
+      { key: 'dealTypeProficiency', pattern: /6\.\s*Deal Type Proficiency\s*([\s\S]*?)(?=7\.\s*Resume Inferred Tags|$)/i },
+      { key: 'resumeInferredTags', pattern: /7\.\s*Resume Inferred Tags\s*([\s\S]*?)(?=8\.\s*Managerial Notes|$)/i },
+      { key: 'managerialNotes', pattern: /8\.\s*Managerial Notes\s*([\s\S]*?)(?=9\.\s*Final Onboarding Placement|$)/i },
+    ];
+
+    for (const { key, pattern } of sectionPatterns) {
+      const match = rawResponse.match(pattern);
+      sections[key] = match ? match[1].trim() : '';
+    }
+
+    // Extract Final Onboarding Placement section
+    const placementMatch = rawResponse.match(/9\.\s*Final Onboarding Placement\s*([\s\S]*?)$/i);
+    const placementText = placementMatch ? placementMatch[1].trim() : '';
+
+    // Parse onboarding placement
+    const onboardingPlacement = {
+      assignedDealTeam: extractPlacementValue(placementText, /A\.\s*Assigned Deal Team[:\s]*(.+)/i) || 'Floater',
+      primaryVertical: extractPlacementValue(placementText, /B\.\s*Primary vertical[:\s]*(.+)/i) || '',
+      secondaryVertical: extractPlacementValue(placementText, /C\.\s*Secondary vertical[:\s]*(.+)/i) || '',
+      primaryDealPhase: extractPlacementValue(placementText, /D\.\s*Primary deal phase[:\s]*(.+)/i) || '',
+      secondaryDealPhase: extractPlacementValue(placementText, /E\.\s*Secondary deal phase[:\s]*(.+)/i) || '',
+      initialSeatRecommendation: extractPlacementValue(placementText, /F\.\s*Initial seat recommendation[:\s]*(.+)/i) || '',
+      topFiveInferredTags: extractInferredTags(placementText),
+      coverageGaps: extractPlacementValue(placementText, /H\.\s*Coverage gaps[:\s]*(.+)/i) || 'No material gaps observed',
+    };
+
+    return {
+      ...sections,
+      onboardingPlacement,
+      rawResponse,
+    };
+  }
+
+  function extractPlacementValue(text: string, pattern: RegExp): string | null {
+    const match = text.match(pattern);
+    return match ? match[1].trim() : null;
+  }
+
+  function extractInferredTags(text: string): string[] {
+    const match = text.match(/G\.\s*Top five Resume Inferred Tags[:\s]*([\s\S]*?)(?=H\.|$)/i);
+    if (!match) return [];
+    const tagsText = match[1].trim();
+    return tagsText
+      .split(/[,\n]/)
+      .map(t => t.replace(/^\d+\.\s*/, '').trim())
+      .filter(t => t.length > 0)
+      .slice(0, 5);
+  }
+
+  // Get current user's resume analysis
+  app.get("/api/resume/analysis", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const analysis = await storage.getResumeAnalysis(user.id);
+      res.json(analysis || null);
+    } catch (error) {
+      console.error('Error fetching resume analysis:', error);
+      res.status(500).json({ error: "Failed to fetch resume analysis" });
+    }
+  });
+
+  // Upload and analyze resume
+  app.post("/api/resume/analyze", requireAuth, uploadLimiter, upload.single('resume'), async (req, res) => {
+    try {
+      const user = req.user as any;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ error: "Resume file is required" });
+      }
+
+      // Extract text from PDF
+      let resumeText = '';
+      if (file.mimetype === 'application/pdf') {
+        try {
+          const pdfData = await pdfParse(file.buffer);
+          resumeText = pdfData.text;
+        } catch (pdfError) {
+          console.error('[Resume] PDF parse error:', pdfError);
+          return res.status(400).json({ error: "Failed to parse PDF. Please ensure it's a valid PDF file." });
+        }
+      } else if (file.mimetype === 'text/plain' || file.originalname.endsWith('.txt')) {
+        resumeText = file.buffer.toString('utf-8');
+      } else {
+        return res.status(400).json({ error: "Unsupported file format. Please upload a PDF or TXT file." });
+      }
+
+      if (!resumeText.trim()) {
+        return res.status(400).json({ error: "Could not extract text from resume. Please ensure the file contains readable text." });
+      }
+
+      // Check if user already has an analysis
+      const existingAnalysis = await storage.getResumeAnalysis(user.id);
+
+      // Create or update analysis with pending status
+      let analysis;
+      if (existingAnalysis) {
+        analysis = await storage.updateResumeAnalysis(existingAnalysis.id, {
+          fileName: file.originalname,
+          fileContent: resumeText.substring(0, 50000), // Limit stored content
+          status: 'analyzing',
+          aiAnalysis: null,
+        });
+      } else {
+        analysis = await storage.createResumeAnalysis({
+          userId: user.id,
+          fileName: file.originalname,
+          fileContent: resumeText.substring(0, 50000),
+          status: 'analyzing',
+          aiAnalysis: null,
+        });
+      }
+
+      // Send response immediately
+      res.json({ ...analysis, status: 'analyzing' });
+
+      // Run AI analysis asynchronously
+      const aiResult = await analyzeResumeWithAI(resumeText);
+
+      // Update with AI analysis
+      if (aiResult.success && analysis) {
+        await storage.updateResumeAnalysis(analysis.id, {
+          aiAnalysis: aiResult.analysis,
+          assignedDealTeam: aiResult.analysis?.onboardingPlacement?.assignedDealTeam || 'Floater',
+          status: 'completed',
+          completedAt: new Date(),
+        });
+      } else if (analysis) {
+        await storage.updateResumeAnalysis(analysis.id, {
+          status: 'failed',
+        });
+      }
+    } catch (error) {
+      console.error('Error analyzing resume:', error);
+      res.status(500).json({ error: "Failed to analyze resume" });
+    }
   });
 
   // ===== DEAL ROUTES =====
