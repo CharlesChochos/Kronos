@@ -2091,6 +2091,20 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.podMembers.userId, userId));
   }
 
+  async getUserCurrentStageAssignments(userId: string): Promise<string[]> {
+    const activePodMemberships = await db.select({
+      stage: schema.dealPods.stage
+    })
+    .from(schema.podMembers)
+    .innerJoin(schema.dealPods, eq(schema.podMembers.podId, schema.dealPods.id))
+    .where(and(
+      eq(schema.podMembers.userId, userId),
+      eq(schema.dealPods.status, 'active')
+    ));
+    
+    return [...new Set(activePodMemberships.map(m => m.stage))];
+  }
+
   // ================================
   // DEAL MILESTONE OPERATIONS
   // ================================

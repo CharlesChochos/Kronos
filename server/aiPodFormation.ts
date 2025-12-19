@@ -104,13 +104,13 @@ You must respond in valid JSON format with this exact structure:
   "dataIntegrityNotes": string
 }`;
 
-function buildUserRoster(usersWithProfiles: Array<{
+async function buildUserRoster(usersWithProfiles: Array<{
   user: User;
   resumeAnalysis: ResumeAnalysis | null;
   personalityAssessment: PersonalityAssessment | null;
   workload: { activeTasks: number; pendingTasks: number; completedThisWeek: number };
-}>): UserWorkloadSnapshot[] {
-  return usersWithProfiles.map(({ user, resumeAnalysis, personalityAssessment, workload }) => {
+}>): Promise<UserWorkloadSnapshot[]> {
+  const rosterPromises = usersWithProfiles.map(async ({ user, resumeAnalysis, personalityAssessment, workload }) => {
     const dealTeamStatus = resumeAnalysis?.assignedDealTeam || 'Floater';
     
     const personalityTags: string[] = [];
@@ -125,6 +125,8 @@ function buildUserRoster(usersWithProfiles: Array<{
     
     const capacityScore = Math.min(100, (workload.activeTasks * 20) + (workload.pendingTasks * 10));
     
+    const currentStages = await storage.getUserCurrentStageAssignments(user.id);
+    
     return {
       userId: user.id,
       userName: user.name,
@@ -135,9 +137,11 @@ function buildUserRoster(usersWithProfiles: Array<{
       completedThisWeek: workload.completedThisWeek,
       activeDeals: user.activeDeals || 0,
       capacityScore,
-      currentStages: []
+      currentStages
     };
   });
+  
+  return Promise.all(rosterPromises);
 }
 
 export async function formPodForDeal(
@@ -149,7 +153,7 @@ export async function formPodForDeal(
     console.log(`[AI Pod Formation] Starting pod formation for deal ${deal.id} at stage ${stage}`);
     
     const usersWithProfiles = await storage.getAllUsersWithProfiles();
-    const userRoster = buildUserRoster(usersWithProfiles);
+    const userRoster = await buildUserRoster(usersWithProfiles);
     
     const dealDocuments = await storage.getDealContextUpdates(deal.id);
     const documentContents = dealDocuments
@@ -185,6 +189,8 @@ Personality Tags: ${u.personalityTags.join(', ') || 'None assessed'}
 Current Workload: ${u.activeTasks} active tasks, ${u.pendingTasks} pending tasks
 Capacity Score: ${u.capacityScore}/100 (lower is more available)
 Active Deals: ${u.activeDeals}
+Current Stage Assignments: ${u.currentStages.length > 0 ? u.currentStages.join(', ') : 'None'}
+AVAILABILITY FOR ${stage}: ${u.currentStages.includes(stage) ? 'ALREADY ASSIGNED TO THIS STAGE - PREFER NOT TO ASSIGN' : 'Available'}
 `).join('\n')}
 
 Based on this information, form the optimal pod team and create the full deal completion plan.
@@ -214,23 +220,55 @@ Consider personality tag compatibility for team chemistry.
     
     const aiResponse: AIPodFormationResponse = JSON.parse(content);
     
-    const leadMember = aiResponse.podMembers.find(m => m.position === 1);
-    const leadUserId = existingPodLeadId || leadMember?.userId || null;
+    if (aiResponse.podSize !== podSize) {
+      console.warn(`[AI Pod Formation] AI returned pod size ${aiResponse.podSize}, but business rule requires ${podSize}. Using deterministic value.`);
+    }
+    
+    const aiLeadMember = aiResponse.podMembers.find(m => m.position === 1);
+    let finalLeadUserId = existingPodLeadId || aiLeadMember?.userId || null;
+    
+    if (existingPodLeadId) {
+      const leadInAIResponse = aiResponse.podMembers.find(m => m.userId === existingPodLeadId);
+      if (!leadInAIResponse) {
+        console.log(`[AI Pod Formation] Enforcing Pod Lead persistence - AI did not include existing lead ${existingPodLeadId}`);
+        const existingLeadUser = userRoster.find(u => u.userId === existingPodLeadId);
+        if (existingLeadUser) {
+          const evictedLead = aiResponse.podMembers.find(m => m.position === 1);
+          if (evictedLead) {
+            aiResponse.podMembers = aiResponse.podMembers.filter(m => m.position !== 1);
+          }
+          aiResponse.podMembers.unshift({
+            position: 1,
+            role: 'Pod Lead',
+            userId: existingPodLeadId,
+            userName: existingLeadUser.userName,
+            dealTeamStatus: existingLeadUser.dealTeamStatus,
+            requiredTags: ['Grandmaster', 'Closer', 'Politician', 'Architect'],
+            matchedTags: existingLeadUser.personalityTags.filter(t => 
+              ['Grandmaster', 'Closer', 'Politician', 'Architect'].includes(t)
+            ),
+            rationale: 'Pod Lead persisted from previous stage (Pod Lead does not move rule)'
+          });
+        }
+      }
+    }
     
     const pod = await storage.createDealPod({
       dealId: deal.id,
       stage,
-      podSize: aiResponse.podSize,
-      leadUserId,
+      podSize,
+      leadUserId: finalLeadUserId,
       aiFormationRationale: aiResponse.formationRationale,
       aiRawResponse: content,
       status: 'active'
     });
     
-    console.log(`[AI Pod Formation] Created pod ${pod.id} with ${aiResponse.podMembers.length} members`);
+    console.log(`[AI Pod Formation] Created pod ${pod.id} with ${aiResponse.podMembers.length} members (deterministic size: ${podSize})`);
     
+    const addedUserIds = new Set<string>();
     for (const member of aiResponse.podMembers) {
-      if (member.userId) {
+      if (member.userId && !addedUserIds.has(member.userId)) {
+        addedUserIds.add(member.userId);
         await storage.createPodMember({
           podId: pod.id,
           userId: member.userId,
@@ -240,7 +278,7 @@ Consider personality tag compatibility for team chemistry.
           requiredTags: member.requiredTags,
           matchedTags: member.matchedTags,
           assignmentRationale: member.rationale,
-          isLead: member.position === 1
+          isLead: member.position === 1 || member.userId === finalLeadUserId
         });
       }
     }
