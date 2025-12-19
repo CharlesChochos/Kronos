@@ -228,29 +228,45 @@ Consider personality tag compatibility for team chemistry.
     let finalLeadUserId = existingPodLeadId || aiLeadMember?.userId || null;
     
     if (existingPodLeadId) {
+      const existingLeadUser = userRoster.find(u => u.userId === existingPodLeadId);
+      if (!existingLeadUser) {
+        console.error(`[AI Pod Formation] CRITICAL: Existing pod lead ${existingPodLeadId} not found in active user roster. Cannot persist lead.`);
+        throw new Error(`Pod lead ${existingPodLeadId} not found in active roster. The lead may be inactive or removed.`);
+      }
+      
       const leadInAIResponse = aiResponse.podMembers.find(m => m.userId === existingPodLeadId);
       if (!leadInAIResponse) {
         console.log(`[AI Pod Formation] Enforcing Pod Lead persistence - AI did not include existing lead ${existingPodLeadId}`);
-        const existingLeadUser = userRoster.find(u => u.userId === existingPodLeadId);
-        if (existingLeadUser) {
-          const evictedLead = aiResponse.podMembers.find(m => m.position === 1);
-          if (evictedLead) {
-            aiResponse.podMembers = aiResponse.podMembers.filter(m => m.position !== 1);
-          }
-          aiResponse.podMembers.unshift({
-            position: 1,
-            role: 'Pod Lead',
-            userId: existingPodLeadId,
-            userName: existingLeadUser.userName,
-            dealTeamStatus: existingLeadUser.dealTeamStatus,
-            requiredTags: ['Grandmaster', 'Closer', 'Politician', 'Architect'],
-            matchedTags: existingLeadUser.personalityTags.filter(t => 
-              ['Grandmaster', 'Closer', 'Politician', 'Architect'].includes(t)
-            ),
-            rationale: 'Pod Lead persisted from previous stage (Pod Lead does not move rule)'
-          });
+        const evictedLead = aiResponse.podMembers.find(m => m.position === 1);
+        if (evictedLead) {
+          aiResponse.podMembers = aiResponse.podMembers.filter(m => m.position !== 1);
         }
+        aiResponse.podMembers.unshift({
+          position: 1,
+          role: 'Pod Lead',
+          userId: existingPodLeadId,
+          userName: existingLeadUser.userName,
+          dealTeamStatus: existingLeadUser.dealTeamStatus,
+          requiredTags: ['Grandmaster', 'Closer', 'Politician', 'Architect'],
+          matchedTags: existingLeadUser.personalityTags.filter(t => 
+            ['Grandmaster', 'Closer', 'Politician', 'Architect'].includes(t)
+          ),
+          rationale: 'Pod Lead persisted from previous stage (Pod Lead does not move rule)'
+        });
       }
+    }
+    
+    if (finalLeadUserId) {
+      const leadInFinalMembers = aiResponse.podMembers.find(m => m.userId === finalLeadUserId);
+      if (!leadInFinalMembers) {
+        console.error(`[AI Pod Formation] CRITICAL: Final lead ${finalLeadUserId} not in pod members list after normalization`);
+        throw new Error(`Pod lead integrity check failed. Lead ${finalLeadUserId} not in final membership list.`);
+      }
+    }
+    
+    const membersWithIds = aiResponse.podMembers.filter(m => m.userId);
+    if (membersWithIds.length < Math.min(podSize, 2)) {
+      console.warn(`[AI Pod Formation] WARNING: Only ${membersWithIds.length} assignable members for a ${podSize}-person pod`);
     }
     
     const pod = await storage.createDealPod({
@@ -281,6 +297,11 @@ Consider personality tag compatibility for team chemistry.
           isLead: member.position === 1 || member.userId === finalLeadUserId
         });
       }
+    }
+    
+    if (finalLeadUserId && !addedUserIds.has(finalLeadUserId)) {
+      console.error(`[AI Pod Formation] CRITICAL: Lead ${finalLeadUserId} was not added to pod_members table`);
+      throw new Error(`Pod lead integrity check failed. Lead was not persisted to membership table.`);
     }
     
     const milestoneMap: Record<string, string> = {};
