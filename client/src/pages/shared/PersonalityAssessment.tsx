@@ -75,10 +75,11 @@ export default function PersonalityAssessment() {
   
   // Pre-populate deal team status from resume analysis if available
   useEffect(() => {
-    if (resumeAnalysis?.assignedDealTeam) {
-      setDealTeamStatus(resumeAnalysis.assignedDealTeam);
+    const assignedTeam = resumeAnalysis?.aiAnalysis?.onboardingPlacement?.assignedDealTeam;
+    if (assignedTeam) {
+      setDealTeamStatus(assignedTeam);
     }
-  }, [resumeAnalysis?.assignedDealTeam]);
+  }, [resumeAnalysis?.aiAnalysis?.onboardingPlacement?.assignedDealTeam]);
   
   const isLoading = questionsLoading || assessmentLoading;
   const isAnalyzing = existingAssessment?.status === 'analyzing';
