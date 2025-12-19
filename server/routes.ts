@@ -1821,13 +1821,13 @@ export async function registerRoutes(
     25: ['Firefighter', 'Auditor'],
   };
 
-  // Calculate personality scores from answers
+  // Calculate personality scores from answers (16 canonical Equiturn tags)
   function calculatePersonalityScores(answers: Record<number, 'A' | 'B'>) {
     const scores: Record<string, number> = {
-      'Politician': 0, 'Sherpa': 0, 'Deal Junkie': 0, 'Closer': 0,
-      'Architect': 0, 'Firefighter': 0, 'Guru': 0, 'Misfit': 0,
-      'Legal': 0, 'Rainmaker': 0, 'Creative': 0, 'Auditor': 0,
-      'Mayor': 0, 'Liaison': 0, 'Grandmaster': 0
+      'Politician': 0, 'Rainmaker': 0, 'Mayor': 0, 'Creative': 0,
+      'Deal Junkie': 0, 'Closer': 0, 'Grandmaster': 0, 'Architect': 0,
+      'Guru': 0, 'Sherpa': 0, 'Firefighter': 0, 'Legal': 0,
+      'Liaison': 0, 'Auditor': 0, 'Regulatory': 0, 'Misfit': 0
     };
 
     for (const [questionNum, answer] of Object.entries(answers)) {
@@ -1840,6 +1840,230 @@ export async function registerRoutes(
     }
 
     return scores;
+  }
+
+  // Equiturn Employee Tagging Analyst prompt
+  const EQUITURN_ANALYST_PROMPT = `You are Equiturn Employee Tagging Analyst. Your sole job is to ingest an uploaded personality assessment score sheet and produce an institutional deployment profile used for deal staffing, ending with final deployment tags.
+Non negotiable constraints
+Confidentiality. Treat all employee data as confidential.
+No fabrication. Do not invent scores, tag names, employee identity, title, or Deal Team status.
+No questions. You must never ask the user for missing inputs. You must proceed using best effort extraction, inference, and clearly labeled assumptions.
+No emojis. No tables.
+Behavioral deployment only. Assume baseline technical competence across finance.
+No advancement language. Do not discuss promotion or progression. Deal Team status is used only to calibrate autonomy, complexity, review cadence, and risk controls.
+Do not reference internal deliberation. Provide conclusions with rationale tied to observed tag scores.
+Primary input source
+ The uploaded file is the source of truth. If multiple files are uploaded, use the most recent file unless a file explicitly states it supersedes another.
+Data extraction rules
+1. Extract employee name and title or function if present anywhere in the file. If not present, set name to Name not provided and title to Function not provided.
+2. Extract Deal Team status if present. Valid values are Floater, Deal Team 10, Deal Team 8, Deal Team 2, Deal Team 4, Deal Team 6.
+ If not present, default to Floater and flag as an assumption.
+3. Extract the full tag list and numeric scores. The assessment is expected to have 15 tags. If fewer than 15 are present, proceed with available tags and flag missing tags.
+4. Determine score direction. Default assumption is higher score means stronger signal. If the file explicitly states the opposite, follow the file.
+5. Determine score scale automatically. Infer scale from observed min and max values. Treat values like 1 to 5, 1 to 10, 0 to 100 as common scales. If scale is unclear, proceed using rank order only and flag scale ambiguity.
+Score standardization and ranking
+1. Rank order all tags from highest to lowest. Handle ties explicitly.
+2. Compute internal strength tiers using percentiles.
+ Tier A equals top third of scores. Tier B equals middle third. Tier C equals bottom third.
+ If the distribution is flat or nearly flat, define Tier A as the top five tags by rank, Tier C as the bottom five.
+3. Define High tags as Tier A, Moderate tags as Tier B, Low tags as Tier C.
+4. Never show calculations unless asked. You may show rank order.
+Canonical tag taxonomy
+ The canonical Equiturn tags used for mapping are: Politician, Rainmaker, Mayor, Creative, Deal Junkie, Closer, Grandmaster, Architect, Guru, Sherpa, Firefighter, Legal, Liaison, Auditor, Regulatory, Misfit.
+Tag name reconciliation
+First attempt exact match.
+Then attempt case and spacing insensitive match.
+Then attempt conservative fuzzy match only when the mapping is obvious.
+If a tag cannot be mapped with high confidence, keep the original tag name and treat it as unmapped. Unmapped tags may influence narrative only if they are in Tier A, but they must not be used to trigger vertical or phase mapping rules. Flag unmapped tags in Data Integrity Notes.
+Vertical fit mapping rules
+ You must output the top two verticals. Use a rule driven score based on core tags.
+1. M and A buy side
+ Core tags: Grandmaster, Closer, Deal Junkie, Architect, Guru
+ Strong fit trigger: Closer and Grandmaster and Architect are High
+2. M and A sell side
+ Core tags: Rainmaker, Politician, Creative, Firefighter, Legal
+ Strong fit trigger: Politician and Rainmaker and Firefighter are High
+3. ECM
+ Core tags: Rainmaker, Mayor, Politician, Creative, Deal Junkie
+ Strong fit trigger: Rainmaker and Creative and Mayor are High
+4. DCM
+ Core tags: Architect, Auditor, Regulatory, Liaison, Guru
+ Strong fit trigger: Architect and Auditor and Regulatory are High
+5. Fundraising and AUM raising
+ Core tags: Rainmaker, Politician, Mayor, Deal Junkie, Closer
+ Strong fit trigger: Rainmaker and Deal Junkie and Politician are High
+Vertical scoring method
+For each vertical, count how many of its core tags are High.
+Break ties by counting how many are in Tier A or Tier B combined.
+Break further ties by the sum of normalized scores across that vertical's core tags.
+The highest scoring is primary vertical. The second highest is secondary vertical.
+If no vertical meets a strong fit trigger, still assign top two verticals by the scoring method and explicitly state that the fit is mixed and why.
+Deal phase fit mapping rules
+ Origination: Rainmaker, Politician, Mayor, Misfit
+ Structuring: Architect, Guru, Legal, Grandmaster
+ Execution: Sherpa, Firefighter, Deal Junkie, Closer
+ Closing: Closer, Grandmaster, Legal, Firefighter
+ Integration: Liaison, Auditor, Sherpa, Grandmaster
+Phase scoring method
+For each phase, count how many of its tags are High.
+Break ties by Tier A or Tier B count, then normalized sum.
+Output phases in best fit order.
+Name a primary phase and secondary phase based on the top two scores.
+Deal Team calibration rules
+ Use Deal Team status to calibrate autonomy, complexity ceiling, and review cadence.
+Floater
+ Baseline competency. Deploy in clearly bounded roles with frequent review and explicit checklists.
+Deal Team 10
+ Deploy on structured tasks with tight scope. Require frequent review and written next steps.
+Deal Team 8
+ Deploy on mid complexity execution and coordination. Moderate autonomy with defined checkpoints.
+Deal Team 2
+ Deploy as lead on complex mandates with strategic autonomy. Reviews focus on risk, legal, and final positioning.
+Deal Team 4
+ Deploy on highest complexity mandates. Minimal supervision. Reviews focus on governance and institutional quality.
+Deal Team 6
+ Deploy on hyper complex mandates. Operate as internal standard setter. Reviews focus on systemic risk and mission critical decisions.
+Mandatory output format
+ Write the output in this exact order, as short paragraphs, no tables.
+1. Employee Snapshot
+ Include name, title or function, Deal Team status, and a one sentence deployment headline.
+ Also include Data Integrity Notes in this section, listing assumptions and missing fields in plain language.
+2. Score Distribution
+ List each tag and score on its own line.
+3. Primary Archetype
+ Identify the top one to two tags that drive behavior in live deals and why.
+4. Secondary Traits
+ Explain the next two to three tags and how they show up under pressure.
+5. Supporting Traits
+ Explain the next three tags that stabilize delivery and what they enable.
+6. Low Signal Tags
+ Explain what is weak and the practical implication.
+7. Absent Traits
+ If any tag is at the minimum observed score, treat it as absent and explain the operational limitation it creates. If none are at minimum, state No fully absent traits observed.
+8. Deal Phase Fit
+ State best fit phases in order, then name a primary phase and secondary phase with rationale grounded in tags.
+9. Deal Type Proficiency
+ State the top two verticals with rationale grounded in the vertical mapping rules. Add one sentence on deal contexts to avoid or constrain.
+10. Managerial Notes
+ Give clear instructions for how leadership should deploy and manage this person on live mandates, including review cadence and what they should not own unsupervised, calibrated to Deal Team status.
+11. Final Deployment Tags
+ Finish with a single block titled Final Deployment Tags containing, in this order:
+ A. Deal Team status
+ B. Primary vertical
+ C. Secondary vertical
+ D. Primary deal phase
+ E. Secondary deal phase
+ F. Top five archetype tags in rank order
+ G. One risk flag tag if applicable, otherwise state No material coverage gaps
+Quality control pass
+ Before finalizing, run two checks silently.
+Completeness check. Every mandatory section exists, Deal Team status stated, and score distribution listed.
+Logic check. Vertical and phase choices must be consistent with the mapping rules and highest scoring tags. If there is a tradeoff, state the tradeoff explicitly.
+Multi employee handling
+ If the uploaded file contains multiple employees, produce one full profile per employee in a single response. Separate profiles with a clear header using the employee name.`;
+
+  // AI Analysis function using OpenAI
+  async function analyzePersonalityWithAI(
+    userName: string,
+    userTitle: string,
+    dealTeamStatus: string,
+    scores: { profile: string; score: number }[]
+  ): Promise<{ success: boolean; analysis?: any; error?: string }> {
+    try {
+      // Format score sheet for the AI
+      const scoreSheet = scores
+        .map(s => `${s.profile}: ${s.score}`)
+        .join('\n');
+
+      const userInput = `Employee Name: ${userName}
+Title/Function: ${userTitle}
+Deal Team Status: ${dealTeamStatus}
+
+Personality Assessment Score Sheet:
+${scoreSheet}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: EQUITURN_ANALYST_PROMPT },
+          { role: "user", content: userInput }
+        ],
+        temperature: 0.3,
+        max_tokens: 3000,
+      });
+
+      const rawResponse = response.choices[0]?.message?.content || '';
+      
+      // Parse the AI response into structured sections
+      const analysis = parseAIAnalysis(rawResponse);
+      
+      return { success: true, analysis };
+    } catch (error: any) {
+      console.error('[Personality AI] Error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Parse AI response into structured sections
+  function parseAIAnalysis(rawResponse: string): any {
+    const sections: Record<string, string> = {};
+    
+    // Extract sections using regex patterns
+    const sectionPatterns = [
+      { key: 'employeeSnapshot', pattern: /1\.\s*Employee Snapshot\s*([\s\S]*?)(?=2\.\s*Score Distribution|$)/i },
+      { key: 'scoreDistribution', pattern: /2\.\s*Score Distribution\s*([\s\S]*?)(?=3\.\s*Primary Archetype|$)/i },
+      { key: 'primaryArchetype', pattern: /3\.\s*Primary Archetype\s*([\s\S]*?)(?=4\.\s*Secondary Traits|$)/i },
+      { key: 'secondaryTraits', pattern: /4\.\s*Secondary Traits\s*([\s\S]*?)(?=5\.\s*Supporting Traits|$)/i },
+      { key: 'supportingTraits', pattern: /5\.\s*Supporting Traits\s*([\s\S]*?)(?=6\.\s*Low Signal Tags|$)/i },
+      { key: 'lowSignalTags', pattern: /6\.\s*Low Signal Tags\s*([\s\S]*?)(?=7\.\s*Absent Traits|$)/i },
+      { key: 'absentTraits', pattern: /7\.\s*Absent Traits\s*([\s\S]*?)(?=8\.\s*Deal Phase Fit|$)/i },
+      { key: 'dealPhaseFit', pattern: /8\.\s*Deal Phase Fit\s*([\s\S]*?)(?=9\.\s*Deal Type Proficiency|$)/i },
+      { key: 'dealTypeProficiency', pattern: /9\.\s*Deal Type Proficiency\s*([\s\S]*?)(?=10\.\s*Managerial Notes|$)/i },
+      { key: 'managerialNotes', pattern: /10\.\s*Managerial Notes\s*([\s\S]*?)(?=11\.\s*Final Deployment Tags|$)/i },
+    ];
+
+    for (const { key, pattern } of sectionPatterns) {
+      const match = rawResponse.match(pattern);
+      sections[key] = match ? match[1].trim() : '';
+    }
+
+    // Extract Final Deployment Tags section
+    const deploymentTagsMatch = rawResponse.match(/11\.\s*Final Deployment Tags\s*([\s\S]*?)$/i);
+    const deploymentTagsText = deploymentTagsMatch ? deploymentTagsMatch[1].trim() : '';
+
+    // Parse deployment tags
+    const deploymentTags = {
+      dealTeamStatus: extractTagValue(deploymentTagsText, /A\.\s*Deal Team status[:\s]*(.+)/i) || 'Floater',
+      primaryVertical: extractTagValue(deploymentTagsText, /B\.\s*Primary vertical[:\s]*(.+)/i) || '',
+      secondaryVertical: extractTagValue(deploymentTagsText, /C\.\s*Secondary vertical[:\s]*(.+)/i) || '',
+      primaryDealPhase: extractTagValue(deploymentTagsText, /D\.\s*Primary deal phase[:\s]*(.+)/i) || '',
+      secondaryDealPhase: extractTagValue(deploymentTagsText, /E\.\s*Secondary deal phase[:\s]*(.+)/i) || '',
+      topFiveArchetypes: extractTopFive(deploymentTagsText),
+      riskFlag: extractTagValue(deploymentTagsText, /G\.\s*(?:One risk flag tag|Risk flag)[:\s]*(.+)/i) || null,
+    };
+
+    return {
+      ...sections,
+      deploymentTags,
+      rawResponse,
+    };
+  }
+
+  function extractTagValue(text: string, pattern: RegExp): string | null {
+    const match = text.match(pattern);
+    return match ? match[1].trim() : null;
+  }
+
+  function extractTopFive(text: string): string[] {
+    const match = text.match(/F\.\s*Top five archetype tags[:\s]*([\s\S]*?)(?=G\.|$)/i);
+    if (!match) return [];
+    const tagsText = match[1].trim();
+    // Split by commas, newlines, or numbered items
+    return tagsText
+      .split(/[,\n]/)
+      .map(t => t.replace(/^\d+\.\s*/, '').trim())
+      .filter(t => t.length > 0)
+      .slice(0, 5);
   }
 
   // Get current user's personality assessment
@@ -1869,7 +2093,7 @@ export async function registerRoutes(
   app.post("/api/personality/assessment", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
-      const { answers } = req.body;
+      const { answers, dealTeamStatus } = req.body;
 
       if (!answers || typeof answers !== 'object') {
         return res.status(400).json({ error: "Answers are required" });
@@ -1886,7 +2110,7 @@ export async function registerRoutes(
         });
       }
 
-      // Calculate scores
+      // Calculate raw scores from answers
       const rawScores = calculatePersonalityScores(answers);
       
       // Convert to sorted array
@@ -1900,29 +2124,52 @@ export async function registerRoutes(
       // Check if user already has an assessment
       const existingAssessment = await storage.getPersonalityAssessment(user.id);
 
+      // First save/update assessment with pending status
       let assessment;
       if (existingAssessment) {
-        // Update existing assessment
         assessment = await storage.updatePersonalityAssessment(existingAssessment.id, {
           answers,
           allScores,
           topThreeProfiles,
-          status: 'completed',
-          completedAt: new Date(),
+          status: 'analyzing',
+          aiAnalysis: null,
         });
       } else {
-        // Create new assessment
         assessment = await storage.createPersonalityAssessment({
           userId: user.id,
           answers,
           allScores,
           topThreeProfiles,
+          status: 'analyzing',
+          aiAnalysis: null,
+        });
+      }
+
+      // Send response immediately, then run AI analysis in background
+      res.json({ ...assessment, status: 'analyzing' });
+
+      // Run AI analysis asynchronously
+      const aiResult = await analyzePersonalityWithAI(
+        user.name || 'Name not provided',
+        user.jobTitle || user.role || 'Function not provided',
+        dealTeamStatus || 'Floater',
+        allScores
+      );
+
+      // Update assessment with AI analysis
+      if (aiResult.success && assessment) {
+        await storage.updatePersonalityAssessment(assessment.id, {
+          aiAnalysis: aiResult.analysis,
+          status: 'completed',
+          completedAt: new Date(),
+        });
+      } else if (assessment) {
+        // Mark as completed even if AI fails - user still has raw scores
+        await storage.updatePersonalityAssessment(assessment.id, {
           status: 'completed',
           completedAt: new Date(),
         });
       }
-
-      res.json(assessment);
     } catch (error) {
       console.error('Error submitting personality assessment:', error);
       res.status(500).json({ error: "Failed to submit personality assessment" });

@@ -3524,13 +3524,39 @@ export type PersonalityScore = {
   score: number;
 };
 
+export type DeploymentTags = {
+  dealTeamStatus: string;
+  primaryVertical: string;
+  secondaryVertical: string;
+  primaryDealPhase: string;
+  secondaryDealPhase: string;
+  topFiveArchetypes: string[];
+  riskFlag: string | null;
+};
+
+export type AIAnalysis = {
+  employeeSnapshot: string;
+  scoreDistribution: string;
+  primaryArchetype: string;
+  secondaryTraits: string;
+  supportingTraits: string;
+  lowSignalTags: string;
+  absentTraits: string;
+  dealPhaseFit: string;
+  dealTypeProficiency: string;
+  managerialNotes: string;
+  deploymentTags: DeploymentTags;
+  rawResponse: string;
+};
+
 export type PersonalityAssessment = {
   id: string;
   userId: string;
   answers: Record<number, 'A' | 'B'>;
   allScores: PersonalityScore[];
   topThreeProfiles: PersonalityScore[];
-  status: string;
+  aiAnalysis: AIAnalysis | null;
+  status: string; // 'pending' | 'analyzing' | 'completed' | 'failed'
   completedAt: string | null;
   createdAt: string;
 };
@@ -3554,6 +3580,11 @@ export function usePersonalityAssessment() {
       if (!res.ok) throw new Error("Failed to fetch personality assessment");
       return res.json() as Promise<PersonalityAssessment | null>;
     },
+    refetchInterval: (data) => {
+      // Poll every 2 seconds while analyzing
+      if (data?.state?.data?.status === 'analyzing') return 2000;
+      return false;
+    },
   });
 }
 
@@ -3572,11 +3603,11 @@ export function useUserPersonalityAssessment(userId: string | undefined) {
 export function useSubmitPersonalityAssessment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (answers: Record<number, 'A' | 'B'>) => {
+    mutationFn: async ({ answers, dealTeamStatus }: { answers: Record<number, 'A' | 'B'>; dealTeamStatus?: string }) => {
       const res = await fetch("/api/personality/assessment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify({ answers, dealTeamStatus }),
       });
       if (!res.ok) {
         const error = await res.json();

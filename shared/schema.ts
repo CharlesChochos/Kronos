@@ -1321,29 +1321,56 @@ export type TaskTemplateUsage = typeof taskTemplateUsage.$inferSelect;
 // PERSONALITY ASSESSMENT SYSTEM
 // ================================
 
-// Personality Profile types - the 15 personality archetypes
+// Personality Profile types - the 16 personality archetypes (canonical Equiturn tags)
 export const PERSONALITY_PROFILES = [
-  'Politician', 'Sherpa', 'Deal Junkie', 'Closer', 'Architect',
-  'Firefighter', 'Guru', 'Misfit', 'Legal', 'Rainmaker',
-  'Creative', 'Auditor', 'Mayor', 'Liaison', 'Grandmaster'
+  'Politician', 'Rainmaker', 'Mayor', 'Creative', 'Deal Junkie', 'Closer',
+  'Grandmaster', 'Architect', 'Guru', 'Sherpa', 'Firefighter', 'Legal',
+  'Liaison', 'Auditor', 'Regulatory', 'Misfit'
 ] as const;
 
 export type PersonalityProfileType = typeof PERSONALITY_PROFILES[number];
 
 // Individual personality score
 export type PersonalityScore = {
-  profile: PersonalityProfileType;
+  profile: string;
   score: number;
 };
 
-// Personality Assessment Responses table - stores user's questionnaire answers
+// AI-generated deployment profile structure
+export type DeploymentTags = {
+  dealTeamStatus: string;
+  primaryVertical: string;
+  secondaryVertical: string;
+  primaryDealPhase: string;
+  secondaryDealPhase: string;
+  topFiveArchetypes: string[];
+  riskFlag: string | null;
+};
+
+export type AIAnalysis = {
+  employeeSnapshot: string;
+  scoreDistribution: string;
+  primaryArchetype: string;
+  secondaryTraits: string;
+  supportingTraits: string;
+  lowSignalTags: string;
+  absentTraits: string;
+  dealPhaseFit: string;
+  dealTypeProficiency: string;
+  managerialNotes: string;
+  deploymentTags: DeploymentTags;
+  rawResponse: string; // Full AI response for reference
+};
+
+// Personality Assessment Responses table - stores user's questionnaire answers and AI analysis
 export const personalityAssessments = pgTable("personality_assessments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
   answers: jsonb("answers").notNull().$type<Record<number, 'A' | 'B'>>(), // Question number -> answer
-  allScores: jsonb("all_scores").default([]).$type<PersonalityScore[]>(), // All profile scores
+  allScores: jsonb("all_scores").default([]).$type<PersonalityScore[]>(), // All profile scores (raw calculation)
   topThreeProfiles: jsonb("top_three_profiles").default([]).$type<PersonalityScore[]>(), // Top 3 profiles
-  status: text("status").notNull().default('completed'), // draft, completed
+  aiAnalysis: jsonb("ai_analysis").$type<AIAnalysis | null>(), // Full AI-generated deployment profile
+  status: text("status").notNull().default('pending'), // pending, analyzing, completed, failed
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
