@@ -337,6 +337,11 @@ export interface IStorage {
   getPersonalityAssessment(userId: string): Promise<schema.PersonalityAssessment | undefined>;
   createPersonalityAssessment(assessment: schema.InsertPersonalityAssessment): Promise<schema.PersonalityAssessment>;
   updatePersonalityAssessment(id: string, updates: Partial<schema.InsertPersonalityAssessment>): Promise<schema.PersonalityAssessment | undefined>;
+  
+  // Resume Analysis operations
+  getResumeAnalysis(userId: string): Promise<schema.ResumeAnalysis | undefined>;
+  createResumeAnalysis(analysis: schema.InsertResumeAnalysis): Promise<schema.ResumeAnalysis>;
+  updateResumeAnalysis(id: string, updates: Partial<schema.InsertResumeAnalysis>): Promise<schema.ResumeAnalysis | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2000,6 +2005,28 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(schema.personalityAssessments)
       .set(updates)
       .where(eq(schema.personalityAssessments.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Resume Analysis operations
+  async getResumeAnalysis(userId: string): Promise<schema.ResumeAnalysis | undefined> {
+    const [analysis] = await db.select().from(schema.resumeAnalyses)
+      .where(eq(schema.resumeAnalyses.userId, userId))
+      .orderBy(desc(schema.resumeAnalyses.createdAt))
+      .limit(1);
+    return analysis;
+  }
+
+  async createResumeAnalysis(analysis: schema.InsertResumeAnalysis): Promise<schema.ResumeAnalysis> {
+    const [created] = await db.insert(schema.resumeAnalyses).values(analysis).returning();
+    return created;
+  }
+
+  async updateResumeAnalysis(id: string, updates: Partial<schema.InsertResumeAnalysis>): Promise<schema.ResumeAnalysis | undefined> {
+    const [updated] = await db.update(schema.resumeAnalyses)
+      .set(updates)
+      .where(eq(schema.resumeAnalyses.id, id))
       .returning();
     return updated;
   }

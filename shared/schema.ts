@@ -1382,3 +1382,49 @@ export const insertPersonalityAssessmentSchema = createInsertSchema(personalityA
 
 export type InsertPersonalityAssessment = z.infer<typeof insertPersonalityAssessmentSchema>;
 export type PersonalityAssessment = typeof personalityAssessments.$inferSelect;
+
+// Resume Analysis types for onboarding placement
+export type OnboardingPlacement = {
+  assignedDealTeam: string;
+  primaryVertical: string;
+  secondaryVertical: string;
+  primaryDealPhase: string;
+  secondaryDealPhase: string;
+  initialSeatRecommendation: string;
+  topFiveInferredTags: string[];
+  coverageGaps: string;
+};
+
+export type ResumeAIAnalysis = {
+  candidateSnapshot: string;
+  evidenceAnchors: string;
+  transactionProfile: string;
+  roleElevationAutonomy: string;
+  dealPhaseFit: string;
+  dealTypeProficiency: string;
+  resumeInferredTags: string;
+  managerialNotes: string;
+  onboardingPlacement: OnboardingPlacement;
+  rawResponse: string;
+};
+
+// Resume Analysis table - stores AI-analyzed resume for Deal Team placement
+export const resumeAnalyses = pgTable("resume_analyses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  fileName: text("file_name").notNull(),
+  fileContent: text("file_content"), // Extracted text content from resume
+  aiAnalysis: jsonb("ai_analysis").$type<ResumeAIAnalysis | null>(),
+  assignedDealTeam: text("assigned_deal_team"), // Extracted for quick access
+  status: text("status").notNull().default('pending'), // pending, analyzing, completed, failed
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertResumeAnalysisSchema = createInsertSchema(resumeAnalyses).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertResumeAnalysis = z.infer<typeof insertResumeAnalysisSchema>;
+export type ResumeAnalysis = typeof resumeAnalyses.$inferSelect;
