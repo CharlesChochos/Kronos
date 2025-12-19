@@ -307,7 +307,7 @@ Consider personality tag compatibility for team chemistry.
             dealId: deal.id,
             stage,
             userId: member.userId,
-            userName: `${user.firstName} ${user.lastName}`,
+            userName: user.name || member.userName || 'Unknown',
             role: member.role,
             email: user.email,
             phone: user.phone || undefined,
@@ -360,27 +360,40 @@ Consider personality tag compatibility for team chemistry.
     
     console.log(`[AI Pod Formation] Created ${aiResponse.podMovementTasks.length} pod movement tasks`);
     
+    let tasksCreated = 0;
     for (const subtask of aiResponse.dailySubtasks) {
       const assignedMember = aiResponse.podMembers.find(m => m.role === subtask.assignedRole);
       
-      if (assignedMember?.userId) {
+      // If no role match, assign to a random pod member with a userId
+      const memberWithUserId = assignedMember?.userId 
+        ? assignedMember 
+        : aiResponse.podMembers.find(m => m.userId);
+      
+      if (memberWithUserId?.userId) {
         const priority = subtask.frequency === 'daily' ? 'High' : 
                         subtask.frequency === 'weekly' ? 'Medium' : 'Low';
         
-        await storage.createTask({
-          title: subtask.title,
-          description: `Part of: ${subtask.parentTaskTitle}\nFrequency: ${subtask.frequency}`,
-          dealId: deal.id,
-          dealStage: stage,
-          assignedTo: assignedMember.userId,
-          priority,
-          type: 'Deal',
-          status: 'Pending'
-        });
+        try {
+          await storage.createTask({
+            title: subtask.title,
+            description: `Part of: ${subtask.parentTaskTitle}\nFrequency: ${subtask.frequency}`,
+            dealId: deal.id,
+            dealStage: stage,
+            assignedTo: memberWithUserId.userId,
+            priority,
+            type: 'Deal',
+            status: 'Pending'
+          });
+          tasksCreated++;
+        } catch (taskError) {
+          console.error(`[AI Pod Formation] Failed to create task "${subtask.title}":`, taskError);
+        }
+      } else {
+        console.warn(`[AI Pod Formation] No pod member available to assign subtask: ${subtask.title}`);
       }
     }
     
-    console.log(`[AI Pod Formation] Created ${aiResponse.dailySubtasks.length} daily subtasks`);
+    console.log(`[AI Pod Formation] Created ${tasksCreated}/${aiResponse.dailySubtasks.length} daily subtasks as tasks`);
     
     const podMemberUserIds = aiResponse.podMembers
       .filter(m => m.userId)
