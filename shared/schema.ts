@@ -1428,3 +1428,202 @@ export const insertResumeAnalysisSchema = createInsertSchema(resumeAnalyses).omi
 
 export type InsertResumeAnalysis = z.infer<typeof insertResumeAnalysisSchema>;
 export type ResumeAnalysis = typeof resumeAnalyses.$inferSelect;
+
+// ================================
+// AUTOMATED DEAL PIPELINE SYSTEM
+// ================================
+
+// Deal stages for pod formation
+export const DEAL_STAGES = [
+  'Origination', 'Structuring', 'Execution', 'Closing', 'Integration'
+] as const;
+
+export type DealStageType = typeof DEAL_STAGES[number];
+
+// Pod roles based on deal size
+export const POD_ROLES_LARGE = ['Pod Lead', 'Origination Lead', 'Structuring Lead', 'Execution Lead', 'Closing Lead'] as const;
+export const POD_ROLES_SMALL = ['Pod Lead', 'Structuring Lead', 'Execution Lead'] as const;
+
+// Deal Pods table - tracks pod teams per deal and stage
+export const dealPods = pgTable("deal_pods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  stage: text("stage").notNull(), // Current stage this pod was formed for
+  podSize: integer("pod_size").notNull(), // 3 or 5 based on deal value
+  leadUserId: varchar("lead_user_id").references(() => users.id), // Pod lead stays constant
+  aiFormationRationale: text("ai_formation_rationale"), // Why AI chose this team
+  aiRawResponse: text("ai_raw_response"), // Full AI response for reference
+  status: text("status").notNull().default('active'), // active, completed, disbanded
+  formedAt: timestamp("formed_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDealPodSchema = createInsertSchema(dealPods).omit({
+  id: true,
+  createdAt: true,
+  formedAt: true,
+});
+
+export type InsertDealPod = z.infer<typeof insertDealPodSchema>;
+export type DealPod = typeof dealPods.$inferSelect;
+
+// Pod Members table - individual pod member assignments
+export const podMembers = pgTable("pod_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  podId: varchar("pod_id").references(() => dealPods.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  role: text("role").notNull(), // Pod Lead, Origination Lead, Structuring Lead, etc.
+  position: integer("position").notNull(), // 1-5 based on hierarchy
+  dealTeamStatus: text("deal_team_status"), // User's Deal Team at time of assignment
+  requiredTags: jsonb("required_tags").default([]).$type<string[]>(), // Tags required for this role
+  matchedTags: jsonb("matched_tags").default([]).$type<string[]>(), // User's matching tags
+  assignmentRationale: text("assignment_rationale"), // Why AI chose this person
+  isLead: boolean("is_lead").default(false),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+});
+
+export const insertPodMemberSchema = createInsertSchema(podMembers).omit({
+  id: true,
+  assignedAt: true,
+});
+
+export type InsertPodMember = z.infer<typeof insertPodMemberSchema>;
+export type PodMember = typeof podMembers.$inferSelect;
+
+// Deal Milestones table - phase milestones for deals
+export const dealMilestones = pgTable("deal_milestones", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  podId: varchar("pod_id").references(() => dealPods.id),
+  stage: text("stage").notNull(), // Which deal stage this milestone belongs to
+  title: text("title").notNull(),
+  description: text("description"),
+  orderIndex: integer("order_index").notNull().default(0),
+  isCompleted: boolean("is_completed").default(false),
+  completedAt: timestamp("completed_at"),
+  completedBy: varchar("completed_by").references(() => users.id),
+  dueDate: text("due_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDealMilestoneSchema = createInsertSchema(dealMilestones).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDealMilestone = z.infer<typeof insertDealMilestoneSchema>;
+export type DealMilestone = typeof dealMilestones.$inferSelect;
+
+// Pod Movement Tasks table - tasks that complete milestones
+export const podMovementTasks = pgTable("pod_movement_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  milestoneId: varchar("milestone_id").references(() => dealMilestones.id),
+  podId: varchar("pod_id").references(() => dealPods.id),
+  title: text("title").notNull(),
+  ownerRole: text("owner_role"), // Which pod role owns this task
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  dependencies: jsonb("dependencies").default([]).$type<string[]>(), // IDs of dependent tasks
+  definitionOfDone: text("definition_of_done"),
+  qualityGates: text("quality_gates"),
+  escalationTriggers: text("escalation_triggers"),
+  status: text("status").notNull().default('pending'), // pending, in_progress, completed
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPodMovementTaskSchema = createInsertSchema(podMovementTasks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPodMovementTask = z.infer<typeof insertPodMovementTaskSchema>;
+export type PodMovementTask = typeof podMovementTasks.$inferSelect;
+
+// Deal Context Updates table - tracks all updates/docs for AI learning
+export const dealContextUpdates = pgTable("deal_context_updates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  updateType: text("update_type").notNull(), // document, note, status_change, task_complete, communication
+  title: text("title").notNull(),
+  content: text("content"), // Text content for AI ingestion
+  documentId: varchar("document_id"), // Reference to documents table if applicable
+  metadata: jsonb("metadata").default({}), // Additional structured data
+  indexedForAI: boolean("indexed_for_ai").default(false), // Whether AI has processed this
+  indexedAt: timestamp("indexed_at"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDealContextUpdateSchema = createInsertSchema(dealContextUpdates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDealContextUpdate = z.infer<typeof insertDealContextUpdateSchema>;
+export type DealContextUpdate = typeof dealContextUpdates.$inferSelect;
+
+// User Workload Snapshot - for tracking capacity
+export type UserWorkloadSnapshot = {
+  userId: string;
+  userName: string;
+  dealTeamStatus: string;
+  personalityTags: string[];
+  activeTasks: number;
+  pendingTasks: number;
+  completedThisWeek: number;
+  activeDeals: number;
+  capacityScore: number; // 0-100, lower = more available
+  currentStages: { dealId: string; dealName: string; stage: string }[];
+};
+
+// AI Pod Formation Request type
+export type AIPodFormationRequest = {
+  dealId: string;
+  dealName: string;
+  dealValue: number;
+  dealType: string;
+  sector: string;
+  client: string;
+  stage: string;
+  dealDocuments: { name: string; content: string }[];
+  availableUsers: UserWorkloadSnapshot[];
+  existingPodLeadId?: string; // For stage transitions, keep the same lead
+};
+
+// AI Pod Formation Response type
+export type AIPodFormationResponse = {
+  podSize: number;
+  podMembers: {
+    position: number;
+    role: string;
+    userId: string | null;
+    userName: string | null;
+    dealTeamStatus: string | null;
+    requiredTags: string[];
+    matchedTags: string[];
+    rationale: string;
+  }[];
+  milestones: {
+    stage: string;
+    title: string;
+    description: string;
+    orderIndex: number;
+  }[];
+  podMovementTasks: {
+    milestoneTitle: string;
+    title: string;
+    ownerRole: string;
+    definitionOfDone: string;
+    qualityGates: string;
+    escalationTriggers: string;
+  }[];
+  dailySubtasks: {
+    parentTaskTitle: string;
+    title: string;
+    assignedRole: string;
+    frequency: 'daily' | 'weekly' | 'monthly';
+  }[];
+  formationRationale: string;
+  dataIntegrityNotes: string;
+};
