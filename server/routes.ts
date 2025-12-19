@@ -19,6 +19,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import * as pdfParse from "pdf-parse";
+import { approveOpportunityToDeal, transitionDealStage, formPodForDeal } from "./aiPodFormation";
 
 // PostgreSQL session store
 const PgSession = connectPgSimple(session);
@@ -2711,6 +2712,224 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
     } catch (error) {
       console.error('Move to opportunity error:', error);
       res.status(500).json({ error: "Failed to move deal to opportunities" });
+    }
+  });
+
+  // ===== AUTOMATED POD FORMATION ROUTES =====
+  
+  app.post("/api/opportunities/:id/approve", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      
+      if (user.accessLevel !== 'admin') {
+        return res.status(403).json({ error: "Only admins can approve opportunities" });
+      }
+      
+      const result = await approveOpportunityToDeal(req.params.id);
+      
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      
+      const deal = await storage.getDeal(result.dealId!);
+      
+      await createAuditLog(req, 'opportunity_approved', 'deal', req.params.id, deal?.name || 'Unknown', {
+        approvedBy: user.name,
+        newDealType: deal?.dealType
+      });
+      
+      res.json({ success: true, deal });
+    } catch (error) {
+      console.error('Approve opportunity error:', error);
+      res.status(500).json({ error: "Failed to approve opportunity" });
+    }
+  });
+  
+  app.post("/api/deals/:id/transition-stage", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { newStage } = req.body;
+      
+      if (!newStage) {
+        return res.status(400).json({ error: "New stage is required" });
+      }
+      
+      const validStages = ['Origination', 'Structuring', 'Execution', 'Closing', 'Integration'];
+      if (!validStages.includes(newStage)) {
+        return res.status(400).json({ error: "Invalid stage" });
+      }
+      
+      const result = await transitionDealStage(req.params.id, newStage);
+      
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      
+      const deal = await storage.getDeal(req.params.id);
+      
+      await createAuditLog(req, 'deal_stage_transition', 'deal', req.params.id, deal?.name || 'Unknown', {
+        newStage,
+        transitionedBy: user.name
+      });
+      
+      res.json({ success: true, deal });
+    } catch (error) {
+      console.error('Stage transition error:', error);
+      res.status(500).json({ error: "Failed to transition deal stage" });
+    }
+  });
+  
+  app.get("/api/deals/:id/pod", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const pod = await storage.getActivePodForDeal(req.params.id);
+      
+      if (!pod) {
+        return res.json({ pod: null, members: [] });
+      }
+      
+      const members = await storage.getPodMembers(pod.id);
+      
+      const membersWithUsers = await Promise.all(
+        members.map(async (member) => {
+          const user = await storage.getUser(member.userId);
+          return {
+            ...member,
+            user: user ? { id: user.id, name: user.name, email: user.email, avatar: user.avatar } : null
+          };
+        })
+      );
+      
+      res.json({ pod, members: membersWithUsers });
+    } catch (error) {
+      console.error('Get deal pod error:', error);
+      res.status(500).json({ error: "Failed to get deal pod" });
+    }
+  });
+  
+  app.get("/api/deals/:id/milestones", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const milestones = await storage.getDealMilestones(req.params.id);
+      res.json(milestones);
+    } catch (error) {
+      console.error('Get deal milestones error:', error);
+      res.status(500).json({ error: "Failed to get deal milestones" });
+    }
+  });
+  
+  app.patch("/api/milestones/:id/complete", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      
+      const updated = await storage.updateDealMilestone(req.params.id, {
+        isCompleted: true,
+        completedAt: new Date(),
+        completedBy: user.id
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error('Complete milestone error:', error);
+      res.status(500).json({ error: "Failed to complete milestone" });
+    }
+  });
+  
+  app.get("/api/deals/:id/pod-movement-tasks", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const tasks = await storage.getPodMovementTasks(req.params.id);
+      res.json(tasks);
+    } catch (error) {
+      console.error('Get pod movement tasks error:', error);
+      res.status(500).json({ error: "Failed to get pod movement tasks" });
+    }
+  });
+  
+  app.get("/api/deals/:id/context-updates", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const updates = await storage.getDealContextUpdates(req.params.id);
+      res.json(updates);
+    } catch (error) {
+      console.error('Get deal context updates error:', error);
+      res.status(500).json({ error: "Failed to get deal context updates" });
+    }
+  });
+  
+  app.post("/api/deals/:id/context-updates", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { updateType, title, content, metadata } = req.body;
+      
+      const update = await storage.createDealContextUpdate({
+        dealId: req.params.id,
+        updateType,
+        title,
+        content,
+        metadata,
+        createdBy: user.id
+      });
+      
+      res.json(update);
+    } catch (error) {
+      console.error('Create deal context update error:', error);
+      res.status(500).json({ error: "Failed to create deal context update" });
+    }
+  });
+  
+  app.get("/api/users/workload", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const usersWithProfiles = await storage.getAllUsersWithProfiles();
+      
+      const workloadData = usersWithProfiles.map(({ user, resumeAnalysis, personalityAssessment, workload }) => ({
+        userId: user.id,
+        userName: user.name,
+        email: user.email,
+        dealTeamStatus: resumeAnalysis?.assignedDealTeam || 'Floater',
+        personalityTags: [
+          ...(personalityAssessment?.aiAnalysis?.deploymentTags?.topFiveArchetypes || []),
+          ...(resumeAnalysis?.aiAnalysis?.onboardingPlacement?.topFiveInferredTags || [])
+        ].filter((v, i, a) => a.indexOf(v) === i),
+        activeTasks: workload.activeTasks,
+        pendingTasks: workload.pendingTasks,
+        completedThisWeek: workload.completedThisWeek,
+        activeDeals: user.activeDeals || 0,
+        capacityScore: Math.min(100, (workload.activeTasks * 20) + (workload.pendingTasks * 10))
+      }));
+      
+      res.json(workloadData);
+    } catch (error) {
+      console.error('Get users workload error:', error);
+      res.status(500).json({ error: "Failed to get users workload" });
+    }
+  });
+  
+  app.post("/api/deals/:id/form-pod", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      
+      if (user.accessLevel !== 'admin') {
+        return res.status(403).json({ error: "Only admins can manually trigger pod formation" });
+      }
+      
+      const deal = await storage.getDeal(req.params.id);
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+      
+      const existingPod = await storage.getActivePodForDeal(req.params.id);
+      const existingLeadId = existingPod?.leadUserId || undefined;
+      
+      const result = await formPodForDeal(deal, deal.stage, existingLeadId);
+      
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      
+      const pod = await storage.getDealPod(result.podId!);
+      const members = await storage.getPodMembers(result.podId!);
+      
+      res.json({ success: true, pod, members });
+    } catch (error) {
+      console.error('Form pod error:', error);
+      res.status(500).json({ error: "Failed to form pod" });
     }
   });
 

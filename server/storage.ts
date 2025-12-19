@@ -2030,6 +2030,214 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updated;
   }
+
+  // ================================
+  // DEAL POD OPERATIONS
+  // ================================
+
+  async getDealPod(id: string): Promise<schema.DealPod | undefined> {
+    const [pod] = await db.select().from(schema.dealPods)
+      .where(eq(schema.dealPods.id, id));
+    return pod;
+  }
+
+  async getDealPodsByDeal(dealId: string): Promise<schema.DealPod[]> {
+    return await db.select().from(schema.dealPods)
+      .where(eq(schema.dealPods.dealId, dealId))
+      .orderBy(desc(schema.dealPods.createdAt));
+  }
+
+  async getActivePodForDeal(dealId: string): Promise<schema.DealPod | undefined> {
+    const [pod] = await db.select().from(schema.dealPods)
+      .where(and(
+        eq(schema.dealPods.dealId, dealId),
+        eq(schema.dealPods.status, 'active')
+      ))
+      .orderBy(desc(schema.dealPods.createdAt))
+      .limit(1);
+    return pod;
+  }
+
+  async createDealPod(pod: schema.InsertDealPod): Promise<schema.DealPod> {
+    const [created] = await db.insert(schema.dealPods).values(pod).returning();
+    return created;
+  }
+
+  async updateDealPod(id: string, updates: Partial<schema.InsertDealPod>): Promise<schema.DealPod | undefined> {
+    const [updated] = await db.update(schema.dealPods)
+      .set(updates)
+      .where(eq(schema.dealPods.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ================================
+  // POD MEMBER OPERATIONS
+  // ================================
+
+  async getPodMembers(podId: string): Promise<schema.PodMember[]> {
+    return await db.select().from(schema.podMembers)
+      .where(eq(schema.podMembers.podId, podId))
+      .orderBy(schema.podMembers.position);
+  }
+
+  async createPodMember(member: schema.InsertPodMember): Promise<schema.PodMember> {
+    const [created] = await db.insert(schema.podMembers).values(member).returning();
+    return created;
+  }
+
+  async getPodMembersByUser(userId: string): Promise<schema.PodMember[]> {
+    return await db.select().from(schema.podMembers)
+      .where(eq(schema.podMembers.userId, userId));
+  }
+
+  // ================================
+  // DEAL MILESTONE OPERATIONS
+  // ================================
+
+  async getDealMilestones(dealId: string): Promise<schema.DealMilestone[]> {
+    return await db.select().from(schema.dealMilestones)
+      .where(eq(schema.dealMilestones.dealId, dealId))
+      .orderBy(schema.dealMilestones.orderIndex);
+  }
+
+  async getDealMilestonesByStage(dealId: string, stage: string): Promise<schema.DealMilestone[]> {
+    return await db.select().from(schema.dealMilestones)
+      .where(and(
+        eq(schema.dealMilestones.dealId, dealId),
+        eq(schema.dealMilestones.stage, stage)
+      ))
+      .orderBy(schema.dealMilestones.orderIndex);
+  }
+
+  async createDealMilestone(milestone: schema.InsertDealMilestone): Promise<schema.DealMilestone> {
+    const [created] = await db.insert(schema.dealMilestones).values(milestone).returning();
+    return created;
+  }
+
+  async updateDealMilestone(id: string, updates: Partial<schema.InsertDealMilestone>): Promise<schema.DealMilestone | undefined> {
+    const [updated] = await db.update(schema.dealMilestones)
+      .set(updates)
+      .where(eq(schema.dealMilestones.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ================================
+  // POD MOVEMENT TASK OPERATIONS
+  // ================================
+
+  async getPodMovementTasks(dealId: string): Promise<schema.PodMovementTask[]> {
+    return await db.select().from(schema.podMovementTasks)
+      .where(eq(schema.podMovementTasks.dealId, dealId));
+  }
+
+  async getPodMovementTasksByMilestone(milestoneId: string): Promise<schema.PodMovementTask[]> {
+    return await db.select().from(schema.podMovementTasks)
+      .where(eq(schema.podMovementTasks.milestoneId, milestoneId));
+  }
+
+  async createPodMovementTask(task: schema.InsertPodMovementTask): Promise<schema.PodMovementTask> {
+    const [created] = await db.insert(schema.podMovementTasks).values(task).returning();
+    return created;
+  }
+
+  async updatePodMovementTask(id: string, updates: Partial<schema.InsertPodMovementTask>): Promise<schema.PodMovementTask | undefined> {
+    const [updated] = await db.update(schema.podMovementTasks)
+      .set(updates)
+      .where(eq(schema.podMovementTasks.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ================================
+  // DEAL CONTEXT UPDATE OPERATIONS
+  // ================================
+
+  async getDealContextUpdates(dealId: string): Promise<schema.DealContextUpdate[]> {
+    return await db.select().from(schema.dealContextUpdates)
+      .where(eq(schema.dealContextUpdates.dealId, dealId))
+      .orderBy(desc(schema.dealContextUpdates.createdAt));
+  }
+
+  async createDealContextUpdate(update: schema.InsertDealContextUpdate): Promise<schema.DealContextUpdate> {
+    const [created] = await db.insert(schema.dealContextUpdates).values(update).returning();
+    return created;
+  }
+
+  async markDealContextIndexed(id: string): Promise<void> {
+    await db.update(schema.dealContextUpdates)
+      .set({ indexedForAI: true, indexedAt: new Date() })
+      .where(eq(schema.dealContextUpdates.id, id));
+  }
+
+  async getUnindexedDealContext(dealId: string): Promise<schema.DealContextUpdate[]> {
+    return await db.select().from(schema.dealContextUpdates)
+      .where(and(
+        eq(schema.dealContextUpdates.dealId, dealId),
+        eq(schema.dealContextUpdates.indexedForAI, false)
+      ))
+      .orderBy(schema.dealContextUpdates.createdAt);
+  }
+
+  // ================================
+  // WORKLOAD TRACKING
+  // ================================
+
+  async getUserWorkload(userId: string): Promise<{ activeTasks: number; pendingTasks: number; completedThisWeek: number }> {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const allTasks = await db.select().from(schema.tasks)
+      .where(eq(schema.tasks.assignedTo, userId));
+
+    const activeTasks = allTasks.filter(t => t.status === 'In Progress').length;
+    const pendingTasks = allTasks.filter(t => t.status === 'Pending').length;
+    const completedThisWeek = allTasks.filter(t => 
+      t.status === 'Completed' && 
+      t.completedAt && 
+      new Date(t.completedAt) >= oneWeekAgo
+    ).length;
+
+    return { activeTasks, pendingTasks, completedThisWeek };
+  }
+
+  async getAllUsersWithProfiles(): Promise<Array<{
+    user: schema.User;
+    resumeAnalysis: schema.ResumeAnalysis | null;
+    personalityAssessment: schema.PersonalityAssessment | null;
+    workload: { activeTasks: number; pendingTasks: number; completedThisWeek: number };
+  }>> {
+    const users = await this.getAllUsers();
+    const results = [];
+
+    for (const user of users) {
+      if (user.isExternal) continue; // Skip external users
+
+      const resumeAnalysis = await this.getResumeAnalysis(user.id);
+      const personalityAssessment = await this.getPersonalityAssessment(user.id);
+      const workload = await this.getUserWorkload(user.id);
+
+      results.push({
+        user,
+        resumeAnalysis: resumeAnalysis || null,
+        personalityAssessment: personalityAssessment || null,
+        workload
+      });
+    }
+
+    return results;
+  }
+
+  async getAllResumeAnalyses(): Promise<schema.ResumeAnalysis[]> {
+    return await db.select().from(schema.resumeAnalyses)
+      .where(eq(schema.resumeAnalyses.status, 'completed'));
+  }
+
+  async getAllPersonalityAssessments(): Promise<schema.PersonalityAssessment[]> {
+    return await db.select().from(schema.personalityAssessments)
+      .where(eq(schema.personalityAssessments.status, 'completed'));
+  }
 }
 
 export const storage = new DatabaseStorage();
