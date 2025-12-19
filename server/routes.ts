@@ -1790,6 +1790,177 @@ export async function registerRoutes(
     }
   });
 
+  // ===== PERSONALITY ASSESSMENT ROUTES =====
+
+  // Question to personality tag mapping (A answer = first tag, B answer = second tag)
+  const PERSONALITY_QUESTION_MAP: Record<number, [string, string]> = {
+    1: ['Politician', 'Sherpa'],
+    2: ['Firefighter', 'Architect'],
+    3: ['Grandmaster', 'Closer'],
+    4: ['Rainmaker', 'Guru'],
+    5: ['Sherpa', 'Creative'],
+    6: ['Misfit', 'Architect'],
+    7: ['Deal Junkie', 'Liaison'],
+    8: ['Closer', 'Sherpa'],
+    9: ['Closer', 'Guru'],
+    10: ['Mayor', 'Grandmaster'],
+    11: ['Deal Junkie', 'Architect'],
+    12: ['Closer', 'Auditor'],
+    13: ['Politician', 'Mayor'],
+    14: ['Firefighter', 'Misfit'],
+    15: ['Deal Junkie', 'Guru'],
+    16: ['Sherpa', 'Liaison'],
+    17: ['Grandmaster', 'Closer'],
+    18: ['Deal Junkie', 'Architect'],
+    19: ['Rainmaker', 'Auditor'],
+    20: ['Closer', 'Guru'],
+    21: ['Deal Junkie', 'Architect'],
+    22: ['Sherpa', 'Misfit'],
+    23: ['Rainmaker', 'Architect'],
+    24: ['Deal Junkie', 'Sherpa'],
+    25: ['Firefighter', 'Auditor'],
+  };
+
+  // Calculate personality scores from answers
+  function calculatePersonalityScores(answers: Record<number, 'A' | 'B'>) {
+    const scores: Record<string, number> = {
+      'Politician': 0, 'Sherpa': 0, 'Deal Junkie': 0, 'Closer': 0,
+      'Architect': 0, 'Firefighter': 0, 'Guru': 0, 'Misfit': 0,
+      'Legal': 0, 'Rainmaker': 0, 'Creative': 0, 'Auditor': 0,
+      'Mayor': 0, 'Liaison': 0, 'Grandmaster': 0
+    };
+
+    for (const [questionNum, answer] of Object.entries(answers)) {
+      const qNum = parseInt(questionNum);
+      const tags = PERSONALITY_QUESTION_MAP[qNum];
+      if (tags) {
+        const selectedTag = answer === 'A' ? tags[0] : tags[1];
+        scores[selectedTag] = (scores[selectedTag] || 0) + 1;
+      }
+    }
+
+    return scores;
+  }
+
+  // Get current user's personality assessment
+  app.get("/api/personality/assessment", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const assessment = await storage.getPersonalityAssessment(user.id);
+      res.json(assessment || null);
+    } catch (error) {
+      console.error('Error fetching personality assessment:', error);
+      res.status(500).json({ error: "Failed to fetch personality assessment" });
+    }
+  });
+
+  // Get personality assessment for a specific user (admin only)
+  app.get("/api/personality/assessment/:userId", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const assessment = await storage.getPersonalityAssessment(req.params.userId);
+      res.json(assessment || null);
+    } catch (error) {
+      console.error('Error fetching personality assessment:', error);
+      res.status(500).json({ error: "Failed to fetch personality assessment" });
+    }
+  });
+
+  // Submit personality assessment
+  app.post("/api/personality/assessment", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { answers } = req.body;
+
+      if (!answers || typeof answers !== 'object') {
+        return res.status(400).json({ error: "Answers are required" });
+      }
+
+      // Validate all 25 questions are answered
+      const answeredQuestions = Object.keys(answers).map(k => parseInt(k));
+      const requiredQuestions = Array.from({ length: 25 }, (_, i) => i + 1);
+      const missingQuestions = requiredQuestions.filter(q => !answeredQuestions.includes(q));
+      
+      if (missingQuestions.length > 0) {
+        return res.status(400).json({ 
+          error: `Missing answers for questions: ${missingQuestions.join(', ')}` 
+        });
+      }
+
+      // Calculate scores
+      const rawScores = calculatePersonalityScores(answers);
+      
+      // Convert to sorted array
+      const allScores = Object.entries(rawScores)
+        .map(([profile, score]) => ({ profile, score }))
+        .sort((a, b) => b.score - a.score);
+
+      // Get top 3
+      const topThreeProfiles = allScores.slice(0, 3);
+
+      // Check if user already has an assessment
+      const existingAssessment = await storage.getPersonalityAssessment(user.id);
+
+      let assessment;
+      if (existingAssessment) {
+        // Update existing assessment
+        assessment = await storage.updatePersonalityAssessment(existingAssessment.id, {
+          answers,
+          allScores,
+          topThreeProfiles,
+          status: 'completed',
+          completedAt: new Date(),
+        });
+      } else {
+        // Create new assessment
+        assessment = await storage.createPersonalityAssessment({
+          userId: user.id,
+          answers,
+          allScores,
+          topThreeProfiles,
+          status: 'completed',
+          completedAt: new Date(),
+        });
+      }
+
+      res.json(assessment);
+    } catch (error) {
+      console.error('Error submitting personality assessment:', error);
+      res.status(500).json({ error: "Failed to submit personality assessment" });
+    }
+  });
+
+  // Get personality questions (public endpoint for the form)
+  app.get("/api/personality/questions", async (req, res) => {
+    const questions = [
+      { id: 1, question: "Which feels more natural?", optionA: "Speaking up early", optionB: "Waiting, then hitting hard" },
+      { id: 2, question: "What do you value more in yourself?", optionA: "Speed", optionB: "Precision" },
+      { id: 3, question: "Which feels more satisfying?", optionA: "Being right", optionB: "Being useful" },
+      { id: 4, question: "Which is more like you?", optionA: "You keep things moving", optionB: "You make sure things fit" },
+      { id: 5, question: "You'd rather be known for:", optionA: "Being sharp in a crisis", optionB: "Being right over time" },
+      { id: 6, question: "You're more drawn to:", optionA: "The moment", optionB: "The system" },
+      { id: 7, question: "Which feels truer to you?", optionA: "You're all-in or not in at all", optionB: "You keep everything balanced" },
+      { id: 8, question: "Which sounds more like you?", optionA: "I take the lead when I know I can finish it", optionB: "I guide things when I know I can fix them" },
+      { id: 9, question: "What do people count on you for?", optionA: "To push things through", optionB: "To think things through" },
+      { id: 10, question: "In a room full of people, you usually:", optionA: "Pick up on energy", optionB: "Pick up on patterns" },
+      { id: 11, question: "When something's unclear, your instinct is to:", optionA: "Start and figure it out", optionB: "Clarify before moving" },
+      { id: 12, question: "You'd rather:", optionA: "Hit the deadline", optionB: "Get it right" },
+      { id: 13, question: "You connect with people by:", optionA: "Matching their vibe", optionB: "Guiding the tone" },
+      { id: 14, question: "You're at your best when:", optionA: "Things are urgent", optionB: "Things are open-ended" },
+      { id: 15, question: "Which feels more like your pace?", optionA: "Fast and reactive", optionB: "Slow and deliberate" },
+      { id: 16, question: "Which one frustrates you more?", optionA: "Things being too rigid", optionB: "Things being too vague" },
+      { id: 17, question: "When something breaks, you:", optionA: "Step in fast", optionB: "Rebuild the foundation" },
+      { id: 18, question: "What makes you feel calm?", optionA: "A full to-do list", optionB: "A clean framework" },
+      { id: 19, question: "You're more comfortable:", optionA: "Trusting your instinct", optionB: "Checking the math" },
+      { id: 20, question: "Which do you care about more?", optionA: "Results", optionB: "Reasons" },
+      { id: 21, question: "Which one's more true?", optionA: "I'd rather move than wait", optionB: "I'd rather wait than guess" },
+      { id: 22, question: "Your headspace is more often:", optionA: "\"What needs to happen next?\"", optionB: "\"What might happen later?\"" },
+      { id: 23, question: "You're more likely to say:", optionA: "\"Let's just go\"", optionB: "\"Let's figure it out first\"" },
+      { id: 24, question: "You lean toward:", optionA: "Doing", optionB: "Directing" },
+      { id: 25, question: "You'd rather be described as:", optionA: "Intense", optionB: "Precise" },
+    ];
+    res.json(questions);
+  });
+
   // ===== DEAL ROUTES =====
   
   // Lightweight deals listing - returns only essential fields (no large JSON fields)

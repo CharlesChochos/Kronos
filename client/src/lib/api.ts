@@ -3509,3 +3509,83 @@ export function useTaskTemplateUsage(templateId: string | undefined) {
     enabled: !!templateId,
   });
 }
+
+// ===== PERSONALITY ASSESSMENT =====
+
+export type PersonalityQuestion = {
+  id: number;
+  question: string;
+  optionA: string;
+  optionB: string;
+};
+
+export type PersonalityScore = {
+  profile: string;
+  score: number;
+};
+
+export type PersonalityAssessment = {
+  id: string;
+  userId: string;
+  answers: Record<number, 'A' | 'B'>;
+  allScores: PersonalityScore[];
+  topThreeProfiles: PersonalityScore[];
+  status: string;
+  completedAt: string | null;
+  createdAt: string;
+};
+
+export function usePersonalityQuestions() {
+  return useQuery({
+    queryKey: ["personality-questions"],
+    queryFn: async () => {
+      const res = await fetch("/api/personality/questions");
+      if (!res.ok) throw new Error("Failed to fetch personality questions");
+      return res.json() as Promise<PersonalityQuestion[]>;
+    },
+  });
+}
+
+export function usePersonalityAssessment() {
+  return useQuery({
+    queryKey: ["personality-assessment"],
+    queryFn: async () => {
+      const res = await fetch("/api/personality/assessment");
+      if (!res.ok) throw new Error("Failed to fetch personality assessment");
+      return res.json() as Promise<PersonalityAssessment | null>;
+    },
+  });
+}
+
+export function useUserPersonalityAssessment(userId: string | undefined) {
+  return useQuery({
+    queryKey: ["personality-assessment", userId],
+    queryFn: async () => {
+      const res = await fetch(`/api/personality/assessment/${userId}`);
+      if (!res.ok) throw new Error("Failed to fetch personality assessment");
+      return res.json() as Promise<PersonalityAssessment | null>;
+    },
+    enabled: !!userId,
+  });
+}
+
+export function useSubmitPersonalityAssessment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (answers: Record<number, 'A' | 'B'>) => {
+      const res = await fetch("/api/personality/assessment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to submit assessment");
+      }
+      return res.json() as Promise<PersonalityAssessment>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["personality-assessment"] });
+    },
+  });
+}

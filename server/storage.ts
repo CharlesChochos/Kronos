@@ -332,6 +332,11 @@ export interface IStorage {
   // Task Template Usage operations
   createTaskTemplateUsage(usage: schema.InsertTaskTemplateUsage): Promise<schema.TaskTemplateUsage>;
   getTaskTemplateUsageByTemplate(templateId: string): Promise<schema.TaskTemplateUsage[]>;
+  
+  // Personality Assessment operations
+  getPersonalityAssessment(userId: string): Promise<schema.PersonalityAssessment | undefined>;
+  createPersonalityAssessment(assessment: schema.InsertPersonalityAssessment): Promise<schema.PersonalityAssessment>;
+  updatePersonalityAssessment(id: string, updates: Partial<schema.InsertPersonalityAssessment>): Promise<schema.PersonalityAssessment | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1975,6 +1980,28 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(schema.taskTemplateUsage)
       .where(eq(schema.taskTemplateUsage.templateId, templateId))
       .orderBy(desc(schema.taskTemplateUsage.createdAt));
+  }
+
+  // Personality Assessment operations
+  async getPersonalityAssessment(userId: string): Promise<schema.PersonalityAssessment | undefined> {
+    const [assessment] = await db.select().from(schema.personalityAssessments)
+      .where(eq(schema.personalityAssessments.userId, userId))
+      .orderBy(desc(schema.personalityAssessments.createdAt))
+      .limit(1);
+    return assessment;
+  }
+
+  async createPersonalityAssessment(assessment: schema.InsertPersonalityAssessment): Promise<schema.PersonalityAssessment> {
+    const [created] = await db.insert(schema.personalityAssessments).values(assessment).returning();
+    return created;
+  }
+
+  async updatePersonalityAssessment(id: string, updates: Partial<schema.InsertPersonalityAssessment>): Promise<schema.PersonalityAssessment | undefined> {
+    const [updated] = await db.update(schema.personalityAssessments)
+      .set(updates)
+      .where(eq(schema.personalityAssessments.id, id))
+      .returning();
+    return updated;
   }
 }
 

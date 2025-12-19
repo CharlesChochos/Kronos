@@ -1316,3 +1316,42 @@ export const insertTaskTemplateUsageSchema = createInsertSchema(taskTemplateUsag
 
 export type InsertTaskTemplateUsage = z.infer<typeof insertTaskTemplateUsageSchema>;
 export type TaskTemplateUsage = typeof taskTemplateUsage.$inferSelect;
+
+// ================================
+// PERSONALITY ASSESSMENT SYSTEM
+// ================================
+
+// Personality Profile types - the 15 personality archetypes
+export const PERSONALITY_PROFILES = [
+  'Politician', 'Sherpa', 'Deal Junkie', 'Closer', 'Architect',
+  'Firefighter', 'Guru', 'Misfit', 'Legal', 'Rainmaker',
+  'Creative', 'Auditor', 'Mayor', 'Liaison', 'Grandmaster'
+] as const;
+
+export type PersonalityProfileType = typeof PERSONALITY_PROFILES[number];
+
+// Individual personality score
+export type PersonalityScore = {
+  profile: PersonalityProfileType;
+  score: number;
+};
+
+// Personality Assessment Responses table - stores user's questionnaire answers
+export const personalityAssessments = pgTable("personality_assessments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  answers: jsonb("answers").notNull().$type<Record<number, 'A' | 'B'>>(), // Question number -> answer
+  allScores: jsonb("all_scores").default([]).$type<PersonalityScore[]>(), // All profile scores
+  topThreeProfiles: jsonb("top_three_profiles").default([]).$type<PersonalityScore[]>(), // Top 3 profiles
+  status: text("status").notNull().default('completed'), // draft, completed
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPersonalityAssessmentSchema = createInsertSchema(personalityAssessments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPersonalityAssessment = z.infer<typeof insertPersonalityAssessmentSchema>;
+export type PersonalityAssessment = typeof personalityAssessments.$inferSelect;

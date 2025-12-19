@@ -23,7 +23,8 @@ import {
   FileStack,
   FolderOpen,
   ClipboardList,
-  ClipboardCheck
+  ClipboardCheck,
+  Brain
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPreferences, useSaveUserPreferences, useCurrentUser } from "@/lib/api";
@@ -160,6 +161,7 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
       links: [
         { icon: Calendar, label: "Calendar", path: "/ceo/calendar" },
         { icon: Target, label: "Goals & OKRs", path: "/ceo/okrs" },
+        { icon: Brain, label: "Personality Profile", path: "/ceo/personality-assessment" },
       ]
     },
     {
@@ -233,6 +235,7 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
       links: [
         { icon: Calendar, label: "Calendar", path: "/employee/calendar" },
         { icon: Target, label: "Goals & OKRs", path: "/employee/okrs" },
+        { icon: Brain, label: "Personality Profile", path: "/employee/personality-assessment" },
       ]
     },
     {
