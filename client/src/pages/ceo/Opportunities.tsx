@@ -31,7 +31,7 @@ import {
 import { 
   useCurrentUser, useDealsListing, useDeal, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers,
   useCustomSectors, useCreateCustomSector, useTagDealMember, useRemoveDealMember,
-  useDealNotes, useCreateDealNote, type DealNoteType
+  useDealNotes, useCreateDealNote, useApproveOpportunity, type DealNoteType
 } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -227,6 +227,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const createDeal = useCreateDeal();
   const updateDeal = useUpdateDeal();
   const deleteDeal = useDeleteDeal();
+  const approveOpportunity = useApproveOpportunity();
   const tagMember = useTagDealMember();
   const removeMember = useRemoveDealMember();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -434,23 +435,24 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const handleApprove = async () => {
     if (!selectedOpportunity) return;
     try {
-      // Map division to dealType for database storage
-      // Investment Banking uses M&A as dealType, Asset Management stays as Asset Management
-      const dealType = approvalDivision === 'Investment Banking' ? 'M&A' : 'Asset Management';
+      if (approvalDivision === 'Investment Banking') {
+        toast.loading("Approving opportunity and forming pod team...", { id: "approve-opportunity" });
+        await approveOpportunity.mutateAsync(selectedOpportunity.id);
+        toast.success("Opportunity approved! Pod team formed and tasks created.", { id: "approve-opportunity" });
+      } else {
+        await updateDeal.mutateAsync({
+          id: selectedOpportunity.id,
+          dealType: 'Asset Management',
+          status: 'Active',
+        } as any);
+        toast.success("Opportunity approved and moved to Asset Management");
+      }
       
-      await updateDeal.mutateAsync({
-        id: selectedOpportunity.id,
-        dealType: dealType,
-        status: 'Active',
-      } as any);
-      
-      const destinationPage = approvalDivision === 'Asset Management' ? 'Asset Management' : 'Deal Management';
-      toast.success(`Opportunity approved and moved to ${destinationPage}`);
       setShowApproveDialog(false);
       setShowOpportunityDetail(false);
       setSelectedOpportunity(null);
-    } catch (error) {
-      toast.error("Failed to approve opportunity");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to approve opportunity", { id: "approve-opportunity" });
     }
   };
   

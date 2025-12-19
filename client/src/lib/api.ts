@@ -250,6 +250,28 @@ export function useCreateDeal() {
   });
 }
 
+export function useApproveOpportunity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (opportunityId: string) => {
+      const res = await fetch(`/api/opportunities/${opportunityId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Failed to approve opportunity" }));
+        throw new Error(errorData.error || "Failed to approve opportunity");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+}
+
 export function useUpdateDeal() {
   const queryClient = useQueryClient();
   return useMutation({
