@@ -155,6 +155,8 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
         { icon: Brain, label: "Team Profiles", path: "/ceo/team-profiles" },
         { icon: Users, label: "Team Assignment", path: "/ceo/team" },
         { icon: GraduationCap, label: "Mentorship", path: "/ceo/mentorship" },
+        { icon: FileText, label: "Resume Onboarding", path: "/ceo/resume-onboarding" },
+        { icon: Brain, label: "Personality Profile", path: "/ceo/personality-assessment" },
       ]
     },
     {
@@ -162,8 +164,6 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
       links: [
         { icon: Calendar, label: "Calendar", path: "/ceo/calendar" },
         { icon: Target, label: "Goals & OKRs", path: "/ceo/okrs" },
-        { icon: FileText, label: "Resume Onboarding", path: "/ceo/resume-onboarding" },
-        { icon: Brain, label: "Personality Profile", path: "/ceo/personality-assessment" },
       ]
     },
     {
@@ -219,6 +219,13 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
       links: employeePlatformLinks as LinkItem[],
     },
     {
+      category: "People",
+      links: [
+        { icon: FileText, label: "Resume Onboarding", path: "/employee/resume-onboarding" },
+        { icon: Brain, label: "Personality Profile", path: "/employee/personality-assessment" },
+      ]
+    },
+    {
       category: "Collaboration",
       links: [
         { icon: Megaphone, label: "Communications", path: "/employee/announcements" },
@@ -237,8 +244,6 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
       links: [
         { icon: Calendar, label: "Calendar", path: "/employee/calendar" },
         { icon: Target, label: "Goals & OKRs", path: "/employee/okrs" },
-        { icon: FileText, label: "Resume Onboarding", path: "/employee/resume-onboarding" },
-        { icon: Brain, label: "Personality Profile", path: "/employee/personality-assessment" },
       ]
     },
     {

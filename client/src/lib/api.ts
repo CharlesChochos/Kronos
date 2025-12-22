@@ -195,7 +195,9 @@ export function useOnboardingStatus() {
   return useQuery({
     queryKey: ["onboarding-status"],
     queryFn: async () => {
-      const res = await fetch("/api/users/onboarding-status");
+      const res = await fetch("/api/users/onboarding-status", {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch onboarding status");
       return res.json() as Promise<OnboardingStatus>;
     },
