@@ -142,7 +142,7 @@ export default function PublicForm() {
                     value={submitterName}
                     onChange={(e) => setSubmitterName(e.target.value)}
                     placeholder="Enter your name"
-                    className="mt-1.5 border-[#d4cbc0] focus:border-[#8b7355] focus:ring-[#8b7355]"
+                    className="mt-1.5 border-[#d4cbc0] bg-white text-[#3d3428] focus:border-[#8b7355] focus:ring-[#8b7355]"
                     data-testid="input-submitter-name"
                   />
                 </div>
@@ -154,7 +154,7 @@ export default function PublicForm() {
                     value={submitterEmail}
                     onChange={(e) => setSubmitterEmail(e.target.value)}
                     placeholder="Enter your email"
-                    className="mt-1.5 border-[#d4cbc0] focus:border-[#8b7355] focus:ring-[#8b7355]"
+                    className="mt-1.5 border-[#d4cbc0] bg-white text-[#3d3428] focus:border-[#8b7355] focus:ring-[#8b7355]"
                     data-testid="input-submitter-email"
                   />
                 </div>
@@ -292,7 +292,7 @@ function FieldRenderer({ field, value, onChange, shareToken }: { field: FormFiel
     <p className="text-sm text-[#8b7355] mt-1">{field.description}</p>
   ) : null;
 
-  const inputClassName = "mt-1.5 border-[#d4cbc0] bg-white focus:border-[#8b7355] focus:ring-[#8b7355]";
+  const inputClassName = "mt-1.5 border-[#d4cbc0] bg-white text-[#3d3428] focus:border-[#8b7355] focus:ring-[#8b7355]";
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;

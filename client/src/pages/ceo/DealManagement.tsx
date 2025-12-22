@@ -4296,11 +4296,16 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
               </div>
               <div className="space-y-2">
                 <Label>Lead</Label>
-                <Input 
-                  placeholder="Deal Lead Name" 
-                  value={newDeal.lead}
-                  onChange={(e) => setNewDeal({ ...newDeal, lead: e.target.value })}
-                />
+                <Select value={newDeal.lead} onValueChange={(v) => setNewDeal({ ...newDeal, lead: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select deal lead..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allUsers.map(user => (
+                      <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             
