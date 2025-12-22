@@ -2517,9 +2517,28 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
         try {
           const parser = new PDFParse({ data: file.buffer });
           const pdfResult = await parser.getText();
-          resumeText = pdfResult.text || '';
+          let rawText = pdfResult.text || '';
+          
+          // Clean and normalize extracted text for better accuracy
+          resumeText = rawText
+            // Normalize whitespace - replace multiple spaces/tabs with single space
+            .replace(/[ \t]+/g, ' ')
+            // Preserve paragraph breaks (double newlines) but normalize single newlines
+            .replace(/\n\s*\n/g, '\n\n')
+            .replace(/(?<!\n)\n(?!\n)/g, ' ')
+            // Remove excessive blank lines
+            .replace(/\n{3,}/g, '\n\n')
+            // Fix common PDF extraction issues
+            .replace(/\s+([.,;:!?])/g, '$1') // Remove space before punctuation
+            .replace(/([a-z])([A-Z])/g, '$1 $2') // Add space between camelCase words (common PDF issue)
+            // Trim whitespace
+            .trim();
+          
           await parser.destroy();
-          console.log('[Resume] PDF parsed successfully, text length:', resumeText.length);
+          console.log('[Resume] PDF parsed successfully, raw length:', rawText.length, 'cleaned length:', resumeText.length);
+          
+          // Log first 200 chars for debugging
+          console.log('[Resume] Text preview:', resumeText.substring(0, 200).replace(/\n/g, ' '));
         } catch (pdfError: any) {
           console.error('[Resume] PDF parse error:', pdfError?.message || pdfError);
           return res.status(400).json({ 
@@ -2527,7 +2546,7 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
           });
         }
       } else if (isTxt) {
-        resumeText = file.buffer.toString('utf-8');
+        resumeText = file.buffer.toString('utf-8').trim();
         console.log('[Resume] TXT file read, text length:', resumeText.length);
       } else {
         console.log('[Resume] Unsupported format:', file.mimetype, file.originalname);
@@ -2542,6 +2561,10 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
           error: "Could not extract text from your resume. This may happen with scanned/image-based PDFs. Please try uploading a text-based PDF or a TXT file." 
         });
       }
+      
+      // Log successful extraction details
+      const wordCount = resumeText.split(/\s+/).filter(w => w.length > 0).length;
+      console.log('[Resume] Extraction complete - words:', wordCount, 'chars:', resumeText.length);
 
       // Check if user already has an analysis
       const existingAnalysis = await storage.getResumeAnalysis(user.id);
