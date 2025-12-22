@@ -2021,6 +2021,7 @@ Multi employee handling
     dealTeamStatus: string,
     scores: { profile: string; score: number }[]
   ): Promise<{ success: boolean; analysis?: any; error?: string }> {
+    console.log('[Personality AI] Starting analysis for:', userName);
     try {
       // Format score sheet for the AI
       const scoreSheet = scores
@@ -2034,6 +2035,7 @@ Deal Team Status: ${dealTeamStatus}
 Personality Assessment Score Sheet:
 ${scoreSheet}`;
 
+      console.log('[Personality AI] Calling OpenAI API...');
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
@@ -2045,13 +2047,21 @@ ${scoreSheet}`;
       });
 
       const rawResponse = response.choices[0]?.message?.content || '';
+      console.log('[Personality AI] Received response, length:', rawResponse.length);
+      
+      if (!rawResponse) {
+        console.error('[Personality AI] Empty response from OpenAI');
+        return { success: false, error: 'Empty response from AI' };
+      }
       
       // Parse the AI response into structured sections
       const analysis = parseAIAnalysis(rawResponse);
+      console.log('[Personality AI] Parsed analysis sections:', Object.keys(analysis).filter(k => analysis[k] && k !== 'rawResponse'));
       
       return { success: true, analysis };
     } catch (error: any) {
-      console.error('[Personality AI] Error:', error);
+      console.error('[Personality AI] Error:', error?.message || error);
+      console.error('[Personality AI] Full error:', JSON.stringify(error, null, 2));
       return { success: false, error: error.message };
     }
   }
@@ -2201,22 +2211,27 @@ ${scoreSheet}`;
       res.json({ ...assessment, status: 'analyzing' });
 
       // Run AI analysis asynchronously
+      console.log('[Personality] Starting AI analysis for user:', user.id, user.name);
       const aiResult = await analyzePersonalityWithAI(
         user.name || 'Name not provided',
         user.jobTitle || user.role || 'Function not provided',
         dealTeamStatus || 'Floater',
         allScores
       );
+      console.log('[Personality] AI analysis result:', aiResult.success ? 'success' : 'failed', aiResult.error || '');
 
       // Update assessment with AI analysis
       if (aiResult.success && assessment) {
+        console.log('[Personality] Saving AI analysis to database...');
         await storage.updatePersonalityAssessment(assessment.id, {
           aiAnalysis: aiResult.analysis,
           status: 'completed',
           completedAt: new Date(),
         });
+        console.log('[Personality] AI analysis saved successfully');
       } else if (assessment) {
         // Mark as completed even if AI fails - user still has raw scores
+        console.log('[Personality] AI failed, marking as completed without analysis');
         await storage.updatePersonalityAssessment(assessment.id, {
           status: 'completed',
           completedAt: new Date(),
@@ -2403,7 +2418,9 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
   async function analyzeResumeWithAI(
     resumeText: string
   ): Promise<{ success: boolean; analysis?: any; error?: string }> {
+    console.log('[Resume AI] Starting analysis, text length:', resumeText.length);
     try {
+      console.log('[Resume AI] Calling OpenAI API...');
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
@@ -2415,11 +2432,20 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       });
 
       const rawResponse = response.choices[0]?.message?.content || '';
+      console.log('[Resume AI] Received response, length:', rawResponse.length);
+      
+      if (!rawResponse) {
+        console.error('[Resume AI] Empty response from OpenAI');
+        return { success: false, error: 'Empty response from AI' };
+      }
+      
       const analysis = parseResumeAIAnalysis(rawResponse);
+      console.log('[Resume AI] Parsed analysis sections:', Object.keys(analysis).filter(k => analysis[k] && k !== 'rawResponse'));
       
       return { success: true, analysis };
     } catch (error: any) {
-      console.error('[Resume AI] Error:', error);
+      console.error('[Resume AI] Error:', error?.message || error);
+      console.error('[Resume AI] Full error:', JSON.stringify(error, null, 2));
       return { success: false, error: error.message };
     }
   }
@@ -2592,16 +2618,20 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       res.json({ ...analysis, status: 'analyzing' });
 
       // Run AI analysis asynchronously
+      console.log('[Resume] Starting AI analysis for user:', user.id, user.name);
       const aiResult = await analyzeResumeWithAI(resumeText);
+      console.log('[Resume] AI analysis result:', aiResult.success ? 'success' : 'failed', aiResult.error || '');
 
       // Update with AI analysis
       if (aiResult.success && analysis) {
+        console.log('[Resume] Saving AI analysis to database...');
         await storage.updateResumeAnalysis(analysis.id, {
           aiAnalysis: aiResult.analysis,
           assignedDealTeam: aiResult.analysis?.onboardingPlacement?.assignedDealTeam || 'Floater',
           status: 'completed',
           completedAt: new Date(),
         });
+        console.log('[Resume] AI analysis saved successfully');
 
         // Notify admin users (including Charles) that resume onboarding is complete
         try {
@@ -2619,6 +2649,7 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
           console.error('Error sending resume onboarding notification:', notifError);
         }
       } else if (analysis) {
+        console.log('[Resume] AI failed, marking as failed');
         await storage.updateResumeAnalysis(analysis.id, {
           status: 'failed',
         });
