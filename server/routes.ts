@@ -685,6 +685,33 @@ export async function registerRoutes(
     }
   });
   
+  // Get onboarding status for all users (for checking assignment eligibility)
+  app.get("/api/users/onboarding-status", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      const onboardingStatus: Record<string, { hasResume: boolean; hasPersonality: boolean; isComplete: boolean }> = {};
+      
+      for (const user of users) {
+        const resumeAnalysis = await storage.getResumeAnalysis(user.id);
+        const personalityAssessment = await storage.getPersonalityAssessment(user.id);
+        
+        const hasResume = !!(resumeAnalysis && resumeAnalysis.status === 'completed');
+        const hasPersonality = !!(personalityAssessment && personalityAssessment.status === 'completed');
+        
+        onboardingStatus[user.id] = {
+          hasResume,
+          hasPersonality,
+          isComplete: hasResume && hasPersonality,
+        };
+      }
+      
+      res.json(onboardingStatus);
+    } catch (error) {
+      console.error('Error fetching onboarding status:', error);
+      res.status(500).json({ error: "Failed to fetch onboarding status" });
+    }
+  });
+
   // ===== ADMIN ROUTES (CEO ONLY) =====
   
   // Get pending users (CEO only)

@@ -452,6 +452,27 @@ export class DatabaseStorage implements IStorage {
       await db.delete(schema.taskAttachmentsTable).where(eq(schema.taskAttachmentsTable.taskId, taskId));
     }
     
+    // Get all deal pods for this deal to delete their related records
+    const dealPodsList = await db.select({ id: schema.dealPods.id }).from(schema.dealPods).where(eq(schema.dealPods.dealId, id));
+    const podIds = dealPodsList.map(p => p.id);
+    
+    // Delete records that reference dealPods first
+    for (const podId of podIds) {
+      await db.delete(schema.podMembers).where(eq(schema.podMembers.podId, podId));
+    }
+    
+    // Delete dealMilestones (references dealPods and deals)
+    await db.delete(schema.dealMilestones).where(eq(schema.dealMilestones.dealId, id));
+    
+    // Delete podMovementTasks (references dealPods and deals)
+    await db.delete(schema.podMovementTasks).where(eq(schema.podMovementTasks.dealId, id));
+    
+    // Delete dealContextUpdates (references deals)
+    await db.delete(schema.dealContextUpdates).where(eq(schema.dealContextUpdates.dealId, id));
+    
+    // Now delete deal pods
+    await db.delete(schema.dealPods).where(eq(schema.dealPods.dealId, id));
+    
     // Delete all deal-related records (foreign key constraints)
     await db.delete(schema.tasks).where(eq(schema.tasks.dealId, id));
     await db.delete(schema.meetings).where(eq(schema.meetings.dealId, id));

@@ -189,6 +189,19 @@ export function useUser(id: string) {
   });
 }
 
+export type OnboardingStatus = Record<string, { hasResume: boolean; hasPersonality: boolean; isComplete: boolean }>;
+
+export function useOnboardingStatus() {
+  return useQuery({
+    queryKey: ["onboarding-status"],
+    queryFn: async () => {
+      const res = await fetch("/api/users/onboarding-status");
+      if (!res.ok) throw new Error("Failed to fetch onboarding status");
+      return res.json() as Promise<OnboardingStatus>;
+    },
+  });
+}
+
 // Deal API - fetches all deals (paginated by default in production)
 export function useDeals() {
   return useQuery({

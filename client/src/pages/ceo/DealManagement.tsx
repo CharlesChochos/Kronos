@@ -44,7 +44,8 @@ import {
   useDealFees, type DealFeeType,
   useCreateDocument,
   useAllInvestors,
-  useDealNotes, useCreateDealNote, type DealNoteType
+  useDealNotes, useCreateDealNote, type DealNoteType,
+  useOnboardingStatus, type OnboardingStatus
 } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -373,6 +374,8 @@ type StageWorkSectionProps = {
   deleteTask: any;
   onAuditEntry?: (action: string, details: string) => Promise<void>;
   totalTeamCount?: number;
+  onboardingStatus?: OnboardingStatus;
+  onShowOnboardingWarning?: (userName: string, missingResume: boolean, missingPersonality: boolean) => void;
 };
 
 function StageWorkSection({
@@ -395,7 +398,9 @@ function StageWorkSection({
   createDocument,
   deleteTask,
   onAuditEntry,
-  totalTeamCount
+  totalTeamCount,
+  onboardingStatus = {},
+  onShowOnboardingWarning
 }: StageWorkSectionProps) {
   const { data: stageDocuments = [] } = useStageDocuments(dealId, activeStageTab);
   const { data: stagePodMembers = [] } = useStagePodMembers(dealId, activeStageTab);
@@ -906,29 +911,46 @@ function StageWorkSection({
                 {filteredMembers.length === 0 ? (
                   <div className="p-2 text-sm text-muted-foreground text-center">No users found</div>
                 ) : (
-                  filteredMembers.map((user: any) => (
-                    <button
-                      key={user.id}
-                      onClick={() => {
-                        setSelectedMember(user);
-                        setMemberRole(user.jobTitle || user.role || 'Team Member');
-                        setMemberSearch('');
-                      }}
-                      className={cn(
-                        "w-full p-2 text-left hover:bg-secondary/50 flex items-center gap-2 text-sm",
-                        selectedMember?.id === user.id && "bg-primary/10"
-                      )}
-                      data-testid={`team-member-${user.id}`}
-                    >
-                      <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xs">
-                        {user.name?.charAt(0) || '?'}
-                      </div>
-                      <div>
-                        <div className="font-medium">{user.name}</div>
-                        <div className="text-xs text-muted-foreground">{user.email}</div>
-                      </div>
-                    </button>
-                  ))
+                  filteredMembers.map((user: any) => {
+                    const userOnboarding = onboardingStatus[user.id];
+                    const isOnboardingComplete = userOnboarding?.isComplete ?? false;
+                    return (
+                      <button
+                        key={user.id}
+                        onClick={() => {
+                          if (!isOnboardingComplete && onShowOnboardingWarning) {
+                            onShowOnboardingWarning(user.name, !userOnboarding?.hasResume, !userOnboarding?.hasPersonality);
+                            setMemberSearch('');
+                            return;
+                          }
+                          setSelectedMember(user);
+                          setMemberRole(user.jobTitle || user.role || 'Team Member');
+                          setMemberSearch('');
+                        }}
+                        className={cn(
+                          "w-full p-2 text-left hover:bg-secondary/50 flex items-center gap-2 text-sm",
+                          selectedMember?.id === user.id && "bg-primary/10"
+                        )}
+                        data-testid={`team-member-${user.id}`}
+                      >
+                        <div className={cn(
+                          "w-6 h-6 rounded-full flex items-center justify-center text-xs",
+                          isOnboardingComplete ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"
+                        )}>
+                          {user.name?.charAt(0) || '?'}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium flex items-center gap-2">
+                            {user.name}
+                            {!isOnboardingComplete && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-500 rounded">Incomplete</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{user.email}</div>
+                        </div>
+                      </button>
+                    );
+                  })
                 )}
               </div>
             )}
@@ -1390,6 +1412,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const { data: allUsers = [] } = useUsers();
   const { data: allTasks = [] } = useTasks();
   const { data: stakeholders = [] } = useAllInvestors();
+  const { data: onboardingStatus = {} } = useOnboardingStatus();
   
   // Filter deals based on access level - non-admin users only see deals they're assigned to
   // Filter out Opportunities and Asset Management deals - those appear in their own respective pages
@@ -1491,6 +1514,10 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const [showDeleteDealDialog, setShowDeleteDealDialog] = useState(false);
   const [dealToDelete, setDealToDelete] = useState<string | null>(null);
   
+  // Onboarding warning dialog
+  const [showOnboardingWarning, setShowOnboardingWarning] = useState(false);
+  const [pendingAssignment, setPendingAssignment] = useState<{ userId: string; userName: string; missingResume: boolean; missingPersonality: boolean } | null>(null);
+  
   const openTaskDetail = (task: any, deal: Deal) => {
     setSelectedCalendarTask({ ...task, deal });
     setShowTaskDetailModal(true);
@@ -1567,6 +1594,8 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   }, [customSectors]);
   const [sectorOpen, setSectorOpen] = useState(false);
   const [editSectorOpen, setEditSectorOpen] = useState(false);
+  const [leadOpen, setLeadOpen] = useState(false);
+  const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [editCustomSector, setEditCustomSector] = useState('');
 
   const [newTeamMember, setNewTeamMember] = useState<PodTeamMember>({
@@ -3448,6 +3477,11 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     createDocument={createDocument}
                     deleteTask={deleteTask}
                     totalTeamCount={uniqueTeamCount}
+                    onboardingStatus={onboardingStatus}
+                    onShowOnboardingWarning={(userName, missingResume, missingPersonality) => {
+                      setPendingAssignment({ userId: '', userName, missingResume, missingPersonality });
+                      setShowOnboardingWarning(true);
+                    }}
                     onAuditEntry={async (action, details) => {
                       try {
                         const auditEntry: AuditEntry = {
@@ -4296,16 +4330,55 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
               </div>
               <div className="space-y-2">
                 <Label>Lead</Label>
-                <Select value={newDeal.lead} onValueChange={(v) => setNewDeal({ ...newDeal, lead: v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select deal lead..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allUsers.map(user => (
-                      <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={leadOpen} onOpenChange={setLeadOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" aria-expanded={leadOpen} className="w-full justify-between">
+                      {newDeal.lead || "Select deal lead..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Search team members..." />
+                      <CommandList>
+                        <CommandEmpty>No team member found.</CommandEmpty>
+                        <CommandGroup>
+                          {allUsers.map(user => {
+                            const userOnboarding = onboardingStatus[user.id];
+                            const isOnboardingComplete = userOnboarding?.isComplete ?? false;
+                            return (
+                              <CommandItem
+                                key={user.id}
+                                value={user.name}
+                                onSelect={() => {
+                                  if (!isOnboardingComplete) {
+                                    setPendingAssignment({
+                                      userId: user.id,
+                                      userName: user.name,
+                                      missingResume: !userOnboarding?.hasResume,
+                                      missingPersonality: !userOnboarding?.hasPersonality
+                                    });
+                                    setShowOnboardingWarning(true);
+                                    setLeadOpen(false);
+                                    return;
+                                  }
+                                  setNewDeal({ ...newDeal, lead: user.name });
+                                  setLeadOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", newDeal.lead === user.name ? "opacity-100" : "opacity-0")} />
+                                <span className={cn(!isOnboardingComplete && "text-muted-foreground")}>{user.name}</span>
+                                {!isOnboardingComplete && (
+                                  <Badge variant="outline" className="ml-2 text-xs text-amber-500 border-amber-500">Incomplete Onboarding</Badge>
+                                )}
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             
@@ -4604,6 +4677,51 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete Deal
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Onboarding Incomplete Warning Dialog */}
+      <AlertDialog open={showOnboardingWarning} onOpenChange={setShowOnboardingWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-500">
+              <UserCircle className="w-5 h-5" />
+              Onboarding Not Complete
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                <strong>{pendingAssignment?.userName}</strong> has not completed the required onboarding steps and cannot be assigned to deals or tasks yet.
+              </p>
+              <div className="bg-secondary/50 rounded-lg p-3 space-y-2">
+                <p className="text-sm font-medium">Missing steps:</p>
+                <ul className="text-sm space-y-1">
+                  {pendingAssignment?.missingResume && (
+                    <li className="flex items-center gap-2">
+                      <X className="w-4 h-4 text-destructive" />
+                      Resume Onboarding (upload and analysis)
+                    </li>
+                  )}
+                  {pendingAssignment?.missingPersonality && (
+                    <li className="flex items-center gap-2">
+                      <X className="w-4 h-4 text-destructive" />
+                      Personality Assessment
+                    </li>
+                  )}
+                </ul>
+              </div>
+              <p className="text-sm">
+                Please have this team member complete their onboarding before assigning them to deals.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => {
+              setShowOnboardingWarning(false);
+              setPendingAssignment(null);
+            }}>
+              Understood
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
