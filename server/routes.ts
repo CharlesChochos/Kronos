@@ -2617,43 +2617,59 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       // Send response immediately
       res.json({ ...analysis, status: 'analyzing' });
 
-      // Run AI analysis asynchronously
-      console.log('[Resume] Starting AI analysis for user:', user.id, user.name);
-      const aiResult = await analyzeResumeWithAI(resumeText);
-      console.log('[Resume] AI analysis result:', aiResult.success ? 'success' : 'failed', aiResult.error || '');
-
-      // Update with AI analysis
-      if (aiResult.success && analysis) {
-        console.log('[Resume] Saving AI analysis to database...');
-        await storage.updateResumeAnalysis(analysis.id, {
-          aiAnalysis: aiResult.analysis,
-          assignedDealTeam: aiResult.analysis?.onboardingPlacement?.assignedDealTeam || 'Floater',
-          status: 'completed',
-          completedAt: new Date(),
-        });
-        console.log('[Resume] AI analysis saved successfully');
-
-        // Notify admin users (including Charles) that resume onboarding is complete
+      // Run AI analysis asynchronously (fire-and-forget with its own error handling)
+      (async () => {
         try {
-          const allUsers = await storage.getAllUsers();
-          const adminUsers = allUsers.filter(u => u.accessLevel === 'admin' && u.status === 'active');
-          for (const admin of adminUsers) {
-            await storage.createNotification({
-              userId: admin.id,
-              title: 'Resume Onboarding Completed',
-              message: `${user.name} has completed their resume onboarding`,
-              type: 'info',
+          console.log('[Resume] Starting AI analysis for user:', user.id, user.name);
+          const aiResult = await analyzeResumeWithAI(resumeText);
+          console.log('[Resume] AI analysis result:', aiResult.success ? 'success' : 'failed', aiResult.error || '');
+
+          // Update with AI analysis
+          if (aiResult.success && analysis) {
+            console.log('[Resume] Saving AI analysis to database...');
+            await storage.updateResumeAnalysis(analysis.id, {
+              aiAnalysis: aiResult.analysis,
+              assignedDealTeam: aiResult.analysis?.onboardingPlacement?.assignedDealTeam || 'Floater',
+              status: 'completed',
+              completedAt: new Date(),
+            });
+            console.log('[Resume] AI analysis saved successfully');
+
+            // Notify admin users (including Charles) that resume onboarding is complete
+            try {
+              const allUsers = await storage.getAllUsers();
+              const adminUsers = allUsers.filter(u => u.accessLevel === 'admin' && u.status === 'active');
+              for (const admin of adminUsers) {
+                await storage.createNotification({
+                  userId: admin.id,
+                  title: 'Resume Onboarding Completed',
+                  message: `${user.name} has completed their resume onboarding`,
+                  type: 'info',
+                });
+              }
+            } catch (notifError) {
+              console.error('[Resume] Error sending resume onboarding notification:', notifError);
+            }
+          } else if (analysis) {
+            console.log('[Resume] AI failed, marking as failed. Error:', aiResult.error);
+            await storage.updateResumeAnalysis(analysis.id, {
+              status: 'failed',
             });
           }
-        } catch (notifError) {
-          console.error('Error sending resume onboarding notification:', notifError);
+        } catch (asyncError) {
+          console.error('[Resume] Async AI analysis error:', asyncError);
+          // Try to mark as failed if possible
+          try {
+            if (analysis) {
+              await storage.updateResumeAnalysis(analysis.id, {
+                status: 'failed',
+              });
+            }
+          } catch (updateError) {
+            console.error('[Resume] Failed to update status after error:', updateError);
+          }
         }
-      } else if (analysis) {
-        console.log('[Resume] AI failed, marking as failed');
-        await storage.updateResumeAnalysis(analysis.id, {
-          status: 'failed',
-        });
-      }
+      })();
     } catch (error) {
       console.error('Error analyzing resume:', error);
       res.status(500).json({ error: "Failed to analyze resume" });
