@@ -54,6 +54,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isToday, isBefore, isAfter, parseISO } from "date-fns";
 import type { Deal, PodTeamMember, TaggedInvestor, AuditEntry } from "@shared/schema";
+import { isDealEligibleUser } from "@shared/schema";
 import { ObjectUploader, type UploadedFile } from "@/components/ObjectUploader";
 import {
   RadarChart,
@@ -445,10 +446,12 @@ function StageWorkSection({
   const filteredMembers = useMemo(() => {
     if (!memberSearch || memberSearch.length < 2) return [];
     const query = memberSearch.toLowerCase();
-    return allUsers.filter((user: any) => 
-      user.name.toLowerCase().includes(query) || 
-      user.email.toLowerCase().includes(query)
-    ).slice(0, 5);
+    return allUsers
+      .filter((user: any) => isDealEligibleUser(user)) // Only show deal-eligible users
+      .filter((user: any) => 
+        user.name.toLowerCase().includes(query) || 
+        user.email.toLowerCase().includes(query)
+      ).slice(0, 5);
   }, [allUsers, memberSearch]);
   
   const handleAddDocument = async () => {
@@ -1240,7 +1243,7 @@ function TaskComments({
   const inputRef = useRef<HTMLInputElement>(null);
   
   const mentionableUsers = useMemo(() => {
-    const activeUsers = users.filter(u => u.status === 'active');
+    const activeUsers = users.filter(u => u.status === 'active' && isDealEligibleUser(u));
     if (!mentionQuery) return activeUsers.slice(0, 5);
     return activeUsers.filter(u => 
       u.name.toLowerCase().includes(mentionQuery.toLowerCase())
@@ -1614,10 +1617,12 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const filteredUsers = useMemo(() => {
     if (!teamMemberSearch || teamMemberSearch.length < 2) return [];
     const query = teamMemberSearch.toLowerCase();
-    return allUsers.filter(user => 
-      user.name.toLowerCase().includes(query) || 
-      user.email.toLowerCase().includes(query)
-    ).slice(0, 5);
+    return allUsers
+      .filter(user => isDealEligibleUser(user)) // Only show deal-eligible users
+      .filter(user => 
+        user.name.toLowerCase().includes(query) || 
+        user.email.toLowerCase().includes(query)
+      ).slice(0, 5);
   }, [allUsers, teamMemberSearch]);
 
   const [newInvestor, setNewInvestor] = useState<Omit<TaggedInvestor, 'id'>>({
@@ -3218,7 +3223,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                               <SelectValue placeholder="Select lead" />
                             </SelectTrigger>
                             <SelectContent>
-                              {allUsers.map(user => (
+                              {allUsers.filter(user => isDealEligibleUser(user)).map(user => (
                                 <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
                               ))}
                             </SelectContent>
@@ -4346,7 +4351,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       <CommandList>
                         <CommandEmpty>No team member found.</CommandEmpty>
                         <CommandGroup>
-                          {allUsers.map(user => {
+                          {allUsers.filter(user => isDealEligibleUser(user)).map(user => {
                             const userOnboarding = onboardingStatus[user.id];
                             const isOnboardingComplete = userOnboarding?.isComplete ?? false;
                             return (

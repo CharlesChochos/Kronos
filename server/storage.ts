@@ -2247,7 +2247,8 @@ export class DatabaseStorage implements IStorage {
     const results = [];
 
     for (const user of users) {
-      if (user.isExternal) continue; // Skip external users
+      // Skip external users and non-deal-eligible users (HR, AI Engineer, etc.)
+      if (!schema.isDealEligibleUser(user)) continue;
 
       const resumeAnalysis = await this.getResumeAnalysis(user.id);
       const personalityAssessment = await this.getPersonalityAssessment(user.id);

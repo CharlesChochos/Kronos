@@ -1627,3 +1627,33 @@ export type AIPodFormationResponse = {
   formationRationale: string;
   dataIntegrityNotes: string;
 };
+
+// Job titles that are NOT eligible for deal work (support roles)
+export const NON_DEAL_ELIGIBLE_JOB_TITLES = [
+  'AI Engineer',
+  'Head of Human Resources',
+  'HR Manager',
+  'HR Specialist',
+  'Software Engineer',
+  'IT Support',
+  'Office Manager',
+  'Administrative Assistant',
+  'Receptionist',
+];
+
+// Helper function to check if a user is eligible for deal work
+export function isDealEligibleUser(user: User): boolean {
+  // External users are not eligible
+  if (user.isExternal) return false;
+  
+  // Check if job title is in the non-eligible list (case-insensitive)
+  if (user.jobTitle) {
+    const normalizedJobTitle = user.jobTitle.trim().toLowerCase();
+    const isNonEligible = NON_DEAL_ELIGIBLE_JOB_TITLES.some(
+      title => normalizedJobTitle === title.toLowerCase()
+    );
+    if (isNonEligible) return false;
+  }
+  
+  return true;
+}

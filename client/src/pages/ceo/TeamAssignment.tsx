@@ -29,6 +29,7 @@ import { useCurrentUser, useUsers, useDealsListing, useTasks, useCreateTask, use
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Deal, User } from "@shared/schema";
+import { isDealEligibleUser } from "@shared/schema";
 
 type PodTeamMember = {
   name: string;
@@ -115,6 +116,8 @@ export default function TeamAssignment() {
   const filteredUsers = users.filter(user => {
     // Only show active users
     if (user.status !== 'active') return false;
+    // Only show deal-eligible users (exclude HR, AI Engineer, etc.)
+    if (!isDealEligibleUser(user)) return false;
     // Filter by availability
     if (filterAvailability && getUserAvailability(user.id) !== filterAvailability) return false;
     // Filter by search query
