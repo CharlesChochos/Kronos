@@ -680,6 +680,7 @@ export const userPreferences = pgTable("user_preferences", {
   complianceDefaults: jsonb("compliance_defaults").default({ sec: false, finra: false, legal: true }),
   marketSymbols: jsonb("market_symbols").default(['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY']),
   settings: jsonb("settings").default({}), // General settings (notifications, display, account preferences)
+  hasSeenWelcome: boolean("has_seen_welcome").default(false), // Track if user has seen welcome modal
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
