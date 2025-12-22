@@ -108,6 +108,7 @@ export function useLogin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["auth"] });
+      queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
     },
   });
 }
@@ -129,6 +130,7 @@ export function useSignup() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["auth"] });
+      queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
     },
   });
 }
@@ -1946,14 +1948,21 @@ export type UserPreferencesType = {
   updatedAt?: string;
 };
 
-export function useUserPreferences() {
+export function useUserPreferences(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["user-preferences"],
     queryFn: async () => {
       const res = await fetch("/api/user-preferences");
-      if (!res.ok) throw new Error("Failed to fetch user preferences");
+      if (res.status === 401) {
+        return null;
+      }
+      if (!res.ok) throw new Error(`Failed to fetch user preferences: ${res.status}`);
       return res.json() as Promise<UserPreferencesType>;
     },
+    enabled: options?.enabled !== false,
+    retry: 1,
+    staleTime: 1000 * 60 * 5,
+    refetchOnMount: true,
   });
 }
 

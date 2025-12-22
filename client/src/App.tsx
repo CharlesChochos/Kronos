@@ -102,19 +102,23 @@ function WelcomeModalWrapper({ children }: { children: React.ReactNode }) {
   const { data: preferences, isLoading: prefsLoading, isSuccess } = useUserPreferences();
   const updatePreferences = useUpdateUserPreferences();
   const [showWelcome, setShowWelcome] = useState(false);
-  const [hasChecked, setHasChecked] = useState(false);
+  const [checkedUserId, setCheckedUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Only check when user is logged in, preferences loaded successfully, and haven't checked yet
-    if (user && !prefsLoading && isSuccess && !hasChecked) {
-      setHasChecked(true);
+    // Only check when:
+    // 1. User is logged in
+    // 2. Preferences query succeeded  
+    // 3. Preferences data exists (not null from 401)
+    // 4. Haven't checked this user yet
+    if (user && !prefsLoading && isSuccess && preferences && checkedUserId !== user.id) {
+      setCheckedUserId(user.id);
       // Show welcome modal if hasSeenWelcome is false, undefined, or null (new users)
       const hasNotSeenWelcome = !preferences?.hasSeenWelcome;
       if (hasNotSeenWelcome) {
         setShowWelcome(true);
       }
     }
-  }, [user, preferences, prefsLoading, hasChecked, isSuccess]);
+  }, [user, preferences, prefsLoading, checkedUserId, isSuccess]);
 
   const handleCloseWelcome = () => {
     setShowWelcome(false);
