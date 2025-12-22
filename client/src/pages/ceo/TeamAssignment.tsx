@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
@@ -24,7 +25,7 @@ import {
   Upload
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import { useCurrentUser, useUsers, useDealsListing, useTasks, useCreateTask, useCreateTaskAttachment, useUpdateDeal } from "@/lib/api";
+import { useCurrentUser, useUsers, useDealsListing, useTasks, useCreateTask, useCreateTaskAttachment, useUpdateDeal, useOnboardingStatus } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Deal, User } from "@shared/schema";
@@ -53,7 +54,16 @@ export default function TeamAssignment() {
   const createTask = useCreateTask();
   const createAttachment = useCreateTaskAttachment();
   const updateDeal = useUpdateDeal();
+  const { data: onboardingStatus = {} } = useOnboardingStatus();
   const [highlightedUserId, setHighlightedUserId] = useState<string | null>(null);
+  const [showOnboardingWarning, setShowOnboardingWarning] = useState(false);
+  const [pendingAssignment, setPendingAssignment] = useState<{ 
+    userId: string; 
+    userName: string; 
+    missingResume: boolean; 
+    missingPersonality: boolean; 
+    onConfirm?: () => void 
+  } | null>(null);
   const userRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const [taskDealId, setTaskDealId] = useState<string | null>(null);
 
@@ -263,6 +273,25 @@ export default function TeamAssignment() {
   };
 
   const openAssignModal = (user: User) => {
+    const userOnboarding = onboardingStatus[user.id];
+    const isOnboardingComplete = userOnboarding?.isComplete ?? false;
+    
+    if (!isOnboardingComplete) {
+      setPendingAssignment({
+        userId: user.id,
+        userName: user.name,
+        missingResume: !userOnboarding?.hasResume,
+        missingPersonality: !userOnboarding?.hasPersonality,
+        onConfirm: () => {
+          setSelectedUser(user);
+          setTaskDealId(selectedDeal);
+          setShowAssignModal(true);
+        }
+      });
+      setShowOnboardingWarning(true);
+      return;
+    }
+    
     setSelectedUser(user);
     setTaskDealId(selectedDeal);
     setShowAssignModal(true);
@@ -275,7 +304,7 @@ export default function TeamAssignment() {
     return podTeam.some(m => m.userId === userId);
   };
 
-  const handleAddToTeam = async (user: User) => {
+  const performAddToTeam = async (user: User) => {
     if (!selectedDeal) {
       toast.error("Please select a deal first");
       return;
@@ -304,6 +333,25 @@ export default function TeamAssignment() {
     } catch (error: any) {
       toast.error(error.message || "Failed to add team member");
     }
+  };
+
+  const handleAddToTeam = (user: User) => {
+    const userOnboarding = onboardingStatus[user.id];
+    const isOnboardingComplete = userOnboarding?.isComplete ?? false;
+    
+    if (!isOnboardingComplete) {
+      setPendingAssignment({
+        userId: user.id,
+        userName: user.name,
+        missingResume: !userOnboarding?.hasResume,
+        missingPersonality: !userOnboarding?.hasPersonality,
+        onConfirm: () => performAddToTeam(user)
+      });
+      setShowOnboardingWarning(true);
+      return;
+    }
+    
+    performAddToTeam(user);
   };
 
   const handleRemoveFromTeam = async (user: User) => {
@@ -735,6 +783,45 @@ export default function TeamAssignment() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={showOnboardingWarning} onOpenChange={setShowOnboardingWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Incomplete Onboarding</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                <strong>{pendingAssignment?.userName}</strong> has not completed their onboarding process:
+              </p>
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                {pendingAssignment?.missingResume && (
+                  <li>Resume Analysis not completed</li>
+                )}
+                {pendingAssignment?.missingPersonality && (
+                  <li>Personality Assessment not completed</li>
+                )}
+              </ul>
+              <p className="mt-3 text-muted-foreground">
+                This may affect optimal team formation and task assignments. You can still proceed, but for best results, have them complete onboarding first.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowOnboardingWarning(false);
+              setPendingAssignment(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              pendingAssignment?.onConfirm?.();
+              setShowOnboardingWarning(false);
+              setPendingAssignment(null);
+            }}>
+              Assign Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }

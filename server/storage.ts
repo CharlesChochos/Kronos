@@ -461,11 +461,11 @@ export class DatabaseStorage implements IStorage {
       await db.delete(schema.podMembers).where(eq(schema.podMembers.podId, podId));
     }
     
+    // Delete podMovementTasks FIRST (references dealMilestones via milestone_id FK)
+    await db.delete(schema.podMovementTasks).where(eq(schema.podMovementTasks.dealId, id));
+    
     // Delete dealMilestones (references dealPods and deals)
     await db.delete(schema.dealMilestones).where(eq(schema.dealMilestones.dealId, id));
-    
-    // Delete podMovementTasks (references dealPods and deals)
-    await db.delete(schema.podMovementTasks).where(eq(schema.podMovementTasks.dealId, id));
     
     // Delete dealContextUpdates (references deals)
     await db.delete(schema.dealContextUpdates).where(eq(schema.dealContextUpdates.dealId, id));
