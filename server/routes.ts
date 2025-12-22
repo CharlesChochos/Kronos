@@ -18,7 +18,7 @@ import * as crypto from "crypto";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
-import * as pdfParse from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 import { approveOpportunityToDeal, transitionDealStage, formPodForDeal } from "./aiPodFormation";
 
 // PostgreSQL session store
@@ -2515,8 +2515,10 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       
       if (isPdf) {
         try {
-          const pdfData = await pdfParse(file.buffer);
-          resumeText = pdfData.text;
+          const parser = new PDFParse({ data: file.buffer });
+          const pdfResult = await parser.getText();
+          resumeText = pdfResult.text || '';
+          await parser.destroy();
           console.log('[Resume] PDF parsed successfully, text length:', resumeText.length);
         } catch (pdfError: any) {
           console.error('[Resume] PDF parse error:', pdfError?.message || pdfError);
