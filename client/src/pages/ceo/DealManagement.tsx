@@ -375,7 +375,7 @@ type StageWorkSectionProps = {
   onAuditEntry?: (action: string, details: string) => Promise<void>;
   totalTeamCount?: number;
   onboardingStatus?: OnboardingStatus;
-  onShowOnboardingWarning?: (userName: string, missingResume: boolean, missingPersonality: boolean) => void;
+  onShowOnboardingWarning?: (userName: string, missingResume: boolean, missingPersonality: boolean, onConfirm?: () => void) => void;
 };
 
 function StageWorkSection({
@@ -919,7 +919,10 @@ function StageWorkSection({
                         key={user.id}
                         onClick={() => {
                           if (!isOnboardingComplete && onShowOnboardingWarning) {
-                            onShowOnboardingWarning(user.name, !userOnboarding?.hasResume, !userOnboarding?.hasPersonality);
+                            onShowOnboardingWarning(user.name, !userOnboarding?.hasResume, !userOnboarding?.hasPersonality, () => {
+                              setSelectedMember(user);
+                              setMemberRole(user.jobTitle || user.role || 'Team Member');
+                            });
                             setMemberSearch('');
                             return;
                           }
@@ -1516,7 +1519,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   
   // Onboarding warning dialog
   const [showOnboardingWarning, setShowOnboardingWarning] = useState(false);
-  const [pendingAssignment, setPendingAssignment] = useState<{ userId: string; userName: string; missingResume: boolean; missingPersonality: boolean } | null>(null);
+  const [pendingAssignment, setPendingAssignment] = useState<{ userId: string; userName: string; missingResume: boolean; missingPersonality: boolean; onConfirm?: () => void } | null>(null);
   
   const openTaskDetail = (task: any, deal: Deal) => {
     setSelectedCalendarTask({ ...task, deal });
@@ -3478,8 +3481,8 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     deleteTask={deleteTask}
                     totalTeamCount={uniqueTeamCount}
                     onboardingStatus={onboardingStatus}
-                    onShowOnboardingWarning={(userName, missingResume, missingPersonality) => {
-                      setPendingAssignment({ userId: '', userName, missingResume, missingPersonality });
+                    onShowOnboardingWarning={(userName, missingResume, missingPersonality, onConfirm) => {
+                      setPendingAssignment({ userId: '', userName, missingResume, missingPersonality, onConfirm });
                       setShowOnboardingWarning(true);
                     }}
                     onAuditEntry={async (action, details) => {
@@ -4356,7 +4359,10 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                                       userId: user.id,
                                       userName: user.name,
                                       missingResume: !userOnboarding?.hasResume,
-                                      missingPersonality: !userOnboarding?.hasPersonality
+                                      missingPersonality: !userOnboarding?.hasPersonality,
+                                      onConfirm: () => {
+                                        setNewDeal({ ...newDeal, lead: user.name });
+                                      }
                                     });
                                     setShowOnboardingWarning(true);
                                     setLeadOpen(false);
@@ -4692,7 +4698,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
               <p>
-                <strong>{pendingAssignment?.userName}</strong> has not completed the required onboarding steps and cannot be assigned to deals or tasks yet.
+                <strong>{pendingAssignment?.userName}</strong> has not completed the required onboarding steps.
               </p>
               <div className="bg-secondary/50 rounded-lg p-3 space-y-2">
                 <p className="text-sm font-medium">Missing steps:</p>
@@ -4712,16 +4718,25 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                 </ul>
               </div>
               <p className="text-sm">
-                Please have this team member complete their onboarding before assigning them to deals.
+                We recommend having this team member complete their onboarding for optimal team assignment. You can still proceed with the assignment if needed.
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => {
+            <AlertDialogCancel onClick={() => {
               setShowOnboardingWarning(false);
               setPendingAssignment(null);
             }}>
-              Understood
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (pendingAssignment?.onConfirm) {
+                pendingAssignment.onConfirm();
+              }
+              setShowOnboardingWarning(false);
+              setPendingAssignment(null);
+            }}>
+              Assign Anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
