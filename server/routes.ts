@@ -2501,28 +2501,44 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       const user = req.user as any;
       const file = req.file;
 
+      console.log('[Resume] Upload attempt - user:', user.id, 'file:', file ? { name: file.originalname, type: file.mimetype, size: file.size } : 'none');
+
       if (!file) {
-        return res.status(400).json({ error: "Resume file is required" });
+        console.log('[Resume] No file received in request');
+        return res.status(400).json({ error: "Resume file is required. Please select a file and try again." });
       }
 
       // Extract text from PDF
       let resumeText = '';
-      if (file.mimetype === 'application/pdf') {
+      const isPdf = file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf');
+      const isTxt = file.mimetype === 'text/plain' || file.originalname.toLowerCase().endsWith('.txt');
+      
+      if (isPdf) {
         try {
           const pdfData = await pdfParse(file.buffer);
           resumeText = pdfData.text;
-        } catch (pdfError) {
-          console.error('[Resume] PDF parse error:', pdfError);
-          return res.status(400).json({ error: "Failed to parse PDF. Please ensure it's a valid PDF file." });
+          console.log('[Resume] PDF parsed successfully, text length:', resumeText.length);
+        } catch (pdfError: any) {
+          console.error('[Resume] PDF parse error:', pdfError?.message || pdfError);
+          return res.status(400).json({ 
+            error: "Failed to parse PDF. Please ensure it's a valid, non-corrupted PDF file. If the PDF is scanned/image-based, try a text-based PDF instead." 
+          });
         }
-      } else if (file.mimetype === 'text/plain' || file.originalname.endsWith('.txt')) {
+      } else if (isTxt) {
         resumeText = file.buffer.toString('utf-8');
+        console.log('[Resume] TXT file read, text length:', resumeText.length);
       } else {
-        return res.status(400).json({ error: "Unsupported file format. Please upload a PDF or TXT file." });
+        console.log('[Resume] Unsupported format:', file.mimetype, file.originalname);
+        return res.status(400).json({ 
+          error: `Unsupported file format (${file.mimetype}). Please upload a PDF or TXT file. Word documents (.doc, .docx) are not currently supported.` 
+        });
       }
 
       if (!resumeText.trim()) {
-        return res.status(400).json({ error: "Could not extract text from resume. Please ensure the file contains readable text." });
+        console.log('[Resume] No text extracted from file');
+        return res.status(400).json({ 
+          error: "Could not extract text from your resume. This may happen with scanned/image-based PDFs. Please try uploading a text-based PDF or a TXT file." 
+        });
       }
 
       // Check if user already has an analysis
