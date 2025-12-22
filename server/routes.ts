@@ -712,6 +712,28 @@ export async function registerRoutes(
     }
   });
 
+  // Get all personality assessments (admin only) - for Team Profiles page
+  app.get("/api/admin/personality-assessments", requireCEO, async (req, res) => {
+    try {
+      const assessments = await storage.getAllPersonalityAssessments();
+      res.json(assessments);
+    } catch (error) {
+      console.error('Error fetching all personality assessments:', error);
+      res.status(500).json({ error: "Failed to fetch personality assessments" });
+    }
+  });
+
+  // Get all resume analyses (admin only) - for Team Profiles page
+  app.get("/api/admin/resume-analyses", requireCEO, async (req, res) => {
+    try {
+      const analyses = await storage.getAllResumeAnalyses();
+      res.json(analyses);
+    } catch (error) {
+      console.error('Error fetching all resume analyses:', error);
+      res.status(500).json({ error: "Failed to fetch resume analyses" });
+    }
+  });
+
   // ===== ADMIN ROUTES (CEO ONLY) =====
   
   // Get pending users (CEO only)
@@ -2199,6 +2221,22 @@ ${scoreSheet}`;
           completedAt: new Date(),
         });
       }
+
+      // Notify admin users (including Charles) that personality assessment is complete
+      try {
+        const allUsers = await storage.getAllUsers();
+        const adminUsers = allUsers.filter(u => u.accessLevel === 'admin' && u.status === 'active');
+        for (const admin of adminUsers) {
+          await storage.createNotification({
+            userId: admin.id,
+            title: 'Personality Assessment Completed',
+            message: `${user.name} has completed their personality profile assessment`,
+            type: 'info',
+          });
+        }
+      } catch (notifError) {
+        console.error('Error sending onboarding notification:', notifError);
+      }
     } catch (error) {
       console.error('Error submitting personality assessment:', error);
       res.status(500).json({ error: "Failed to submit personality assessment" });
@@ -2522,6 +2560,22 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
           status: 'completed',
           completedAt: new Date(),
         });
+
+        // Notify admin users (including Charles) that resume onboarding is complete
+        try {
+          const allUsers = await storage.getAllUsers();
+          const adminUsers = allUsers.filter(u => u.accessLevel === 'admin' && u.status === 'active');
+          for (const admin of adminUsers) {
+            await storage.createNotification({
+              userId: admin.id,
+              title: 'Resume Onboarding Completed',
+              message: `${user.name} has completed their resume onboarding`,
+              type: 'info',
+            });
+          }
+        } catch (notifError) {
+          console.error('Error sending resume onboarding notification:', notifError);
+        }
       } else if (analysis) {
         await storage.updateResumeAnalysis(analysis.id, {
           status: 'failed',

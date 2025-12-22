@@ -26,6 +26,7 @@ const InvestorMatching = lazy(() => import("@/pages/ceo/InvestorMatching"));
 const EmployeeInvestorMatching = lazy(() => import("@/pages/employee/InvestorMatching"));
 const TeamAssignment = lazy(() => import("@/pages/ceo/TeamAssignment"));
 const TeamPerformance = lazy(() => import("@/pages/ceo/TeamPerformance"));
+const TeamProfiles = lazy(() => import("@/pages/ceo/TeamProfiles"));
 const InvestorCRM = lazy(() => import("@/pages/ceo/InvestorCRM"));
 const ClientPortal = lazy(() => import("@/pages/shared/ClientPortal"));
 const MentorshipPairing = lazy(() => import("@/pages/shared/MentorshipPairing"));
@@ -199,6 +200,9 @@ function Router() {
         </Route>
         <Route path="/ceo/team-performance">
           {() => <ProtectedRoute component={TeamPerformance} />}
+        </Route>
+        <Route path="/ceo/team-profiles">
+          {() => <ProtectedRoute component={TeamProfiles} />}
         </Route>
         <Route path="/ceo/investor-crm">
           {() => <ProtectedRoute component={InvestorCRM} />}
