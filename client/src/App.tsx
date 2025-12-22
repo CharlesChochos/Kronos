@@ -3,11 +3,12 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useCurrentUser, onSessionExpired } from "@/lib/api";
+import { useCurrentUser, onSessionExpired, useUserPreferences, useUpdateUserPreferences } from "@/lib/api";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { useEffect, lazy, Suspense, useCallback, useRef } from "react";
+import { useEffect, lazy, Suspense, useCallback, useRef, useState } from "react";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { toast } from "sonner";
+import { WelcomeModal } from "@/components/WelcomeModal";
 
 // Loading component for lazy-loaded routes
 const PageLoader = () => (
@@ -94,6 +95,48 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   }
 
   return <Component />;
+}
+
+function WelcomeModalWrapper({ children }: { children: React.ReactNode }) {
+  const { data: user } = useCurrentUser();
+  const { data: preferences, isLoading: prefsLoading, isSuccess } = useUserPreferences();
+  const updatePreferences = useUpdateUserPreferences();
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [hasChecked, setHasChecked] = useState(false);
+
+  useEffect(() => {
+    // Only check when user is logged in, preferences loaded successfully, and haven't checked yet
+    if (user && !prefsLoading && isSuccess && !hasChecked) {
+      setHasChecked(true);
+      // Show welcome modal if hasSeenWelcome is false, undefined, or null (new users)
+      const hasNotSeenWelcome = !preferences?.hasSeenWelcome;
+      if (hasNotSeenWelcome) {
+        setShowWelcome(true);
+      }
+    }
+  }, [user, preferences, prefsLoading, hasChecked, isSuccess]);
+
+  const handleCloseWelcome = () => {
+    setShowWelcome(false);
+    updatePreferences.mutate({ hasSeenWelcome: true }, {
+      onError: (error) => {
+        console.error('Failed to save welcome preference:', error);
+      }
+    });
+  };
+
+  return (
+    <>
+      {children}
+      {user && (
+        <WelcomeModal 
+          isOpen={showWelcome} 
+          onClose={handleCloseWelcome}
+          userName={user.name?.split(' ')[0]}
+        />
+      )}
+    </>
+  );
 }
 
 function PortalProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -338,7 +381,9 @@ function App() {
         <DashboardProvider>
           <TooltipProvider>
             <Toaster />
-            <Router />
+            <WelcomeModalWrapper>
+              <Router />
+            </WelcomeModalWrapper>
           </TooltipProvider>
         </DashboardProvider>
       </QueryClientProvider>

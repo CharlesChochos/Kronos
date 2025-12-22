@@ -1942,6 +1942,7 @@ export type UserPreferencesType = {
   complianceDefaults: { sec: boolean; finra: boolean; legal: boolean };
   marketSymbols: string[];
   settings?: Record<string, any>; // General settings (notifications, display, account preferences)
+  hasSeenWelcome?: boolean;
   updatedAt?: string;
 };
 

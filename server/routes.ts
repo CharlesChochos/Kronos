@@ -8562,6 +8562,7 @@ Only include entries with both name AND company. Extract ALL rows.`
         theme: 'system',
         complianceDefaults: { sec: false, finra: false, legal: true },
         marketSymbols: ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'SPY'],
+        hasSeenWelcome: false,
       });
     } catch (error) {
       console.error('Get user preferences error:', error);
