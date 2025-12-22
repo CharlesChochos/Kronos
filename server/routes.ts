@@ -665,27 +665,9 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to fetch users" });
     }
   });
-
-  app.get("/api/users/:id", requireAuth, requireInternal, async (req, res) => {
-    try {
-      const currentUser = req.user as any;
-      const user = await storage.getUser(req.params.id);
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-      
-      // Admin can see anyone, others can only see themselves
-      if (currentUser.accessLevel !== 'admin' && currentUser.id !== req.params.id) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-      
-      res.json(sanitizeUser(user));
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch user" });
-    }
-  });
   
   // Get onboarding status for all users (for checking assignment eligibility)
+  // IMPORTANT: This must be defined BEFORE /api/users/:id to avoid route conflict
   app.get("/api/users/onboarding-status", requireAuth, requireInternal, async (req, res) => {
     try {
       const users = await storage.getAllUsers();
@@ -709,6 +691,25 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Error fetching onboarding status:', error);
       res.status(500).json({ error: "Failed to fetch onboarding status" });
+    }
+  });
+
+  app.get("/api/users/:id", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Admin can see anyone, others can only see themselves
+      if (currentUser.accessLevel !== 'admin' && currentUser.id !== req.params.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      res.json(sanitizeUser(user));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user" });
     }
   });
 
