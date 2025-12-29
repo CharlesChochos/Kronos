@@ -232,29 +232,30 @@ Consider personality tag compatibility for team chemistry.
     if (existingPodLeadId) {
       const existingLeadUser = userRoster.find(u => u.userId === existingPodLeadId);
       if (!existingLeadUser) {
-        console.error(`[AI Pod Formation] CRITICAL: Existing pod lead ${existingPodLeadId} not found in active user roster. Cannot persist lead.`);
-        throw new Error(`Pod lead ${existingPodLeadId} not found in active roster. The lead may be inactive or removed.`);
-      }
-      
-      const leadInAIResponse = aiResponse.podMembers.find(m => m.userId === existingPodLeadId);
-      if (!leadInAIResponse) {
-        console.log(`[AI Pod Formation] Enforcing Pod Lead persistence - AI did not include existing lead ${existingPodLeadId}`);
-        const evictedLead = aiResponse.podMembers.find(m => m.position === 1);
-        if (evictedLead) {
-          aiResponse.podMembers = aiResponse.podMembers.filter(m => m.position !== 1);
+        console.warn(`[AI Pod Formation] Existing pod lead ${existingPodLeadId} not found in active user roster. Falling back to AI-selected lead.`);
+        // Fall back to AI-selected lead instead of throwing
+        finalLeadUserId = aiLeadMember?.userId || null;
+      } else {
+        const leadInAIResponse = aiResponse.podMembers.find(m => m.userId === existingPodLeadId);
+        if (!leadInAIResponse) {
+          console.log(`[AI Pod Formation] Enforcing Pod Lead persistence - AI did not include existing lead ${existingPodLeadId}`);
+          const evictedLead = aiResponse.podMembers.find(m => m.position === 1);
+          if (evictedLead) {
+            aiResponse.podMembers = aiResponse.podMembers.filter(m => m.position !== 1);
+          }
+          aiResponse.podMembers.unshift({
+            position: 1,
+            role: 'Pod Lead',
+            userId: existingPodLeadId,
+            userName: existingLeadUser.userName,
+            dealTeamStatus: existingLeadUser.dealTeamStatus,
+            requiredTags: ['Grandmaster', 'Closer', 'Politician', 'Architect'],
+            matchedTags: existingLeadUser.personalityTags.filter(t => 
+              ['Grandmaster', 'Closer', 'Politician', 'Architect'].includes(t)
+            ),
+            rationale: 'Pod Lead persisted from previous stage (Pod Lead does not move rule)'
+          });
         }
-        aiResponse.podMembers.unshift({
-          position: 1,
-          role: 'Pod Lead',
-          userId: existingPodLeadId,
-          userName: existingLeadUser.userName,
-          dealTeamStatus: existingLeadUser.dealTeamStatus,
-          requiredTags: ['Grandmaster', 'Closer', 'Politician', 'Architect'],
-          matchedTags: existingLeadUser.personalityTags.filter(t => 
-            ['Grandmaster', 'Closer', 'Politician', 'Architect'].includes(t)
-          ),
-          rationale: 'Pod Lead persisted from previous stage (Pod Lead does not move rule)'
-        });
       }
     }
     

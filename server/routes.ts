@@ -3030,32 +3030,47 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
         // When stage changes, form new pod team and generate AI tasks for the new stage
         if (changes.stage && updatedDeal) {
           const newStage = changes.stage.to;
-          console.log(`[Stage Transition] Deal ${deal.name} moved from ${changes.stage.from} to ${newStage}, forming new pod team...`);
+          const oldStage = changes.stage.from;
+          console.log(`[Stage Transition] Deal ${deal.name} moved from ${oldStage} to ${newStage}, forming new pod team...`);
           
           // Form pod team for the new stage (async, don't block response)
           (async () => {
             try {
-              // Get existing lead from the deal
-              const existingLeadId = updatedDeal.lead || undefined;
+              // Get existing lead userId from the previous stage's pod members (not deal.lead which is a name)
+              let existingLeadId: string | undefined = undefined;
+              try {
+                const previousPodMembers = await storage.getStagePodMembers(deal.id, oldStage);
+                const leadMember = previousPodMembers.find(m => m.role === 'Pod Lead' || m.role === 'Deal Lead');
+                if (leadMember?.userId) {
+                  existingLeadId = leadMember.userId;
+                  console.log(`[Stage Transition] Found existing lead userId: ${existingLeadId}`);
+                }
+              } catch (err) {
+                console.log(`[Stage Transition] Could not get previous stage pod members, will let AI select lead`);
+              }
               
               // Form pod for the new stage
               const podResult = await formPodForDeal(updatedDeal, newStage, existingLeadId);
               
-              if (podResult.assignments && podResult.assignments.length > 0) {
-                console.log(`[Stage Transition] Created ${podResult.assignments.length} pod assignments for ${newStage}`);
+              if (podResult.success) {
+                console.log(`[Stage Transition] Pod formed successfully with podId: ${podResult.podId}`);
+                
+                // Get the newly created stage pod members and generate AI tasks for each
+                const newPodMembers = await storage.getStagePodMembers(deal.id, newStage);
+                console.log(`[Stage Transition] Found ${newPodMembers.length} pod members for ${newStage}`);
                 
                 // Generate AI tasks for each new pod member
-                for (const assignment of podResult.assignments) {
-                  if (assignment.userId) {
-                    const assignedUser = await storage.getUser(assignment.userId);
+                for (const member of newPodMembers) {
+                  if (member.userId) {
+                    const assignedUser = await storage.getUser(member.userId);
                     if (assignedUser) {
                       try {
                         await generateAiTasksForAssignment({
                           dealId: deal.id,
                           stage: newStage,
-                          assigneeId: assignment.userId,
+                          assigneeId: member.userId,
                           assigneeName: assignedUser.name,
-                          assigneeRole: assignment.role || 'Team Member'
+                          assigneeRole: member.role || 'Team Member'
                         });
                         console.log(`[Stage Transition] Generated AI tasks for ${assignedUser.name} on ${newStage}`);
                       } catch (taskErr) {
@@ -3064,6 +3079,8 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
                     }
                   }
                 }
+              } else {
+                console.error(`[Stage Transition] Pod formation failed: ${podResult.error}`);
               }
             } catch (podErr) {
               console.error('[Stage Transition] Error forming pod for new stage:', podErr);
