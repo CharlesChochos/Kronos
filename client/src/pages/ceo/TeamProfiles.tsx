@@ -29,20 +29,48 @@ import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
+type DeploymentTags = {
+  dealTeamStatus: string;
+  primaryVertical: string;
+  secondaryVertical: string;
+  primaryDealPhase: string;
+  secondaryDealPhase: string;
+  topFiveArchetypes: string[];
+  riskFlag: string | null;
+};
+
 type PersonalityAssessment = {
   id: string;
   userId: string;
   status: string;
   completedAt?: string;
+  allScores?: { profile: string; score: number }[];
   topThreeProfiles?: { profile: string; score: number }[];
   aiAnalysis?: {
     employeeSnapshot: string;
+    scoreDistribution: string;
     primaryArchetype: string;
     secondaryTraits: string;
+    supportingTraits: string;
+    lowSignalTags: string;
+    absentTraits: string;
     dealPhaseFit: string;
     dealTypeProficiency: string;
     managerialNotes: string;
+    deploymentTags: DeploymentTags;
+    rawResponse: string;
   } | null;
+};
+
+type OnboardingPlacement = {
+  assignedDealTeam: string;
+  primaryVertical: string;
+  secondaryVertical: string;
+  primaryDealPhase: string;
+  secondaryDealPhase: string;
+  initialSeatRecommendation: string;
+  topFiveInferredTags: string[];
+  coverageGaps?: string;
 };
 
 type ResumeAnalysis = {
@@ -56,18 +84,13 @@ type ResumeAnalysis = {
     candidateSnapshot: string;
     evidenceAnchors: string;
     transactionProfile: string;
+    roleElevationAutonomy: string;
     dealPhaseFit: string;
     dealTypeProficiency: string;
+    resumeInferredTags: string;
     managerialNotes: string;
-    onboardingPlacement?: {
-      assignedDealTeam: string;
-      primaryVertical: string;
-      secondaryVertical: string;
-      primaryDealPhase: string;
-      secondaryDealPhase: string;
-      initialSeatRecommendation: string;
-      topFiveInferredTags: string[];
-    };
+    onboardingPlacement: OnboardingPlacement;
+    rawResponse: string;
   } | null;
 };
 
@@ -315,7 +338,7 @@ export default function TeamProfiles() {
         </Card>
 
         <Dialog open={!!selectedUserId} onOpenChange={(open) => !open && setSelectedUserId(null)}>
-          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3">
                 <Avatar className="h-10 w-10">
@@ -329,87 +352,172 @@ export default function TeamProfiles() {
                 </div>
               </DialogTitle>
               <DialogDescription>
-                Onboarding profile and assessment results
+                Complete onboarding profile and assessment results
               </DialogDescription>
             </DialogHeader>
 
-            <Tabs defaultValue="personality" className="mt-4">
+            <Tabs defaultValue="resume" className="mt-4">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="personality" className="flex items-center gap-2">
-                  <Brain className="w-4 h-4" />
-                  Personality Profile
-                </TabsTrigger>
-                <TabsTrigger value="resume" className="flex items-center gap-2">
+                <TabsTrigger value="resume" className="flex items-center gap-2" data-testid="tab-resume-analysis">
                   <FileText className="w-4 h-4" />
                   Resume Analysis
                 </TabsTrigger>
+                <TabsTrigger value="personality" className="flex items-center gap-2" data-testid="tab-personality-profile">
+                  <Brain className="w-4 h-4" />
+                  Personality Profile
+                </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="personality" className="mt-4 space-y-4">
-                {!selectedPersonality || selectedPersonality.status !== 'completed' ? (
+              <TabsContent value="resume" className="mt-4">
+                {!selectedResume || selectedResume.status !== 'completed' ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <Brain className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>Personality assessment not completed yet</p>
+                    <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>Resume analysis not completed yet</p>
                   </div>
                 ) : (
-                  <>
-                    {selectedPersonality.topThreeProfiles && (
-                      <Card>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-base flex items-center gap-2">
-                            <Star className="w-4 h-4 text-amber-500" />
-                            Top Personality Profiles
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="flex gap-2 flex-wrap">
-                            {selectedPersonality.topThreeProfiles.map((p, i) => (
-                              <Badge 
-                                key={p.profile} 
-                                variant={i === 0 ? "default" : "secondary"}
-                                className={i === 0 ? "bg-primary" : ""}
-                              >
-                                {i + 1}. {p.profile} ({p.score})
-                              </Badge>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
+                  <Tabs defaultValue="candidate" className="w-full">
+                    <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
+                      <TabsTrigger value="candidate" className="text-xs" data-testid="subtab-candidate-profile">Candidate Profile</TabsTrigger>
+                      <TabsTrigger value="experience" className="text-xs" data-testid="subtab-experience">Experience</TabsTrigger>
+                      <TabsTrigger value="deployment" className="text-xs" data-testid="subtab-deployment-fit">Deployment Fit</TabsTrigger>
+                      <TabsTrigger value="management" className="text-xs" data-testid="subtab-management-notes">Management Notes</TabsTrigger>
+                    </TabsList>
 
-                    {selectedPersonality.aiAnalysis && (
-                      <>
+                    <TabsContent value="candidate" className="mt-4 space-y-4">
+                      {selectedResume.aiAnalysis?.onboardingPlacement && (
                         <Card>
                           <CardHeader className="pb-3">
-                            <CardTitle className="text-base">Employee Snapshot</CardTitle>
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <Target className="w-4 h-4 text-green-500" />
+                              Onboarding Placement
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                              <div className="p-3 bg-secondary/30 rounded-lg">
+                                <div className="text-xs text-muted-foreground">Deal Team</div>
+                                <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.assignedDealTeam}</div>
+                              </div>
+                              <div className="p-3 bg-secondary/30 rounded-lg">
+                                <div className="text-xs text-muted-foreground">Primary Vertical</div>
+                                <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.primaryVertical}</div>
+                              </div>
+                              <div className="p-3 bg-secondary/30 rounded-lg">
+                                <div className="text-xs text-muted-foreground">Primary Deal Phase</div>
+                                <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.primaryDealPhase}</div>
+                              </div>
+                              <div className="p-3 bg-secondary/30 rounded-lg">
+                                <div className="text-xs text-muted-foreground">Secondary Vertical</div>
+                                <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.secondaryVertical}</div>
+                              </div>
+                              <div className="p-3 bg-secondary/30 rounded-lg">
+                                <div className="text-xs text-muted-foreground">Secondary Deal Phase</div>
+                                <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.secondaryDealPhase}</div>
+                              </div>
+                              <div className="p-3 bg-secondary/30 rounded-lg">
+                                <div className="text-xs text-muted-foreground">Initial Seat</div>
+                                <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.initialSeatRecommendation}</div>
+                              </div>
+                            </div>
+                            {selectedResume.aiAnalysis.onboardingPlacement.topFiveInferredTags?.length > 0 && (
+                              <div className="mt-3">
+                                <div className="text-xs text-muted-foreground mb-2">Inferred Tags</div>
+                                <div className="flex flex-wrap gap-1">
+                                  {selectedResume.aiAnalysis.onboardingPlacement.topFiveInferredTags.map((tag, i) => (
+                                    <Badge key={i} variant="outline">{tag}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {selectedResume.aiAnalysis.onboardingPlacement.coverageGaps && (
+                              <div className="mt-3">
+                                <div className="text-xs text-muted-foreground mb-1">Coverage Gaps</div>
+                                <p className="text-sm">{selectedResume.aiAnalysis.onboardingPlacement.coverageGaps}</p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {selectedResume.aiAnalysis && (
+                        <Card>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <User className="w-4 h-4" />
+                              Candidate Snapshot
+                            </CardTitle>
                           </CardHeader>
                           <CardContent>
                             <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                              {selectedPersonality.aiAnalysis.employeeSnapshot}
+                              {selectedResume.aiAnalysis.candidateSnapshot}
                             </p>
                           </CardContent>
                         </Card>
+                      )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>File: {selectedResume.fileName}</span>
+                        {selectedResume.completedAt && (
+                          <span>Completed on {format(new Date(selectedResume.completedAt), 'MMM d, yyyy \'at\' h:mm a')}</span>
+                        )}
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="experience" className="mt-4 space-y-4">
+                      {selectedResume.aiAnalysis && (
+                        <>
                           <Card>
                             <CardHeader className="pb-3">
-                              <CardTitle className="text-base">Primary Archetype</CardTitle>
+                              <CardTitle className="text-base">Transaction Profile</CardTitle>
                             </CardHeader>
                             <CardContent>
-                              <p className="text-sm">{selectedPersonality.aiAnalysis.primaryArchetype}</p>
+                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                {selectedResume.aiAnalysis.transactionProfile}
+                              </p>
                             </CardContent>
                           </Card>
+
                           <Card>
                             <CardHeader className="pb-3">
-                              <CardTitle className="text-base">Secondary Traits</CardTitle>
+                              <CardTitle className="text-base">Evidence Anchors</CardTitle>
                             </CardHeader>
                             <CardContent>
-                              <p className="text-sm">{selectedPersonality.aiAnalysis.secondaryTraits}</p>
+                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                {selectedResume.aiAnalysis.evidenceAnchors}
+                              </p>
                             </CardContent>
                           </Card>
-                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <Card>
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-base">Role Elevation & Autonomy</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                {selectedResume.aiAnalysis.roleElevationAutonomy}
+                              </p>
+                            </CardContent>
+                          </Card>
+
+                          {selectedResume.aiAnalysis.resumeInferredTags && (
+                            <Card>
+                              <CardHeader className="pb-3">
+                                <CardTitle className="text-base">Resume Inferred Tags</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                  {selectedResume.aiAnalysis.resumeInferredTags}
+                                </p>
+                              </CardContent>
+                            </Card>
+                          )}
+                        </>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="deployment" className="mt-4 space-y-4">
+                      {selectedResume.aiAnalysis && (
+                        <>
                           <Card>
                             <CardHeader className="pb-3">
                               <CardTitle className="text-base flex items-center gap-2">
@@ -418,9 +526,12 @@ export default function TeamProfiles() {
                               </CardTitle>
                             </CardHeader>
                             <CardContent>
-                              <p className="text-sm text-muted-foreground">{selectedPersonality.aiAnalysis.dealPhaseFit}</p>
+                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                {selectedResume.aiAnalysis.dealPhaseFit}
+                              </p>
                             </CardContent>
                           </Card>
+
                           <Card>
                             <CardHeader className="pb-3">
                               <CardTitle className="text-base flex items-center gap-2">
@@ -429,152 +540,296 @@ export default function TeamProfiles() {
                               </CardTitle>
                             </CardHeader>
                             <CardContent>
-                              <p className="text-sm text-muted-foreground">{selectedPersonality.aiAnalysis.dealTypeProficiency}</p>
-                            </CardContent>
-                          </Card>
-                        </div>
-
-                        {selectedPersonality.aiAnalysis.managerialNotes && (
-                          <Card>
-                            <CardHeader className="pb-3">
-                              <CardTitle className="text-base flex items-center gap-2">
-                                <AlertTriangle className="w-4 h-4 text-amber-500" />
-                                Managerial Notes
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent>
                               <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                {selectedPersonality.aiAnalysis.managerialNotes}
+                                {selectedResume.aiAnalysis.dealTypeProficiency}
                               </p>
                             </CardContent>
                           </Card>
-                        )}
-                      </>
-                    )}
+                        </>
+                      )}
+                    </TabsContent>
 
-                    {selectedPersonality.completedAt && (
-                      <p className="text-xs text-muted-foreground text-center">
-                        Completed on {format(new Date(selectedPersonality.completedAt), 'MMM d, yyyy \'at\' h:mm a')}
-                      </p>
-                    )}
-                  </>
-                )}
-              </TabsContent>
-
-              <TabsContent value="resume" className="mt-4 space-y-4">
-                {!selectedResume || selectedResume.status !== 'completed' ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>Resume analysis not completed yet</p>
-                  </div>
-                ) : (
-                  <>
-                    {selectedResume.aiAnalysis?.onboardingPlacement && (
-                      <Card>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-base flex items-center gap-2">
-                            <Target className="w-4 h-4 text-green-500" />
-                            Onboarding Placement
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            <div className="p-3 bg-secondary/30 rounded-lg">
-                              <div className="text-xs text-muted-foreground">Deal Team</div>
-                              <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.assignedDealTeam}</div>
-                            </div>
-                            <div className="p-3 bg-secondary/30 rounded-lg">
-                              <div className="text-xs text-muted-foreground">Primary Vertical</div>
-                              <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.primaryVertical}</div>
-                            </div>
-                            <div className="p-3 bg-secondary/30 rounded-lg">
-                              <div className="text-xs text-muted-foreground">Primary Deal Phase</div>
-                              <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.primaryDealPhase}</div>
-                            </div>
-                            <div className="p-3 bg-secondary/30 rounded-lg">
-                              <div className="text-xs text-muted-foreground">Secondary Vertical</div>
-                              <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.secondaryVertical}</div>
-                            </div>
-                            <div className="p-3 bg-secondary/30 rounded-lg">
-                              <div className="text-xs text-muted-foreground">Secondary Deal Phase</div>
-                              <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.secondaryDealPhase}</div>
-                            </div>
-                            <div className="p-3 bg-secondary/30 rounded-lg">
-                              <div className="text-xs text-muted-foreground">Initial Seat</div>
-                              <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.initialSeatRecommendation}</div>
-                            </div>
-                          </div>
-                          {selectedResume.aiAnalysis.onboardingPlacement.topFiveInferredTags?.length > 0 && (
-                            <div className="mt-3">
-                              <div className="text-xs text-muted-foreground mb-2">Inferred Tags</div>
-                              <div className="flex flex-wrap gap-1">
-                                {selectedResume.aiAnalysis.onboardingPlacement.topFiveInferredTags.map((tag, i) => (
-                                  <Badge key={i} variant="outline">{tag}</Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {selectedResume.aiAnalysis && (
-                      <>
+                    <TabsContent value="management" className="mt-4 space-y-4">
+                      {selectedResume.aiAnalysis?.managerialNotes && (
                         <Card>
                           <CardHeader className="pb-3">
-                            <CardTitle className="text-base">Candidate Snapshot</CardTitle>
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <AlertTriangle className="w-4 h-4 text-amber-500" />
+                              Managerial Notes
+                            </CardTitle>
                           </CardHeader>
                           <CardContent>
                             <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                              {selectedResume.aiAnalysis.candidateSnapshot}
+                              {selectedResume.aiAnalysis.managerialNotes}
                             </p>
                           </CardContent>
                         </Card>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                )}
+              </TabsContent>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <TabsContent value="personality" className="mt-4">
+                {!selectedPersonality || selectedPersonality.status !== 'completed' ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Brain className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>Personality assessment not completed yet</p>
+                  </div>
+                ) : (
+                  <Tabs defaultValue="profile" className="w-full">
+                    <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
+                      <TabsTrigger value="profile" className="text-xs" data-testid="subtab-profile-analysis">Profile Analysis</TabsTrigger>
+                      <TabsTrigger value="scores" className="text-xs" data-testid="subtab-raw-scores">Raw Scores</TabsTrigger>
+                      <TabsTrigger value="deployment" className="text-xs" data-testid="subtab-personality-deployment">Deployment Fit</TabsTrigger>
+                      <TabsTrigger value="management" className="text-xs" data-testid="subtab-personality-management">Management Notes</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="profile" className="mt-4 space-y-4">
+                      {selectedPersonality.aiAnalysis && (
+                        <>
                           <Card>
                             <CardHeader className="pb-3">
-                              <CardTitle className="text-base">Transaction Profile</CardTitle>
+                              <CardTitle className="text-base">Employee Snapshot</CardTitle>
                             </CardHeader>
                             <CardContent>
-                              <p className="text-sm text-muted-foreground">{selectedResume.aiAnalysis.transactionProfile}</p>
+                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                {selectedPersonality.aiAnalysis.employeeSnapshot}
+                              </p>
                             </CardContent>
                           </Card>
-                          <Card>
-                            <CardHeader className="pb-3">
-                              <CardTitle className="text-base">Evidence Anchors</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <p className="text-sm text-muted-foreground">{selectedResume.aiAnalysis.evidenceAnchors}</p>
-                            </CardContent>
-                          </Card>
-                        </div>
 
-                        {selectedResume.aiAnalysis.managerialNotes && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Card>
+                              <CardHeader className="pb-3">
+                                <CardTitle className="text-base">Primary Archetype</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                <p className="text-sm whitespace-pre-wrap">{selectedPersonality.aiAnalysis.primaryArchetype}</p>
+                              </CardContent>
+                            </Card>
+                            <Card>
+                              <CardHeader className="pb-3">
+                                <CardTitle className="text-base">Secondary Traits</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                <p className="text-sm whitespace-pre-wrap">{selectedPersonality.aiAnalysis.secondaryTraits}</p>
+                              </CardContent>
+                            </Card>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Card>
+                              <CardHeader className="pb-3">
+                                <CardTitle className="text-base">Supporting Traits</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedPersonality.aiAnalysis.supportingTraits}</p>
+                              </CardContent>
+                            </Card>
+                            <Card>
+                              <CardHeader className="pb-3">
+                                <CardTitle className="text-base">Low Signal Tags</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedPersonality.aiAnalysis.lowSignalTags}</p>
+                              </CardContent>
+                            </Card>
+                          </div>
+
+                          {selectedPersonality.aiAnalysis.absentTraits && (
+                            <Card>
+                              <CardHeader className="pb-3">
+                                <CardTitle className="text-base">Absent Traits</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                  {selectedPersonality.aiAnalysis.absentTraits}
+                                </p>
+                              </CardContent>
+                            </Card>
+                          )}
+
+                          {selectedPersonality.aiAnalysis.deploymentTags && (
+                            <Card>
+                              <CardHeader className="pb-3">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                  <Target className="w-4 h-4 text-green-500" />
+                                  Final Deployment Tags
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                  <div className="p-3 bg-secondary/30 rounded-lg">
+                                    <div className="text-xs text-muted-foreground">Deal Team Status</div>
+                                    <div className="font-medium">{selectedPersonality.aiAnalysis.deploymentTags.dealTeamStatus}</div>
+                                  </div>
+                                  <div className="p-3 bg-secondary/30 rounded-lg">
+                                    <div className="text-xs text-muted-foreground">Primary Vertical</div>
+                                    <div className="font-medium">{selectedPersonality.aiAnalysis.deploymentTags.primaryVertical}</div>
+                                  </div>
+                                  <div className="p-3 bg-secondary/30 rounded-lg">
+                                    <div className="text-xs text-muted-foreground">Primary Deal Phase</div>
+                                    <div className="font-medium">{selectedPersonality.aiAnalysis.deploymentTags.primaryDealPhase}</div>
+                                  </div>
+                                  <div className="p-3 bg-secondary/30 rounded-lg">
+                                    <div className="text-xs text-muted-foreground">Secondary Vertical</div>
+                                    <div className="font-medium">{selectedPersonality.aiAnalysis.deploymentTags.secondaryVertical}</div>
+                                  </div>
+                                  <div className="p-3 bg-secondary/30 rounded-lg">
+                                    <div className="text-xs text-muted-foreground">Secondary Deal Phase</div>
+                                    <div className="font-medium">{selectedPersonality.aiAnalysis.deploymentTags.secondaryDealPhase}</div>
+                                  </div>
+                                  {selectedPersonality.aiAnalysis.deploymentTags.riskFlag && (
+                                    <div className="p-3 bg-amber-500/20 rounded-lg">
+                                      <div className="text-xs text-muted-foreground">Risk Flag</div>
+                                      <div className="font-medium text-amber-600">{selectedPersonality.aiAnalysis.deploymentTags.riskFlag}</div>
+                                    </div>
+                                  )}
+                                </div>
+                                {selectedPersonality.aiAnalysis.deploymentTags.topFiveArchetypes?.length > 0 && (
+                                  <div className="mt-3">
+                                    <div className="text-xs text-muted-foreground mb-2">Top 5 Archetype Tags</div>
+                                    <div className="flex flex-wrap gap-1">
+                                      {selectedPersonality.aiAnalysis.deploymentTags.topFiveArchetypes.map((tag, i) => (
+                                        <Badge key={i} variant={i === 0 ? "default" : "outline"}>{tag}</Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          )}
+                        </>
+                      )}
+
+                      {selectedPersonality.completedAt && (
+                        <p className="text-xs text-muted-foreground text-center">
+                          Completed on {format(new Date(selectedPersonality.completedAt), 'MMM d, yyyy \'at\' h:mm a')}
+                        </p>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="scores" className="mt-4 space-y-4">
+                      {selectedPersonality.topThreeProfiles && (
+                        <Card>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <Star className="w-4 h-4 text-amber-500" />
+                              Top 3 Personality Profiles
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex gap-2 flex-wrap">
+                              {selectedPersonality.topThreeProfiles.map((p, i) => (
+                                <Badge 
+                                  key={p.profile} 
+                                  variant={i === 0 ? "default" : "secondary"}
+                                  className={i === 0 ? "bg-primary" : ""}
+                                >
+                                  {i + 1}. {p.profile} ({p.score})
+                                </Badge>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {selectedPersonality.allScores && selectedPersonality.allScores.length > 0 && (
+                        <Card>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base">All Profile Scores</CardTitle>
+                            <CardDescription>Complete score distribution across all personality profiles</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2">
+                              {selectedPersonality.allScores
+                                .sort((a, b) => b.score - a.score)
+                                .map((s) => (
+                                  <div key={s.profile} className="flex items-center justify-between">
+                                    <span className="text-sm">{s.profile}</span>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-32 h-2 bg-secondary rounded-full overflow-hidden">
+                                        <div 
+                                          className="h-full bg-primary rounded-full" 
+                                          style={{ width: `${Math.min(s.score * 10, 100)}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-sm font-medium w-8 text-right">{s.score}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {selectedPersonality.aiAnalysis?.scoreDistribution && (
+                        <Card>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base">Score Distribution Analysis</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                              {selectedPersonality.aiAnalysis.scoreDistribution}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="deployment" className="mt-4 space-y-4">
+                      {selectedPersonality.aiAnalysis && (
+                        <>
                           <Card>
                             <CardHeader className="pb-3">
                               <CardTitle className="text-base flex items-center gap-2">
-                                <AlertTriangle className="w-4 h-4 text-amber-500" />
-                                Managerial Notes
+                                <Target className="w-4 h-4" />
+                                Deal Phase Fit
                               </CardTitle>
                             </CardHeader>
                             <CardContent>
                               <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                {selectedResume.aiAnalysis.managerialNotes}
+                                {selectedPersonality.aiAnalysis.dealPhaseFit}
                               </p>
                             </CardContent>
                           </Card>
-                        )}
-                      </>
-                    )}
 
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>File: {selectedResume.fileName}</span>
-                      {selectedResume.completedAt && (
-                        <span>Completed on {format(new Date(selectedResume.completedAt), 'MMM d, yyyy \'at\' h:mm a')}</span>
+                          <Card>
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-base flex items-center gap-2">
+                                <Briefcase className="w-4 h-4" />
+                                Deal Type Proficiency
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                {selectedPersonality.aiAnalysis.dealTypeProficiency}
+                              </p>
+                            </CardContent>
+                          </Card>
+                        </>
                       )}
-                    </div>
-                  </>
+                    </TabsContent>
+
+                    <TabsContent value="management" className="mt-4 space-y-4">
+                      {selectedPersonality.aiAnalysis?.managerialNotes && (
+                        <Card>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <AlertTriangle className="w-4 h-4 text-amber-500" />
+                              Managerial Notes
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                              {selectedPersonality.aiAnalysis.managerialNotes}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+                  </Tabs>
                 )}
               </TabsContent>
             </Tabs>
