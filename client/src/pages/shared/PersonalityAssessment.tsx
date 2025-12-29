@@ -35,6 +35,25 @@ const PROFILE_COLORS: Record<string, string> = {
   'Regulatory': 'bg-rose-100 text-rose-800 border-rose-300',
 };
 
+const TAG_DESCRIPTIONS: Record<string, string> = {
+  'Politician': 'Skilled at navigating complex stakeholder dynamics, building consensus, and managing internal politics. Excels at relationship management and diplomatic negotiations.',
+  'Sherpa': 'Expert guide who leads teams through challenging deal landscapes. Provides mentorship, process expertise, and steady guidance to ensure successful outcomes.',
+  'Deal Junkie': 'Thrives on high-volume, fast-paced deal environments. Energized by multiple simultaneous transactions and demonstrates exceptional stamina during intense periods.',
+  'Closer': 'Focused on driving deals to completion. Skilled at overcoming last-minute obstacles, negotiating final terms, and ensuring transactions cross the finish line.',
+  'Architect': 'Strategic thinker who designs deal structures and frameworks. Excels at complex modeling, creative problem-solving, and building comprehensive transaction architectures.',
+  'Firefighter': 'Calm under pressure when deals face unexpected challenges. Quick to diagnose problems, mobilize resources, and implement solutions during crisis situations.',
+  'Guru': 'Deep subject matter expert with specialized knowledge. Provides authoritative guidance on technical matters and is the go-to resource for complex questions.',
+  'Misfit': 'Unconventional thinker who challenges assumptions and brings fresh perspectives. Thrives in ambiguous situations and often identifies overlooked opportunities.',
+  'Legal': 'Strong understanding of legal frameworks and documentation. Skilled at coordinating with legal counsel and ensuring proper compliance throughout transactions.',
+  'Rainmaker': 'Exceptional at originating new business and building client relationships. Natural networker who consistently brings in new opportunities and expands the firm\'s reach.',
+  'Creative': 'Innovative problem-solver who develops novel approaches to deal challenges. Excels at pitch presentations, marketing materials, and unique transaction structures.',
+  'Auditor': 'Meticulous attention to detail and quality control. Ensures accuracy in documents, catches errors before they become problems, and maintains high standards.',
+  'Mayor': 'Natural leader who builds team morale and facilitates collaboration. Creates positive working environments and helps teams function at their best.',
+  'Liaison': 'Bridge-builder between different parties and departments. Excellent at coordinating communication, managing expectations, and keeping all stakeholders aligned.',
+  'Grandmaster': 'Strategic mastermind with exceptional foresight and planning abilities. Thinks several moves ahead and anticipates challenges before they arise.',
+  'Regulatory': 'Expert in compliance, regulatory frameworks, and industry-specific requirements. Ensures deals meet all legal and regulatory obligations.',
+};
+
 const DEAL_TEAM_OPTIONS = [
   { value: 'Floater', label: 'Floater - New/Rotating Member' },
   { value: 'Deal Team 10', label: 'Deal Team 10 - Entry Level' },
@@ -207,7 +226,7 @@ export default function PersonalityAssessment() {
                   </div>
                 </div>
                 <Separator className="my-4" />
-                <div className="space-y-2">
+                <div className="space-y-4">
                   <p className="text-xs text-muted-foreground">Top 5 Archetypes</p>
                   <div className="flex flex-wrap gap-2">
                     {deploymentTags.topFiveArchetypes?.map((tag, idx) => (
@@ -217,6 +236,28 @@ export default function PersonalityAssessment() {
                       >
                         {idx + 1}. {tag}
                       </Badge>
+                    ))}
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">What Your Archetypes Mean</p>
+                    {deploymentTags.topFiveArchetypes?.map((tag, idx) => (
+                      <div key={idx} className={cn("p-3 rounded-lg border-l-4", 
+                        idx === 0 ? "bg-primary/5 border-l-primary" : "bg-secondary/30 border-l-muted-foreground/30"
+                      )}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge 
+                            variant="outline"
+                            className={cn("text-xs", PROFILE_COLORS[tag] || 'bg-gray-100 text-gray-800')}
+                          >
+                            #{idx + 1}
+                          </Badge>
+                          <span className="font-semibold text-sm">{tag}</span>
+                          {idx === 0 && <Badge className="text-xs bg-primary/80">Primary</Badge>}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {TAG_DESCRIPTIONS[tag] || 'A unique profile that combines multiple characteristics to define your working style.'}
+                        </p>
+                      </div>
                     ))}
                   </div>
                 </div>
