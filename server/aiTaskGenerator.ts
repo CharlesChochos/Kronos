@@ -222,16 +222,21 @@ function calculateDueDates(cadence: 'daily' | 'weekly' | 'monthly', index: numbe
 
   switch (cadence) {
     case 'daily':
+      // Daily tasks: first one due today, subsequent ones staggered over next few days
       dueDate = new Date(now);
-      dueDate.setDate(now.getDate() + index + 1);
+      dueDate.setDate(now.getDate() + index); // index 0 = today, 1 = tomorrow, etc.
       break;
     case 'weekly':
+      // Weekly tasks: due at end of this week (Sunday) or following weeks
       dueDate = new Date(now);
-      dueDate.setDate(now.getDate() + (index + 1) * 7);
+      const daysUntilSunday = (7 - now.getDay()) % 7; // Days until end of this week (0 if already Sunday)
+      // If today is Sunday, first weekly task is still due today (index 0), otherwise due this Sunday
+      dueDate.setDate(now.getDate() + daysUntilSunday + (index * 7)); // index 0 = this Sunday, 1 = next Sunday
       break;
     case 'monthly':
+      // Monthly tasks: due at end of this month or following months
       dueDate = new Date(now);
-      dueDate.setMonth(now.getMonth() + index + 1);
+      dueDate.setMonth(now.getMonth() + index + 1, 0); // Last day of current month (index 0) or future months
       break;
   }
 

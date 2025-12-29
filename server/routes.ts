@@ -3026,6 +3026,50 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
             console.error('[AI Reoptimization] Error on deal update:', err);
           });
         }
+        
+        // When stage changes, form new pod team and generate AI tasks for the new stage
+        if (changes.stage && updatedDeal) {
+          const newStage = changes.stage.to;
+          console.log(`[Stage Transition] Deal ${deal.name} moved from ${changes.stage.from} to ${newStage}, forming new pod team...`);
+          
+          // Form pod team for the new stage (async, don't block response)
+          (async () => {
+            try {
+              // Get existing lead from the deal
+              const existingLeadId = updatedDeal.lead || undefined;
+              
+              // Form pod for the new stage
+              const podResult = await formPodForDeal(updatedDeal, newStage, existingLeadId);
+              
+              if (podResult.assignments && podResult.assignments.length > 0) {
+                console.log(`[Stage Transition] Created ${podResult.assignments.length} pod assignments for ${newStage}`);
+                
+                // Generate AI tasks for each new pod member
+                for (const assignment of podResult.assignments) {
+                  if (assignment.userId) {
+                    const assignedUser = await storage.getUser(assignment.userId);
+                    if (assignedUser) {
+                      try {
+                        await generateAiTasksForAssignment({
+                          dealId: deal.id,
+                          stage: newStage,
+                          assigneeId: assignment.userId,
+                          assigneeName: assignedUser.name,
+                          assigneeRole: assignment.role || 'Team Member'
+                        });
+                        console.log(`[Stage Transition] Generated AI tasks for ${assignedUser.name} on ${newStage}`);
+                      } catch (taskErr) {
+                        console.error(`[Stage Transition] Failed to generate tasks for ${assignedUser.name}:`, taskErr);
+                      }
+                    }
+                  }
+                }
+              }
+            } catch (podErr) {
+              console.error('[Stage Transition] Error forming pod for new stage:', podErr);
+            }
+          })();
+        }
       }
       res.json(updatedDeal);
     } catch (error) {
