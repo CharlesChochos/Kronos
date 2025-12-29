@@ -2953,6 +2953,49 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       }
       const deal = await storage.createDeal(result.data);
       await createAuditLog(req, 'deal_created', 'deal', deal.id, deal.name, { value: deal.value, client: deal.client, sector: deal.sector, stage: deal.stage });
+      
+      // If this is an active deal (not an opportunity), trigger pod formation and AI task generation
+      if (deal.dealType !== 'Opportunity' && deal.stage) {
+        (async () => {
+          try {
+            console.log(`[Deal Created] Forming pod for new deal ${deal.id} at stage ${deal.stage}`);
+            const podResult = await formPodForDeal(deal, deal.stage);
+            
+            if (podResult.success) {
+              console.log(`[Deal Created] Pod formed successfully, generating AI tasks...`);
+              
+              // Get the newly created pod members and generate AI tasks for each
+              const podMembers = await storage.getStagePodMembers(deal.id, deal.stage);
+              console.log(`[Deal Created] Found ${podMembers.length} pod members for ${deal.stage}`);
+              
+              for (const member of podMembers) {
+                if (member.userId) {
+                  const assignedUser = await storage.getUser(member.userId);
+                  if (assignedUser) {
+                    try {
+                      await generateAiTasksForAssignment({
+                        dealId: deal.id,
+                        stage: deal.stage,
+                        assigneeId: member.userId,
+                        assigneeName: assignedUser.name,
+                        assigneeRole: member.role || 'Team Member'
+                      });
+                      console.log(`[Deal Created] Generated AI tasks for ${assignedUser.name}`);
+                    } catch (taskErr) {
+                      console.error(`[Deal Created] Failed to generate tasks for ${assignedUser.name}:`, taskErr);
+                    }
+                  }
+                }
+              }
+            } else {
+              console.error(`[Deal Created] Pod formation failed: ${podResult.error}`);
+            }
+          } catch (podErr) {
+            console.error('[Deal Created] Error in pod formation:', podErr);
+          }
+        })();
+      }
+      
       res.json(deal);
     } catch (error) {
       res.status(500).json({ error: "Failed to create deal" });

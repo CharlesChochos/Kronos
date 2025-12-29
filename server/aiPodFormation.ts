@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { storage } from "./storage";
 import type { Deal, User, ResumeAnalysis, PersonalityAssessment, UserWorkloadSnapshot, AIPodFormationResponse } from "@shared/schema";
+import { generateAiTasksForAssignment } from "./aiTaskGenerator";
 
 const openai = new OpenAI({ 
   apiKey: process.env.OPENAI_API_KEY
@@ -493,7 +494,33 @@ export async function approveOpportunityToDeal(
     
     const podResult = await formPodForDeal(updatedDeal, 'Origination');
     
-    if (!podResult.success) {
+    if (podResult.success) {
+      console.log(`[Opportunity Approval] Pod formed successfully, generating AI tasks...`);
+      
+      // Get the newly created pod members and generate AI tasks for each
+      const podMembers = await storage.getStagePodMembers(opportunityId, 'Origination');
+      console.log(`[Opportunity Approval] Found ${podMembers.length} pod members for Origination`);
+      
+      for (const member of podMembers) {
+        if (member.userId) {
+          const assignedUser = await storage.getUser(member.userId);
+          if (assignedUser) {
+            try {
+              await generateAiTasksForAssignment({
+                dealId: opportunityId,
+                stage: 'Origination',
+                assigneeId: member.userId,
+                assigneeName: assignedUser.name,
+                assigneeRole: member.role || 'Team Member'
+              });
+              console.log(`[Opportunity Approval] Generated AI tasks for ${assignedUser.name}`);
+            } catch (taskErr) {
+              console.error(`[Opportunity Approval] Failed to generate tasks for ${assignedUser.name}:`, taskErr);
+            }
+          }
+        }
+      }
+    } else {
       console.error(`[Opportunity Approval] Pod formation failed: ${podResult.error}`);
     }
     
