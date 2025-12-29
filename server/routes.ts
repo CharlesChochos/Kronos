@@ -28,11 +28,9 @@ const PgSession = connectPgSimple(session);
 // This ensures both dev and production use the same database when PRODUCTION_DATABASE_URL is configured
 const databaseUrl = process.env.PRODUCTION_DATABASE_URL || process.env.DATABASE_URL!;
 
-// Initialize OpenAI client with Replit AI Integrations
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+// Initialize OpenAI client with user's API key
 const openai = new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY
 });
 
 export async function registerRoutes(
@@ -4342,8 +4340,7 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       }
       
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.OPENAI_API_KEY,
       });
       
       const complianceText = [
@@ -4411,8 +4408,7 @@ Generate only the document content, no additional commentary.`;
       }
       
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.OPENAI_API_KEY,
       });
 
       // Build rich task context

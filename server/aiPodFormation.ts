@@ -3,8 +3,7 @@ import { storage } from "./storage";
 import type { Deal, User, ResumeAnalysis, PersonalityAssessment, UserWorkloadSnapshot, AIPodFormationResponse } from "@shared/schema";
 
 const openai = new OpenAI({ 
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL
+  apiKey: process.env.OPENAI_API_KEY
 });
 
 const MASTER_POD_PLANNER_PROMPT = `You are Equiturn Master Pod Movement Planner. You ingest a deal's uploaded documents plus the firm's Pod Movement and Daily Movement logic, then you output a full deal completion plan that links milestones to Pod Movement Tasks to daily subtasks across Origination, Structuring, Execution, Closing, Integration.
