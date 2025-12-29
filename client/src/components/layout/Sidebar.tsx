@@ -24,7 +24,8 @@ import {
   FolderOpen,
   ClipboardList,
   ClipboardCheck,
-  Brain
+  Brain,
+  Clock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPreferences, useSaveUserPreferences, useCurrentUser } from "@/lib/api";
@@ -152,6 +153,7 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
       category: "People",
       links: [
         { icon: BarChart3, label: "Team Performance", path: "/ceo/team-performance" },
+        { icon: Clock, label: "Time Analytics", path: "/ceo/time-analytics" },
         { icon: Brain, label: "Team Profiles", path: "/ceo/team-profiles" },
         { icon: Users, label: "Team Assignment", path: "/ceo/team" },
         { icon: GraduationCap, label: "Mentorship", path: "/ceo/mentorship" },
