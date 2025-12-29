@@ -239,6 +239,59 @@ Consider personality tag compatibility for team chemistry.
     
     const aiResponse: AIPodFormationResponse = JSON.parse(content);
     
+    // Validate and normalize pod member userIds - AI sometimes returns names instead of IDs
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    
+    // Helper to normalize names for comparison
+    const normalizeName = (name: string | undefined): string => {
+      if (!name) return '';
+      return name.trim().toLowerCase().replace(/\s+/g, ' ');
+    };
+    
+    for (const member of aiResponse.podMembers) {
+      const memberIdValue = member.userId?.trim();
+      if (memberIdValue && !uuidRegex.test(memberIdValue)) {
+        // userId is not a valid UUID, likely a name - try to find the user by name
+        const normalizedMemberId = normalizeName(memberIdValue);
+        const normalizedMemberName = normalizeName(member.userName);
+        
+        const matchingUser = userRoster.find(u => {
+          const normalizedUserName = normalizeName(u.userName);
+          // Try exact match first
+          if (normalizedUserName === normalizedMemberId || normalizedUserName === normalizedMemberName) {
+            return true;
+          }
+          // Try partial match (first and last name)
+          const memberParts = normalizedMemberId.split(' ');
+          const userParts = normalizedUserName.split(' ');
+          if (memberParts.length >= 2 && userParts.length >= 2) {
+            // Match if first and last names match
+            if (memberParts[0] === userParts[0] && memberParts[memberParts.length - 1] === userParts[userParts.length - 1]) {
+              return true;
+            }
+          }
+          return false;
+        });
+        
+        if (matchingUser) {
+          console.log(`[AI Pod Formation] Resolved user name "${memberIdValue}" to ID ${matchingUser.userId}`);
+          member.userId = matchingUser.userId;
+          member.userName = matchingUser.userName;
+        } else {
+          console.warn(`[AI Pod Formation] Could not resolve user "${memberIdValue}" to a valid ID, removing from pod`);
+          member.userId = undefined as any; // Mark as unresolvable
+        }
+      }
+    }
+    
+    // Filter out any members with unresolved IDs and count removed
+    const beforeCount = aiResponse.podMembers.length;
+    aiResponse.podMembers = aiResponse.podMembers.filter(m => m.userId && uuidRegex.test(m.userId));
+    const removedCount = beforeCount - aiResponse.podMembers.length;
+    if (removedCount > 0) {
+      console.warn(`[AI Pod Formation] Removed ${removedCount} members with unresolvable IDs from pod`);
+    }
+    
     if (aiResponse.podSize !== podSize) {
       console.warn(`[AI Pod Formation] AI returned pod size ${aiResponse.podSize}, but business rule requires ${podSize}. Using deterministic value.`);
     }
