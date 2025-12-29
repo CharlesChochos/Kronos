@@ -57,6 +57,39 @@ import type { Task, Deal } from "@shared/schema";
 
 type SwipeDirection = 'left' | 'right' | 'up' | null;
 
+// Helper to open data URLs in a new tab (converts to blob URL to avoid security restrictions)
+const openDataUrlInNewTab = (dataUrl: string, filename?: string) => {
+  try {
+    if (dataUrl.startsWith('data:')) {
+      // Parse the data URL
+      const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (matches) {
+        const mimeType = matches[1];
+        const base64Data = matches[2];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: mimeType });
+        const blobUrl = URL.createObjectURL(blob);
+        const newWindow = window.open(blobUrl, '_blank');
+        if (!newWindow) {
+          toast.error("Unable to open file. Please allow popups.");
+          URL.revokeObjectURL(blobUrl);
+        }
+        return;
+      }
+    }
+    // Not a data URL, open directly
+    window.open(dataUrl, '_blank');
+  } catch (error) {
+    console.error('Failed to open file:', error);
+    toast.error("Failed to open file");
+  }
+};
+
 // Helper to format due date with optional time
 const formatDueDateTime = (dueDate: string) => {
   if (!dueDate) return '';
@@ -1665,7 +1698,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                                 variant="ghost" 
                                 size="icon" 
                                 className="h-6 w-6"
-                                onClick={() => window.open(url, '_blank')}
+                                onClick={() => openDataUrlInNewTab(url, filename)}
                                 title="View"
                                 data-testid={`view-attachment-${i}`}
                               >
