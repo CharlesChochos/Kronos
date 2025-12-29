@@ -220,7 +220,8 @@ export function DockedChatBoxes() {
     return otherMember?.name || "Chat";
   };
 
-  const getInitials = (name: string) => {
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "??";
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 

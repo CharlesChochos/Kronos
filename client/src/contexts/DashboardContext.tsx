@@ -93,7 +93,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       <div className="bg-card border border-border rounded-lg shadow-xl p-4 max-w-sm animate-in slide-in-from-top-5 duration-300">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">
-            {notification.senderName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+            {(notification.senderName || "?").split(' ').map(n => n[0]).join('').slice(0, 2)}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">

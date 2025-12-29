@@ -2742,7 +2742,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
 
                 <div className="flex items-center gap-2 pt-2">
                   <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">
-                    {deal.lead.split(' ').map(n => n[0]).join('')}
+                    {(deal.lead || "?").split(' ').map(n => n[0]).join('')}
                   </div>
                   <span className="text-xs text-muted-foreground">Lead: {deal.lead}</span>
                 </div>

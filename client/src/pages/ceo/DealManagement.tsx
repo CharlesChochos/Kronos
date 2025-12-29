@@ -2736,7 +2736,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
 
                 <div className="flex items-center gap-2 pt-2">
                   <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">
-                    {deal.lead.split(' ').map(n => n[0]).join('')}
+                    {(deal.lead || "?").split(' ').map(n => n[0]).join('')}
                   </div>
                   <span className="text-xs text-muted-foreground">Lead: {deal.lead}</span>
                 </div>
@@ -3549,7 +3549,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       {/* First show stage_pod_members from database */}
                       {allStagePodMembers.map((member: any, index: number) => {
                         const memberName = member.userName || 'Unknown';
-                        const initials = memberName.split(' ').map((n: string) => n[0] || '').join('').slice(0, 2);
+                        const initials = (memberName || "?").split(' ').map((n: string) => n[0] || '').join('').slice(0, 2);
                         return (
                           <div key={member.id || `stage-${index}`} className="p-3 bg-secondary/30 rounded-lg flex items-center justify-between group">
                             <div className="flex items-center gap-3">

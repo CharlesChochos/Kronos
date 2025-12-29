@@ -361,7 +361,7 @@ export default function InvestorMatching() {
                           <div className="text-center">
                               <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Focus</div>
                               <div className="font-medium text-sm line-clamp-2 max-h-10 overflow-hidden" title={currentInvestor.focus}>
-                                {currentInvestor.focus.split(',').slice(0, 3).join(', ')}{currentInvestor.focus.split(',').length > 3 ? '...' : ''}
+                                {(currentInvestor.focus || "").split(',').slice(0, 3).join(', ')}{(currentInvestor.focus || "").split(',').length > 3 ? '...' : ''}
                               </div>
                           </div>
                           <div className="text-center">
