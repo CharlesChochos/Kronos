@@ -211,7 +211,7 @@ export default function TeamAssignment() {
 
   const removeAttachment = async (index: number) => {
     const file = uploadedFiles[index];
-    if (file) {
+    if (file && file.url && !file.url.startsWith('data:')) {
       try {
         const filename = file.url.replace('/uploads/', '');
         await fetch(`/api/upload/${filename}`, { method: 'DELETE' });
