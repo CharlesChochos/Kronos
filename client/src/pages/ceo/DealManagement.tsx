@@ -1491,11 +1491,41 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   
   // Fetch fees for the selected deal
   const { data: selectedDealFees = [] } = useDealFees(selectedDeal?.id || '');
+  // Use the fresh deal data for stage (after updates) rather than stale selectedDeal state
+  const currentDealStage = fullDealData?.stage || selectedDeal?.stage || 'Origination';
   // Fetch pod members for the CURRENT stage of the selected deal only
-  const currentDealStage = selectedDeal?.stage || 'Origination';
-  const { data: currentStagePodMembers = [] } = useStagePodMembers(selectedDeal?.id || '', currentDealStage);
+  const { data: currentStagePodMembers = [], refetch: refetchPodMembers } = useStagePodMembers(selectedDeal?.id || '', currentDealStage);
   // Count is just the current stage team size
   const currentTeamCount = currentStagePodMembers.length;
+  
+  // When deal stage changes, poll for pod members until they appear (async pod formation takes 10-20s)
+  const [isPodPolling, setIsPodPolling] = useState(false);
+  useEffect(() => {
+    if (!selectedDeal?.id || !currentDealStage) return;
+    
+    // Start polling when stage changes
+    setIsPodPolling(true);
+    let pollCount = 0;
+    const maxPolls = 10; // Poll up to 10 times (30 seconds total)
+    
+    const pollForPod = () => {
+      refetchPodMembers().then((result) => {
+        pollCount++;
+        // Stop if we found members or hit max polls
+        if ((result.data && result.data.length > 0) || pollCount >= maxPolls) {
+          setIsPodPolling(false);
+          return;
+        }
+        // Continue polling every 3 seconds
+        setTimeout(pollForPod, 3000);
+      });
+    };
+    
+    // Start polling
+    pollForPod();
+    
+    return () => setIsPodPolling(false);
+  }, [selectedDeal?.id, currentDealStage]);
   const [activeStageTab, setActiveStageTab] = useState("Origination");
   const [viewMode, setViewMode] = useState<'grid' | 'calendar' | 'compare'>('grid');
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('week');
@@ -3543,7 +3573,12 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                   {/* Team Members List - Current Stage Only */}
                   <ScrollArea className="h-[250px]">
                     <div className="space-y-2">
-                      {currentStagePodMembers.length > 0 ? (
+                      {isPodPolling && currentStagePodMembers.length === 0 ? (
+                        <div className="text-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-3"></div>
+                          <p className="text-sm text-muted-foreground">Forming team for {currentDealStage}...</p>
+                        </div>
+                      ) : currentStagePodMembers.length > 0 ? (
                         currentStagePodMembers.map((member: any, index: number) => {
                           const memberName = member.userName || 'Unknown';
                           const initials = (memberName || "?").split(' ').map((n: string) => n[0] || '').join('').slice(0, 2);
