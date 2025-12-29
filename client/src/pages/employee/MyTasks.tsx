@@ -435,6 +435,33 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
   
   const myTasks = currentUser ? allTasks.filter(t => t.assignedTo === currentUser.id) : [];
   
+  const aiMemoTasks = myTasks.filter(t => (t as any).cadence === 'memo');
+  const aiDailyTasks = myTasks.filter(t => (t as any).cadence === 'daily');
+  const aiWeeklyTasks = myTasks.filter(t => (t as any).cadence === 'weekly');
+  const aiMonthlyTasks = myTasks.filter(t => (t as any).cadence === 'monthly');
+  const hasAiTasks = aiMemoTasks.length > 0 || aiDailyTasks.length > 0 || aiWeeklyTasks.length > 0 || aiMonthlyTasks.length > 0;
+  
+  const getCadenceBadge = (cadence: string | null | undefined) => {
+    if (!cadence) return null;
+    const colors: Record<string, string> = {
+      memo: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+      daily: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      weekly: 'bg-green-500/20 text-green-400 border-green-500/30',
+      monthly: 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+    };
+    const labels: Record<string, string> = {
+      memo: 'AI Memo',
+      daily: 'Daily',
+      weekly: 'Weekly',
+      monthly: 'Monthly'
+    };
+    return (
+      <span className={cn("px-1.5 py-0.5 text-[10px] font-medium rounded border", colors[cadence] || 'bg-secondary')}>
+        {labels[cadence] || cadence}
+      </span>
+    );
+  };
+  
   const getDealName = (dealId: string | null) => {
     const deal = deals.find(d => d.id === dealId);
     return deal?.name || 'No Deal';
@@ -2862,9 +2889,13 @@ interface TaskCardProps {
   completed?: boolean;
   isFlagged?: boolean;
   onFlag?: (e: React.MouseEvent) => void;
+  cadenceBadge?: React.ReactNode;
 }
 
-const TaskCard = ({ task, dealName, onClick, highlighted, completed, isFlagged, onFlag, ref }: TaskCardProps & { ref?: React.Ref<HTMLDivElement> }) => {
+const TaskCard = ({ task, dealName, onClick, highlighted, completed, isFlagged, onFlag, cadenceBadge, ref }: TaskCardProps & { ref?: React.Ref<HTMLDivElement> }) => {
+  const isAiTask = !!(task as any).aiPlanId;
+  const cadence = (task as any).cadence;
+  
   return (
     <Card 
       ref={ref}
@@ -2872,22 +2903,37 @@ const TaskCard = ({ task, dealName, onClick, highlighted, completed, isFlagged, 
         "bg-card border-border hover:border-primary/50 transition-all cursor-pointer group",
         highlighted && "ring-2 ring-primary border-primary animate-pulse",
         completed && "opacity-60",
-        isFlagged && "border-orange-500/50 bg-orange-500/5"
+        isFlagged && "border-orange-500/50 bg-orange-500/5",
+        isAiTask && cadence === 'memo' && "border-purple-500/30 bg-purple-500/5"
       )}
       onClick={onClick}
       data-testid={`card-task-${task.id}`}
     >
       <CardContent className="p-3 space-y-2">
         <div className="flex justify-between items-start gap-2">
-          <Badge variant="outline" className={cn(
-            "text-[10px] px-1.5 py-0.5 h-5 shrink-0",
-            completed ? "bg-green-500/10 text-green-500 border-green-500/20" :
-            task.priority === 'High' ? "bg-red-500/10 text-red-500 border-red-500/20" : 
-            task.priority === 'Medium' ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" :
-            "bg-blue-500/10 text-blue-500 border-blue-500/20"
-          )}>
-            {completed ? 'Done' : task.priority}
-          </Badge>
+          <div className="flex items-center gap-1.5">
+            <Badge variant="outline" className={cn(
+              "text-[10px] px-1.5 py-0.5 h-5 shrink-0",
+              completed ? "bg-green-500/10 text-green-500 border-green-500/20" :
+              task.priority === 'High' ? "bg-red-500/10 text-red-500 border-red-500/20" : 
+              task.priority === 'Medium' ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" :
+              "bg-blue-500/10 text-blue-500 border-blue-500/20"
+            )}>
+              {completed ? 'Done' : task.priority}
+            </Badge>
+            {cadence && (
+              <span className={cn(
+                "px-1.5 py-0.5 text-[10px] font-medium rounded border",
+                cadence === 'memo' ? "bg-purple-500/20 text-purple-400 border-purple-500/30" :
+                cadence === 'daily' ? "bg-blue-500/20 text-blue-400 border-blue-500/30" :
+                cadence === 'weekly' ? "bg-green-500/20 text-green-400 border-green-500/30" :
+                cadence === 'monthly' ? "bg-orange-500/20 text-orange-400 border-orange-500/30" :
+                "bg-secondary"
+              )}>
+                {cadence === 'memo' ? 'AI Memo' : cadence.charAt(0).toUpperCase() + cadence.slice(1)}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-1">
             {onFlag && (
               <button
@@ -2901,6 +2947,7 @@ const TaskCard = ({ task, dealName, onClick, highlighted, completed, isFlagged, 
                 <Flag className="w-3.5 h-3.5" fill={isFlagged ? "currentColor" : "none"} />
               </button>
             )}
+            {isAiTask && <Sparkles className="w-3 h-3 text-purple-400" />}
             <Badge variant="secondary" className="text-[10px]">{task.type}</Badge>
           </div>
         </div>

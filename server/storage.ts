@@ -342,6 +342,15 @@ export interface IStorage {
   getResumeAnalysis(userId: string): Promise<schema.ResumeAnalysis | undefined>;
   createResumeAnalysis(analysis: schema.InsertResumeAnalysis): Promise<schema.ResumeAnalysis>;
   updateResumeAnalysis(id: string, updates: Partial<schema.InsertResumeAnalysis>): Promise<schema.ResumeAnalysis | undefined>;
+  
+  // AI Task Plan operations
+  getAiTaskPlan(id: string): Promise<schema.AiTaskPlan | undefined>;
+  getActiveAiTaskPlan(dealId: string, stage: string, assigneeId: string): Promise<schema.AiTaskPlan | undefined>;
+  getAiTaskPlansByDeal(dealId: string): Promise<schema.AiTaskPlan[]>;
+  createAiTaskPlan(plan: schema.InsertAiTaskPlan): Promise<schema.AiTaskPlan>;
+  archiveAiTaskPlan(id: string): Promise<void>;
+  bulkCreateTasks(tasks: InsertTask[]): Promise<Task[]>;
+  getTasksByAiPlan(aiPlanId: string): Promise<Task[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2287,6 +2296,56 @@ export class DatabaseStorage implements IStorage {
   async getAllPersonalityAssessments(): Promise<schema.PersonalityAssessment[]> {
     return await db.select().from(schema.personalityAssessments)
       .where(eq(schema.personalityAssessments.status, 'completed'));
+  }
+
+  // ================================
+  // AI TASK PLAN OPERATIONS
+  // ================================
+
+  async getAiTaskPlan(id: string): Promise<schema.AiTaskPlan | undefined> {
+    const [plan] = await db.select().from(schema.aiTaskPlans)
+      .where(eq(schema.aiTaskPlans.id, id));
+    return plan;
+  }
+
+  async getActiveAiTaskPlan(dealId: string, stage: string, assigneeId: string): Promise<schema.AiTaskPlan | undefined> {
+    const [plan] = await db.select().from(schema.aiTaskPlans)
+      .where(and(
+        eq(schema.aiTaskPlans.dealId, dealId),
+        eq(schema.aiTaskPlans.stage, stage),
+        eq(schema.aiTaskPlans.assigneeId, assigneeId),
+        eq(schema.aiTaskPlans.isActive, true)
+      ));
+    return plan;
+  }
+
+  async getAiTaskPlansByDeal(dealId: string): Promise<schema.AiTaskPlan[]> {
+    return await db.select().from(schema.aiTaskPlans)
+      .where(eq(schema.aiTaskPlans.dealId, dealId))
+      .orderBy(desc(schema.aiTaskPlans.generatedAt));
+  }
+
+  async createAiTaskPlan(plan: schema.InsertAiTaskPlan): Promise<schema.AiTaskPlan> {
+    const [created] = await db.insert(schema.aiTaskPlans).values(plan).returning();
+    return created;
+  }
+
+  async archiveAiTaskPlan(id: string): Promise<void> {
+    await db.update(schema.aiTaskPlans)
+      .set({ isActive: false, archivedAt: new Date() })
+      .where(eq(schema.aiTaskPlans.id, id));
+  }
+
+  async bulkCreateTasks(tasks: InsertTask[]): Promise<Task[]> {
+    if (tasks.length === 0) return [];
+    const created = await db.insert(schema.tasks).values(tasks).returning();
+    return created;
+  }
+
+  async getTasksByAiPlan(aiPlanId: string): Promise<Task[]> {
+    return await db.select().from(schema.tasks)
+      .where(eq(schema.tasks.aiPlanId, aiPlanId))
+      .orderBy(schema.tasks.createdAt);
   }
 }
 

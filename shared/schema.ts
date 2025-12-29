@@ -126,6 +126,37 @@ export type TaskAttachment = {
   uploadedAt: string;
 };
 
+// AI Task Plan type - for grouping AI-generated tasks
+export type AiTaskPlanData = {
+  memo: string;
+  rationale: string;
+  dealSummary: string;
+  stageObjectives: string[];
+};
+
+// AI Task Plans table - stores AI-generated work plans
+export const aiTaskPlans = pgTable("ai_task_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").notNull().references(() => deals.id),
+  stage: text("stage").notNull(),
+  assigneeId: varchar("assignee_id").notNull().references(() => users.id),
+  memo: text("memo").notNull(),
+  rationale: text("rationale"),
+  dealSummary: text("deal_summary"),
+  stageObjectives: jsonb("stage_objectives").default([]).$type<string[]>(),
+  isActive: boolean("is_active").default(true),
+  generatedAt: timestamp("generated_at").defaultNow(),
+  archivedAt: timestamp("archived_at"),
+});
+
+export const insertAiTaskPlanSchema = createInsertSchema(aiTaskPlans).omit({
+  id: true,
+  generatedAt: true,
+});
+
+export type InsertAiTaskPlan = z.infer<typeof insertAiTaskPlanSchema>;
+export type AiTaskPlan = typeof aiTaskPlans.$inferSelect;
+
 // Tasks table
 export const tasks = pgTable("tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -139,6 +170,8 @@ export const tasks = pgTable("tasks", {
   dueDate: text("due_date"), // Optional - tasks without due dates are valid
   status: text("status").notNull().default('Pending'),
   type: text("type").default('General'), // Optional with default
+  cadence: text("cadence"), // memo, daily, weekly, monthly - for AI-generated tasks
+  aiPlanId: varchar("ai_plan_id").references(() => aiTaskPlans.id), // Links to AI task plan
   attachments: jsonb("attachments").default([]).$type<TaskAttachment[]>(),
   startedAt: timestamp("started_at"), // When task moved to In Progress
   completedAt: timestamp("completed_at"),

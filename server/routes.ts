@@ -30,6 +30,7 @@ import {
   getUserMultiDealMatrix,
   reoptimizeDealTasks
 } from "./aiPodFormation";
+import { generateAiTasksForAssignment, regenerateAiTasks, getAiTaskPlanWithTasks } from "./aiTaskGenerator";
 
 // PostgreSQL session store
 const PgSession = connectPgSimple(session);
@@ -3571,10 +3572,26 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
 
   app.post("/api/deals/:dealId/stage-pod-members", requireAuth, requireInternal, async (req, res) => {
     try {
+      const dealId = req.params.dealId;
       const member = await storage.createStagePodMember({
         ...req.body,
-        dealId: req.params.dealId,
+        dealId,
       });
+      
+      if (member.userId && member.userName && member.stage) {
+        generateAiTasksForAssignment({
+          dealId,
+          stage: member.stage,
+          assigneeId: member.userId,
+          assigneeName: member.userName,
+          assigneeRole: member.role || 'Team Member'
+        }).then(result => {
+          console.log(`[Auto AI Tasks] Generated ${result.tasksCreated} tasks for ${member.userName} on stage ${member.stage}`);
+        }).catch(err => {
+          console.error(`[Auto AI Tasks] Failed to generate tasks:`, err.message);
+        });
+      }
+      
       res.json(member);
     } catch (error) {
       res.status(500).json({ error: "Failed to add stage pod member" });
@@ -3599,6 +3616,86 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       res.json({ message: "Pod member removed successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to remove stage pod member" });
+    }
+  });
+
+  // ===== AI TASK GENERATION ROUTES =====
+  
+  app.post("/api/deals/:dealId/stages/:stage/tasks/generate", requireAuth, requireInternal, aiLimiter, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { dealId, stage } = req.params;
+      const { assigneeId, assigneeName, assigneeRole } = req.body;
+      
+      if (!assigneeId || !assigneeName) {
+        return res.status(400).json({ error: "Missing assignee information" });
+      }
+
+      console.log(`[AI Tasks] Generating tasks for ${assigneeName} on deal ${dealId} stage ${stage}`);
+      
+      const result = await generateAiTasksForAssignment({
+        dealId,
+        stage,
+        assigneeId,
+        assigneeName,
+        assigneeRole: assigneeRole || 'Team Member'
+      });
+      
+      res.json({ 
+        success: true, 
+        planId: result.planId, 
+        tasksCreated: result.tasksCreated,
+        message: `Generated ${result.tasksCreated} tasks for ${assigneeName}`
+      });
+    } catch (error: any) {
+      console.error("[AI Tasks] Generation error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate AI tasks" });
+    }
+  });
+
+  app.post("/api/deals/:dealId/stages/:stage/tasks/regenerate", requireAuth, requireInternal, aiLimiter, async (req, res) => {
+    try {
+      const { dealId, stage } = req.params;
+      const { assigneeId } = req.body;
+      
+      if (!assigneeId) {
+        return res.status(400).json({ error: "Missing assignee ID" });
+      }
+
+      console.log(`[AI Tasks] Regenerating tasks for user ${assigneeId} on deal ${dealId} stage ${stage}`);
+      
+      const result = await regenerateAiTasks(dealId, stage, assigneeId);
+      
+      res.json({ 
+        success: true, 
+        planId: result.planId, 
+        tasksCreated: result.tasksCreated,
+        message: `Regenerated ${result.tasksCreated} tasks`
+      });
+    } catch (error: any) {
+      console.error("[AI Tasks] Regeneration error:", error);
+      res.status(500).json({ error: error.message || "Failed to regenerate AI tasks" });
+    }
+  });
+
+  app.get("/api/ai-task-plans/:planId", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const result = await getAiTaskPlanWithTasks(req.params.planId);
+      if (!result) {
+        return res.status(404).json({ error: "AI task plan not found" });
+      }
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to fetch AI task plan" });
+    }
+  });
+
+  app.get("/api/deals/:dealId/ai-task-plans", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const plans = await storage.getAiTaskPlansByDeal(req.params.dealId);
+      res.json(plans);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to fetch AI task plans" });
     }
   });
 
