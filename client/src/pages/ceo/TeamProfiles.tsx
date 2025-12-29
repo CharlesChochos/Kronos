@@ -63,14 +63,17 @@ type PersonalityAssessment = {
 };
 
 type OnboardingPlacement = {
-  assignedDealTeam: string;
-  primaryVertical: string;
-  secondaryVertical: string;
-  primaryDealPhase: string;
-  secondaryDealPhase: string;
-  initialSeatRecommendation: string;
+  assignedDealTeam: string | null;
+  primaryVertical: string | null;
+  secondaryVertical: string | null;
+  primaryDealPhase: string | null;
+  secondaryDealPhase: string | null;
+  initialSeatRecommendation: string | null;
   topFiveInferredTags: string[];
-  coverageGaps?: string;
+  coverageGaps?: string | null;
+  pendingCombinedAnalysis?: boolean;
+  combinedAnalysisCompletedAt?: string;
+  placementRationale?: string;
 };
 
 type ResumeAnalysis = {
@@ -320,7 +323,7 @@ export default function TeamProfiles() {
                                 {personality.topThreeProfiles[0].profile}
                               </Badge>
                             )}
-                            {resume?.assignedDealTeam && (
+                            {resume?.assignedDealTeam && !resume?.aiAnalysis?.onboardingPlacement?.pendingCombinedAnalysis && (
                               <Badge variant="outline" className="hidden md:flex">
                                 {resume.assignedDealTeam}
                               </Badge>
@@ -393,47 +396,63 @@ export default function TeamProfiles() {
                             </CardTitle>
                           </CardHeader>
                           <CardContent>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                              <div className="p-3 bg-secondary/30 rounded-lg">
-                                <div className="text-xs text-muted-foreground">Deal Team</div>
-                                <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.assignedDealTeam}</div>
+                            {selectedResume.aiAnalysis.onboardingPlacement.pendingCombinedAnalysis ? (
+                              <div className="text-center py-6 text-muted-foreground">
+                                <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                <p className="font-medium">Placement Pending</p>
+                                <p className="text-sm mt-1">Deal team, tags, and placement will be assigned after personality assessment is complete.</p>
                               </div>
-                              <div className="p-3 bg-secondary/30 rounded-lg">
-                                <div className="text-xs text-muted-foreground">Primary Vertical</div>
-                                <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.primaryVertical}</div>
-                              </div>
-                              <div className="p-3 bg-secondary/30 rounded-lg">
-                                <div className="text-xs text-muted-foreground">Primary Deal Phase</div>
-                                <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.primaryDealPhase}</div>
-                              </div>
-                              <div className="p-3 bg-secondary/30 rounded-lg">
-                                <div className="text-xs text-muted-foreground">Secondary Vertical</div>
-                                <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.secondaryVertical}</div>
-                              </div>
-                              <div className="p-3 bg-secondary/30 rounded-lg">
-                                <div className="text-xs text-muted-foreground">Secondary Deal Phase</div>
-                                <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.secondaryDealPhase}</div>
-                              </div>
-                              <div className="p-3 bg-secondary/30 rounded-lg">
-                                <div className="text-xs text-muted-foreground">Initial Seat</div>
-                                <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.initialSeatRecommendation}</div>
-                              </div>
-                            </div>
-                            {selectedResume.aiAnalysis.onboardingPlacement.topFiveInferredTags?.length > 0 && (
-                              <div className="mt-3">
-                                <div className="text-xs text-muted-foreground mb-2">Inferred Tags</div>
-                                <div className="flex flex-wrap gap-1">
-                                  {selectedResume.aiAnalysis.onboardingPlacement.topFiveInferredTags.map((tag, i) => (
-                                    <Badge key={i} variant="outline">{tag}</Badge>
-                                  ))}
+                            ) : (
+                              <>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                  <div className="p-3 bg-secondary/30 rounded-lg">
+                                    <div className="text-xs text-muted-foreground">Deal Team</div>
+                                    <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.assignedDealTeam || 'Not assigned'}</div>
+                                  </div>
+                                  <div className="p-3 bg-secondary/30 rounded-lg">
+                                    <div className="text-xs text-muted-foreground">Primary Vertical</div>
+                                    <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.primaryVertical || 'Not assigned'}</div>
+                                  </div>
+                                  <div className="p-3 bg-secondary/30 rounded-lg">
+                                    <div className="text-xs text-muted-foreground">Primary Deal Phase</div>
+                                    <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.primaryDealPhase || 'Not assigned'}</div>
+                                  </div>
+                                  <div className="p-3 bg-secondary/30 rounded-lg">
+                                    <div className="text-xs text-muted-foreground">Secondary Vertical</div>
+                                    <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.secondaryVertical || 'Not assigned'}</div>
+                                  </div>
+                                  <div className="p-3 bg-secondary/30 rounded-lg">
+                                    <div className="text-xs text-muted-foreground">Secondary Deal Phase</div>
+                                    <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.secondaryDealPhase || 'Not assigned'}</div>
+                                  </div>
+                                  <div className="p-3 bg-secondary/30 rounded-lg">
+                                    <div className="text-xs text-muted-foreground">Initial Seat</div>
+                                    <div className="font-medium">{selectedResume.aiAnalysis.onboardingPlacement.initialSeatRecommendation || 'Not assigned'}</div>
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                            {selectedResume.aiAnalysis.onboardingPlacement.coverageGaps && (
-                              <div className="mt-3">
-                                <div className="text-xs text-muted-foreground mb-1">Coverage Gaps</div>
-                                <p className="text-sm">{selectedResume.aiAnalysis.onboardingPlacement.coverageGaps}</p>
-                              </div>
+                                {selectedResume.aiAnalysis.onboardingPlacement.topFiveInferredTags?.length > 0 && (
+                                  <div className="mt-3">
+                                    <div className="text-xs text-muted-foreground mb-2">Inferred Tags</div>
+                                    <div className="flex flex-wrap gap-1">
+                                      {selectedResume.aiAnalysis.onboardingPlacement.topFiveInferredTags.map((tag, i) => (
+                                        <Badge key={i} variant="outline">{tag}</Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {selectedResume.aiAnalysis.onboardingPlacement.placementRationale && (
+                                  <div className="mt-3">
+                                    <div className="text-xs text-muted-foreground mb-1">Placement Rationale</div>
+                                    <p className="text-sm">{selectedResume.aiAnalysis.onboardingPlacement.placementRationale}</p>
+                                  </div>
+                                )}
+                                {selectedResume.aiAnalysis.onboardingPlacement.coverageGaps && (
+                                  <div className="mt-3">
+                                    <div className="text-xs text-muted-foreground mb-1">Coverage Gaps</div>
+                                    <p className="text-sm">{selectedResume.aiAnalysis.onboardingPlacement.coverageGaps}</p>
+                                  </div>
+                                )}
+                              </>
                             )}
                           </CardContent>
                         </Card>

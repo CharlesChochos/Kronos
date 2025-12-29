@@ -2279,6 +2279,15 @@ ${scoreSheet}`;
       } catch (notifError) {
         console.error('Error sending onboarding notification:', notifError);
       }
+
+      // Trigger combined onboarding analysis if resume is also complete
+      console.log('[Personality] Checking for combined onboarding analysis...');
+      const combinedResult = await runCombinedOnboardingAnalysis(user.id);
+      if (combinedResult.success) {
+        console.log('[Personality] Combined onboarding analysis completed successfully');
+      } else {
+        console.log('[Personality] Combined analysis not ready or failed:', combinedResult.error);
+      }
     } catch (error) {
       console.error('Error submitting personality assessment:', error);
       res.status(500).json({ error: "Failed to submit personality assessment" });
@@ -2317,10 +2326,156 @@ ${scoreSheet}`;
     res.json(questions);
   });
 
+  // ===== COMBINED ONBOARDING ANALYSIS =====
+  // This runs AFTER both resume analysis AND personality assessment are complete
+  // to assign archetype tags, deal teams, and final placement
+
+  const COMBINED_ONBOARDING_PROMPT = `You are the Equiturn Final Onboarding Placement Analyst. Your job is to synthesize BOTH the resume analysis insights AND the personality assessment results to produce the final placement recommendation.
+
+You will receive:
+1. Resume analysis: Evidence-based insights about the candidate's experience, transactions, and capabilities
+2. Personality assessment: Scores and profiles indicating behavioral tendencies and working style
+
+Non-negotiable constraints:
+- Confidentiality: Treat all data as confidential
+- No fabrication: Only use evidence from the provided inputs
+- Evidence-based: All conclusions must be grounded in the provided data
+- No emojis or tables
+
+Core Equiturn Deal Team framework:
+- Floater: baseline competency, deploy in bounded roles with high review cadence
+- Deal Team 10: entry level, scoped analytical tasks, frequent review
+- Deal Team 8: mid complexity execution, moderate autonomy with checkpoints
+- Deal Team 2: complex mandate lead, high autonomy with risk oversight
+- Deal Team 4: highest complexity mandates, minimal supervision
+- Deal Team 6: Zeno Citium hyper complexity, only with explicit proof
+
+Archetype Tags (assign top 5 in rank order):
+Politician, Rainmaker, Mayor, Creative, Deal Junkie, Closer, Grandmaster, Architect, Guru, Sherpa, Firefighter, Legal, Liaison, Auditor, Regulatory, Misfit
+
+When assigning tags, consider BOTH resume evidence AND personality profile:
+- Personality indicating high Closer Drive + resume showing negotiation experience = stronger Closer tag
+- Personality indicating high Architect tendency + resume showing structuring work = stronger Architect tag
+- Look for alignment or tension between resume evidence and personality tendencies
+
+Output must be in this exact JSON format:
+{
+  "assignedDealTeam": "Deal Team X or Floater",
+  "primaryVertical": "vertical name",
+  "secondaryVertical": "vertical name",
+  "primaryDealPhase": "phase name",
+  "secondaryDealPhase": "phase name",
+  "initialSeatRecommendation": "specific seat recommendation",
+  "topFiveInferredTags": ["Tag1", "Tag2", "Tag3", "Tag4", "Tag5"],
+  "coverageGaps": "description of gaps or 'No material gaps observed'",
+  "placementRationale": "Brief explanation of why this placement combining resume and personality insights"
+}`;
+
+  // Combined Onboarding Analysis - runs after both assessments complete
+  async function runCombinedOnboardingAnalysis(userId: string): Promise<{ success: boolean; error?: string }> {
+    console.log('[CombinedOnboarding] Starting combined analysis for user:', userId);
+    
+    try {
+      // Get resume analysis
+      const resumeAnalysis = await storage.getResumeAnalysis(userId);
+      if (!resumeAnalysis || resumeAnalysis.status !== 'completed') {
+        console.log('[CombinedOnboarding] Resume analysis not completed');
+        return { success: false, error: 'Resume analysis not completed' };
+      }
+
+      // Get personality assessment
+      const personalityAssessment = await storage.getPersonalityAssessment(userId);
+      if (!personalityAssessment || personalityAssessment.status !== 'completed') {
+        console.log('[CombinedOnboarding] Personality assessment not completed');
+        return { success: false, error: 'Personality assessment not completed' };
+      }
+
+      console.log('[CombinedOnboarding] Both assessments found, running AI synthesis...');
+
+      // Build the synthesis prompt input
+      const resumeData = {
+        candidateSnapshot: resumeAnalysis.candidateSnapshot,
+        evidenceAnchors: resumeAnalysis.evidenceAnchors,
+        transactionProfile: resumeAnalysis.transactionProfile,
+        roleElevationAutonomy: resumeAnalysis.roleElevationAutonomy,
+        dealPhaseFit: resumeAnalysis.dealPhaseFit,
+        dealTypeProficiency: resumeAnalysis.dealTypeProficiency,
+        managerialNotes: resumeAnalysis.managerialNotes,
+      };
+
+      const personalityData = {
+        topThreeProfiles: personalityAssessment.topThreeProfiles,
+        allScores: personalityAssessment.allScores,
+        aiAnalysis: personalityAssessment.aiAnalysis,
+      };
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: COMBINED_ONBOARDING_PROMPT },
+          { 
+            role: "user", 
+            content: `Please synthesize the following resume analysis and personality assessment to produce the final onboarding placement:
+
+RESUME ANALYSIS:
+${JSON.stringify(resumeData, null, 2)}
+
+PERSONALITY ASSESSMENT:
+${JSON.stringify(personalityData, null, 2)}
+
+Provide the final placement recommendation in JSON format.`
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 1500,
+        response_format: { type: "json_object" },
+      });
+
+      const content = response.choices[0]?.message?.content || '';
+      console.log('[CombinedOnboarding] AI response received, length:', content.length);
+
+      if (!content) {
+        return { success: false, error: 'Empty response from AI' };
+      }
+
+      const placement = JSON.parse(content);
+      console.log('[CombinedOnboarding] Parsed placement:', placement.assignedDealTeam, placement.topFiveInferredTags);
+
+      // Update resume analysis with combined placement
+      const updatedOnboardingPlacement = {
+        assignedDealTeam: placement.assignedDealTeam || 'Floater',
+        primaryVertical: placement.primaryVertical || '',
+        secondaryVertical: placement.secondaryVertical || '',
+        primaryDealPhase: placement.primaryDealPhase || '',
+        secondaryDealPhase: placement.secondaryDealPhase || '',
+        initialSeatRecommendation: placement.initialSeatRecommendation || '',
+        topFiveInferredTags: placement.topFiveInferredTags || [],
+        coverageGaps: placement.coverageGaps || 'No material gaps observed',
+        pendingCombinedAnalysis: false,
+        combinedAnalysisCompletedAt: new Date().toISOString(),
+        placementRationale: placement.placementRationale || '',
+      };
+
+      // Update resume analysis with combined placement AND set assignedDealTeam at top level
+      await storage.updateResumeAnalysis(resumeAnalysis.id, {
+        resumeInferredTags: (placement.topFiveInferredTags || []).join(', '),
+        onboardingPlacement: updatedOnboardingPlacement,
+        assignedDealTeam: placement.assignedDealTeam || 'Floater', // Set at top level now
+      });
+
+      console.log('[CombinedOnboarding] Updated resume analysis with combined placement');
+      return { success: true };
+
+    } catch (error: any) {
+      console.error('[CombinedOnboarding] Error:', error?.message || error);
+      return { success: false, error: error?.message || 'Unknown error' };
+    }
+  }
+
   // ===== RESUME ANALYSIS ROUTES =====
 
-  // Equiturn Onboarding Deal Team Placement Analyst prompt
-  const ONBOARDING_ANALYST_PROMPT = `You are Equiturn Onboarding Deal Team Placement Analyst. Your job is to ingest one or more uploaded resumes and produce a paper ready initial deployment profile used to place people onto Equiturn Deal Teams at onboarding. You must end with a final onboarding placement block that assigns the person to a Deal Team and tags their initial deployment seat.
+  // Equiturn Resume Analysis Prompt - extracts facts and evidence only, NO placement recommendations
+  const ONBOARDING_ANALYST_PROMPT = `You are Equiturn Resume Analyst. Your job is to analyze uploaded resumes and extract factual evidence about the candidate's experience, skills, and transaction history. You do NOT assign deal teams, archetype tags, or make placement recommendations - those will be determined separately after a personality assessment is also completed.
 Non negotiable constraints
 Confidentiality. Treat all resumes and employee data as confidential.
 No fabrication. Do not invent credentials, employers, deal experience, dates, or outcomes.
@@ -2372,45 +2527,14 @@ Deal phase mapping from resume evidence
  Execution indicators: diligence management, workstream coordination, third party management, timeline control
  Closing indicators: negotiation support, definitive documentation coordination, approvals, closing deliverables
  Integration indicators: post close operating plan, KPI build, governance cadence, reporting, value creation initiatives
-Initial archetype tag inference from resume
- You must infer a ranked top five set of Equiturn archetype tags using only resume evidence signals. These are provisional and must be labeled as Resume Inferred Tags.
- Canonical tags: Politician, Rainmaker, Mayor, Creative, Deal Junkie, Closer, Grandmaster, Architect, Guru, Sherpa, Firefighter, Legal, Liaison, Auditor, Regulatory, Misfit
- Inference rules
- Architect: repeated structuring and modeling ownership
- Sherpa: coordination, project management, diligence control, process discipline
- Rainmaker: sourcing, BD, relationship ownership, revenue ownership
- Politician: stakeholder management, negotiations, executive interface
- Closer: negotiation and closing deliverables ownership, signed outcomes stated
- Auditor: controls, accounting rigor, reconciliation, audit exposure
- Regulatory: regulated environments explicitly stated, filings, compliance exposure
- Legal: contract drafting, legal workstream ownership, document negotiation coordination
- Liaison: cross functional bridging, vendor and counsel coordination, communication cadence
- Firefighter: turnarounds, urgent remediation, restructurings, crisis execution
- Deal Junkie: high deal volume exposure, multiple live mandates, deal centric roles
- Grandmaster: pattern level strategic leadership across multiple complex mandates with outcomes
- Guru: deep technical domain expertise stated and demonstrated through repeatable outcomes
- Mayor: internal leadership, cross team influence, enterprise wide coordination
- Creative: narrative, positioning, messaging, deck leadership tied to outcomes
- Misfit: nonstandard background that creates edge, only when resume shows it clearly
-Deal Team assignment rules at onboarding
- Default posture is conservative. Assign the highest Deal Team that is clearly supported by evidence. If evidence is insufficient, default to Floater.
- Floater assignment
- Use when resume lacks clear deal outcomes, lacks transaction specifics, or is primarily non deal operational without deal adjacency
- Deal Team 10 assignment
- Use when early career, limited deal exposure, primarily analytical support, or no ownership evidence
- Deal Team 8 assignment
- Use when the resume shows multiple live deals, clear execution contributions, defined workstreams, and credible tools fluency
- Deal Team 2 assignment
- Use when the resume shows lead workstream ownership on complex mandates, repeated closings, and independent client interface
- Deal Team 4 assignment
- Use when the resume shows senior leadership, autonomous mandate leadership, cross border or regulated complexity, repeated high stakes outcomes
- Deal Team 6 assignment
- Assign only if the resume explicitly demonstrates Zeno level hyper complexity execution plus internal standard setting credentials stated in the resume. Otherwise assign Deal Team 4 and include DT6 gate review required in Data Integrity Notes.
+IMPORTANT: Do NOT assign archetype tags, Deal Teams, or make final placement recommendations during resume analysis.
+ These will be determined later after both resume analysis AND personality assessment are complete.
+ Focus only on extracting and summarizing the factual evidence from the resume.
 Mandatory output format
  Write the output in this exact order, short paragraphs per section, no tables.
 1. Candidate Snapshot
- Name, current or most recent title, inferred primary function, and one sentence onboarding deployment headline.
- Include Data Integrity Notes here, listing assumptions, missing fields, and any DT6 gate review flag.
+ Name, current or most recent title, inferred primary function, and one sentence summary of their background.
+ Include Data Integrity Notes here, listing assumptions and missing fields.
 2. Evidence Anchors
  List the most decision relevant resume facts as short lines, such as firms, roles, deal types, stated sizes, outcomes, tools, licenses, and leadership scope.
 3. Transaction Profile
@@ -2421,23 +2545,11 @@ Mandatory output format
  List phases in best fit order, then name a primary phase and secondary phase with evidence based rationale.
 6. Deal Type Proficiency
  State primary and secondary vertical with evidence based rationale grounded in the vertical indicators above. Include one sentence on contexts to avoid or constrain at onboarding.
-7. Resume Inferred Tags
- Provide the top five inferred tags in rank order with one sentence of evidence rationale for the top two.
-8. Managerial Notes
- Provide onboarding deployment instructions, review cadence, what they should own, what they must not own unsupervised, and the ideal seat on a live mandate.
-9. Final Onboarding Placement
- A single block titled Final Onboarding Placement containing, in this order
- A. Assigned Deal Team
- B. Primary vertical
- C. Secondary vertical
- D. Primary deal phase
- E. Secondary deal phase
- F. Initial seat recommendation, for example origination support, structuring support, execution lead support, diligence quarterback, closing coordinator, integration liaison
- G. Top five Resume Inferred Tags
- H. Coverage gaps, either No material gaps observed or a short statement such as needs closer coverage or needs regulatory coverage
+7. Managerial Notes
+ Provide observations about review cadence needs, what they appear suited to own, what may need supervision, and the ideal seat on a live mandate based on resume evidence.
 Quality control pass
  Before finalizing, run two silent checks
-Completeness check, every mandatory section present, final placement block present
+Completeness check, every mandatory section 1-7 present
 Evidence check, every major conclusion is anchored to resume evidence, and any assumption is clearly flagged in Data Integrity Notes`;
 
   // AI Resume Analysis function
@@ -2477,19 +2589,20 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
   }
 
   // Parse AI response for resume analysis - handles both numbered and non-numbered formats
+  // NOTE: Resume analysis does NOT assign tags, deal teams, or fit scores - those come from combined analysis
   function parseResumeAIAnalysis(rawResponse: string): any {
     const sections: Record<string, string> = {};
     
     // Patterns that match both "1. Candidate Snapshot" and just "Candidate Snapshot"
+    // Updated to match new 7-section format (no Resume Inferred Tags or Final Onboarding Placement)
     const sectionPatterns = [
       { key: 'candidateSnapshot', pattern: /(?:1\.\s*)?Candidate Snapshot\s*([\s\S]*?)(?=(?:\d\.\s*)?Evidence Anchors|$)/i },
       { key: 'evidenceAnchors', pattern: /(?:2\.\s*)?Evidence Anchors\s*([\s\S]*?)(?=(?:\d\.\s*)?Transaction Profile|$)/i },
       { key: 'transactionProfile', pattern: /(?:3\.\s*)?Transaction Profile\s*([\s\S]*?)(?=(?:\d\.\s*)?Role Elevation|$)/i },
       { key: 'roleElevationAutonomy', pattern: /(?:4\.\s*)?Role Elevation[^\n]*\s*([\s\S]*?)(?=(?:\d\.\s*)?Deal Phase Fit|$)/i },
       { key: 'dealPhaseFit', pattern: /(?:5\.\s*)?Deal Phase Fit\s*([\s\S]*?)(?=(?:\d\.\s*)?Deal Type Proficiency|$)/i },
-      { key: 'dealTypeProficiency', pattern: /(?:6\.\s*)?Deal Type Proficiency\s*([\s\S]*?)(?=(?:\d\.\s*)?Resume Inferred Tags|$)/i },
-      { key: 'resumeInferredTags', pattern: /(?:7\.\s*)?Resume Inferred Tags\s*([\s\S]*?)(?=(?:\d\.\s*)?Managerial Notes|$)/i },
-      { key: 'managerialNotes', pattern: /(?:8\.\s*)?Managerial Notes\s*([\s\S]*?)(?=(?:\d\.\s*)?Final Onboarding Placement|$)/i },
+      { key: 'dealTypeProficiency', pattern: /(?:6\.\s*)?Deal Type Proficiency\s*([\s\S]*?)(?=(?:\d\.\s*)?Managerial Notes|$)/i },
+      { key: 'managerialNotes', pattern: /(?:7\.\s*)?Managerial Notes\s*([\s\S]*?)(?=Quality control|$)/i },
     ];
 
     for (const { key, pattern } of sectionPatterns) {
@@ -2497,24 +2610,23 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       sections[key] = match ? match[1].trim() : '';
     }
 
-    // Extract Final Onboarding Placement section - handles both numbered and non-numbered
-    const placementMatch = rawResponse.match(/(?:9\.\s*)?Final Onboarding Placement\s*([\s\S]*?)$/i);
-    const placementText = placementMatch ? placementMatch[1].trim() : '';
-
-    // Parse onboarding placement - handles both lettered and non-lettered formats
+    // Resume analysis no longer populates tags or placement - these are null/placeholder
+    // They will be populated by combinedOnboardingAnalysis after personality assessment completes
     const onboardingPlacement = {
-      assignedDealTeam: extractPlacementValueFlexible(placementText, 'Assigned Deal Team') || 'Floater',
-      primaryVertical: extractPlacementValueFlexible(placementText, 'Primary Vertical') || '',
-      secondaryVertical: extractPlacementValueFlexible(placementText, 'Secondary Vertical') || '',
-      primaryDealPhase: extractPlacementValueFlexible(placementText, 'Primary Deal Phase') || '',
-      secondaryDealPhase: extractPlacementValueFlexible(placementText, 'Secondary Deal Phase') || '',
-      initialSeatRecommendation: extractPlacementValueFlexible(placementText, 'Initial Seat Recommendation') || '',
-      topFiveInferredTags: extractInferredTagsFlexible(placementText),
-      coverageGaps: extractPlacementValueFlexible(placementText, 'Coverage Gaps') || 'No material gaps observed',
+      assignedDealTeam: null,
+      primaryVertical: null,
+      secondaryVertical: null,
+      primaryDealPhase: null,
+      secondaryDealPhase: null,
+      initialSeatRecommendation: null,
+      topFiveInferredTags: [],
+      coverageGaps: null,
+      pendingCombinedAnalysis: true, // Flag indicating combined analysis needed
     };
 
     return {
       ...sections,
+      resumeInferredTags: null, // Not populated during resume analysis
       onboardingPlacement,
       rawResponse,
     };
@@ -2680,12 +2792,13 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
           const aiResult = await analyzeResumeWithAI(resumeText);
           console.log('[Resume] AI analysis result:', aiResult.success ? 'success' : 'failed', aiResult.error || '');
 
-          // Update with AI analysis
+          // Update with AI analysis - NOTE: assignedDealTeam is NOT set here
+          // It will be set by combinedOnboardingAnalysis after personality assessment completes
           if (aiResult.success && analysis) {
-            console.log('[Resume] Saving AI analysis to database...');
+            console.log('[Resume] Saving AI analysis to database (no deal team yet - pending combined analysis)...');
             await storage.updateResumeAnalysis(analysis.id, {
               aiAnalysis: aiResult.analysis,
-              assignedDealTeam: aiResult.analysis?.onboardingPlacement?.assignedDealTeam || 'Floater',
+              assignedDealTeam: null, // Will be set by combined analysis
               status: 'completed',
               completedAt: new Date(),
             });
@@ -2705,6 +2818,15 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
               }
             } catch (notifError) {
               console.error('[Resume] Error sending resume onboarding notification:', notifError);
+            }
+
+            // Trigger combined onboarding analysis if personality assessment is also complete
+            console.log('[Resume] Checking for combined onboarding analysis...');
+            const combinedResult = await runCombinedOnboardingAnalysis(user.id);
+            if (combinedResult.success) {
+              console.log('[Resume] Combined onboarding analysis completed successfully');
+            } else {
+              console.log('[Resume] Combined analysis not ready or failed:', combinedResult.error);
             }
           } else if (analysis) {
             console.log('[Resume] AI failed, marking as failed. Error:', aiResult.error);
