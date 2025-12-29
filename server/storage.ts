@@ -455,6 +455,11 @@ export class DatabaseStorage implements IStorage {
     const dealTasks = await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.dealId, id));
     const taskIds = dealTasks.map(t => t.id);
     
+    // Clear time entries referencing these tasks (set taskId to null to avoid FK violation)
+    for (const taskId of taskIds) {
+      await db.update(schema.timeEntries).set({ taskId: null }).where(eq(schema.timeEntries.taskId, taskId));
+    }
+    
     // Delete task-related records first (they reference tasks)
     for (const taskId of taskIds) {
       await db.delete(schema.taskComments).where(eq(schema.taskComments.taskId, taskId));
@@ -483,7 +488,10 @@ export class DatabaseStorage implements IStorage {
     await db.delete(schema.dealPods).where(eq(schema.dealPods.dealId, id));
     
     // Delete all deal-related records (foreign key constraints)
+    // First delete tasks (they reference aiPlanId)
     await db.delete(schema.tasks).where(eq(schema.tasks.dealId, id));
+    // Then delete AI task plans for this deal
+    await db.delete(schema.aiTaskPlans).where(eq(schema.aiTaskPlans.dealId, id));
     await db.delete(schema.meetings).where(eq(schema.meetings.dealId, id));
     await db.delete(schema.dealFees).where(eq(schema.dealFees.dealId, id));
     await db.delete(schema.stageDocuments).where(eq(schema.stageDocuments.dealId, id));
