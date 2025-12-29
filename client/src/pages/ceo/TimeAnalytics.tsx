@@ -73,7 +73,8 @@ function formatDuration(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
-function getInitials(name: string): string {
+function getInitials(name: string | null | undefined): string {
+  if (!name) return "??";
   return name
     .split(" ")
     .map((n) => n[0])
@@ -107,7 +108,7 @@ export default function TimeAnalytics() {
     : null;
 
   const chartData = filteredUsers.slice(0, 10).map((u) => ({
-    name: u.userName.split(" ")[0],
+    name: u.userName?.split(" ")[0] || "Unknown",
     avgTime: u.avgDurationMinutes,
     completed: u.completedTasks,
   }));

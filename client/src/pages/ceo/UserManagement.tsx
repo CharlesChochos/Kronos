@@ -309,7 +309,8 @@ export default function UserManagement() {
     },
   });
 
-  const getInitials = (name: string) => {
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "??";
     return name
       .split(" ")
       .map((n) => n[0])
