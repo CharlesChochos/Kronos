@@ -1915,7 +1915,7 @@ export default function Chat({ role }: ChatProps) {
                           key={`${msg.id}-${idx}`}
                           className="aspect-square rounded-lg overflow-hidden bg-secondary cursor-pointer hover:opacity-80 transition-opacity"
                           onClick={() => {
-                            if (att.url) window.open(att.url, '_blank');
+                            if (att.url) import('@/lib/utils').then(m => m.openUrlInNewTab(att.url!));
                           }}
                         >
                           <img 

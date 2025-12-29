@@ -872,7 +872,7 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                               key={`${item.deal.id}-${item.doc.id || index}`}
                               onClick={() => { 
                                 if (item.doc.url) {
-                                  window.open(item.doc.url, '_blank');
+                                  import('@/lib/utils').then(m => m.openUrlInNewTab(item.doc.url));
                                 }
                                 setShowSearchResults(false); 
                                 setSearchQuery(""); 

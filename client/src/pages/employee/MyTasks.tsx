@@ -2410,7 +2410,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                         className="h-6 w-6"
                         onClick={(e) => {
                           e.stopPropagation();
-                          window.open(file.url, '_blank');
+                          import('@/lib/utils').then(m => m.openUrlInNewTab(file.url));
                         }}
                         title="View"
                         data-testid={`view-upload-${index}`}

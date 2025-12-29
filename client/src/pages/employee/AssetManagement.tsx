@@ -873,7 +873,7 @@ function StageWorkSection({
                         className="h-6 w-6"
                         onClick={() => {
                           const viewUrl = doc.url || doc.fileData;
-                          if (viewUrl) window.open(viewUrl, '_blank');
+                          if (viewUrl) import('@/lib/utils').then(m => m.openUrlInNewTab(viewUrl));
                         }}
                         title="View"
                         data-testid={`view-doc-${doc.id}`}
@@ -1086,7 +1086,7 @@ function StageWorkSection({
                         variant="ghost" 
                         size="icon" 
                         className="h-6 w-6"
-                        onClick={() => window.open(note.url, '_blank')}
+                        onClick={() => import('@/lib/utils').then(m => m.openUrlInNewTab(note.url))}
                         data-testid={`download-note-${note.id}`}
                       >
                         <Download className="w-3 h-3 text-purple-400" />
@@ -3926,7 +3926,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                                   toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
                                   return;
                                 }
-                                window.open(doc.url, '_blank');
+                                import('@/lib/utils').then(m => m.openUrlInNewTab(doc.url));
                               }}
                               title="View"
                               data-testid={`button-view-doc-${doc.id}`}

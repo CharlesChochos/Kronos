@@ -1273,7 +1273,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                             </div>
                             <div className="flex gap-1">
                               <Button variant="ghost" size="icon" className="h-8 w-8"
-                                onClick={() => window.open(file.url, '_blank')}
+                                onClick={() => import('@/lib/utils').then(m => m.openUrlInNewTab(file.url))}
                                 title="View"
                                 data-testid={`view-attachment-${file.id}`}
                               >
