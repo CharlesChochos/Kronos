@@ -1491,26 +1491,11 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   
   // Fetch fees for the selected deal
   const { data: selectedDealFees = [] } = useDealFees(selectedDeal?.id || '');
-  // Fetch ALL stage pod members for the selected deal (across all stages)
-  const { data: allStagePodMembers = [] } = useStagePodMembers(selectedDeal?.id || '', undefined);
-  // Count unique team members (deduplicated by email or name)
-  const uniqueTeamCount = useMemo(() => {
-    const seen = new Set<string>();
-    allStagePodMembers.forEach((member: any) => {
-      const key = member.email || member.userName || member.userId || crypto.randomUUID();
-      seen.add(key);
-    });
-    return seen.size;
-  }, [allStagePodMembers]);
-  
-  // Group pod members by stage for organized display
-  const podMembersByStage = useMemo(() => {
-    const grouped: Record<string, any[]> = {};
-    DEAL_STAGES.forEach(stage => {
-      grouped[stage] = allStagePodMembers.filter((m: any) => m.stage === stage);
-    });
-    return grouped;
-  }, [allStagePodMembers]);
+  // Fetch pod members for the CURRENT stage of the selected deal only
+  const currentDealStage = selectedDeal?.stage || 'Origination';
+  const { data: currentStagePodMembers = [] } = useStagePodMembers(selectedDeal?.id || '', currentDealStage);
+  // Count is just the current stage team size
+  const currentTeamCount = currentStagePodMembers.length;
   const [activeStageTab, setActiveStageTab] = useState("Origination");
   const [viewMode, setViewMode] = useState<'grid' | 'calendar' | 'compare'>('grid');
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('week');
@@ -3493,7 +3478,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     createTask={createTask}
                     createDocument={createDocument}
                     deleteTask={deleteTask}
-                    totalTeamCount={uniqueTeamCount}
+                    totalTeamCount={currentTeamCount}
                     onboardingStatus={onboardingStatus}
                     onShowOnboardingWarning={(userName, missingResume, missingPersonality, onConfirm) => {
                       setPendingAssignment({ userId: '', userName, missingResume, missingPersonality, onConfirm });
@@ -3548,126 +3533,77 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                 {/* Pod Team Tab */}
                 <TabsContent value="team" className="mt-4 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Pod Team Members</h4>
-                    <Badge variant="secondary">{uniqueTeamCount} members</Badge>
+                    <div>
+                      <h4 className="font-medium">Pod Team - {currentDealStage}</h4>
+                      <p className="text-xs text-muted-foreground">Team assigned to this stage</p>
+                    </div>
+                    <Badge variant="secondary">{currentTeamCount} members</Badge>
                   </div>
 
-                  {/* Team Members List - Grouped by Stage */}
-                  <ScrollArea className="h-[300px]">
-                    <div className="space-y-4">
-                      {/* Show pod members grouped by stage */}
-                      {DEAL_STAGES.map((stage) => {
-                        const stageMembers = podMembersByStage[stage] || [];
-                        if (stageMembers.length === 0) return null;
-                        
-                        const stageColors: Record<string, string> = {
-                          'Origination': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-                          'Structuring': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-                          'Diligence': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-                          'Legal': 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-                          'Close': 'bg-green-500/20 text-green-400 border-green-500/30',
-                        };
-                        
-                        return (
-                          <div key={stage} className="space-y-2">
-                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-md border ${stageColors[stage]}`}>
-                              <span className="text-sm font-semibold">{stage}</span>
-                              <Badge variant="outline" className="text-xs">{stageMembers.length} members</Badge>
-                            </div>
-                            <div className="space-y-1 pl-2">
-                              {stageMembers.map((member: any, index: number) => {
-                                const memberName = member.userName || 'Unknown';
-                                const initials = (memberName || "?").split(' ').map((n: string) => n[0] || '').join('').slice(0, 2);
-                                return (
-                                  <div key={member.id || `stage-${stage}-${index}`} className="p-2 bg-secondary/20 rounded-lg flex items-center justify-between group">
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                                        {initials}
-                                      </div>
-                                      <div>
-                                        <div className="text-sm font-medium flex items-center gap-2">
-                                          {memberName}
-                                          {member.isLead && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Lead</Badge>}
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">{member.role}</div>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      {member.phone && (
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
-                                          <a href={`tel:${member.phone}`}><Phone className="w-3 h-3 text-green-500" /></a>
-                                        </Button>
-                                      )}
-                                      {member.email && (
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
-                                          <a href={`mailto:${member.email}`}><Mail className="w-3 h-3 text-blue-500" /></a>
-                                        </Button>
-                                      )}
-                                      <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                          <Button 
-                                            variant="ghost" 
-                                            size="icon" 
-                                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                          >
-                                            <X className="w-3 h-3 text-red-500" />
-                                          </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                              This will remove {memberName} from the {stage} pod team. This action cannot be undone.
-                                            </AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => deleteStagePodMember.mutate(member.id)}>
-                                              Remove
-                                            </AlertDialogAction>
-                                          </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                      </AlertDialog>
-                                    </div>
+                  {/* Team Members List - Current Stage Only */}
+                  <ScrollArea className="h-[250px]">
+                    <div className="space-y-2">
+                      {currentStagePodMembers.length > 0 ? (
+                        currentStagePodMembers.map((member: any, index: number) => {
+                          const memberName = member.userName || 'Unknown';
+                          const initials = (memberName || "?").split(' ').map((n: string) => n[0] || '').join('').slice(0, 2);
+                          return (
+                            <div key={member.id || `member-${index}`} className="p-3 bg-secondary/30 rounded-lg flex items-center justify-between group">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary">
+                                  {initials}
+                                </div>
+                                <div>
+                                  <div className="font-medium flex items-center gap-2">
+                                    {memberName}
+                                    {member.isLead && <Badge variant="secondary" className="text-xs">Lead</Badge>}
                                   </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {/* Show legacy podTeam members from deal JSON if no stage_pod_members exist */}
-                      {allStagePodMembers.length === 0 && (selectedDealWithAttachments as any)?.podTeam && ((selectedDealWithAttachments as any).podTeam as PodTeamMember[]).map((member: PodTeamMember, index: number) => {
-                        const initials = (member.name || "?").split(' ').map((n: string) => n[0] || '').join('').slice(0, 2);
-                        return (
-                          <div key={`legacy-${index}`} className="p-3 bg-secondary/30 rounded-lg flex items-center justify-between group">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary">
-                                {initials}
+                                  <div className="text-xs text-muted-foreground">{member.role}</div>
+                                </div>
                               </div>
-                              <div>
-                                <div className="font-medium">{member.name}</div>
-                                <div className="text-xs text-muted-foreground">{member.role}</div>
+                              <div className="flex items-center gap-1">
+                                {member.phone && (
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                    <a href={`tel:${member.phone}`}><Phone className="w-4 h-4 text-green-500" /></a>
+                                  </Button>
+                                )}
+                                {member.email && (
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                    <a href={`mailto:${member.email}`}><Mail className="w-4 h-4 text-blue-500" /></a>
+                                  </Button>
+                                )}
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      <X className="w-4 h-4 text-red-500" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will remove {memberName} from the {currentDealStage} pod team. This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => deleteStagePodMember.mutate(member.id)}>
+                                        Remove
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1">
-                              {member.phone && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                                  <a href={`tel:${member.phone}`}><Phone className="w-4 h-4 text-green-500" /></a>
-                                </Button>
-                              )}
-                              {member.email && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                                  <a href={`mailto:${member.email}`}><Mail className="w-4 h-4 text-blue-500" /></a>
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {allStagePodMembers.length === 0 && !((selectedDealWithAttachments as any)?.podTeam?.length) && (
+                          );
+                        })
+                      ) : (
                         <div className="text-center py-8 text-muted-foreground text-sm">
-                          No team members assigned yet
+                          No team members assigned to {currentDealStage} stage yet
                         </div>
                       )}
                     </div>
