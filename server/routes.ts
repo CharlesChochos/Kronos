@@ -2064,22 +2064,22 @@ ${scoreSheet}`;
     }
   }
 
-  // Parse AI response into structured sections
+  // Parse AI response into structured sections - handles both numbered and non-numbered formats
   function parseAIAnalysis(rawResponse: string): any {
     const sections: Record<string, string> = {};
     
-    // Extract sections using regex patterns
+    // Extract sections using regex patterns - flexible for numbered or non-numbered
     const sectionPatterns = [
-      { key: 'employeeSnapshot', pattern: /1\.\s*Employee Snapshot\s*([\s\S]*?)(?=2\.\s*Score Distribution|$)/i },
-      { key: 'scoreDistribution', pattern: /2\.\s*Score Distribution\s*([\s\S]*?)(?=3\.\s*Primary Archetype|$)/i },
-      { key: 'primaryArchetype', pattern: /3\.\s*Primary Archetype\s*([\s\S]*?)(?=4\.\s*Secondary Traits|$)/i },
-      { key: 'secondaryTraits', pattern: /4\.\s*Secondary Traits\s*([\s\S]*?)(?=5\.\s*Supporting Traits|$)/i },
-      { key: 'supportingTraits', pattern: /5\.\s*Supporting Traits\s*([\s\S]*?)(?=6\.\s*Low Signal Tags|$)/i },
-      { key: 'lowSignalTags', pattern: /6\.\s*Low Signal Tags\s*([\s\S]*?)(?=7\.\s*Absent Traits|$)/i },
-      { key: 'absentTraits', pattern: /7\.\s*Absent Traits\s*([\s\S]*?)(?=8\.\s*Deal Phase Fit|$)/i },
-      { key: 'dealPhaseFit', pattern: /8\.\s*Deal Phase Fit\s*([\s\S]*?)(?=9\.\s*Deal Type Proficiency|$)/i },
-      { key: 'dealTypeProficiency', pattern: /9\.\s*Deal Type Proficiency\s*([\s\S]*?)(?=10\.\s*Managerial Notes|$)/i },
-      { key: 'managerialNotes', pattern: /10\.\s*Managerial Notes\s*([\s\S]*?)(?=11\.\s*Final Deployment Tags|$)/i },
+      { key: 'employeeSnapshot', pattern: /(?:1\.\s*)?Employee Snapshot\s*([\s\S]*?)(?=(?:\d+\.\s*)?Score Distribution|$)/i },
+      { key: 'scoreDistribution', pattern: /(?:2\.\s*)?Score Distribution\s*([\s\S]*?)(?=(?:\d+\.\s*)?Primary Archetype|$)/i },
+      { key: 'primaryArchetype', pattern: /(?:3\.\s*)?Primary Archetype\s*([\s\S]*?)(?=(?:\d+\.\s*)?Secondary Traits|$)/i },
+      { key: 'secondaryTraits', pattern: /(?:4\.\s*)?Secondary Traits\s*([\s\S]*?)(?=(?:\d+\.\s*)?Supporting Traits|$)/i },
+      { key: 'supportingTraits', pattern: /(?:5\.\s*)?Supporting Traits\s*([\s\S]*?)(?=(?:\d+\.\s*)?Low Signal Tags|$)/i },
+      { key: 'lowSignalTags', pattern: /(?:6\.\s*)?Low Signal Tags\s*([\s\S]*?)(?=(?:\d+\.\s*)?Absent Traits|$)/i },
+      { key: 'absentTraits', pattern: /(?:7\.\s*)?Absent Traits\s*([\s\S]*?)(?=(?:\d+\.\s*)?Deal Phase Fit|$)/i },
+      { key: 'dealPhaseFit', pattern: /(?:8\.\s*)?Deal Phase Fit\s*([\s\S]*?)(?=(?:\d+\.\s*)?Deal Type Proficiency|$)/i },
+      { key: 'dealTypeProficiency', pattern: /(?:9\.\s*)?Deal Type Proficiency\s*([\s\S]*?)(?=(?:\d+\.\s*)?Managerial Notes|$)/i },
+      { key: 'managerialNotes', pattern: /(?:10\.\s*)?Managerial Notes\s*([\s\S]*?)(?=(?:\d+\.\s*)?Final Deployment Tags|$)/i },
     ];
 
     for (const { key, pattern } of sectionPatterns) {
@@ -2087,19 +2087,19 @@ ${scoreSheet}`;
       sections[key] = match ? match[1].trim() : '';
     }
 
-    // Extract Final Deployment Tags section
-    const deploymentTagsMatch = rawResponse.match(/11\.\s*Final Deployment Tags\s*([\s\S]*?)$/i);
+    // Extract Final Deployment Tags section - handles numbered or non-numbered
+    const deploymentTagsMatch = rawResponse.match(/(?:11\.\s*)?Final Deployment Tags\s*([\s\S]*?)$/i);
     const deploymentTagsText = deploymentTagsMatch ? deploymentTagsMatch[1].trim() : '';
 
-    // Parse deployment tags
+    // Parse deployment tags - flexible extraction
     const deploymentTags = {
-      dealTeamStatus: extractTagValue(deploymentTagsText, /A\.\s*Deal Team status[:\s]*(.+)/i) || 'Floater',
-      primaryVertical: extractTagValue(deploymentTagsText, /B\.\s*Primary vertical[:\s]*(.+)/i) || '',
-      secondaryVertical: extractTagValue(deploymentTagsText, /C\.\s*Secondary vertical[:\s]*(.+)/i) || '',
-      primaryDealPhase: extractTagValue(deploymentTagsText, /D\.\s*Primary deal phase[:\s]*(.+)/i) || '',
-      secondaryDealPhase: extractTagValue(deploymentTagsText, /E\.\s*Secondary deal phase[:\s]*(.+)/i) || '',
-      topFiveArchetypes: extractTopFive(deploymentTagsText),
-      riskFlag: extractTagValue(deploymentTagsText, /G\.\s*(?:One risk flag tag|Risk flag)[:\s]*(.+)/i) || null,
+      dealTeamStatus: extractTagValueFlexible(deploymentTagsText, 'Deal Team status') || 'Floater',
+      primaryVertical: extractTagValueFlexible(deploymentTagsText, 'Primary vertical') || '',
+      secondaryVertical: extractTagValueFlexible(deploymentTagsText, 'Secondary vertical') || '',
+      primaryDealPhase: extractTagValueFlexible(deploymentTagsText, 'Primary deal phase') || '',
+      secondaryDealPhase: extractTagValueFlexible(deploymentTagsText, 'Secondary deal phase') || '',
+      topFiveArchetypes: extractTopFiveFlexible(deploymentTagsText),
+      riskFlag: extractTagValueFlexible(deploymentTagsText, '(?:One )?[Rr]isk [Ff]lag(?: tag)?') || null,
     };
 
     return {
@@ -2109,16 +2109,44 @@ ${scoreSheet}`;
     };
   }
 
+  // Flexible tag value extraction for personality assessment
+  function extractTagValueFlexible(text: string, label: string): string | null {
+    // Try lettered format first: "A. Label: value"
+    const letteredPattern = new RegExp(`[A-G]\\.\\s*${label}[:\\s]+(.+)`, 'i');
+    let match = text.match(letteredPattern);
+    if (match) return match[1].trim();
+    
+    // Try non-lettered format: "Label: value"
+    const simplePattern = new RegExp(`${label}[:\\s]+(.+)`, 'i');
+    match = text.match(simplePattern);
+    return match ? match[1].trim() : null;
+  }
+
   function extractTagValue(text: string, pattern: RegExp): string | null {
     const match = text.match(pattern);
     return match ? match[1].trim() : null;
+  }
+
+  function extractTopFiveFlexible(text: string): string[] {
+    // Try lettered format first
+    let match = text.match(/F\.\s*Top five archetype tags[:\s]*([\s\S]*?)(?=G\.|[Rr]isk|$)/i);
+    if (!match) {
+      // Try non-lettered format
+      match = text.match(/Top five archetype tags[:\s]*([\s\S]*?)(?=[Rr]isk|$)/i);
+    }
+    if (!match) return [];
+    const tagsText = match[1].trim();
+    return tagsText
+      .split(/[,\n]/)
+      .map(t => t.replace(/^\d+\.\s*/, '').trim())
+      .filter(t => t.length > 0)
+      .slice(0, 5);
   }
 
   function extractTopFive(text: string): string[] {
     const match = text.match(/F\.\s*Top five archetype tags[:\s]*([\s\S]*?)(?=G\.|$)/i);
     if (!match) return [];
     const tagsText = match[1].trim();
-    // Split by commas, newlines, or numbered items
     return tagsText
       .split(/[,\n]/)
       .map(t => t.replace(/^\d+\.\s*/, '').trim())
@@ -2448,19 +2476,20 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
     }
   }
 
-  // Parse AI response for resume analysis
+  // Parse AI response for resume analysis - handles both numbered and non-numbered formats
   function parseResumeAIAnalysis(rawResponse: string): any {
     const sections: Record<string, string> = {};
     
+    // Patterns that match both "1. Candidate Snapshot" and just "Candidate Snapshot"
     const sectionPatterns = [
-      { key: 'candidateSnapshot', pattern: /1\.\s*Candidate Snapshot\s*([\s\S]*?)(?=2\.\s*Evidence Anchors|$)/i },
-      { key: 'evidenceAnchors', pattern: /2\.\s*Evidence Anchors\s*([\s\S]*?)(?=3\.\s*Transaction Profile|$)/i },
-      { key: 'transactionProfile', pattern: /3\.\s*Transaction Profile\s*([\s\S]*?)(?=4\.\s*Role Elevation|$)/i },
-      { key: 'roleElevationAutonomy', pattern: /4\.\s*Role Elevation[^5]*([\s\S]*?)(?=5\.\s*Deal Phase Fit|$)/i },
-      { key: 'dealPhaseFit', pattern: /5\.\s*Deal Phase Fit\s*([\s\S]*?)(?=6\.\s*Deal Type Proficiency|$)/i },
-      { key: 'dealTypeProficiency', pattern: /6\.\s*Deal Type Proficiency\s*([\s\S]*?)(?=7\.\s*Resume Inferred Tags|$)/i },
-      { key: 'resumeInferredTags', pattern: /7\.\s*Resume Inferred Tags\s*([\s\S]*?)(?=8\.\s*Managerial Notes|$)/i },
-      { key: 'managerialNotes', pattern: /8\.\s*Managerial Notes\s*([\s\S]*?)(?=9\.\s*Final Onboarding Placement|$)/i },
+      { key: 'candidateSnapshot', pattern: /(?:1\.\s*)?Candidate Snapshot\s*([\s\S]*?)(?=(?:\d\.\s*)?Evidence Anchors|$)/i },
+      { key: 'evidenceAnchors', pattern: /(?:2\.\s*)?Evidence Anchors\s*([\s\S]*?)(?=(?:\d\.\s*)?Transaction Profile|$)/i },
+      { key: 'transactionProfile', pattern: /(?:3\.\s*)?Transaction Profile\s*([\s\S]*?)(?=(?:\d\.\s*)?Role Elevation|$)/i },
+      { key: 'roleElevationAutonomy', pattern: /(?:4\.\s*)?Role Elevation[^\n]*\s*([\s\S]*?)(?=(?:\d\.\s*)?Deal Phase Fit|$)/i },
+      { key: 'dealPhaseFit', pattern: /(?:5\.\s*)?Deal Phase Fit\s*([\s\S]*?)(?=(?:\d\.\s*)?Deal Type Proficiency|$)/i },
+      { key: 'dealTypeProficiency', pattern: /(?:6\.\s*)?Deal Type Proficiency\s*([\s\S]*?)(?=(?:\d\.\s*)?Resume Inferred Tags|$)/i },
+      { key: 'resumeInferredTags', pattern: /(?:7\.\s*)?Resume Inferred Tags\s*([\s\S]*?)(?=(?:\d\.\s*)?Managerial Notes|$)/i },
+      { key: 'managerialNotes', pattern: /(?:8\.\s*)?Managerial Notes\s*([\s\S]*?)(?=(?:\d\.\s*)?Final Onboarding Placement|$)/i },
     ];
 
     for (const { key, pattern } of sectionPatterns) {
@@ -2468,20 +2497,20 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       sections[key] = match ? match[1].trim() : '';
     }
 
-    // Extract Final Onboarding Placement section
-    const placementMatch = rawResponse.match(/9\.\s*Final Onboarding Placement\s*([\s\S]*?)$/i);
+    // Extract Final Onboarding Placement section - handles both numbered and non-numbered
+    const placementMatch = rawResponse.match(/(?:9\.\s*)?Final Onboarding Placement\s*([\s\S]*?)$/i);
     const placementText = placementMatch ? placementMatch[1].trim() : '';
 
-    // Parse onboarding placement
+    // Parse onboarding placement - handles both lettered and non-lettered formats
     const onboardingPlacement = {
-      assignedDealTeam: extractPlacementValue(placementText, /A\.\s*Assigned Deal Team[:\s]*(.+)/i) || 'Floater',
-      primaryVertical: extractPlacementValue(placementText, /B\.\s*Primary vertical[:\s]*(.+)/i) || '',
-      secondaryVertical: extractPlacementValue(placementText, /C\.\s*Secondary vertical[:\s]*(.+)/i) || '',
-      primaryDealPhase: extractPlacementValue(placementText, /D\.\s*Primary deal phase[:\s]*(.+)/i) || '',
-      secondaryDealPhase: extractPlacementValue(placementText, /E\.\s*Secondary deal phase[:\s]*(.+)/i) || '',
-      initialSeatRecommendation: extractPlacementValue(placementText, /F\.\s*Initial seat recommendation[:\s]*(.+)/i) || '',
-      topFiveInferredTags: extractInferredTags(placementText),
-      coverageGaps: extractPlacementValue(placementText, /H\.\s*Coverage gaps[:\s]*(.+)/i) || 'No material gaps observed',
+      assignedDealTeam: extractPlacementValueFlexible(placementText, 'Assigned Deal Team') || 'Floater',
+      primaryVertical: extractPlacementValueFlexible(placementText, 'Primary Vertical') || '',
+      secondaryVertical: extractPlacementValueFlexible(placementText, 'Secondary Vertical') || '',
+      primaryDealPhase: extractPlacementValueFlexible(placementText, 'Primary Deal Phase') || '',
+      secondaryDealPhase: extractPlacementValueFlexible(placementText, 'Secondary Deal Phase') || '',
+      initialSeatRecommendation: extractPlacementValueFlexible(placementText, 'Initial Seat Recommendation') || '',
+      topFiveInferredTags: extractInferredTagsFlexible(placementText),
+      coverageGaps: extractPlacementValueFlexible(placementText, 'Coverage Gaps') || 'No material gaps observed',
     };
 
     return {
@@ -2491,9 +2520,38 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
     };
   }
 
+  // Flexible extraction that handles "A. Label: value" or just "Label: value"
+  function extractPlacementValueFlexible(text: string, label: string): string | null {
+    // Try lettered format first: "A. Label: value" or "A. Label value"
+    const letteredPattern = new RegExp(`[A-H]\\.\\s*${label}[:\\s]+(.+)`, 'i');
+    let match = text.match(letteredPattern);
+    if (match) return match[1].trim();
+    
+    // Try non-lettered format: "Label: value"
+    const simplePattern = new RegExp(`${label}[:\\s]+(.+)`, 'i');
+    match = text.match(simplePattern);
+    return match ? match[1].trim() : null;
+  }
+
   function extractPlacementValue(text: string, pattern: RegExp): string | null {
     const match = text.match(pattern);
     return match ? match[1].trim() : null;
+  }
+
+  function extractInferredTagsFlexible(text: string): string[] {
+    // Try lettered format first
+    let match = text.match(/G\.\s*Top five Resume Inferred Tags[:\s]*([\s\S]*?)(?=H\.|Coverage|$)/i);
+    if (!match) {
+      // Try non-lettered format
+      match = text.match(/Top five Resume Inferred Tags[:\s]*([\s\S]*?)(?=Coverage|$)/i);
+    }
+    if (!match) return [];
+    const tagsText = match[1].trim();
+    return tagsText
+      .split(/[,\n]/)
+      .map(t => t.replace(/^\d+\.\s*/, '').trim())
+      .filter(t => t.length > 0)
+      .slice(0, 5);
   }
 
   function extractInferredTags(text: string): string[] {
