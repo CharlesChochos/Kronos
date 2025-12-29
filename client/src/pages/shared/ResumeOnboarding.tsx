@@ -1,35 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
-import { useResumeAnalysis, useUploadResume, type ResumeAIAnalysis, type OnboardingPlacement } from "@/lib/api";
+import { useResumeAnalysis, useUploadResume, type ResumeAIAnalysis } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Upload, FileText, Loader2, Target, Briefcase, Users, AlertTriangle, CheckCircle2, RefreshCw, ChevronRight } from "lucide-react";
+import { Upload, FileText, Loader2, Target, Briefcase, Users, CheckCircle2, RefreshCw, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-
-const PROFILE_COLORS: Record<string, string> = {
-  'Politician': 'bg-purple-100 text-purple-800 border-purple-300',
-  'Sherpa': 'bg-blue-100 text-blue-800 border-blue-300',
-  'Deal Junkie': 'bg-red-100 text-red-800 border-red-300',
-  'Closer': 'bg-green-100 text-green-800 border-green-300',
-  'Architect': 'bg-slate-100 text-slate-800 border-slate-300',
-  'Firefighter': 'bg-orange-100 text-orange-800 border-orange-300',
-  'Guru': 'bg-indigo-100 text-indigo-800 border-indigo-300',
-  'Misfit': 'bg-pink-100 text-pink-800 border-pink-300',
-  'Legal': 'bg-gray-100 text-gray-800 border-gray-300',
-  'Rainmaker': 'bg-yellow-100 text-yellow-800 border-yellow-300',
-  'Creative': 'bg-cyan-100 text-cyan-800 border-cyan-300',
-  'Auditor': 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  'Mayor': 'bg-amber-100 text-amber-800 border-amber-300',
-  'Liaison': 'bg-teal-100 text-teal-800 border-teal-300',
-  'Grandmaster': 'bg-violet-100 text-violet-800 border-violet-300',
-  'Regulatory': 'bg-rose-100 text-rose-800 border-rose-300',
-};
 
 function AnalysisSection({ title, content, icon: Icon }: { title: string; content: string; icon?: any }) {
   if (!content) return null;
@@ -155,13 +136,14 @@ export default function ResumeOnboarding() {
   if (hasCompletedAnalysis) {
     const aiAnalysis = existingAnalysis.aiAnalysis;
     const placement = aiAnalysis?.onboardingPlacement;
+    const hasCombinedAnalysis = placement && !placement.pendingCombinedAnalysis;
     
     return (
       <Layout role={role}>
         <div className="max-w-5xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Your Onboarding Placement</h1>
+              <h1 className="text-2xl font-bold tracking-tight">Resume Analysis Complete</h1>
               <p className="text-muted-foreground">
                 {existingAnalysis.completedAt && `Analyzed on ${format(new Date(existingAnalysis.completedAt), 'MMMM d, yyyy')}`}
                 {existingAnalysis.fileName && ` - ${existingAnalysis.fileName}`}
@@ -187,64 +169,17 @@ export default function ResumeOnboarding() {
             className="hidden"
           />
           
-          {placement && (
+          {hasCombinedAnalysis && placement?.assignedDealTeam && (
             <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Target className="h-5 w-5" />
-                  Final Onboarding Placement
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Assigned Deal Team</p>
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Target className="h-5 w-5 text-primary" />
+                    <span className="font-medium">Recommended Deal Team:</span>
                     <Badge variant="secondary" className="text-sm font-semibold">{placement.assignedDealTeam}</Badge>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Primary Vertical</p>
-                    <Badge className="text-sm bg-blue-600">{placement.primaryVertical}</Badge>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Secondary Vertical</p>
-                    <Badge variant="outline" className="text-sm">{placement.secondaryVertical}</Badge>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Initial Seat</p>
-                    <Badge className="text-sm bg-green-600">{placement.initialSeatRecommendation}</Badge>
-                  </div>
+                  <p className="text-sm text-muted-foreground">Based on resume and personality assessment</p>
                 </div>
-                <Separator className="my-4" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">Deal Phases</p>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge className="text-sm bg-emerald-600">Primary: {placement.primaryDealPhase}</Badge>
-                      <Badge variant="outline" className="text-sm">Secondary: {placement.secondaryDealPhase}</Badge>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">Resume Inferred Tags</p>
-                    <div className="flex flex-wrap gap-2">
-                      {placement.topFiveInferredTags?.map((tag, idx) => (
-                        <Badge 
-                          key={idx}
-                          className={cn("text-sm border", PROFILE_COLORS[tag] || 'bg-gray-100 text-gray-800')}
-                        >
-                          {idx + 1}. {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                {placement.coverageGaps && placement.coverageGaps !== 'No material gaps observed' && (
-                  <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200">
-                    <div className="flex items-center gap-2 text-amber-800">
-                      <AlertTriangle className="h-4 w-4" />
-                      <span className="text-sm font-medium">Coverage Gaps: {placement.coverageGaps}</span>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}
@@ -295,10 +230,6 @@ export default function ResumeOnboarding() {
                   {aiAnalysis?.dealTypeProficiency && (
                     <AnalysisSection title="Deal Type Proficiency" content={aiAnalysis.dealTypeProficiency} icon={Briefcase} />
                   )}
-                  <Separator />
-                  {aiAnalysis?.resumeInferredTags && (
-                    <AnalysisSection title="Resume Inferred Tags" content={aiAnalysis.resumeInferredTags} />
-                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -320,7 +251,7 @@ export default function ResumeOnboarding() {
                 <div>
                   <h3 className="font-semibold">Ready for Personality Assessment?</h3>
                   <p className="text-sm text-muted-foreground">
-                    Complete the 25-question assessment to refine your deployment profile with behavioral insights.
+                    Complete the 25-question assessment to finalize your Deal Team placement.
                   </p>
                 </div>
                 <Button onClick={handleContinueToAssessment} size="lg">
@@ -407,15 +338,15 @@ export default function ResumeOnboarding() {
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Assigns you to a Deal Team (Floater, DT10, DT8, DT6, DT4, or DT2)
+                Extracts your candidate profile and evidence anchors
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Identifies your vertical fit and deal phase strengths
+                Identifies your deployment fit and deal phase strengths
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Recommends your initial seat on live mandates
+                Generates management notes for team leaders
               </li>
             </ul>
           </CardContent>

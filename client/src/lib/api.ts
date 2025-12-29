@@ -3679,6 +3679,9 @@ export type OnboardingPlacement = {
   initialSeatRecommendation: string;
   topFiveInferredTags: string[];
   coverageGaps: string;
+  pendingCombinedAnalysis?: boolean;
+  combinedAnalysisCompletedAt?: string;
+  placementRationale?: string;
 };
 
 export type ResumeAIAnalysis = {
