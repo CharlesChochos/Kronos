@@ -3916,10 +3916,27 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       }
       
       const updateData = { ...result.data };
+      
+      // Track timing when status changes
+      if (updateData.status === 'In Progress' && existingTask.status !== 'In Progress') {
+        // Starting the task - record start time
+        (updateData as any).startedAt = new Date();
+      }
+      
       if (updateData.status === 'Completed' && existingTask.status !== 'Completed') {
-        (updateData as any).completedAt = new Date();
+        const now = new Date();
+        (updateData as any).completedAt = now;
+        
+        // Calculate duration if we have a start time
+        if (existingTask.startedAt) {
+          const startTime = new Date(existingTask.startedAt);
+          const durationMs = now.getTime() - startTime.getTime();
+          (updateData as any).durationMinutes = Math.round(durationMs / (1000 * 60));
+        }
       } else if (updateData.status && updateData.status !== 'Completed' && existingTask.status === 'Completed') {
+        // Reopening a completed task - clear completion data
         (updateData as any).completedAt = null;
+        (updateData as any).durationMinutes = null;
       }
       
       const task = await storage.updateTask(req.params.id, updateData);
