@@ -515,6 +515,20 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(schema.tasks).where(eq(schema.tasks.dealId, dealId));
   }
 
+  async getTasksByDealAndUser(dealId: string, userId: string): Promise<Task[]> {
+    return await db.select().from(schema.tasks).where(
+      and(
+        eq(schema.tasks.dealId, dealId),
+        eq(schema.tasks.assignedTo, userId)
+      )
+    );
+  }
+
+  async getUserPodMemberships(userId: string): Promise<schema.PodMember[]> {
+    return await db.select().from(schema.podMembers)
+      .where(eq(schema.podMembers.userId, userId));
+  }
+
   async createTask(insertTask: InsertTask): Promise<Task> {
     const [task] = await db.insert(schema.tasks)
       .values(insertTask)

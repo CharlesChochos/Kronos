@@ -19,7 +19,17 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { PDFParse } from "pdf-parse";
-import { approveOpportunityToDeal, transitionDealStage, formPodForDeal } from "./aiPodFormation";
+import { 
+  approveOpportunityToDeal, 
+  transitionDealStage, 
+  formPodForDeal,
+  onTaskCompleted,
+  onDealDocumentUploaded,
+  onDealUpdated,
+  checkAndRebalanceWorkloads,
+  getUserMultiDealMatrix,
+  reoptimizeDealTasks
+} from "./aiPodFormation";
 
 // PostgreSQL session store
 const PgSession = connectPgSimple(session);
@@ -3007,6 +3017,14 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
             });
           }
         }
+        
+        // Trigger AI workload reoptimization on significant deal updates
+        if (changes.stage || changes.status || changes.value) {
+          const changeDesc = Object.keys(changes).map(k => `${k}: ${changes[k].from} → ${changes[k].to}`).join(', ');
+          onDealUpdated(deal.id, changeDesc).catch(err => {
+            console.error('[AI Reoptimization] Error on deal update:', err);
+          });
+        }
       }
       res.json(updatedDeal);
     } catch (error) {
@@ -3937,6 +3955,13 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
               link: '/ceo/dashboard',
             });
           }
+        }
+        
+        // Trigger AI workload reoptimization when task is completed
+        if (changes.status?.to === 'Completed' && existingTask.dealId) {
+          onTaskCompleted(existingTask.dealId, currentUser.id, existingTask.id).catch(err => {
+            console.error('[AI Reoptimization] Error on task completion:', err);
+          });
         }
       }
       res.json(task);
@@ -9543,6 +9568,14 @@ Only include entries with both name AND company. Extract ALL rows.`
         uploadedBy: user.id,
       });
       await createAuditLog(req, 'document_created', 'document', doc.id, doc.title, { category: doc.category, dealId: doc.dealId });
+      
+      // Trigger AI workload reoptimization when document is uploaded to a deal
+      if (doc.dealId) {
+        onDealDocumentUploaded(doc.dealId, doc.id).catch(err => {
+          console.error('[AI Reoptimization] Error on document upload:', err);
+        });
+      }
+      
       res.status(201).json(doc);
     } catch (error) {
       console.error('Create document error:', error);
@@ -10038,6 +10071,59 @@ Only include entries with both name AND company. Extract ALL rows.`
       res.json(users.map(sanitizeUser));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch external users" });
+    }
+  });
+
+  // ==================== Workload Management API ====================
+  
+  // Get multi-deal user workload matrix (CEO only)
+  app.get("/api/workload/matrix", requireCEO, async (req, res) => {
+    try {
+      const matrix = await getUserMultiDealMatrix();
+      res.json(matrix);
+    } catch (error) {
+      console.error('[Workload API] Error getting matrix:', error);
+      res.status(500).json({ error: "Failed to get workload matrix" });
+    }
+  });
+  
+  // Trigger manual workload rebalancing across all deals (CEO only)
+  app.post("/api/workload/rebalance", requireCEO, aiLimiter, async (req, res) => {
+    try {
+      console.log('[Workload API] Manual rebalance triggered');
+      const result = await checkAndRebalanceWorkloads();
+      res.json({
+        success: true,
+        message: 'Workload rebalancing completed',
+        dealsRebalanced: result.dealsRebalanced,
+        totalChanges: result.totalChanges
+      });
+    } catch (error) {
+      console.error('[Workload API] Error during rebalancing:', error);
+      res.status(500).json({ error: "Failed to rebalance workloads" });
+    }
+  });
+  
+  // Trigger task reoptimization for a specific deal (CEO only)
+  app.post("/api/deals/:id/reoptimize", requireCEO, aiLimiter, async (req, res) => {
+    try {
+      const deal = await storage.getDeal(req.params.id);
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+      
+      const { reason } = req.body;
+      console.log(`[Workload API] Manual reoptimization for deal ${deal.name}: ${reason || 'manual trigger'}`);
+      
+      const result = await reoptimizeDealTasks(req.params.id, reason || 'Manual reoptimization requested');
+      res.json({
+        success: result.success,
+        changes: result.changes,
+        error: result.error
+      });
+    } catch (error) {
+      console.error('[Workload API] Error during deal reoptimization:', error);
+      res.status(500).json({ error: "Failed to reoptimize deal tasks" });
     }
   });
 
