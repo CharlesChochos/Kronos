@@ -140,7 +140,9 @@ export const tasks = pgTable("tasks", {
   status: text("status").notNull().default('Pending'),
   type: text("type").default('General'), // Optional with default
   attachments: jsonb("attachments").default([]).$type<TaskAttachment[]>(),
+  startedAt: timestamp("started_at"), // When task moved to In Progress
   completedAt: timestamp("completed_at"),
+  durationMinutes: integer("duration_minutes"), // Actual time taken to complete
   createdAt: timestamp("created_at").defaultNow(),
 });
 
