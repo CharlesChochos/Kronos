@@ -2527,9 +2527,6 @@ Deal phase mapping from resume evidence
  Execution indicators: diligence management, workstream coordination, third party management, timeline control
  Closing indicators: negotiation support, definitive documentation coordination, approvals, closing deliverables
  Integration indicators: post close operating plan, KPI build, governance cadence, reporting, value creation initiatives
-IMPORTANT: Do NOT assign archetype tags, Deal Teams, or make final placement recommendations during resume analysis.
- These will be determined later after both resume analysis AND personality assessment are complete.
- Focus only on extracting and summarizing the factual evidence from the resume.
 Mandatory output format
  Write the output in this exact order, short paragraphs per section, no tables.
 1. Candidate Snapshot
@@ -2547,9 +2544,12 @@ Mandatory output format
  State primary and secondary vertical with evidence based rationale grounded in the vertical indicators above. Include one sentence on contexts to avoid or constrain at onboarding.
 7. Managerial Notes
  Provide observations about review cadence needs, what they appear suited to own, what may need supervision, and the ideal seat on a live mandate based on resume evidence.
+8. Deal Team Assignment
+ Based on the resume evidence, assign one of the following Deal Team statuses: Floater, Deal Team 10, Deal Team 8, Deal Team 2, Deal Team 4, or Deal Team 6.
+ Format: "Assigned Deal Team: [TEAM NAME]" followed by a one-sentence evidence-based rationale.
 Quality control pass
  Before finalizing, run two silent checks
-Completeness check, every mandatory section 1-7 present
+Completeness check, every mandatory section 1-8 present
 Evidence check, every major conclusion is anchored to resume evidence, and any assumption is clearly flagged in Data Integrity Notes`;
 
   // AI Resume Analysis function
@@ -2589,12 +2589,10 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
   }
 
   // Parse AI response for resume analysis - handles both numbered and non-numbered formats
-  // NOTE: Resume analysis does NOT assign tags, deal teams, or fit scores - those come from combined analysis
   function parseResumeAIAnalysis(rawResponse: string): any {
     const sections: Record<string, string> = {};
     
     // Patterns that match both "1. Candidate Snapshot" and just "Candidate Snapshot"
-    // Updated to match new 7-section format (no Resume Inferred Tags or Final Onboarding Placement)
     const sectionPatterns = [
       { key: 'candidateSnapshot', pattern: /(?:1\.\s*)?Candidate Snapshot\s*([\s\S]*?)(?=(?:\d\.\s*)?Evidence Anchors|$)/i },
       { key: 'evidenceAnchors', pattern: /(?:2\.\s*)?Evidence Anchors\s*([\s\S]*?)(?=(?:\d\.\s*)?Transaction Profile|$)/i },
@@ -2602,7 +2600,8 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       { key: 'roleElevationAutonomy', pattern: /(?:4\.\s*)?Role Elevation[^\n]*\s*([\s\S]*?)(?=(?:\d\.\s*)?Deal Phase Fit|$)/i },
       { key: 'dealPhaseFit', pattern: /(?:5\.\s*)?Deal Phase Fit\s*([\s\S]*?)(?=(?:\d\.\s*)?Deal Type Proficiency|$)/i },
       { key: 'dealTypeProficiency', pattern: /(?:6\.\s*)?Deal Type Proficiency\s*([\s\S]*?)(?=(?:\d\.\s*)?Managerial Notes|$)/i },
-      { key: 'managerialNotes', pattern: /(?:7\.\s*)?Managerial Notes\s*([\s\S]*?)(?=Quality control|$)/i },
+      { key: 'managerialNotes', pattern: /(?:7\.\s*)?Managerial Notes\s*([\s\S]*?)(?=(?:\d\.\s*)?Deal Team Assignment|Quality control|$)/i },
+      { key: 'dealTeamAssignment', pattern: /(?:8\.\s*)?Deal Team Assignment\s*([\s\S]*?)(?=Quality control|$)/i },
     ];
 
     for (const { key, pattern } of sectionPatterns) {
@@ -2610,10 +2609,20 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       sections[key] = match ? match[1].trim() : '';
     }
 
-    // Resume analysis no longer populates tags or placement - these are null/placeholder
-    // They will be populated by combinedOnboardingAnalysis after personality assessment completes
+    // Extract deal team from the Deal Team Assignment section
+    let assignedDealTeam = 'Floater';
+    const dealTeamSection = sections.dealTeamAssignment || '';
+    const dealTeamMatch = dealTeamSection.match(/Assigned Deal Team:\s*(Floater|Deal Team \d+|DT\s*\d+)/i);
+    if (dealTeamMatch) {
+      assignedDealTeam = dealTeamMatch[1].trim();
+      // Normalize format (e.g., "DT 10" -> "Deal Team 10")
+      if (assignedDealTeam.match(/^DT\s*\d+$/i)) {
+        assignedDealTeam = assignedDealTeam.replace(/^DT\s*/i, 'Deal Team ');
+      }
+    }
+
     const onboardingPlacement = {
-      assignedDealTeam: null,
+      assignedDealTeam,
       primaryVertical: null,
       secondaryVertical: null,
       primaryDealPhase: null,
@@ -2621,12 +2630,12 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       initialSeatRecommendation: null,
       topFiveInferredTags: [],
       coverageGaps: null,
-      pendingCombinedAnalysis: true, // Flag indicating combined analysis needed
+      pendingCombinedAnalysis: false,
     };
 
     return {
       ...sections,
-      resumeInferredTags: null, // Not populated during resume analysis
+      resumeInferredTags: null,
       onboardingPlacement,
       rawResponse,
     };
@@ -2792,17 +2801,17 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
           const aiResult = await analyzeResumeWithAI(resumeText);
           console.log('[Resume] AI analysis result:', aiResult.success ? 'success' : 'failed', aiResult.error || '');
 
-          // Update with AI analysis - NOTE: assignedDealTeam is NOT set here
-          // It will be set by combinedOnboardingAnalysis after personality assessment completes
+          // Update with AI analysis - assignedDealTeam is set from resume analysis
           if (aiResult.success && analysis) {
-            console.log('[Resume] Saving AI analysis to database (no deal team yet - pending combined analysis)...');
+            const dealTeam = aiResult.analysis?.onboardingPlacement?.assignedDealTeam || 'Floater';
+            console.log('[Resume] Saving AI analysis to database, assigned deal team:', dealTeam);
             await storage.updateResumeAnalysis(analysis.id, {
               aiAnalysis: aiResult.analysis,
-              assignedDealTeam: null, // Will be set by combined analysis
+              assignedDealTeam: dealTeam,
               status: 'completed',
               completedAt: new Date(),
             });
-            console.log('[Resume] AI analysis saved successfully');
+            console.log('[Resume] AI analysis saved successfully with deal team:', dealTeam);
 
             // Notify admin users (including Charles) that resume onboarding is complete
             try {

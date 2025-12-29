@@ -135,8 +135,7 @@ export default function ResumeOnboarding() {
   
   if (hasCompletedAnalysis) {
     const aiAnalysis = existingAnalysis.aiAnalysis;
-    const placement = aiAnalysis?.onboardingPlacement;
-    const hasCombinedAnalysis = placement && !placement.pendingCombinedAnalysis;
+    const assignedDealTeam = existingAnalysis.assignedDealTeam || aiAnalysis?.onboardingPlacement?.assignedDealTeam;
     
     return (
       <Layout role={role}>
@@ -169,16 +168,16 @@ export default function ResumeOnboarding() {
             className="hidden"
           />
           
-          {hasCombinedAnalysis && placement?.assignedDealTeam && (
+          {assignedDealTeam && (
             <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
               <CardContent className="py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Target className="h-5 w-5 text-primary" />
-                    <span className="font-medium">Recommended Deal Team:</span>
-                    <Badge variant="secondary" className="text-sm font-semibold">{placement.assignedDealTeam}</Badge>
+                    <span className="font-medium">Assigned Deal Team:</span>
+                    <Badge variant="secondary" className="text-sm font-semibold">{assignedDealTeam}</Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground">Based on resume and personality assessment</p>
+                  <p className="text-sm text-muted-foreground">Based on resume analysis</p>
                 </div>
               </CardContent>
             </Card>
