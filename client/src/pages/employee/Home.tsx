@@ -232,12 +232,12 @@ export default function EmployeeHome() {
   const now = new Date();
   const activeTasks = myTasks.filter((t: any) => t.status === 'In Progress');
   const upcomingTasksAll = myTasks.filter((t: any) => {
-    if (t.status === 'Completed') return false;
+    if (t.status === 'Completed' || !t.dueDate) return false;
     const dueDate = new Date(t.dueDate);
     return dueDate > now;
-  }).sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  }).sort((a: any, b: any) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime());
   const overdueTasks = myTasks.filter((t: any) => {
-    if (t.status === 'Completed') return false;
+    if (t.status === 'Completed' || !t.dueDate) return false;
     const dueDate = new Date(t.dueDate);
     return dueDate < now;
   });
@@ -281,7 +281,7 @@ export default function EmployeeHome() {
   // Get upcoming tasks (due within next 7 days)
   const upcomingTasks = myTasks
     .filter((t: any) => t.status !== 'Completed')
-    .sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+    .sort((a: any, b: any) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime())
     .slice(0, 5);
 
   // Get unread notifications
@@ -327,11 +327,16 @@ export default function EmployeeHome() {
     }
   };
 
-  const formatDueDate = (dateStr: string) => {
-    const date = parseISO(dateStr);
-    if (isToday(date)) return 'Today';
-    if (isTomorrow(date)) return 'Tomorrow';
-    return format(date, 'MMM d');
+  const formatDueDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return 'No date';
+    try {
+      const date = parseISO(dateStr);
+      if (isToday(date)) return 'Today';
+      if (isTomorrow(date)) return 'Tomorrow';
+      return format(date, 'MMM d');
+    } catch {
+      return 'Invalid date';
+    }
   };
   
   const renderQuickStats = () => widgetSettings.showQuickStats && (
@@ -897,7 +902,7 @@ export default function EmployeeHome() {
     const date = subDays(new Date(), 6 - i);
     const dayStr = format(date, 'EEE');
     const completedOnDay = completedTasks.filter((t: any) => {
-      const taskDate = new Date(t.updatedAt || t.dueDate);
+      const taskDate = new Date(t.updatedAt || t.dueDate || new Date());
       return format(taskDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
     }).length;
     return { day: dayStr, completed: completedOnDay, assigned: Math.floor(Math.random() * 3) + 1 };
