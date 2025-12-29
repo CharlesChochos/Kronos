@@ -475,7 +475,7 @@ export default function TeamPerformance() {
                     </div>
                     <Avatar className="w-8 h-8">
                       <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                        {member.name.split(' ').map(n => n[0]).join('')}
+                        {(member.name || "?").split(' ').map(n => n[0]).join('')}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
@@ -527,7 +527,7 @@ export default function TeamPerformance() {
                     <div className="flex items-start gap-3">
                       <Avatar className="w-12 h-12">
                         <AvatarFallback className="bg-primary/20 text-primary">
-                          {member.name.split(' ').map(n => n[0]).join('')}
+                          {(member.name || "?").split(' ').map(n => n[0]).join('')}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
@@ -575,7 +575,7 @@ export default function TeamPerformance() {
                 <CardTitle className="flex items-center gap-2">
                   <Avatar className="w-8 h-8">
                     <AvatarFallback className="bg-primary/20 text-primary text-sm">
-                      {selectedMemberData.name.split(' ').map(n => n[0]).join('')}
+                      {(selectedMemberData.name || "?").split(' ').map(n => n[0]).join('')}
                     </AvatarFallback>
                   </Avatar>
                   {selectedMemberData.name} - Performance Details

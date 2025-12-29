@@ -1406,7 +1406,7 @@ function TaskComments({
                 onClick={() => insertMention(user)}
               >
                 <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-medium text-primary">
-                  {user.name.split(' ').map((n: string) => n[0]).join('')}
+                  {(user.name || "?").split(' ').map((n: string) => n[0]).join('')}
                 </div>
                 <span>{user.name}</span>
               </div>

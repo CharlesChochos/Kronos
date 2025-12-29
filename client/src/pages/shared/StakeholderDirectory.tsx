@@ -826,7 +826,7 @@ export default function StakeholderDirectory({ role }: { role: 'CEO' | 'Employee
                             <div className="flex items-center gap-3">
                               <Avatar className="h-12 w-12">
                                 <AvatarFallback className={cn("text-white", typeColors[stakeholder.type])}>
-                                  {stakeholder.name.split(' ').map(n => n[0]).join('')}
+                                  {(stakeholder.name || "?").split(' ').map(n => n[0]).join('')}
                                 </AvatarFallback>
                               </Avatar>
                               <div>

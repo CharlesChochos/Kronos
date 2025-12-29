@@ -461,7 +461,7 @@ export default function InvestorCRM() {
                             <div className="flex items-center gap-3">
                               <Avatar className="w-10 h-10">
                                 <AvatarFallback className="bg-primary/20 text-primary">
-                                  {investor.name.split(' ').map(n => n[0]).join('')}
+                                  {(investor.name || "?").split(' ').map(n => n[0]).join('')}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="flex-1 min-w-0">
@@ -494,7 +494,7 @@ export default function InvestorCRM() {
                     <div className="flex items-center gap-4">
                       <Avatar className="w-16 h-16">
                         <AvatarFallback className="text-xl bg-primary/20 text-primary">
-                          {selectedInvestor.name.split(' ').map(n => n[0]).join('')}
+                          {(selectedInvestor.name || "?").split(' ').map(n => n[0]).join('')}
                         </AvatarFallback>
                       </Avatar>
                       <div>

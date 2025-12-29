@@ -1567,7 +1567,7 @@ export default function EmployeeHome() {
                         {(selectedDeal.podTeam as PodTeamMember[]).map((member, idx) => (
                           <div key={idx} className="flex items-center gap-2 p-2 bg-secondary/20 rounded-lg">
                             <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium">
-                              {member.name.split(' ').map(n => n[0]).join('')}
+                              {(member.name || "?").split(' ').map(n => n[0]).join('')}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{member.name}</p>

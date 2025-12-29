@@ -214,7 +214,7 @@ export default function AuthPage() {
         return;
       }
       
-      const firstName = values.name.split(' ')[0];
+      const firstName = (values.name || "").split(' ')[0] || "User";
       setWelcomeName(firstName);
       
       if (result?.accessLevel === 'admin') {

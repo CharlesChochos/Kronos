@@ -1394,7 +1394,7 @@ function TaskComments({
                 onClick={() => insertMention(user)}
               >
                 <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-medium text-primary">
-                  {user.name.split(' ').map((n: string) => n[0]).join('')}
+                  {(user.name || "?").split(' ').map((n: string) => n[0]).join('')}
                 </div>
                 <span>{user.name}</span>
               </div>
@@ -3606,7 +3606,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       })}
                       {/* Show legacy podTeam members from deal JSON if no stage_pod_members exist */}
                       {allStagePodMembers.length === 0 && (selectedDealWithAttachments as any)?.podTeam && ((selectedDealWithAttachments as any).podTeam as PodTeamMember[]).map((member: PodTeamMember, index: number) => {
-                        const initials = member.name.split(' ').map((n: string) => n[0] || '').join('').slice(0, 2);
+                        const initials = (member.name || "?").split(' ').map((n: string) => n[0] || '').join('').slice(0, 2);
                         return (
                           <div key={`legacy-${index}`} className="p-3 bg-secondary/30 rounded-lg flex items-center justify-between group">
                             <div className="flex items-center gap-3">

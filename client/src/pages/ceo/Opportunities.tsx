@@ -1164,7 +1164,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                                 data-testid={`tag-member-${user.id}`}
                               >
                                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                                  {user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                  {(user.name || "?").split(' ').map(n => n[0]).join('').slice(0, 2)}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="text-sm font-medium truncate">{user.name}</div>
@@ -1200,7 +1200,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                             <div key={member.userId || index} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
                               <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                                  {member.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                  {(member.name || "?").split(' ').map(n => n[0]).join('').slice(0, 2)}
                                 </div>
                                 <div>
                                   <p className="text-sm font-medium">{member.name}</p>

@@ -79,7 +79,7 @@ export default function PortalDashboard() {
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h2 className="text-2xl font-bold">Welcome, {user.name.split(" ")[0]}</h2>
+          <h2 className="text-2xl font-bold">Welcome, {user.name?.split(" ")[0] || "User"}</h2>
           <p className="text-muted-foreground">
             {(user as any).externalOrganization ? `${(user as any).externalOrganization} Portal` : "Your deal dashboard"}
           </p>

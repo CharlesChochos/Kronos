@@ -522,7 +522,7 @@ export default function TeamAssignment() {
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary">
-                                  {user.name.split(' ').map((n: string) => n[0]).join('')}
+                                  {(user.name || "?").split(' ').map((n: string) => n[0]).join('')}
                                 </div>
                                 <div>
                                   <h4 className="font-medium">{user.name}</h4>

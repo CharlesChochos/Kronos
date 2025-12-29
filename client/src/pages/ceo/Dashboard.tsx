@@ -925,7 +925,7 @@ export default function Dashboard() {
       .sort((a, b) => (b.score || 0) - (a.score || 0))
       .slice(0, 5)
       .map(e => ({
-        name: e.name.split(' ')[0],
+        name: (e.name || "?").split(' ')[0],
         score: e.score || 0,
         tasks: e.completedTasks,
       }));
@@ -1695,7 +1695,7 @@ export default function Dashboard() {
                           "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white",
                           index === 0 ? "bg-primary" : "bg-secondary border border-border"
                         )}>
-                          {employee.name.split(' ').map((n: string) => n[0]).join('')}
+                          {(employee.name || "?").split(' ').map((n: string) => n[0]).join('')}
                         </div>
                         <div>
                           <h4 className="text-sm font-medium text-foreground group-hover:text-primary transition-colors flex items-center gap-1">

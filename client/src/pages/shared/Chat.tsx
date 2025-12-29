@@ -1450,7 +1450,7 @@ export default function Chat({ role }: ChatProps) {
                             >
                               <Avatar className="w-6 h-6">
                                 <AvatarFallback className="bg-blue-500/20 text-blue-500 text-xs">
-                                  {user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                  {(user.name || "?").split(' ').map(n => n[0]).join('').slice(0, 2)}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="min-w-0">
@@ -1591,7 +1591,7 @@ export default function Chat({ role }: ChatProps) {
                   >
                     <Avatar className="w-10 h-10">
                       <AvatarFallback className="bg-blue-500/20 text-blue-500 text-sm">
-                        {user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        {(user.name || "?").split(' ').map(n => n[0]).join('').slice(0, 2)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="text-left">
@@ -1657,7 +1657,7 @@ export default function Chat({ role }: ChatProps) {
                       />
                       <Avatar className="w-8 h-8">
                         <AvatarFallback className="bg-blue-500/20 text-blue-500 text-xs">
-                          {user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                          {(user.name || "?").split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </AvatarFallback>
                       </Avatar>
                       <span className="text-sm">{user.name}</span>
