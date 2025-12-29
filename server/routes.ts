@@ -2102,13 +2102,13 @@ ${scoreSheet}`;
     const deploymentTagsMatch = rawResponse.match(/(?:11\.\s*)?Final Deployment Tags\s*([\s\S]*?)$/i);
     const deploymentTagsText = deploymentTagsMatch ? deploymentTagsMatch[1].trim() : '';
 
-    // Parse deployment tags - flexible extraction
+    // Parse deployment tags - flexible extraction with fallback for simpler formats
     const deploymentTags = {
-      dealTeamStatus: extractTagValueFlexible(deploymentTagsText, 'Deal Team status') || 'Floater',
-      primaryVertical: extractTagValueFlexible(deploymentTagsText, 'Primary vertical') || '',
-      secondaryVertical: extractTagValueFlexible(deploymentTagsText, 'Secondary vertical') || '',
-      primaryDealPhase: extractTagValueFlexible(deploymentTagsText, 'Primary deal phase') || '',
-      secondaryDealPhase: extractTagValueFlexible(deploymentTagsText, 'Secondary deal phase') || '',
+      dealTeamStatus: extractDealTeamStatus(deploymentTagsText) || 'Floater',
+      primaryVertical: extractLetterValue(deploymentTagsText, 'B') || extractTagValueFlexible(deploymentTagsText, 'Primary vertical') || '',
+      secondaryVertical: extractLetterValue(deploymentTagsText, 'C') || extractTagValueFlexible(deploymentTagsText, 'Secondary vertical') || '',
+      primaryDealPhase: extractLetterValue(deploymentTagsText, 'D') || extractTagValueFlexible(deploymentTagsText, 'Primary deal phase') || '',
+      secondaryDealPhase: extractLetterValue(deploymentTagsText, 'E') || extractTagValueFlexible(deploymentTagsText, 'Secondary deal phase') || '',
       topFiveArchetypes: extractTopFiveFlexible(deploymentTagsText),
       riskFlag: extractTagValueFlexible(deploymentTagsText, '(?:One )?[Rr]isk [Ff]lag(?: tag)?') || null,
     };
@@ -2118,6 +2118,41 @@ ${scoreSheet}`;
       deploymentTags,
       rawResponse,
     };
+  }
+
+  // Extract deal team status - handles multiple formats
+  function extractDealTeamStatus(text: string): string | null {
+    // First try labeled format: "A. Deal Team status: Deal Team 6"
+    const labeledMatch = text.match(/[A-G]\.\s*Deal Team status[:\s]+(.+)/i);
+    if (labeledMatch) return labeledMatch[1].trim();
+    
+    // Try simple labeled: "Deal Team status: Deal Team 6"
+    const simpleMatch = text.match(/Deal Team status[:\s]+(.+)/i);
+    if (simpleMatch) return simpleMatch[1].trim();
+    
+    // Try direct letter format: "A. Deal Team 6" or "A. Floater"
+    const letterMatch = text.match(/A\.\s*(Deal Team \d+|Floater)/i);
+    if (letterMatch) return letterMatch[1].trim();
+    
+    // Try to find Deal Team anywhere in A. line
+    const lineMatch = text.match(/A\.\s*(.+?)(?:\n|$)/i);
+    if (lineMatch) {
+      const lineValue = lineMatch[1].trim();
+      // Check if it contains a valid deal team
+      if (/Deal Team \d+|Floater/i.test(lineValue)) {
+        const dtMatch = lineValue.match(/(Deal Team \d+|Floater)/i);
+        if (dtMatch) return dtMatch[1];
+      }
+    }
+    
+    return null;
+  }
+
+  // Extract value from a specific letter line: "B. value"
+  function extractLetterValue(text: string, letter: string): string | null {
+    const pattern = new RegExp(`${letter}\\.\\s*(.+?)(?:\\n|$)`, 'i');
+    const match = text.match(pattern);
+    return match ? match[1].trim() : null;
   }
 
   // Flexible tag value extraction for personality assessment

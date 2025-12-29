@@ -114,7 +114,23 @@ async function buildUserRoster(usersWithProfiles: Array<{
   workload: { activeTasks: number; pendingTasks: number; completedThisWeek: number };
 }>): Promise<UserWorkloadSnapshot[]> {
   const rosterPromises = usersWithProfiles.map(async ({ user, resumeAnalysis, personalityAssessment, workload }) => {
-    const dealTeamStatus = resumeAnalysis?.assignedDealTeam || 'Floater';
+    // Check multiple sources for deal team status:
+    // 1. Resume analysis assignedDealTeam (top-level)
+    // 2. Resume analysis onboardingPlacement.assignedDealTeam
+    // 3. Personality assessment deploymentTags.dealTeamStatus
+    let dealTeamStatus = resumeAnalysis?.assignedDealTeam 
+      || (resumeAnalysis?.aiAnalysis as any)?.onboardingPlacement?.assignedDealTeam
+      || (personalityAssessment?.aiAnalysis as any)?.deploymentTags?.dealTeamStatus
+      || 'Floater';
+    
+    // Normalize deal team status - handle variations
+    if (dealTeamStatus && typeof dealTeamStatus === 'string') {
+      // Ensure consistent formatting
+      const normalized = dealTeamStatus.trim();
+      if (/^Deal Team \d+$/i.test(normalized) || normalized === 'Floater') {
+        dealTeamStatus = normalized;
+      }
+    }
     
     const personalityTags: string[] = [];
     if (personalityAssessment?.aiAnalysis?.deploymentTags?.topFiveArchetypes) {
