@@ -10091,6 +10091,93 @@ Only include entries with both name AND company. Extract ALL rows.`
     }
   });
 
+  // ==================== Time Analytics API ====================
+  
+  // Get time analytics for all employees (CEO only)
+  app.get("/api/analytics/time", requireCEO, async (req, res) => {
+    try {
+      const allTasks = await storage.getAllTasks();
+      const allUsers = await storage.getAllUsers();
+      const internalUsers = allUsers.filter(u => !u.isExternal && u.status === 'active');
+      
+      // Calculate per-user analytics
+      const userAnalytics = internalUsers.map(user => {
+        const userTasks = allTasks.filter(t => t.assignedTo === user.id);
+        const completedTasks = userTasks.filter(t => t.status === 'Completed');
+        const tasksWithDuration = completedTasks.filter(t => t.durationMinutes !== null && t.durationMinutes !== undefined);
+        
+        const totalDuration = tasksWithDuration.reduce((sum, t) => sum + (t.durationMinutes || 0), 0);
+        const avgDuration = tasksWithDuration.length > 0 ? Math.round(totalDuration / tasksWithDuration.length) : 0;
+        
+        // Calculate tasks by priority
+        const byPriority = {
+          High: completedTasks.filter(t => t.priority === 'High').length,
+          Medium: completedTasks.filter(t => t.priority === 'Medium').length,
+          Low: completedTasks.filter(t => t.priority === 'Low').length,
+        };
+        
+        // Tasks completed this week
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        const completedThisWeek = completedTasks.filter(t => 
+          t.completedAt && new Date(t.completedAt) > oneWeekAgo
+        ).length;
+        
+        // Get recent completed tasks with timing
+        const recentTasks = tasksWithDuration
+          .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())
+          .slice(0, 10)
+          .map(t => ({
+            id: t.id,
+            title: t.title,
+            priority: t.priority,
+            durationMinutes: t.durationMinutes,
+            completedAt: t.completedAt,
+          }));
+        
+        return {
+          userId: user.id,
+          userName: user.name,
+          email: user.email,
+          jobTitle: user.jobTitle,
+          avatar: user.avatar,
+          totalTasks: userTasks.length,
+          completedTasks: completedTasks.length,
+          pendingTasks: userTasks.filter(t => t.status === 'Pending').length,
+          inProgressTasks: userTasks.filter(t => t.status === 'In Progress').length,
+          tasksWithTiming: tasksWithDuration.length,
+          totalDurationMinutes: totalDuration,
+          avgDurationMinutes: avgDuration,
+          completedThisWeek,
+          byPriority,
+          recentTasks,
+        };
+      });
+      
+      // Overall stats
+      const allCompletedWithDuration = allTasks.filter(t => 
+        t.status === 'Completed' && t.durationMinutes !== null && t.durationMinutes !== undefined
+      );
+      const overallTotalDuration = allCompletedWithDuration.reduce((sum, t) => sum + (t.durationMinutes || 0), 0);
+      const overallAvgDuration = allCompletedWithDuration.length > 0 
+        ? Math.round(overallTotalDuration / allCompletedWithDuration.length) 
+        : 0;
+      
+      res.json({
+        users: userAnalytics.sort((a, b) => b.completedTasks - a.completedTasks),
+        overall: {
+          totalTasksCompleted: allTasks.filter(t => t.status === 'Completed').length,
+          tasksWithTiming: allCompletedWithDuration.length,
+          totalDurationMinutes: overallTotalDuration,
+          avgDurationMinutes: overallAvgDuration,
+        }
+      });
+    } catch (error) {
+      console.error('[Time Analytics] Error:', error);
+      res.status(500).json({ error: "Failed to fetch time analytics" });
+    }
+  });
+
   // ==================== Workload Management API ====================
   
   // Get multi-deal user workload matrix (CEO only)
