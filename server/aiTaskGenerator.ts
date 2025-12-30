@@ -303,7 +303,8 @@ export async function generateAiTasksForAssignment(
     status: 'Pending',
     type: 'Planning',
     cadence: 'memo',
-    aiPlanId: plan.id
+    aiPlanId: plan.id,
+    dueDate: calculateDueDates('daily', 0) // Due today - memo should be reviewed immediately
   };
   tasksToCreate.push(memoTask);
 

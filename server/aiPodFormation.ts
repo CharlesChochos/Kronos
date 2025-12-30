@@ -213,8 +213,12 @@ AVAILABILITY FOR ${stage}: ${u.currentStages.includes(stage) ? 'ALREADY ASSIGNED
 `).join('\n')}
 
 Based on this information, form the optimal pod team and create the full deal completion plan.
-Prioritize team members with lower capacity scores (more available) while still meeting Deal Team status requirements.
-Consider personality tag compatibility for team chemistry.
+
+CRITICAL WORKLOAD BALANCING RULES:
+1. When multiple candidates meet the Deal Team status requirements (e.g., multiple DT6 users for Pod Lead), you MUST select the candidate with the LOWEST capacity score.
+2. Never repeatedly assign the same person as Pod Lead across multiple deals if other qualified candidates have lower workloads.
+3. Capacity score is the primary tiebreaker when Deal Team status is equal.
+4. Consider personality tag compatibility for team chemistry as a secondary factor.
 `;
 
     console.log(`[AI Pod Formation] Calling OpenAI with ${userRoster.length} available users`);
