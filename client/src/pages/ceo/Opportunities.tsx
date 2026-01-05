@@ -31,8 +31,9 @@ import {
 import { 
   useCurrentUser, useDealsListing, useDeal, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers,
   useCustomSectors, useCreateCustomSector, useTagDealMember, useRemoveDealMember,
-  useDealNotes, useCreateDealNote, useApproveOpportunity, type DealNoteType
+  useDealNotes, useCreateDealNote, useApproveOpportunity, useBulkDeleteDeals, type DealNoteType
 } from "@/lib/api";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { ChevronsUpDown, Check as CheckIcon } from "lucide-react";
@@ -228,6 +229,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const updateDeal = useUpdateDeal();
   const deleteDeal = useDeleteDeal();
   const approveOpportunity = useApproveOpportunity();
+  const bulkDeleteDeals = useBulkDeleteDeals();
   const tagMember = useTagDealMember();
   const removeMember = useRemoveDealMember();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -284,6 +286,10 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const [teamSearchQuery, setTeamSearchQuery] = useState("");
   const [showTeamDropdown, setShowTeamDropdown] = useState(false);
   
+  // Bulk selection state
+  const [selectedOpportunities, setSelectedOpportunities] = useState<string[]>([]);
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  
   // Filter for Opportunity deals only
   const opportunities = useMemo(() => {
     return deals.filter((deal: Deal) => (deal as any).dealType === 'Opportunity');
@@ -321,6 +327,31 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
     const pending = opportunities.filter((d: Deal) => d.status === 'Active').length;
     return { total: opportunities.length, totalValue, pending };
   }, [opportunities]);
+  
+  const toggleOpportunitySelection = (id: string) => {
+    setSelectedOpportunities(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllOpportunities = () => {
+    if (selectedOpportunities.length === filteredOpportunities.length) {
+      setSelectedOpportunities([]);
+    } else {
+      setSelectedOpportunities(filteredOpportunities.map((o: Deal) => o.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await bulkDeleteDeals.mutateAsync(selectedOpportunities);
+      toast.success(`${selectedOpportunities.length} opportunities deleted`);
+      setSelectedOpportunities([]);
+      setShowBulkDeleteDialog(false);
+    } catch (error) {
+      toast.error("Failed to delete opportunities");
+    }
+  };
   
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, isDetail: boolean = false) => {
     const files = e.target.files;
@@ -593,6 +624,28 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
           </Card>
         </div>
         
+        {/* Bulk Actions Bar */}
+        {selectedOpportunities.length > 0 && (
+          <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/30 rounded-lg mb-4">
+            <div className="flex items-center gap-3">
+              <Checkbox
+                checked={selectedOpportunities.length === filteredOpportunities.length}
+                onCheckedChange={selectAllOpportunities}
+                data-testid="checkbox-select-all-opportunities"
+              />
+              <span className="text-sm font-medium">{selectedOpportunities.length} selected</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="destructive" size="sm" onClick={() => setShowBulkDeleteDialog(true)} data-testid="button-bulk-delete-opportunities">
+                <Trash2 className="w-4 h-4 mr-1" /> Delete Selected
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setSelectedOpportunities([])} data-testid="button-clear-selection">
+                Clear Selection
+              </Button>
+            </div>
+          </div>
+        )}
+        
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-4">
           <div className="relative flex-1 max-w-md">
@@ -623,9 +676,18 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
               >
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base truncate">{opportunity.name}</CardTitle>
-                      <CardDescription className="truncate">{opportunity.client}</CardDescription>
+                    <div className="flex items-start gap-2">
+                      <Checkbox
+                        checked={selectedOpportunities.includes(opportunity.id)}
+                        onCheckedChange={() => toggleOpportunitySelection(opportunity.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-1"
+                        data-testid={`checkbox-opportunity-${opportunity.id}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base truncate">{opportunity.name}</CardTitle>
+                        <CardDescription className="truncate">{opportunity.client}</CardDescription>
+                      </div>
                     </div>
                     <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 shrink-0">
                       Pending
@@ -1396,6 +1458,24 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleReject} className="bg-red-600 hover:bg-red-700" data-testid="button-confirm-reject">
               Reject & Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Bulk Delete Dialog */}
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedOpportunities.length} Opportunities</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedOpportunities.length} opportunities? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground">
+              Delete All
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -363,6 +363,46 @@ export function useMoveDealToOpportunity() {
   });
 }
 
+export function useBulkDeleteDeals() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (dealIds: string[]) => {
+      const res = await fetch("/api/deals/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dealIds }),
+      });
+      if (!res.ok) throw new Error("Failed to bulk delete deals");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
+export function useBulkMoveToOpportunity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (dealIds: string[]) => {
+      const res = await fetch("/api/deals/bulk-move-to-opportunity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dealIds }),
+      });
+      if (!res.ok) throw new Error("Failed to bulk move deals");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
+    },
+  });
+}
+
 // Custom Sectors API
 export type CustomSector = {
   id: string;

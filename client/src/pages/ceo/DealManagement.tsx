@@ -45,7 +45,8 @@ import {
   useCreateDocument,
   useAllInvestors,
   useDealNotes, useCreateDealNote, type DealNoteType,
-  useOnboardingStatus, type OnboardingStatus
+  useOnboardingStatus, type OnboardingStatus,
+  useBulkDeleteDeals, useBulkMoveToOpportunity
 } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -1450,6 +1451,8 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const updateDeal = useUpdateDeal();
   const deleteDeal = useDeleteDeal();
   const moveDealToOpportunity = useMoveDealToOpportunity();
+  const bulkDeleteDeals = useBulkDeleteDeals();
+  const bulkMoveToOpportunity = useBulkMoveToOpportunity();
   const createDealFee = useCreateDealFee();
   const createDocument = useCreateDocument();
   
@@ -1468,6 +1471,9 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const createTask = useCreateTask();
   const deleteTask = useDeleteTask();
 
+  const [selectedDeals, setSelectedDeals] = useState<string[]>([]);
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [showBulkMoveDialog, setShowBulkMoveDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [stageFilter, setStageFilter] = useState<string | null>(null);
@@ -2177,6 +2183,42 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
     setShowEditModal(true);
   };
 
+  const toggleDealSelection = (id: string) => {
+    setSelectedDeals(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllDeals = () => {
+    if (selectedDeals.length === filteredDeals.length) {
+      setSelectedDeals([]);
+    } else {
+      setSelectedDeals(filteredDeals.map((d: Deal) => d.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await bulkDeleteDeals.mutateAsync(selectedDeals);
+      toast.success(`${selectedDeals.length} deals deleted`);
+      setSelectedDeals([]);
+      setShowBulkDeleteDialog(false);
+    } catch (error) {
+      toast.error("Failed to delete deals");
+    }
+  };
+
+  const handleBulkMoveToOpportunity = async () => {
+    try {
+      await bulkMoveToOpportunity.mutateAsync(selectedDeals);
+      toast.success(`${selectedDeals.length} deals moved to opportunities`);
+      setSelectedDeals([]);
+      setShowBulkMoveDialog(false);
+    } catch (error) {
+      toast.error("Failed to move deals");
+    }
+  };
+
   if (isLoading) {
     return (
       <Layout role={role} pageTitle="Deal Management" userName={currentUser?.name || ""}>
@@ -2190,6 +2232,30 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   return (
     <Layout role={role} pageTitle="Deal Management" userName={currentUser?.name || ""}>
       <div className="space-y-6">
+        {/* Bulk Actions Bar */}
+        {selectedDeals.length > 0 && (
+          <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/30 rounded-lg mb-4">
+            <div className="flex items-center gap-3">
+              <Checkbox
+                checked={selectedDeals.length === filteredDeals.length}
+                onCheckedChange={selectAllDeals}
+                data-testid="checkbox-select-all-deals"
+              />
+              <span className="text-sm font-medium">{selectedDeals.length} selected</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowBulkMoveDialog(true)} data-testid="button-bulk-move-deals">
+                <ArrowLeftCircle className="w-4 h-4 mr-1" /> Move to Opportunities
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => setShowBulkDeleteDialog(true)} data-testid="button-bulk-delete-deals">
+                <Trash2 className="w-4 h-4 mr-1" /> Delete Selected
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setSelectedDeals([])} data-testid="button-clear-deal-selection">
+                Clear
+              </Button>
+            </div>
+          </div>
+        )}
         {/* Header & Filters */}
         <div className="flex flex-col md:flex-row justify-between gap-4">
           <div className="relative flex-1 max-w-md">
@@ -2661,16 +2727,25 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
             >
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
-                  <Badge variant="outline" className={cn(
-                    "border-0 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider",
-                    deal.stage === 'Origination' ? "bg-blue-500/20 text-blue-400" :
-                    deal.stage === 'Structuring' ? "bg-indigo-500/20 text-indigo-400" :
-                    deal.stage === 'Diligence' ? "bg-orange-500/20 text-orange-400" :
-                    deal.stage === 'Legal' ? "bg-purple-500/20 text-purple-400" :
-                    "bg-green-500/20 text-green-400"
-                  )}>
-                    {deal.stage}
-                  </Badge>
+                  <div className="flex items-start gap-2">
+                    <Checkbox
+                      checked={selectedDeals.includes(deal.id)}
+                      onCheckedChange={() => toggleDealSelection(deal.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-1"
+                      data-testid={`checkbox-deal-${deal.id}`}
+                    />
+                    <Badge variant="outline" className={cn(
+                      "border-0 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider",
+                      deal.stage === 'Origination' ? "bg-blue-500/20 text-blue-400" :
+                      deal.stage === 'Structuring' ? "bg-indigo-500/20 text-indigo-400" :
+                      deal.stage === 'Diligence' ? "bg-orange-500/20 text-orange-400" :
+                      deal.stage === 'Legal' ? "bg-purple-500/20 text-purple-400" :
+                      "bg-green-500/20 text-green-400"
+                    )}>
+                      {deal.stage}
+                    </Badge>
+                  </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                       <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2">
@@ -4691,6 +4766,42 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete Deal
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedDeals.length} Deals</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedDeals.length} deals? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground">
+              Delete All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Move to Opportunities Dialog */}
+      <AlertDialog open={showBulkMoveDialog} onOpenChange={setShowBulkMoveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Move {selectedDeals.length} Deals to Opportunities</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will move {selectedDeals.length} deals back to the opportunities queue for review.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkMoveToOpportunity}>
+              Move to Opportunities
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

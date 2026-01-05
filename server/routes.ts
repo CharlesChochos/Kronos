@@ -3187,6 +3187,90 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
     }
   });
 
+  // Bulk delete deals (CEO only)
+  app.post("/api/deals/bulk-delete", requireCEO, async (req, res) => {
+    try {
+      const { dealIds } = req.body;
+      if (!Array.isArray(dealIds) || dealIds.length === 0) {
+        return res.status(400).json({ error: "dealIds must be a non-empty array" });
+      }
+      
+      const results = { deleted: 0, failed: 0, errors: [] as string[] };
+      
+      for (const dealId of dealIds) {
+        try {
+          const deal = await storage.getDeal(dealId);
+          await storage.deleteDeal(dealId);
+          if (deal) {
+            await createAuditLog(req, 'deal_deleted', 'deal', dealId, deal.name, { client: deal.client, value: deal.value, bulkOperation: true });
+          }
+          results.deleted++;
+        } catch (err: any) {
+          results.failed++;
+          results.errors.push(`Failed to delete ${dealId}: ${err.message}`);
+        }
+      }
+      
+      res.json({ 
+        message: `Bulk delete completed: ${results.deleted} deleted, ${results.failed} failed`,
+        ...results 
+      });
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      res.status(500).json({ error: "Failed to bulk delete deals" });
+    }
+  });
+
+  // Bulk move deals to opportunities (CEO only)
+  app.post("/api/deals/bulk-move-to-opportunity", requireCEO, async (req, res) => {
+    try {
+      const { dealIds } = req.body;
+      const user = req.user as any;
+      
+      if (!Array.isArray(dealIds) || dealIds.length === 0) {
+        return res.status(400).json({ error: "dealIds must be a non-empty array" });
+      }
+      
+      const results = { moved: 0, failed: 0, errors: [] as string[] };
+      
+      for (const dealId of dealIds) {
+        try {
+          const deal = await storage.getDeal(dealId);
+          if (!deal) {
+            results.failed++;
+            results.errors.push(`Deal ${dealId} not found`);
+            continue;
+          }
+          
+          const previousType = deal.dealType;
+          await storage.updateDeal(dealId, {
+            dealType: 'Opportunity',
+            stage: 'Origination',
+            status: 'Active',
+          });
+          
+          await createAuditLog(req, 'deal_moved_to_opportunity', 'deal', dealId, deal.name, {
+            previousDealType: previousType,
+            movedBy: user.name,
+            bulkOperation: true
+          });
+          results.moved++;
+        } catch (err: any) {
+          results.failed++;
+          results.errors.push(`Failed to move ${dealId}: ${err.message}`);
+        }
+      }
+      
+      res.json({ 
+        message: `Bulk move completed: ${results.moved} moved, ${results.failed} failed`,
+        ...results 
+      });
+    } catch (error) {
+      console.error('Bulk move error:', error);
+      res.status(500).json({ error: "Failed to bulk move deals" });
+    }
+  });
+
   // Move deal back to Opportunities
   app.patch("/api/deals/:id/move-to-opportunity", requireAuth, requireInternal, async (req, res) => {
     try {
