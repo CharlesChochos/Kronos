@@ -270,10 +270,11 @@ export function useCreateDeal() {
 export function useApproveOpportunity() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (opportunityId: string) => {
+    mutationFn: async ({ opportunityId, skipPodFormation = false }: { opportunityId: string; skipPodFormation?: boolean }) => {
       const res = await fetch(`/api/opportunities/${opportunityId}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skipPodFormation }),
       });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ error: "Failed to approve opportunity" }));
@@ -284,6 +285,31 @@ export function useApproveOpportunity() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
       queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+}
+
+export function useTransitionStage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ dealId, newStage, skipPodFormation = false }: { dealId: string; newStage: string; skipPodFormation?: boolean }) => {
+      const res = await fetch(`/api/deals/${dealId}/transition-stage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newStage, skipPodFormation }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Failed to transition stage" }));
+        throw new Error(errorData.error || "Failed to transition stage");
+      }
+      return res.json();
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
+      queryClient.invalidateQueries({ queryKey: ["deals", vars.dealId] });
+      queryClient.invalidateQueries({ queryKey: ["stage-pod-members", vars.dealId] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
   });

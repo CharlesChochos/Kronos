@@ -3328,7 +3328,8 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
         return res.status(403).json({ error: "Only admins can approve opportunities" });
       }
       
-      const result = await approveOpportunityToDeal(req.params.id);
+      const skipPodFormation = req.body.skipPodFormation === true;
+      const result = await approveOpportunityToDeal(req.params.id, skipPodFormation);
       
       if (!result.success) {
         return res.status(400).json({ error: result.error });
@@ -3362,7 +3363,8 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
         return res.status(400).json({ error: "Invalid stage" });
       }
       
-      const result = await transitionDealStage(req.params.id, newStage);
+      const skipPodFormation = req.body.skipPodFormation === true;
+      const result = await transitionDealStage(req.params.id, newStage, skipPodFormation);
       
       if (!result.success) {
         return res.status(400).json({ error: result.error });

@@ -503,7 +503,8 @@ CRITICAL WORKLOAD BALANCING RULES:
 
 export async function transitionDealStage(
   dealId: string,
-  newStage: string
+  newStage: string,
+  skipPodFormation: boolean = false
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const deal = await storage.getDeal(dealId);
@@ -520,6 +521,12 @@ export async function transitionDealStage(
     
     await storage.updateDeal(dealId, { stage: newStage });
     
+    // Skip pod formation if requested
+    if (skipPodFormation) {
+      console.log(`[Stage Transition] Skipping pod formation for deal ${dealId} at stage ${newStage} (manual override)`);
+      return { success: true };
+    }
+    
     const result = await formPodForDeal(deal, newStage, existingLeadId);
     
     return result;
@@ -531,7 +538,8 @@ export async function transitionDealStage(
 }
 
 export async function approveOpportunityToDeal(
-  opportunityId: string
+  opportunityId: string,
+  skipPodFormation: boolean = false
 ): Promise<{ success: boolean; dealId?: string; error?: string }> {
   try {
     const opportunity = await storage.getDeal(opportunityId);
@@ -559,9 +567,17 @@ export async function approveOpportunityToDeal(
       dealId: opportunityId,
       updateType: 'status_change',
       title: 'Opportunity approved and converted to active deal',
-      content: `Deal type set to ${dealType}. Starting automated pod formation.`,
-      metadata: { previousType: 'Opportunity', newType: dealType }
+      content: skipPodFormation 
+        ? `Deal type set to ${dealType}. Pod formation skipped (manual override).`
+        : `Deal type set to ${dealType}. Starting automated pod formation.`,
+      metadata: { previousType: 'Opportunity', newType: dealType, skipPodFormation }
     });
+    
+    // Skip pod formation if requested
+    if (skipPodFormation) {
+      console.log(`[Opportunity Approval] Opportunity ${opportunityId} approved, pod formation skipped (manual override)`);
+      return { success: true, dealId: opportunityId };
+    }
     
     console.log(`[Opportunity Approval] Opportunity ${opportunityId} approved, forming pod...`);
     

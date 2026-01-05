@@ -47,7 +47,7 @@ import {
   useAllInvestors,
   useDealNotes, useCreateDealNote, type DealNoteType,
   useOnboardingStatus, type OnboardingStatus,
-  useBulkDeleteDeals, useBulkMoveToOpportunity
+  useBulkDeleteDeals, useBulkMoveToOpportunity, useTransitionStage
 } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -1625,6 +1625,13 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const [teamMemberSearch, setTeamMemberSearch] = useState('');
   const [teamMemberOpen, setTeamMemberOpen] = useState(false);
   
+  // Stage change confirmation dialog state
+  const [showStageChangeDialog, setShowStageChangeDialog] = useState(false);
+  const [stageChangeDeal, setStageChangeDeal] = useState<Deal | null>(null);
+  const [stageChangeTarget, setStageChangeTarget] = useState<string>('');
+  const [skipStageChangePodFormation, setSkipStageChangePodFormation] = useState(false);
+  const transitionStage = useTransitionStage();
+  
   const filteredUsers = useMemo(() => {
     if (!teamMemberSearch || teamMemberSearch.length < 2) return [];
     const query = teamMemberSearch.toLowerCase();
@@ -1917,28 +1924,62 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   };
 
   const handleStageChange = async (deal: Deal, newStage: string) => {
-    const newProgress = getStageProgress(newStage);
+    // Show confirmation dialog instead of directly changing stage
+    setStageChangeDeal(deal);
+    setStageChangeTarget(newStage);
+    setSkipStageChangePodFormation(false);
+    setShowStageChangeDialog(true);
+  };
+  
+  const confirmStageChange = async () => {
+    if (!stageChangeDeal || !stageChangeTarget) return;
+    
+    const newProgress = getStageProgress(stageChangeTarget);
     const auditEntry: AuditEntry = {
       id: crypto.randomUUID(),
       timestamp: new Date().toISOString(),
       action: 'Stage Changed',
       user: currentUser?.name || 'System',
-      details: `Stage changed from "${deal.stage}" to "${newStage}"`,
+      details: `Stage changed from "${stageChangeDeal.stage}" to "${stageChangeTarget}"${skipStageChangePodFormation ? ' (team auto-assignment skipped)' : ''}`,
     };
     
     try {
-      await updateDeal.mutateAsync({
-        id: deal.id,
-        stage: newStage,
-        progress: newProgress,
-        auditTrail: [...(deal.auditTrail as AuditEntry[] || []), auditEntry],
-      });
-      toast.success(`Deal moved to ${newStage}`);
-      if (selectedDeal?.id === deal.id) {
-        setSelectedDeal({ ...deal, stage: newStage, progress: newProgress, auditTrail: [...(deal.auditTrail as AuditEntry[] || []), auditEntry] });
+      if (skipStageChangePodFormation) {
+        toast.loading("Changing stage...", { id: "stage-change" });
+      } else {
+        toast.loading("Changing stage and updating team...", { id: "stage-change" });
       }
+      
+      // Use the transition stage API which handles pod formation
+      await transitionStage.mutateAsync({
+        dealId: stageChangeDeal.id,
+        newStage: stageChangeTarget,
+        skipPodFormation: skipStageChangePodFormation,
+      });
+      
+      // Also update the local deal audit trail
+      await updateDeal.mutateAsync({
+        id: stageChangeDeal.id,
+        progress: newProgress,
+        auditTrail: [...(stageChangeDeal.auditTrail as AuditEntry[] || []), auditEntry],
+      });
+      
+      if (skipStageChangePodFormation) {
+        toast.success(`Deal moved to ${stageChangeTarget}. You can manually assign team members.`, { id: "stage-change" });
+      } else {
+        toast.success(`Deal moved to ${stageChangeTarget}. Team updated.`, { id: "stage-change" });
+      }
+      
+      if (selectedDeal?.id === stageChangeDeal.id) {
+        setSelectedDeal({ ...stageChangeDeal, stage: stageChangeTarget, progress: newProgress, auditTrail: [...(stageChangeDeal.auditTrail as AuditEntry[] || []), auditEntry] });
+      }
+      
+      setShowStageChangeDialog(false);
+      setStageChangeDeal(null);
+      setStageChangeTarget('');
+      setSkipStageChangePodFormation(false);
     } catch (error: any) {
-      toast.error(error.message || "Failed to update stage");
+      toast.error(error.message || "Failed to update stage", { id: "stage-change" });
     }
   };
 
@@ -4739,6 +4780,49 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Stage Change Confirmation Dialog */}
+      <AlertDialog open={showStageChangeDialog} onOpenChange={setShowStageChangeDialog}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change Deal Stage</AlertDialogTitle>
+            <AlertDialogDescription>
+              {stageChangeDeal && (
+                <>Move <span className="font-medium text-foreground">{stageChangeDeal.name}</span> from <span className="font-medium text-foreground">{stageChangeDeal.stage}</span> to <span className="font-medium text-foreground">{stageChangeTarget}</span>?</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+              <div className="flex-1">
+                <Label className="font-medium text-sm">Skip Automatic Team Assignment</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  When enabled, no team members will be auto-assigned for this stage. You can manually assign team members later.
+                </p>
+              </div>
+              <Switch
+                checked={skipStageChangePodFormation}
+                onCheckedChange={setSkipStageChangePodFormation}
+                data-testid="switch-skip-pod-formation-stage-change"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setStageChangeDeal(null);
+              setStageChangeTarget('');
+              setSkipStageChangePodFormation(false);
+            }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmStageChange}
+              disabled={transitionStage.isPending}
+              data-testid="button-confirm-stage-change"
+            >
+              {transitionStage.isPending ? "Changing..." : "Change Stage"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Deal Confirmation Dialog */}
       <AlertDialog open={showDeleteDealDialog} onOpenChange={setShowDeleteDealDialog}>

@@ -34,6 +34,7 @@ import {
   useDealNotes, useCreateDealNote, useApproveOpportunity, useBulkDeleteDeals, type DealNoteType
 } from "@/lib/api";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { ChevronsUpDown, Check as CheckIcon } from "lucide-react";
@@ -252,6 +253,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [approvalDivision, setApprovalDivision] = useState<string>('Investment Banking');
+  const [skipPodFormation, setSkipPodFormation] = useState(false);
   const [detailTab, setDetailTab] = useState<'overview' | 'attachments' | 'notes'>('overview');
   const [newNote, setNewNote] = useState("");
   const [isEditMode, setIsEditMode] = useState(false);
@@ -467,9 +469,17 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
     if (!selectedOpportunity) return;
     try {
       if (approvalDivision === 'Investment Banking') {
-        toast.loading("Approving opportunity and forming pod team...", { id: "approve-opportunity" });
-        await approveOpportunity.mutateAsync(selectedOpportunity.id);
-        toast.success("Opportunity approved! Pod team formed and tasks created.", { id: "approve-opportunity" });
+        if (skipPodFormation) {
+          toast.loading("Approving opportunity...", { id: "approve-opportunity" });
+        } else {
+          toast.loading("Approving opportunity and forming pod team...", { id: "approve-opportunity" });
+        }
+        await approveOpportunity.mutateAsync({ opportunityId: selectedOpportunity.id, skipPodFormation });
+        if (skipPodFormation) {
+          toast.success("Opportunity approved! You can manually assign team members.", { id: "approve-opportunity" });
+        } else {
+          toast.success("Opportunity approved! Pod team formed and tasks created.", { id: "approve-opportunity" });
+        }
       } else {
         await updateDeal.mutateAsync({
           id: selectedOpportunity.id,
@@ -482,6 +492,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
       setShowApproveDialog(false);
       setShowOpportunityDetail(false);
       setSelectedOpportunity(null);
+      setSkipPodFormation(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to approve opportunity", { id: "approve-opportunity" });
     }
@@ -1415,23 +1426,41 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
               Choose which division this deal should be assigned to.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-4">
-            <Label>Assign to Division</Label>
-            <Select value={approvalDivision} onValueChange={setApprovalDivision}>
-              <SelectTrigger className="mt-2" data-testid="select-approval-division">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DIVISIONS.map(division => (
-                  <SelectItem key={division} value={division}>{division}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground mt-2">
-              {approvalDivision === 'Investment Banking' 
-                ? 'Deal will appear in Deal Management page' 
-                : 'Deal will appear in Asset Management page'}
-            </p>
+          <div className="py-4 space-y-4">
+            <div>
+              <Label>Assign to Division</Label>
+              <Select value={approvalDivision} onValueChange={setApprovalDivision}>
+                <SelectTrigger className="mt-2" data-testid="select-approval-division">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DIVISIONS.map(division => (
+                    <SelectItem key={division} value={division}>{division}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-2">
+                {approvalDivision === 'Investment Banking' 
+                  ? 'Deal will appear in Deal Management page' 
+                  : 'Deal will appear in Asset Management page'}
+              </p>
+            </div>
+            
+            {approvalDivision === 'Investment Banking' && (
+              <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                <div className="flex-1">
+                  <Label className="font-medium text-sm">Skip Automatic Team Assignment</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    When enabled, no pod team will be auto-assigned. You can manually assign team members later.
+                  </p>
+                </div>
+                <Switch
+                  checked={skipPodFormation}
+                  onCheckedChange={setSkipPodFormation}
+                  data-testid="switch-skip-pod-formation-approval"
+                />
+              </div>
+            )}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
