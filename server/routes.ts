@@ -3358,7 +3358,7 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
         return res.status(400).json({ error: "New stage is required" });
       }
       
-      const validStages = ['Origination', 'Structuring', 'Execution', 'Closing', 'Integration'];
+      const validStages = ['Origination', 'Structuring', 'Diligence', 'Legal', 'Close', 'Execution', 'Closing', 'Integration'];
       if (!validStages.includes(newStage)) {
         return res.status(400).json({ error: "Invalid stage" });
       }
