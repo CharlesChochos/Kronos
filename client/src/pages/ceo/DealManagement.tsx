@@ -4453,21 +4453,19 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
               </div>
             </div>
             
-            {newDeal.stage !== 'Origination' && (
-              <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                <div className="flex-1">
-                  <Label className="font-medium text-sm">Skip Automatic Team Assignment</Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    When enabled, no pod team will be auto-assigned. You can manually assign team members later.
-                  </p>
-                </div>
-                <Switch
-                  checked={newDeal.skipPodFormation}
-                  onCheckedChange={(checked) => setNewDeal({ ...newDeal, skipPodFormation: checked })}
-                  data-testid="switch-skip-pod-formation"
-                />
+            <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+              <div className="flex-1">
+                <Label className="font-medium text-sm">Skip Automatic Team Assignment</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  When enabled, no pod team will be auto-assigned. You can manually assign team members later.
+                </p>
               </div>
-            )}
+              <Switch
+                checked={newDeal.skipPodFormation}
+                onCheckedChange={(checked) => setNewDeal({ ...newDeal, skipPodFormation: checked })}
+                data-testid="switch-skip-pod-formation"
+              />
+            </div>
             
             <div className="border-t border-border pt-4 mt-4">
               <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
