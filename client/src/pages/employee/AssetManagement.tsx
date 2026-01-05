@@ -114,26 +114,21 @@ function DealStageTeamCount({ dealId, stage }: { dealId: string; stage: string }
   );
 }
 
-function DealTotalTeamCount({ dealId, podTeam = [] }: { dealId: string; podTeam?: PodTeamMember[] }) {
-  const { data: allStagePodMembers = [] } = useStagePodMembers(dealId);
+function DealTotalTeamCount({ dealId, stage, podTeam = [] }: { dealId: string; stage: string; podTeam?: PodTeamMember[] }) {
+  // Only fetch members for the current stage
+  const { data: stagePodMembers = [] } = useStagePodMembers(dealId, stage);
   const [showPopover, setShowPopover] = useState(false);
   
   const distinctMembers = useMemo(() => {
     const seen = new Map<string, any>();
-    // Add stage pod members
-    allStagePodMembers.forEach((member: any) => {
+    // Add only current stage pod members
+    stagePodMembers.forEach((member: any) => {
       if (member.userId && !seen.has(member.userId)) {
         seen.set(member.userId, { ...member, source: 'stage' });
       }
     });
-    // Add pod team members (legacy)
-    podTeam.forEach((member: PodTeamMember) => {
-      if (member.userId && !seen.has(member.userId)) {
-        seen.set(member.userId, { userId: member.userId, userName: member.name, role: member.role, source: 'pod' });
-      }
-    });
     return Array.from(seen.values());
-  }, [allStagePodMembers, podTeam]);
+  }, [stagePodMembers]);
   
   return (
     <Popover open={showPopover} onOpenChange={setShowPopover}>
@@ -176,27 +171,11 @@ function DealTotalTeamCount({ dealId, podTeam = [] }: { dealId: string; podTeam?
   );
 }
 
-function DealTotalTeamCountNumber({ dealId, podTeam = [] }: { dealId: string; podTeam?: PodTeamMember[] }) {
-  const { data: allStagePodMembers = [] } = useStagePodMembers(dealId);
+function DealTotalTeamCountNumber({ dealId, stage }: { dealId: string; stage: string }) {
+  // Only fetch members for the current stage
+  const { data: stagePodMembers = [] } = useStagePodMembers(dealId, stage);
   
-  const distinctCount = useMemo(() => {
-    const seen = new Set<string>();
-    // Add stage pod members
-    allStagePodMembers.forEach((member: any) => {
-      if (member.userId) {
-        seen.add(member.userId);
-      }
-    });
-    // Add pod team members (legacy)
-    podTeam.forEach((member: PodTeamMember) => {
-      if (member.userId) {
-        seen.add(member.userId);
-      }
-    });
-    return seen.size;
-  }, [allStagePodMembers, podTeam]);
-  
-  return <>{distinctCount}</>;
+  return <>{stagePodMembers.length}</>;
 }
 
 function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[] }) {
@@ -2812,7 +2791,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                       <Users className="w-3 h-3" /> Team
                     </div>
-                    <DealTotalTeamCount dealId={deal.id} podTeam={(deal.podTeam as PodTeamMember[]) || []} />
+                    <DealTotalTeamCount dealId={deal.id} stage={deal.stage} />
                   </div>
                 </div>
 
@@ -3274,7 +3253,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                     <Card className="bg-secondary/30">
                       <CardContent className="p-4 text-center">
                         <Users className="w-5 h-5 mx-auto mb-1 text-primary" />
-                        <div className="text-2xl font-bold text-primary"><DealTotalTeamCountNumber dealId={selectedDeal.id} podTeam={(selectedDeal.podTeam as PodTeamMember[]) || []} /></div>
+                        <div className="text-2xl font-bold text-primary"><DealTotalTeamCountNumber dealId={selectedDeal.id} stage={selectedDeal.stage} /></div>
                         <div className="text-xs text-muted-foreground">Team Members</div>
                       </CardContent>
                     </Card>

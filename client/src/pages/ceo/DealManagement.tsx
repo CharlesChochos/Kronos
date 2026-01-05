@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { 
   Search, Filter, MoreVertical, ArrowRight, Calendar, DollarSign, Briefcase, 
   Pencil, Trash2, Eye, Users, Phone, Mail, MessageSquare, Plus, X, 
@@ -117,26 +118,21 @@ function DealStageTeamCount({ dealId, stage }: { dealId: string; stage: string }
   );
 }
 
-function DealTotalTeamCount({ dealId, podTeam = [] }: { dealId: string; podTeam?: PodTeamMember[] }) {
-  const { data: allStagePodMembers = [] } = useStagePodMembers(dealId);
+function DealTotalTeamCount({ dealId, stage, podTeam = [] }: { dealId: string; stage: string; podTeam?: PodTeamMember[] }) {
+  // Only fetch members for the current stage
+  const { data: stagePodMembers = [] } = useStagePodMembers(dealId, stage);
   const [showPopover, setShowPopover] = useState(false);
   
   const distinctMembers = useMemo(() => {
     const seen = new Map<string, any>();
-    // Add stage pod members
-    allStagePodMembers.forEach((member: any) => {
+    // Add only current stage pod members
+    stagePodMembers.forEach((member: any) => {
       if (member.userId && !seen.has(member.userId)) {
         seen.set(member.userId, { ...member, source: 'stage' });
       }
     });
-    // Add pod team members (legacy)
-    podTeam.forEach((member: PodTeamMember) => {
-      if (member.userId && !seen.has(member.userId)) {
-        seen.set(member.userId, { userId: member.userId, userName: member.name, role: member.role, source: 'pod' });
-      }
-    });
     return Array.from(seen.values());
-  }, [allStagePodMembers, podTeam]);
+  }, [stagePodMembers]);
   
   return (
     <Popover open={showPopover} onOpenChange={setShowPopover}>
@@ -179,27 +175,11 @@ function DealTotalTeamCount({ dealId, podTeam = [] }: { dealId: string; podTeam?
   );
 }
 
-function DealTotalTeamCountNumber({ dealId, podTeam = [] }: { dealId: string; podTeam?: PodTeamMember[] }) {
-  const { data: allStagePodMembers = [] } = useStagePodMembers(dealId);
+function DealTotalTeamCountNumber({ dealId, stage }: { dealId: string; stage: string }) {
+  // Only fetch members for the current stage
+  const { data: stagePodMembers = [] } = useStagePodMembers(dealId, stage);
   
-  const distinctCount = useMemo(() => {
-    const seen = new Set<string>();
-    // Add stage pod members
-    allStagePodMembers.forEach((member: any) => {
-      if (member.userId) {
-        seen.add(member.userId);
-      }
-    });
-    // Add pod team members (legacy)
-    podTeam.forEach((member: PodTeamMember) => {
-      if (member.userId) {
-        seen.add(member.userId);
-      }
-    });
-    return seen.size;
-  }, [allStagePodMembers, podTeam]);
-  
-  return <>{distinctCount}</>;
+  return <>{stagePodMembers.length}</>;
 }
 
 function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[] }) {
@@ -1605,6 +1585,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
     lead: '',
     status: 'Active',
     progress: 0,
+    skipPodFormation: false,
   });
   
   const [newDealFees, setNewDealFees] = useState<{
@@ -1887,7 +1868,8 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
           user: currentUser?.name || 'System',
           details: `Deal "${newDeal.name}" created with initial stage: ${newDeal.stage}`,
         }],
-      });
+        skipPodFormation: newDeal.skipPodFormation,
+      } as any);
       
       const feePromises = [];
       if (newDealFees.engagement && parseFloat(newDealFees.engagement) > 0) {
@@ -1927,7 +1909,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
       
       toast.success("Deal created successfully!");
       setShowNewDealModal(false);
-      setNewDeal({ name: '', client: '', sector: 'Technology', customSector: '', value: '', stage: 'Origination', lead: '', status: 'Active', progress: 0 });
+      setNewDeal({ name: '', client: '', sector: 'Technology', customSector: '', value: '', stage: 'Origination', lead: '', status: 'Active', progress: 0, skipPodFormation: false });
       setNewDealFees({ engagement: '', monthly: '', success: '', transaction: '', spread: '' });
     } catch (error: any) {
       toast.error(error.message || "Failed to create deal");
@@ -2829,7 +2811,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                       <Users className="w-3 h-3" /> Team
                     </div>
-                    <DealTotalTeamCount dealId={deal.id} podTeam={(deal.podTeam as PodTeamMember[]) || []} />
+                    <DealTotalTeamCount dealId={deal.id} stage={deal.stage} />
                   </div>
                 </div>
 
@@ -3292,7 +3274,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     <Card className="bg-secondary/30">
                       <CardContent className="p-4 text-center">
                         <Users className="w-5 h-5 mx-auto mb-1 text-primary" />
-                        <div className="text-2xl font-bold text-primary"><DealTotalTeamCountNumber dealId={selectedDeal.id} podTeam={(selectedDeal.podTeam as PodTeamMember[]) || []} /></div>
+                        <div className="text-2xl font-bold text-primary"><DealTotalTeamCountNumber dealId={selectedDeal.id} stage={selectedDeal.stage} /></div>
                         <div className="text-xs text-muted-foreground">Team Members</div>
                       </CardContent>
                     </Card>
@@ -4470,6 +4452,22 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                 </Popover>
               </div>
             </div>
+            
+            {newDeal.stage !== 'Origination' && (
+              <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                <div className="flex-1">
+                  <Label className="font-medium text-sm">Skip Automatic Team Assignment</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    When enabled, no pod team will be auto-assigned. You can manually assign team members later.
+                  </p>
+                </div>
+                <Switch
+                  checked={newDeal.skipPodFormation}
+                  onCheckedChange={(checked) => setNewDeal({ ...newDeal, skipPodFormation: checked })}
+                  data-testid="switch-skip-pod-formation"
+                />
+              </div>
+            )}
             
             <div className="border-t border-border pt-4 mt-4">
               <h4 className="text-sm font-medium mb-3 flex items-center gap-2">

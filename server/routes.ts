@@ -2989,8 +2989,12 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       const deal = await storage.createDeal(result.data);
       await createAuditLog(req, 'deal_created', 'deal', deal.id, deal.name, { value: deal.value, client: deal.client, sector: deal.sector, stage: deal.stage });
       
+      // Check if skipPodFormation was requested
+      const skipPodFormation = req.body.skipPodFormation === true;
+      
       // If this is an active deal (not an opportunity), trigger pod formation and AI task generation
-      if (deal.dealType !== 'Opportunity' && deal.stage) {
+      // unless skipPodFormation is true
+      if (deal.dealType !== 'Opportunity' && deal.stage && !skipPodFormation) {
         (async () => {
           try {
             console.log(`[Deal Created] Forming pod for new deal ${deal.id} at stage ${deal.stage}`);
