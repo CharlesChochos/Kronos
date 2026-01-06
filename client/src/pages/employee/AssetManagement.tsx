@@ -1410,24 +1410,25 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
   const { data: allTasks = [] } = useTasks();
   const { data: stakeholders = [] } = useAllInvestors();
   
-  // Filter deals based on access level - non-admin users only see deals they're assigned to
-  // Filter out Opportunities and Asset Management deals - those appear in their own respective pages
+  // Filter deals based on access level
+  // Users with hasAssetManagementAccess or admin access can see all Asset Management deals
   const deals = useMemo(() => {
-    // Filter out opportunities and asset management deals - they have their own pages
-    const investmentBankingDeals = allDeals.filter(deal => {
+    // Filter to only Asset Management deals
+    const assetManagementDeals = allDeals.filter(deal => {
       const dealType = (deal as any).dealType;
       return dealType === 'Asset Management';
     });
     
-    if (currentUser?.accessLevel === 'admin') {
-      return investmentBankingDeals;
+    // Admins and users with explicit Asset Management access see all deals
+    if (currentUser?.accessLevel === 'admin' || currentUser?.hasAssetManagementAccess) {
+      return assetManagementDeals;
     }
-    // For employees, filter to only show deals where they are in the pod team
+    // For other employees, filter to only show deals where they are in the pod team
     // If user data is not yet available, show no deals until we can verify access
     if (!currentUser?.id && !currentUser?.email && !currentUser?.name) {
       return [];
     }
-    return investmentBankingDeals.filter(deal => {
+    return assetManagementDeals.filter(deal => {
       const podTeam = deal.podTeam || [];
       return podTeam.some((member: PodTeamMember) => 
         (currentUser.id && member.userId === currentUser.id) || 
