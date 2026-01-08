@@ -3812,3 +3812,88 @@ export function useUploadResume() {
     },
   });
 }
+
+// ===== AI DOCUMENT ANALYSIS =====
+
+export type AiDocumentAnalysis = {
+  id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  summary: string | null;
+  error: string | null;
+  createdAt: string;
+  completedAt: string | null;
+};
+
+export function useStartAiDocumentAnalysis() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ dealId, documentIds }: { dealId: string; documentIds: string[] }) => {
+      const res = await fetch(`/api/deals/${dealId}/ai-summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentIds }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to start document analysis");
+      }
+      return res.json() as Promise<{ success: boolean; analysisId: string; status: string }>;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["ai-document-analysis", vars.dealId] });
+    },
+  });
+}
+
+export function useAiDocumentAnalysis(dealId: string, analysisId: string | null) {
+  return useQuery({
+    queryKey: ["ai-document-analysis", dealId, analysisId],
+    queryFn: async () => {
+      if (!analysisId) return null;
+      const res = await fetch(`/api/deals/${dealId}/ai-summary/${analysisId}`);
+      if (!res.ok) throw new Error("Failed to fetch analysis status");
+      return res.json() as Promise<AiDocumentAnalysis>;
+    },
+    enabled: !!analysisId,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === 'pending' || status === 'processing') return 2000;
+      return false;
+    },
+  });
+}
+
+export function useLatestAiDocumentAnalysis(dealId: string | undefined) {
+  return useQuery({
+    queryKey: ["ai-document-analysis-latest", dealId],
+    queryFn: async () => {
+      if (!dealId) return null;
+      const res = await fetch(`/api/deals/${dealId}/ai-summary/latest`);
+      if (!res.ok) throw new Error("Failed to fetch latest analysis");
+      const data = await res.json();
+      return data.analysis as AiDocumentAnalysis | null;
+    },
+    enabled: !!dealId,
+  });
+}
+
+export function useSaveAiSummaryAsNote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ dealId, analysisId }: { dealId: string; analysisId: string }) => {
+      const res = await fetch(`/api/deals/${dealId}/ai-summary/${analysisId}/save-as-note`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to save summary as note");
+      }
+      return res.json();
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["deal-notes", vars.dealId] });
+      queryClient.invalidateQueries({ queryKey: ["ai-document-analysis-latest", vars.dealId] });
+    },
+  });
+}

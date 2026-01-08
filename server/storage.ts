@@ -351,6 +351,13 @@ export interface IStorage {
   archiveAiTaskPlan(id: string): Promise<void>;
   bulkCreateTasks(tasks: InsertTask[]): Promise<Task[]>;
   getTasksByAiPlan(aiPlanId: string): Promise<Task[]>;
+  
+  // AI Document Analysis operations
+  getAiDocumentAnalysis(id: string): Promise<schema.AiDocumentAnalysis | undefined>;
+  getAiDocumentAnalysesByDeal(dealId: string): Promise<schema.AiDocumentAnalysis[]>;
+  getLatestAiDocumentAnalysis(dealId: string): Promise<schema.AiDocumentAnalysis | undefined>;
+  createAiDocumentAnalysis(analysis: schema.InsertAiDocumentAnalysis): Promise<schema.AiDocumentAnalysis>;
+  updateAiDocumentAnalysis(id: string, updates: Partial<schema.InsertAiDocumentAnalysis & { completedAt?: Date }>): Promise<schema.AiDocumentAnalysis | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2354,6 +2361,43 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(schema.tasks)
       .where(eq(schema.tasks.aiPlanId, aiPlanId))
       .orderBy(schema.tasks.createdAt);
+  }
+
+  // ================================
+  // AI DOCUMENT ANALYSIS OPERATIONS
+  // ================================
+
+  async getAiDocumentAnalysis(id: string): Promise<schema.AiDocumentAnalysis | undefined> {
+    const [analysis] = await db.select().from(schema.aiDocumentAnalyses)
+      .where(eq(schema.aiDocumentAnalyses.id, id));
+    return analysis;
+  }
+
+  async getAiDocumentAnalysesByDeal(dealId: string): Promise<schema.AiDocumentAnalysis[]> {
+    return await db.select().from(schema.aiDocumentAnalyses)
+      .where(eq(schema.aiDocumentAnalyses.dealId, dealId))
+      .orderBy(desc(schema.aiDocumentAnalyses.createdAt));
+  }
+
+  async getLatestAiDocumentAnalysis(dealId: string): Promise<schema.AiDocumentAnalysis | undefined> {
+    const [analysis] = await db.select().from(schema.aiDocumentAnalyses)
+      .where(eq(schema.aiDocumentAnalyses.dealId, dealId))
+      .orderBy(desc(schema.aiDocumentAnalyses.createdAt))
+      .limit(1);
+    return analysis;
+  }
+
+  async createAiDocumentAnalysis(analysis: schema.InsertAiDocumentAnalysis): Promise<schema.AiDocumentAnalysis> {
+    const [created] = await db.insert(schema.aiDocumentAnalyses).values(analysis).returning();
+    return created;
+  }
+
+  async updateAiDocumentAnalysis(id: string, updates: Partial<schema.InsertAiDocumentAnalysis & { completedAt?: Date }>): Promise<schema.AiDocumentAnalysis | undefined> {
+    const [updated] = await db.update(schema.aiDocumentAnalyses)
+      .set(updates)
+      .where(eq(schema.aiDocumentAnalyses.id, id))
+      .returning();
+    return updated;
   }
 }
 

@@ -1664,6 +1664,29 @@ export type AIPodFormationResponse = {
   dataIntegrityNotes: string;
 };
 
+// AI Document Analysis table - tracks AI analysis jobs for deals
+export const aiDocumentAnalyses = pgTable("ai_document_analyses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  status: text("status").notNull().default('pending'), // pending, processing, completed, failed
+  selectedDocuments: jsonb("selected_documents").default([]).$type<string[]>(), // Array of document URLs/paths
+  extractedText: text("extracted_text"), // Concatenated text from all documents
+  summary: text("summary"), // AI-generated summary
+  error: text("error"), // Error message if failed
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertAiDocumentAnalysisSchema = createInsertSchema(aiDocumentAnalyses).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+export type InsertAiDocumentAnalysis = z.infer<typeof insertAiDocumentAnalysisSchema>;
+export type AiDocumentAnalysis = typeof aiDocumentAnalyses.$inferSelect;
+
 // Job titles that are NOT eligible for deal work (support roles)
 export const NON_DEAL_ELIGIBLE_JOB_TITLES = [
   'AI Engineer',

@@ -10534,6 +10534,154 @@ Only include entries with both name AND company. Extract ALL rows.`
     }
   });
   
+  // ===== AI DOCUMENT ANALYSIS ROUTES =====
+  
+  // Start AI document analysis for a deal
+  app.post("/api/deals/:id/ai-summary", requireAuth, requireInternal, aiLimiter, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { documentIds } = req.body;
+      
+      if (!documentIds || !Array.isArray(documentIds) || documentIds.length === 0) {
+        return res.status(400).json({ error: "At least one document ID is required" });
+      }
+      
+      const deal = await storage.getDeal(req.params.id);
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+      
+      // Fetch all stage documents for this deal and validate the document IDs
+      const allDealDocs = await storage.getStageDocuments(req.params.id);
+      const validDocs: { url: string; filename: string; mimeType?: string }[] = [];
+      const validDocIds: string[] = [];
+      
+      for (const docId of documentIds) {
+        const doc = allDealDocs.find((d: any) => d.id === docId);
+        if (!doc) {
+          return res.status(400).json({ error: `Document ${docId} does not belong to this deal` });
+        }
+        validDocs.push({
+          url: doc.url,
+          filename: doc.fileName || 'Document',
+          mimeType: doc.mimeType || undefined,
+        });
+        validDocIds.push(docId);
+      }
+      
+      // Create analysis record with validated document IDs
+      const analysis = await storage.createAiDocumentAnalysis({
+        dealId: req.params.id,
+        userId: user.id,
+        status: 'pending',
+        selectedDocuments: validDocIds,
+      });
+      
+      // Import and start the analysis asynchronously
+      const { analyzeDocumentsForDeal } = await import('./aiDocumentAnalyzer');
+      
+      // Don't await - let it run in background with validated documents only
+      analyzeDocumentsForDeal(analysis.id, req.params.id, validDocs, user.id)
+        .catch(err => console.error('[AI Summary] Background analysis failed:', err));
+      
+      res.json({ 
+        success: true, 
+        analysisId: analysis.id,
+        status: 'pending',
+        message: 'Document analysis started'
+      });
+    } catch (error) {
+      console.error('AI summary error:', error);
+      res.status(500).json({ error: "Failed to start document analysis" });
+    }
+  });
+  
+  // Get AI analysis status/result
+  app.get("/api/deals/:id/ai-summary/:analysisId", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const analysis = await storage.getAiDocumentAnalysis(req.params.analysisId);
+      
+      if (!analysis) {
+        return res.status(404).json({ error: "Analysis not found" });
+      }
+      
+      if (analysis.dealId !== req.params.id) {
+        return res.status(403).json({ error: "Analysis does not belong to this deal" });
+      }
+      
+      res.json({
+        id: analysis.id,
+        status: analysis.status,
+        summary: analysis.summary,
+        error: analysis.error,
+        createdAt: analysis.createdAt,
+        completedAt: analysis.completedAt,
+      });
+    } catch (error) {
+      console.error('Get AI summary error:', error);
+      res.status(500).json({ error: "Failed to get analysis status" });
+    }
+  });
+  
+  // Get latest AI analysis for a deal
+  app.get("/api/deals/:id/ai-summary/latest", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const analysis = await storage.getLatestAiDocumentAnalysis(req.params.id);
+      
+      if (!analysis) {
+        return res.json({ analysis: null });
+      }
+      
+      res.json({
+        analysis: {
+          id: analysis.id,
+          status: analysis.status,
+          summary: analysis.summary,
+          error: analysis.error,
+          createdAt: analysis.createdAt,
+          completedAt: analysis.completedAt,
+        }
+      });
+    } catch (error) {
+      console.error('Get latest AI summary error:', error);
+      res.status(500).json({ error: "Failed to get latest analysis" });
+    }
+  });
+  
+  // Save AI summary as a deal note
+  app.post("/api/deals/:id/ai-summary/:analysisId/save-as-note", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const analysis = await storage.getAiDocumentAnalysis(req.params.analysisId);
+      
+      if (!analysis) {
+        return res.status(404).json({ error: "Analysis not found" });
+      }
+      
+      if (analysis.dealId !== req.params.id) {
+        return res.status(403).json({ error: "Analysis does not belong to this deal" });
+      }
+      
+      if (analysis.status !== 'completed' || !analysis.summary) {
+        return res.status(400).json({ error: "Analysis not completed or no summary available" });
+      }
+      
+      const { createNoteFromSummary } = await import('./aiDocumentAnalyzer');
+      const note = await createNoteFromSummary(
+        req.params.id,
+        user.id,
+        user.name,
+        analysis.summary,
+        user.avatar
+      );
+      
+      res.json({ success: true, note });
+    } catch (error) {
+      console.error('Save AI summary as note error:', error);
+      res.status(500).json({ error: "Failed to save summary as note" });
+    }
+  });
+
   // Trigger task reoptimization for a specific deal (CEO only)
   app.post("/api/deals/:id/reoptimize", requireCEO, aiLimiter, async (req, res) => {
     try {

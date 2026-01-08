@@ -47,7 +47,8 @@ import {
   useAllInvestors,
   useDealNotes, useCreateDealNote, type DealNoteType,
   useOnboardingStatus, type OnboardingStatus,
-  useBulkDeleteDeals, useBulkMoveToOpportunity, useTransitionStage
+  useBulkDeleteDeals, useBulkMoveToOpportunity, useTransitionStage,
+  useStartAiDocumentAnalysis, useAiDocumentAnalysis, useSaveAiSummaryAsNote
 } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -190,6 +191,15 @@ function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[
   const [mentionQuery, setMentionQuery] = useState("");
   const [cursorPosition, setCursorPosition] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // AI Document Analysis state
+  const [showAiAnalysisDialog, setShowAiAnalysisDialog] = useState(false);
+  const [selectedDocsForAnalysis, setSelectedDocsForAnalysis] = useState<string[]>([]);
+  const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(null);
+  const { data: stageDocuments = [] } = useStageDocuments(dealId);
+  const startAnalysis = useStartAiDocumentAnalysis();
+  const { data: analysisStatus } = useAiDocumentAnalysis(dealId, currentAnalysisId);
+  const saveAsNote = useSaveAiSummaryAsNote();
 
   const filteredUsers = useMemo(() => {
     if (!mentionQuery) return allUsers.slice(0, 5);
@@ -248,6 +258,52 @@ function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[
     });
   };
 
+  // Flatten documents from all stages for AI analysis
+  const allDocuments = useMemo(() => {
+    return stageDocuments.map((doc: any) => ({
+      id: doc.id,
+      url: doc.url,
+      filename: doc.fileName || doc.filename || 'Document',
+      mimeType: doc.mimeType,
+      stage: doc.stage
+    }));
+  }, [stageDocuments]);
+
+  const handleStartAnalysis = async () => {
+    if (selectedDocsForAnalysis.length === 0) {
+      toast.error("Please select at least one document");
+      return;
+    }
+    
+    try {
+      const result = await startAnalysis.mutateAsync({ dealId, documentIds: selectedDocsForAnalysis });
+      setCurrentAnalysisId(result.analysisId);
+      toast.success("AI analysis started - this may take a minute");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to start analysis");
+    }
+  };
+
+  const handleSaveAsNote = async () => {
+    if (!currentAnalysisId || analysisStatus?.status !== 'completed') return;
+    
+    try {
+      await saveAsNote.mutateAsync({ dealId, analysisId: currentAnalysisId });
+      toast.success("Summary saved as deal note");
+      setShowAiAnalysisDialog(false);
+      setCurrentAnalysisId(null);
+      setSelectedDocsForAnalysis([]);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save as note");
+    }
+  };
+
+  const toggleDocSelection = (docId: string) => {
+    setSelectedDocsForAnalysis(prev => 
+      prev.includes(docId) ? prev.filter(id => id !== docId) : [...prev, docId]
+    );
+  };
+
   if (isLoading) {
     return <div className="text-center py-8 text-muted-foreground">Loading notes...</div>;
   }
@@ -259,8 +315,140 @@ function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[
           <MessageSquare className="w-4 h-4" />
           Deal Notes
         </h4>
-        <Badge variant="secondary">{notes.length} notes</Badge>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowAiAnalysisDialog(true)}
+            disabled={allDocuments.length === 0}
+            data-testid="button-ai-analyze-docs"
+          >
+            <FileText className="w-4 h-4 mr-1" />
+            AI Analyze Docs
+          </Button>
+          <Badge variant="secondary">{notes.length} notes</Badge>
+        </div>
       </div>
+
+      {/* AI Document Analysis Dialog */}
+      <Dialog open={showAiAnalysisDialog} onOpenChange={(open) => {
+        setShowAiAnalysisDialog(open);
+        if (!open) {
+          setCurrentAnalysisId(null);
+          setSelectedDocsForAnalysis([]);
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              AI Document Analysis
+            </DialogTitle>
+            <DialogDescription>
+              Select documents to analyze. AI will generate a comprehensive summary that you can save as a deal note.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {!currentAnalysisId ? (
+            <>
+              <div className="space-y-3 py-4">
+                <Label>Select documents to analyze:</Label>
+                {allDocuments.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm bg-secondary/20 rounded-lg">
+                    No documents uploaded yet. Add documents in the Stage Work sections first.
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[200px] border rounded-lg p-2">
+                    <div className="space-y-2">
+                      {allDocuments.map((doc: any) => (
+                        <div
+                          key={doc.id}
+                          className={cn(
+                            "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors",
+                            selectedDocsForAnalysis.includes(doc.id) 
+                              ? "bg-primary/20 border border-primary/50" 
+                              : "bg-secondary/30 hover:bg-secondary/50"
+                          )}
+                          onClick={() => toggleDocSelection(doc.id)}
+                        >
+                          <Checkbox 
+                            checked={selectedDocsForAnalysis.includes(doc.id)}
+                            onCheckedChange={() => toggleDocSelection(doc.id)}
+                          />
+                          <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{doc.filename}</div>
+                            <div className="text-xs text-muted-foreground">{doc.stage} stage</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAiAnalysisDialog(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleStartAnalysis}
+                  disabled={selectedDocsForAnalysis.length === 0 || startAnalysis.isPending}
+                >
+                  {startAnalysis.isPending ? "Starting..." : "Start Analysis"}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="py-4">
+                {analysisStatus?.status === 'pending' || analysisStatus?.status === 'processing' ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+                    <p className="text-muted-foreground">
+                      {analysisStatus?.status === 'pending' ? 'Preparing analysis...' : 'Analyzing documents...'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">This may take a minute for large documents</p>
+                  </div>
+                ) : analysisStatus?.status === 'completed' ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                      <CheckCircle2 className="w-5 h-5" />
+                      <span className="font-medium">Analysis Complete</span>
+                    </div>
+                    <ScrollArea className="h-[300px] border rounded-lg p-4 bg-secondary/10">
+                      <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
+                        {analysisStatus.summary}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                ) : analysisStatus?.status === 'failed' ? (
+                  <div className="text-center py-8 text-red-500">
+                    <X className="w-12 h-12 mx-auto mb-4" />
+                    <p className="font-medium">Analysis Failed</p>
+                    <p className="text-sm text-muted-foreground mt-2">{analysisStatus.error || 'Unknown error occurred'}</p>
+                  </div>
+                ) : null}
+              </div>
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setCurrentAnalysisId(null);
+                    setSelectedDocsForAnalysis([]);
+                  }}
+                >
+                  {analysisStatus?.status === 'completed' ? 'Discard' : 'Cancel'}
+                </Button>
+                {analysisStatus?.status === 'completed' && (
+                  <Button onClick={handleSaveAsNote} disabled={saveAsNote.isPending}>
+                    {saveAsNote.isPending ? "Saving..." : "Save as Note"}
+                  </Button>
+                )}
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <div className="relative">
         <Textarea
