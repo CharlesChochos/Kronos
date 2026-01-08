@@ -14,10 +14,11 @@ export interface DocumentInfo {
 
 function getOpenAIClient(): OpenAI {
   const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-  if (!apiKey) {
+  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  if (!apiKey || !baseURL) {
     throw new Error("OpenAI API key not configured");
   }
-  return new OpenAI({ apiKey });
+  return new OpenAI({ apiKey, baseURL });
 }
 
 /**
