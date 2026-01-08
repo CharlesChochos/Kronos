@@ -10537,13 +10537,18 @@ Only include entries with both name AND company. Extract ALL rows.`
   // ===== AI DOCUMENT ANALYSIS ROUTES =====
   
   // Start AI document analysis for a deal
+  // Accepts: { documents: [{source: 'stage' | 'attachment', id: string}] } or legacy { documentIds: string[] }
   app.post("/api/deals/:id/ai-summary", requireAuth, requireInternal, aiLimiter, async (req, res) => {
     try {
       const user = req.user as any;
-      const { documentIds } = req.body;
+      const { documentIds, documents } = req.body;
       
-      if (!documentIds || !Array.isArray(documentIds) || documentIds.length === 0) {
-        return res.status(400).json({ error: "At least one document ID is required" });
+      // Support both old format (documentIds) and new format (documents with source)
+      const docRefs: { source: 'stage' | 'attachment'; id: string }[] = documents || 
+        (documentIds?.map((id: string) => ({ source: 'stage' as const, id })) ?? []);
+      
+      if (!docRefs || !Array.isArray(docRefs) || docRefs.length === 0) {
+        return res.status(400).json({ error: "At least one document is required" });
       }
       
       const deal = await storage.getDeal(req.params.id);
@@ -10551,22 +10556,45 @@ Only include entries with both name AND company. Extract ALL rows.`
         return res.status(404).json({ error: "Deal not found" });
       }
       
-      // Fetch all stage documents for this deal and validate the document IDs
-      const allDealDocs = await storage.getStageDocuments(req.params.id);
+      // Fetch stage documents for validation
+      const allStageDocs = await storage.getStageDocuments(req.params.id);
+      const dealAttachments = (deal.attachments as any[] || []);
+      
       const validDocs: { url: string; filename: string; mimeType?: string }[] = [];
       const validDocIds: string[] = [];
       
-      for (const docId of documentIds) {
-        const doc = allDealDocs.find((d: any) => d.id === docId);
-        if (!doc) {
-          return res.status(400).json({ error: `Document ${docId} does not belong to this deal` });
+      for (const docRef of docRefs) {
+        if (docRef.source === 'stage') {
+          // Stage document - look up in stageDocuments table
+          const doc = allStageDocs.find((d: any) => d.id === docRef.id);
+          if (!doc) {
+            return res.status(400).json({ error: `Stage document ${docRef.id} does not belong to this deal` });
+          }
+          validDocs.push({
+            url: doc.url,
+            filename: doc.fileName || 'Document',
+            mimeType: doc.mimeType || undefined,
+          });
+          validDocIds.push(`stage:${docRef.id}`);
+        } else if (docRef.source === 'attachment') {
+          // Deal attachment - look up in deal.attachments JSON
+          const attachment = dealAttachments.find((a: any) => a.id === docRef.id);
+          if (!attachment) {
+            return res.status(400).json({ error: `Attachment ${docRef.id} does not belong to this deal` });
+          }
+          const url = attachment.objectPath || attachment.url;
+          if (!url) {
+            return res.status(400).json({ error: `Attachment ${docRef.id} has no valid URL` });
+          }
+          validDocs.push({
+            url: url,
+            filename: attachment.filename || 'Attachment',
+            mimeType: attachment.type || undefined,
+          });
+          validDocIds.push(`attachment:${docRef.id}`);
+        } else {
+          return res.status(400).json({ error: `Invalid document source: ${docRef.source}` });
         }
-        validDocs.push({
-          url: doc.url,
-          filename: doc.fileName || 'Document',
-          mimeType: doc.mimeType || undefined,
-        });
-        validDocIds.push(docId);
       }
       
       // Create analysis record with validated document IDs

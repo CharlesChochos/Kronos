@@ -3828,14 +3828,16 @@ export type AiDocumentAnalysis = {
   completedAt: string | null;
 };
 
+export type DocumentRef = { source: 'stage' | 'attachment'; id: string };
+
 export function useStartAiDocumentAnalysis() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ dealId, documentIds }: { dealId: string; documentIds: string[] }) => {
+    mutationFn: async ({ dealId, documents }: { dealId: string; documents: DocumentRef[] }) => {
       const res = await fetch(`/api/deals/${dealId}/ai-summary`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentIds }),
+        body: JSON.stringify({ documents }),
       });
       if (!res.ok) {
         const error = await res.json();

@@ -183,7 +183,7 @@ function DealTotalTeamCountNumber({ dealId, stage }: { dealId: string; stage: st
   return <>{stagePodMembers.length}</>;
 }
 
-function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[] }) {
+function DealNotesSection({ dealId, allUsers, dealAttachments = [] }: { dealId: string; allUsers: any[]; dealAttachments?: any[] }) {
   const { data: notes = [], isLoading } = useDealNotes(dealId);
   const createDealNote = useCreateDealNote();
   const [newNote, setNewNote] = useState("");
@@ -194,7 +194,7 @@ function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[
   
   // AI Document Analysis state
   const [showAiAnalysisDialog, setShowAiAnalysisDialog] = useState(false);
-  const [selectedDocsForAnalysis, setSelectedDocsForAnalysis] = useState<string[]>([]);
+  const [selectedDocsForAnalysis, setSelectedDocsForAnalysis] = useState<{source: 'stage' | 'attachment'; id: string}[]>([]);
   const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(null);
   const { data: stageDocuments = [] } = useStageDocuments(dealId);
   const startAnalysis = useStartAiDocumentAnalysis();
@@ -258,16 +258,28 @@ function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[
     });
   };
 
-  // Flatten documents from all stages for AI analysis
+  // Combine stage documents and deal attachments for AI analysis
   const allDocuments = useMemo(() => {
-    return stageDocuments.map((doc: any) => ({
+    const stageDocs = stageDocuments.map((doc: any) => ({
+      source: 'stage' as const,
       id: doc.id,
       url: doc.url,
       filename: doc.fileName || doc.filename || 'Document',
       mimeType: doc.mimeType,
-      stage: doc.stage
+      category: doc.stage ? `${doc.stage} Stage` : 'Stage Document'
     }));
-  }, [stageDocuments]);
+    
+    const attachmentDocs = dealAttachments.map((att: any) => ({
+      source: 'attachment' as const,
+      id: att.id,
+      url: att.objectPath || att.url,
+      filename: att.filename || 'Attachment',
+      mimeType: att.type,
+      category: 'Deal Attachment'
+    }));
+    
+    return [...stageDocs, ...attachmentDocs];
+  }, [stageDocuments, dealAttachments]);
 
   const handleStartAnalysis = async () => {
     if (selectedDocsForAnalysis.length === 0) {
@@ -276,7 +288,7 @@ function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[
     }
     
     try {
-      const result = await startAnalysis.mutateAsync({ dealId, documentIds: selectedDocsForAnalysis });
+      const result = await startAnalysis.mutateAsync({ dealId, documents: selectedDocsForAnalysis });
       setCurrentAnalysisId(result.analysisId);
       toast.success("AI analysis started - this may take a minute");
     } catch (err: any) {
@@ -298,10 +310,18 @@ function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[
     }
   };
 
-  const toggleDocSelection = (docId: string) => {
-    setSelectedDocsForAnalysis(prev => 
-      prev.includes(docId) ? prev.filter(id => id !== docId) : [...prev, docId]
-    );
+  const isDocSelected = (source: 'stage' | 'attachment', id: string) => {
+    return selectedDocsForAnalysis.some(d => d.source === source && d.id === id);
+  };
+
+  const toggleDocSelection = (source: 'stage' | 'attachment', id: string) => {
+    setSelectedDocsForAnalysis(prev => {
+      const exists = prev.some(d => d.source === source && d.id === id);
+      if (exists) {
+        return prev.filter(d => !(d.source === source && d.id === id));
+      }
+      return [...prev, { source, id }];
+    });
   };
 
   if (isLoading) {
@@ -362,24 +382,24 @@ function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[
                     <div className="space-y-2">
                       {allDocuments.map((doc: any) => (
                         <div
-                          key={doc.id}
+                          key={`${doc.source}-${doc.id}`}
                           className={cn(
                             "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors",
-                            selectedDocsForAnalysis.includes(doc.id) 
+                            isDocSelected(doc.source, doc.id) 
                               ? "bg-primary/20 border border-primary/50" 
                               : "bg-secondary/30 hover:bg-secondary/50"
                           )}
-                          onClick={() => toggleDocSelection(doc.id)}
+                          onClick={() => toggleDocSelection(doc.source, doc.id)}
                         >
                           <Checkbox 
-                            checked={selectedDocsForAnalysis.includes(doc.id)}
+                            checked={isDocSelected(doc.source, doc.id)}
                             onClick={(e) => e.stopPropagation()}
-                            onCheckedChange={() => toggleDocSelection(doc.id)}
+                            onCheckedChange={() => toggleDocSelection(doc.source, doc.id)}
                           />
                           <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium truncate">{doc.filename}</div>
-                            <div className="text-xs text-muted-foreground">{doc.stage} stage</div>
+                            <div className="text-xs text-muted-foreground">{doc.category}</div>
                           </div>
                         </div>
                       ))}
@@ -4477,7 +4497,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
 
                 {/* Deal Notes Tab */}
                 <TabsContent value="notes" className="mt-4 space-y-4">
-                  <DealNotesSection dealId={selectedDeal.id} allUsers={allUsers} />
+                  <DealNotesSection dealId={selectedDeal.id} allUsers={allUsers} dealAttachments={selectedDealWithAttachments?.attachments as any[] || []} />
                 </TabsContent>
 
                 {/* Audit Trail Tab */}
