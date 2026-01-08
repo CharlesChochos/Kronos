@@ -2859,6 +2859,8 @@ export function useCreateStageDocument() {
     },
     onSettled: (_, __, vars) => {
       queryClient.invalidateQueries({ queryKey: ["stage-documents", vars.dealId, vars.doc.stage] });
+      // Also invalidate the "all documents" query (without stage) for AI analysis feature
+      queryClient.invalidateQueries({ queryKey: ["stage-documents", vars.dealId, undefined] });
     },
   });
 }
@@ -2891,6 +2893,8 @@ export function useDeleteStageDocument() {
     onSettled: (_, __, vars) => {
       if (vars.dealId && vars.stage) {
         queryClient.invalidateQueries({ queryKey: ["stage-documents", vars.dealId, vars.stage] });
+        // Also invalidate the "all documents" query (without stage) for AI analysis feature
+        queryClient.invalidateQueries({ queryKey: ["stage-documents", vars.dealId, undefined] });
       } else {
         queryClient.invalidateQueries({ queryKey: ["stage-documents"] });
       }

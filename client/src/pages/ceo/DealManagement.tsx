@@ -373,6 +373,7 @@ function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[
                         >
                           <Checkbox 
                             checked={selectedDocsForAnalysis.includes(doc.id)}
+                            onClick={(e) => e.stopPropagation()}
                             onCheckedChange={() => toggleDocSelection(doc.id)}
                           />
                           <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
