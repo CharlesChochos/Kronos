@@ -13,12 +13,20 @@ export interface DocumentInfo {
 }
 
 function getOpenAIClient(): OpenAI {
-  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-  if (!apiKey || !baseURL) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
     throw new Error("OpenAI API key not configured");
   }
-  return new OpenAI({ apiKey, baseURL });
+  return new OpenAI({ apiKey });
+}
+
+function getAbsoluteUrl(url: string): string {
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  const host = process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000';
+  const protocol = host.includes('localhost') ? 'http' : 'https';
+  return `${protocol}://${host}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 
 /**
@@ -29,7 +37,9 @@ async function extractTextFromDocument(doc: DocumentInfo): Promise<string> {
   try {
     console.log(`[AI Doc Analyzer] Extracting text from: ${doc.filename}`);
     
-    const response = await fetch(doc.url);
+    const absoluteUrl = getAbsoluteUrl(doc.url);
+    console.log(`[AI Doc Analyzer] Fetching from: ${absoluteUrl}`);
+    const response = await fetch(absoluteUrl);
     if (!response.ok) {
       throw new Error(`Failed to fetch document: ${response.statusText}`);
     }
