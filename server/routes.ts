@@ -451,6 +451,38 @@ export async function registerRoutes(
   // Configure multer for file uploads - use memory storage for base64 conversion
   const memoryStorage = multer.memoryStorage();
 
+  // MIME type to extension mapping for files with missing extensions
+  const mimeToExtension: Record<string, string> = {
+    'application/pdf': '.pdf',
+    'application/msword': '.doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+    'application/vnd.ms-excel': '.xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+    'application/vnd.ms-powerpoint': '.ppt',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+    'text/plain': '.txt',
+    'text/csv': '.csv',
+    'application/rtf': '.rtf',
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'image/svg+xml': '.svg',
+    'video/mp4': '.mp4',
+    'video/quicktime': '.mov',
+    'video/webm': '.webm',
+    'audio/mpeg': '.mp3',
+    'audio/wav': '.wav',
+    'application/zip': '.zip',
+    'application/json': '.json',
+    'application/xml': '.xml',
+    'text/html': '.html',
+    'text/css': '.css',
+    'text/javascript': '.js',
+    'text/markdown': '.md',
+    'application/octet-stream': '', // Allow generic binary files from folders
+  };
+
   const upload = multer({
     storage: memoryStorage,
     limits: {
@@ -471,9 +503,25 @@ export async function registerRoutes(
         // Other
         '.json', '.xml', '.html', '.css', '.js', '.ts', '.md'
       ];
-      const ext = path.extname(file.originalname).toLowerCase();
-      if (allowedExtensions.includes(ext)) {
+      let ext = path.extname(file.originalname).toLowerCase();
+      
+      // If no extension, try to infer from MIME type
+      if (!ext && file.mimetype) {
+        const inferredExt = mimeToExtension[file.mimetype];
+        if (inferredExt !== undefined) {
+          ext = inferredExt;
+          console.log(`[Upload] Inferred extension ${ext} from MIME type ${file.mimetype} for ${file.originalname}`);
+        }
+      }
+      
+      // Allow files with no extension if they have a valid MIME type (common in folder uploads)
+      if (!ext && file.mimetype && mimeToExtension[file.mimetype] !== undefined) {
         cb(null, true);
+      } else if (allowedExtensions.includes(ext)) {
+        cb(null, true);
+      } else if (!ext) {
+        // Better error message for files without extension
+        cb(new Error(`File "${file.originalname}" has no extension and unknown type. Please rename to include an extension.`));
       } else {
         cb(new Error(`File type ${ext} is not allowed. Supported: documents, images, videos, audio, and archives.`));
       }

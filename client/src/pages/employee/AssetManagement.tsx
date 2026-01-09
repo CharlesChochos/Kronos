@@ -4788,14 +4788,14 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
 
       {/* Delete Deal Confirmation Dialog - Offers Archive Option First */}
       <AlertDialog open={showDeleteDealDialog} onOpenChange={setShowDeleteDealDialog}>
-        <AlertDialogContent className="bg-card border-border">
-          <AlertDialogHeader>
+        <AlertDialogContent className="bg-card border-border max-w-md overflow-hidden">
+          <AlertDialogHeader className="space-y-3">
             <AlertDialogTitle className="flex items-center gap-2">
-              <Archive className="w-5 h-5 text-amber-500" />
-              Delete or Archive Deal?
+              <Archive className="w-5 h-5 text-amber-500 flex-shrink-0" />
+              <span>Delete or Archive Deal?</span>
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
-              <div className="text-sm text-muted-foreground space-y-3">
+              <div className="text-sm text-muted-foreground space-y-3 break-words whitespace-normal">
                 <p>We recommend <strong>archiving</strong> instead of deleting. Archived deals preserve all documents, notes, and data for future reference and can be restored at any time.</p>
                 <p className="text-red-400"><strong>Permanent deletion</strong> cannot be undone and will remove all associated data including team members, investors, and documents.</p>
               </div>
