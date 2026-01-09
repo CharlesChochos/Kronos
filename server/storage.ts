@@ -31,7 +31,7 @@ export interface IStorage {
   // Deal operations
   getDeal(id: string): Promise<Deal | undefined>;
   getAllDeals(): Promise<Deal[]>;
-  getDealsListing(): Promise<Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt' | 'podTeam' | 'attachments' | 'archivedAt'>[]>;
+  getDealsListing(): Promise<Array<Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt' | 'podTeam' | 'archivedAt'> & { attachmentCount: number }>>;
   getArchivedDeals(): Promise<Deal[]>;
   createDeal(deal: InsertDeal): Promise<Deal>;
   updateDeal(id: string, updates: Partial<InsertDeal>): Promise<Deal | undefined>;
@@ -422,10 +422,12 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(schema.deals);
   }
 
-  async getDealsListing(): Promise<Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt' | 'podTeam' | 'attachments' | 'archivedAt'>[]> {
-    // Return essential fields for listing - includes podTeam for filtering and attachments for opportunities
+  async getDealsListing(): Promise<Array<Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt' | 'podTeam' | 'archivedAt'> & { attachmentCount: number }>> {
+    // Return essential fields for listing - includes podTeam for filtering
+    // EXCLUDES full attachments data to prevent 64MB response limit errors
+    // Instead, we compute attachmentCount for display purposes
     // Also excludes archived deals (archivedAt is not null)
-    return await db.select({
+    const results = await db.select({
       id: schema.deals.id,
       name: schema.deals.name,
       dealType: schema.deals.dealType,
@@ -444,6 +446,27 @@ export class DatabaseStorage implements IStorage {
       attachments: schema.deals.attachments,
       archivedAt: schema.deals.archivedAt,
     }).from(schema.deals).where(isNull(schema.deals.archivedAt));
+    
+    // Compute attachment count without returning full attachment data
+    return results.map(deal => ({
+      id: deal.id,
+      name: deal.name,
+      dealType: deal.dealType,
+      stage: deal.stage,
+      value: deal.value,
+      client: deal.client,
+      clientContactName: deal.clientContactName,
+      clientContactEmail: deal.clientContactEmail,
+      sector: deal.sector,
+      lead: deal.lead,
+      progress: deal.progress,
+      status: deal.status,
+      description: deal.description,
+      createdAt: deal.createdAt,
+      podTeam: deal.podTeam,
+      archivedAt: deal.archivedAt,
+      attachmentCount: Array.isArray(deal.attachments) ? deal.attachments.length : 0,
+    }));
   }
 
   async getArchivedDeals(): Promise<Deal[]> {

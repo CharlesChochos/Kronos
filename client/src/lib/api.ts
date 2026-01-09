@@ -218,8 +218,9 @@ export function useDeals() {
   });
 }
 
-// Lightweight deal type for listing endpoints (excludes large JSON fields except attachments for opportunities)
-export type DealListing = Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt' | 'attachments' | 'archivedAt'>;
+// Lightweight deal type for listing endpoints (excludes large JSON fields for performance)
+// Uses attachmentCount instead of full attachments to prevent 64MB response limit
+export type DealListing = Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt' | 'archivedAt'> & { attachmentCount: number };
 
 // Lightweight deals listing (excludes large JSON fields for performance)
 // Use this for dropdowns, selectors, or simple lists that don't need full data

@@ -592,13 +592,28 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
     }
   };
   
-  const openOpportunityDetail = (opportunity: DealListing) => {
+  const openOpportunityDetail = async (opportunity: DealListing) => {
     setSelectedOpportunity(opportunity);
     setDetailTab('overview');
     setIsEditMode(false);
-    // Load any existing attachments/notes from the opportunity
-    setOpportunityAttachments(opportunity.attachments || []);
-    setOpportunityNotes((opportunity as any).opportunityNotes || []);
+    
+    // Fetch full deal data to get attachments (listing doesn't include full attachment data)
+    try {
+      const res = await fetch(`/api/deals/${opportunity.id}`);
+      if (res.ok) {
+        const fullDeal = await res.json();
+        setOpportunityAttachments(fullDeal.attachments || []);
+        setOpportunityNotes(fullDeal.opportunityNotes || []);
+      } else {
+        setOpportunityAttachments([]);
+        setOpportunityNotes([]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch opportunity details:", error);
+      setOpportunityAttachments([]);
+      setOpportunityNotes([]);
+    }
+    
     // Initialize edit form with opportunity data
     setEditForm({
       name: opportunity.name,
@@ -801,10 +816,10 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                         <span className="font-medium">{opportunity.lead}</span>
                       </div>
                     )}
-                    {(opportunity.attachments && opportunity.attachments.length > 0) && (
+                    {(opportunity.attachmentCount > 0) && (
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Paperclip className="w-3 h-3" />
-                        {opportunity.attachments.length} attachment(s)
+                        {opportunity.attachmentCount} attachment(s)
                       </div>
                     )}
                     <div className="pt-2 border-t border-border">
