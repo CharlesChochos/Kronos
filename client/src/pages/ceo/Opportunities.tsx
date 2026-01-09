@@ -597,9 +597,8 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
     setDetailTab('overview');
     setIsEditMode(false);
     // Load any existing attachments/notes from the opportunity
-    const opp = opportunity as any;
-    setOpportunityAttachments(opp.attachments || []);
-    setOpportunityNotes(opp.opportunityNotes || []);
+    setOpportunityAttachments(opportunity.attachments || []);
+    setOpportunityNotes((opportunity as any).opportunityNotes || []);
     // Initialize edit form with opportunity data
     setEditForm({
       name: opportunity.name,
@@ -802,10 +801,10 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                         <span className="font-medium">{opportunity.lead}</span>
                       </div>
                     )}
-                    {((opportunity as any).attachments?.length > 0) && (
+                    {(opportunity.attachments && opportunity.attachments.length > 0) && (
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Paperclip className="w-3 h-3" />
-                        {(opportunity as any).attachments.length} attachment(s)
+                        {opportunity.attachments.length} attachment(s)
                       </div>
                     )}
                     <div className="pt-2 border-t border-border">
