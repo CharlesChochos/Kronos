@@ -31,7 +31,8 @@ import {
 import { 
   useCurrentUser, useDealsListing, useDeal, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers,
   useCustomSectors, useCreateCustomSector, useTagDealMember, useRemoveDealMember,
-  useDealNotes, useCreateDealNote, useApproveOpportunity, useBulkDeleteDeals, useArchiveDeal, type DealNoteType
+  useDealNotes, useCreateDealNote, useApproveOpportunity, useBulkDeleteDeals, useArchiveDeal, type DealNoteType,
+  type DealListing
 } from "@/lib/api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -41,7 +42,7 @@ import { ChevronsUpDown, Check as CheckIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import type { Deal, PodTeamMember } from "@shared/schema";
+import type { Deal, PodTeamMember, DealAttachment } from "@shared/schema";
 import { ObjectUploader, type UploadedFile } from "@/components/ObjectUploader";
 
 const DIVISIONS = ['Investment Banking', 'Asset Management'];
@@ -250,7 +251,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewOpportunityDialog, setShowNewOpportunityDialog] = useState(false);
   const [showOpportunityDetail, setShowOpportunityDetail] = useState(false);
-  const [selectedOpportunity, setSelectedOpportunity] = useState<Deal | null>(null);
+  const [selectedOpportunity, setSelectedOpportunity] = useState<DealListing | null>(null);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState<string>('');
@@ -304,9 +305,9 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   
   // Filter for Opportunity deals only (excluding archived)
   const opportunities = useMemo(() => {
-    return deals.filter((deal: Deal) => {
-      const isOpportunity = (deal as any).dealType === 'Opportunity';
-      const isArchived = deal.status === 'Archived' || (deal as any).archivedAt;
+    return deals.filter((deal) => {
+      const isOpportunity = deal.dealType === 'Opportunity';
+      const isArchived = deal.status === 'Archived' || deal.archivedAt;
       return isOpportunity && !isArchived;
     });
   }, [deals]);
@@ -317,9 +318,9 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
       const params = new URLSearchParams(searchString);
       const opportunityId = params.get('id');
       if (opportunityId) {
-        const opportunity = opportunities.find((d: Deal) => d.id === opportunityId);
+        const opportunity = opportunities.find((d) => d.id === opportunityId);
         if (opportunity) {
-          setSelectedOpportunity(opportunity);
+          setSelectedOpportunity(opportunity as DealListing);
           setShowOpportunityDetail(true);
         }
       }
@@ -330,7 +331,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const filteredOpportunities = useMemo(() => {
     if (!searchQuery) return opportunities;
     const query = searchQuery.toLowerCase();
-    return opportunities.filter((deal: Deal) => 
+    return opportunities.filter((deal) => 
       deal.name.toLowerCase().includes(query) ||
       deal.client.toLowerCase().includes(query) ||
       deal.sector.toLowerCase().includes(query)
@@ -339,8 +340,8 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   
   // Stats
   const stats = useMemo(() => {
-    const totalValue = opportunities.reduce((sum, deal: Deal) => sum + deal.value, 0);
-    const pending = opportunities.filter((d: Deal) => d.status === 'Active').length;
+    const totalValue = opportunities.reduce((sum, deal) => sum + deal.value, 0);
+    const pending = opportunities.filter((d) => d.status === 'Active').length;
     return { total: opportunities.length, totalValue, pending };
   }, [opportunities]);
   
@@ -354,7 +355,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
     if (selectedOpportunities.length === filteredOpportunities.length) {
       setSelectedOpportunities([]);
     } else {
-      setSelectedOpportunities(filteredOpportunities.map((o: Deal) => o.id));
+      setSelectedOpportunities(filteredOpportunities.map((o) => o.id));
     }
   };
 
@@ -374,7 +375,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
         successCount++;
         successfulIds.push(opportunityId);
       } catch (error: any) {
-        const opp = filteredOpportunities.find((o: Deal) => o.id === opportunityId);
+        const opp = filteredOpportunities.find((o) => o.id === opportunityId);
         errors.push(opp?.name || opportunityId);
       }
     }
@@ -434,9 +435,23 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
     e.target.value = '';
   };
   
-  const removeAttachment = (id: string, isDetail: boolean = false) => {
+  const removeAttachment = async (id: string, isDetail: boolean = false) => {
     if (isDetail) {
-      setOpportunityAttachments(prev => prev.filter(a => a.id !== id));
+      const filteredAttachments = opportunityAttachments.filter(a => a.id !== id);
+      setOpportunityAttachments(filteredAttachments);
+      
+      if (selectedOpportunity) {
+        try {
+          await updateDeal.mutateAsync({
+            id: selectedOpportunity.id,
+            attachments: filteredAttachments,
+          } as any);
+          toast.success("Attachment removed");
+        } catch (error) {
+          console.error("Failed to persist attachment removal:", error);
+          toast.error("Failed to save changes");
+        }
+      }
     } else {
       setNewOpportunity(prev => ({
         ...prev,
@@ -577,7 +592,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
     }
   };
   
-  const openOpportunityDetail = (opportunity: Deal) => {
+  const openOpportunityDetail = (opportunity: DealListing) => {
     setSelectedOpportunity(opportunity);
     setDetailTab('overview');
     setIsEditMode(false);
@@ -744,7 +759,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
         {/* Opportunities Grid */}
         {filteredOpportunities.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredOpportunities.map((opportunity: Deal) => (
+            {filteredOpportunities.map((opportunity) => (
               <Card 
                 key={opportunity.id} 
                 className="bg-card border-border hover:border-primary/30 transition-colors cursor-pointer group"
@@ -1343,7 +1358,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                                 </div>
                                 <div>
                                   <p className="text-sm font-medium">{member.name}</p>
-                                  <p className="text-xs text-muted-foreground">{member.jobTitle || member.role}</p>
+                                  <p className="text-xs text-muted-foreground">{member.role}</p>
                                 </div>
                               </div>
                               <Button
@@ -1380,22 +1395,43 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                   </TabsContent>
                   
                   <TabsContent value="attachments" className="space-y-4 pr-4 mt-0">
-                    <input
-                      ref={detailFileInputRef}
-                      type="file"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => handleFileUpload(e, true)}
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png"
-                    />
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={() => detailFileInputRef.current?.click()}
+                    <ObjectUploader
+                      maxNumberOfFiles={100}
+                      maxFileSize={500 * 1024 * 1024}
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,.mp4,.mov,.avi,.mp3,.wav,image/*,video/*,audio/*"
+                      onComplete={async (files: UploadedFile[]) => {
+                        if (!selectedOpportunity) return;
+                        const newAttachments: DealAttachment[] = files.map(f => ({
+                          id: f.id,
+                          filename: f.filename,
+                          url: f.objectPath,
+                          objectPath: f.objectPath,
+                          size: f.size,
+                          type: f.type,
+                          relativePath: f.relativePath,
+                          uploadedAt: new Date().toISOString(),
+                        }));
+                        
+                        const mergedAttachments = [...opportunityAttachments, ...newAttachments];
+                        setOpportunityAttachments(mergedAttachments);
+                        
+                        try {
+                          await updateDeal.mutateAsync({
+                            id: selectedOpportunity.id,
+                            attachments: mergedAttachments,
+                          } as any);
+                          toast.success(`${files.length} file(s) uploaded and saved`);
+                        } catch (error) {
+                          console.error("Failed to persist attachments:", error);
+                          toast.error("Files uploaded but failed to save. Please try again.");
+                        }
+                      }}
+                      buttonVariant="outline"
+                      buttonSize="default"
                     >
                       <Upload className="w-4 h-4 mr-2" />
                       Upload Attachments
-                    </Button>
+                    </ObjectUploader>
                     
                     {opportunityAttachments.length > 0 ? (
                       <div className="space-y-2">

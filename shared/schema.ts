@@ -82,6 +82,18 @@ export type AuditEntry = {
   details: string;
 };
 
+// Deal Attachment type - for opportunity/deal file attachments
+export type DealAttachment = {
+  id: string;
+  filename: string;
+  url: string;  // Can be objectPath (/objects/...), upload path (/uploads/...), or data URL
+  objectPath?: string;
+  size: number;
+  type?: string;
+  relativePath?: string;  // For folder structure preservation
+  uploadedAt: string;
+};
+
 // Deal Types: 'M&A', 'Capital Raising', 'Asset Management', 'Opportunity'
 // Opportunity deals are pending approval before becoming active deals
 
@@ -102,7 +114,7 @@ export const deals = pgTable("deals", {
   progress: integer("progress").default(0),
   status: text("status").notNull().default('Active'),
   description: text("description"),
-  attachments: jsonb("attachments").default([]),
+  attachments: jsonb("attachments").default([]).$type<DealAttachment[]>(),
   podTeam: jsonb("pod_team").default([]).$type<PodTeamMember[]>(),
   taggedInvestors: jsonb("tagged_investors").default([]).$type<TaggedInvestor[]>(),
   auditTrail: jsonb("audit_trail").default([]).$type<AuditEntry[]>(),
