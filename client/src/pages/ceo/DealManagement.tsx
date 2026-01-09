@@ -5095,7 +5095,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                 if (dealToDelete) {
                   const deal = deals.find((d: Deal) => d.id === dealToDelete);
                   if (deal) {
-                    setDealToArchive(deal);
+                    setDealToArchive(deal.id);
                     setShowArchiveDialog(true);
                   }
                   setDealToDelete(null);
