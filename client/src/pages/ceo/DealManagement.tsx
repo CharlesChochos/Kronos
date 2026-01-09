@@ -1666,6 +1666,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const [selectedDeals, setSelectedDeals] = useState<string[]>([]);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [showBulkMoveDialog, setShowBulkMoveDialog] = useState(false);
+  const [isBulkArchiving, setIsBulkArchiving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [stageFilter, setStageFilter] = useState<string | null>(null);
@@ -5070,17 +5071,40 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Deal Confirmation Dialog */}
+      {/* Delete Deal Confirmation Dialog - Offers Archive Option First */}
       <AlertDialog open={showDeleteDealDialog} onOpenChange={setShowDeleteDealDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete this deal and all its associated data including team members, investors, and documents.
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Archive className="w-5 h-5 text-amber-500" />
+              Delete or Archive Deal?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>We recommend <strong>archiving</strong> instead of deleting. Archived deals preserve all documents, notes, and data for future reference and can be restored at any time.</p>
+              <p className="text-red-400"><strong>Permanent deletion</strong> cannot be undone and will remove all associated data including team members, investors, and documents.</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel onClick={() => setDealToDelete(null)}>Cancel</AlertDialogCancel>
+            <Button
+              variant="outline"
+              className="border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
+              onClick={() => {
+                if (dealToDelete) {
+                  const deal = deals.find((d: Deal) => d.id === dealToDelete);
+                  if (deal) {
+                    setDealToArchive(deal);
+                    setShowArchiveDialog(true);
+                  }
+                  setDealToDelete(null);
+                  setShowDeleteDealDialog(false);
+                }
+              }}
+              data-testid="button-archive-instead"
+            >
+              <Archive className="w-4 h-4 mr-2" />
+              Archive Instead (Recommended)
+            </Button>
             <AlertDialogAction 
               onClick={() => {
                 if (dealToDelete) {
@@ -5090,8 +5114,9 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                 }
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-permanent-delete"
             >
-              Delete Deal
+              Delete Permanently
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -5164,19 +5189,76 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Delete Confirmation Dialog */}
+      {/* Bulk Delete Confirmation Dialog - Offers Archive Option First */}
       <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {selectedDeals.length} Deals</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete {selectedDeals.length} deals? This action cannot be undone.
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Archive className="w-5 h-5 text-amber-500" />
+              Delete or Archive {selectedDeals.length} Deals?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>We recommend <strong>archiving</strong> instead of deleting. Archived deals preserve all documents, notes, and data for future reference and can be restored at any time.</p>
+              <p className="text-red-400"><strong>Permanent deletion</strong> cannot be undone and will remove all associated data.</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground">
-              Delete All
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel disabled={isBulkArchiving || bulkDeleteDeals.isPending}>Cancel</AlertDialogCancel>
+            <Button
+              variant="outline"
+              className="border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
+              disabled={isBulkArchiving || bulkDeleteDeals.isPending}
+              onClick={async () => {
+                setIsBulkArchiving(true);
+                let successCount = 0;
+                const errors: string[] = [];
+                const successfulIds: string[] = [];
+                
+                for (const dealId of selectedDeals) {
+                  try {
+                    await archiveDeal.mutateAsync({
+                      id: dealId,
+                      reason: 'Bulk Archive',
+                      notes: undefined
+                    });
+                    successCount++;
+                    successfulIds.push(dealId);
+                  } catch (error: any) {
+                    const deal = deals.find((d: Deal) => d.id === dealId);
+                    errors.push(deal?.name || dealId);
+                  }
+                }
+                
+                setIsBulkArchiving(false);
+                
+                if (errors.length === 0) {
+                  toast.success(`${successCount} deals archived. You can find them in the Archived Deals section.`);
+                  setSelectedDeals([]);
+                  setShowBulkDeleteDialog(false);
+                } else if (successCount > 0) {
+                  toast.warning(`${successCount} deals archived, ${errors.length} failed: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? '...' : ''}`);
+                  setSelectedDeals(selectedDeals.filter(id => !successfulIds.includes(id)));
+                } else {
+                  toast.error(`Failed to archive deals: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? '...' : ''}`);
+                }
+              }}
+              data-testid="button-bulk-archive-instead"
+            >
+              {isBulkArchiving ? (
+                <>Archiving...</>
+              ) : (
+                <>
+                  <Archive className="w-4 h-4 mr-2" />
+                  Archive All (Recommended)
+                </>
+              )}
+            </Button>
+            <AlertDialogAction 
+              onClick={handleBulkDelete} 
+              disabled={isBulkArchiving || bulkDeleteDeals.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeleteDeals.isPending ? "Deleting..." : "Delete Permanently"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

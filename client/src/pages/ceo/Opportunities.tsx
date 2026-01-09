@@ -253,6 +253,8 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const [selectedOpportunity, setSelectedOpportunity] = useState<Deal | null>(null);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectReason, setRejectReason] = useState<string>('');
+  const [rejectNotes, setRejectNotes] = useState<string>('');
   const [approvalDivision, setApprovalDivision] = useState<string>('Investment Banking');
   const [skipPodFormation, setSkipPodFormation] = useState(false);
   const [detailTab, setDetailTab] = useState<'overview' | 'attachments' | 'notes'>('overview');
@@ -292,6 +294,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   // Bulk selection state
   const [selectedOpportunities, setSelectedOpportunities] = useState<string[]>([]);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [isBulkArchiving, setIsBulkArchiving] = useState(false);
   
   // Archive dialog state
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
@@ -355,14 +358,38 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
     }
   };
 
-  const handleBulkDelete = async () => {
-    try {
-      await bulkDeleteDeals.mutateAsync(selectedOpportunities);
-      toast.success(`${selectedOpportunities.length} opportunities deleted`);
+  const handleBulkArchive = async () => {
+    setIsBulkArchiving(true);
+    let successCount = 0;
+    const errors: string[] = [];
+    const successfulIds: string[] = [];
+    
+    for (const opportunityId of selectedOpportunities) {
+      try {
+        await archiveDeal.mutateAsync({
+          id: opportunityId,
+          reason: 'Bulk Archive',
+          notes: undefined
+        });
+        successCount++;
+        successfulIds.push(opportunityId);
+      } catch (error: any) {
+        const opp = filteredOpportunities.find((o: Deal) => o.id === opportunityId);
+        errors.push(opp?.name || opportunityId);
+      }
+    }
+    
+    setIsBulkArchiving(false);
+    
+    if (errors.length === 0) {
+      toast.success(`${successCount} opportunities archived. You can find them in the Archived Deals section.`);
       setSelectedOpportunities([]);
       setShowBulkDeleteDialog(false);
-    } catch (error) {
-      toast.error("Failed to delete opportunities");
+    } else if (successCount > 0) {
+      toast.warning(`${successCount} opportunities archived, ${errors.length} failed: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? '...' : ''}`);
+      setSelectedOpportunities(selectedOpportunities.filter(id => !successfulIds.includes(id)));
+    } else {
+      toast.error(`Failed to archive opportunities: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? '...' : ''}`);
     }
   };
   
@@ -512,13 +539,19 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const handleReject = async () => {
     if (!selectedOpportunity) return;
     try {
-      await deleteDeal.mutateAsync(selectedOpportunity.id);
-      toast.success("Opportunity rejected and removed");
+      await archiveDeal.mutateAsync({
+        id: selectedOpportunity.id,
+        reason: rejectReason || 'Opportunity Rejected',
+        notes: rejectNotes || undefined
+      });
+      toast.success("Opportunity rejected and archived. You can find it in the Archived Deals section and restore it if needed.");
       setShowRejectDialog(false);
       setShowOpportunityDetail(false);
       setSelectedOpportunity(null);
-    } catch (error) {
-      toast.error("Failed to reject opportunity");
+      setRejectReason('');
+      setRejectNotes('');
+    } catch (error: any) {
+      toast.error(error.message || "Failed to reject opportunity");
     }
   };
 
@@ -680,8 +713,8 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
               <span className="text-sm font-medium">{selectedOpportunities.length} selected</span>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="destructive" size="sm" onClick={() => setShowBulkDeleteDialog(true)} data-testid="button-bulk-delete-opportunities">
-                <Trash2 className="w-4 h-4 mr-1" /> Delete Selected
+              <Button variant="outline" size="sm" className="border-amber-500/50 text-amber-500 hover:bg-amber-500/10" onClick={() => setShowBulkDeleteDialog(true)} data-testid="button-bulk-archive-opportunities">
+                <Archive className="w-4 h-4 mr-1" /> Archive Selected
               </Button>
               <Button variant="outline" size="sm" onClick={() => setSelectedOpportunities([])} data-testid="button-clear-selection">
                 Clear Selection
@@ -1518,40 +1551,89 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
         </AlertDialogContent>
       </AlertDialog>
       
-      {/* Reject Dialog */}
-      <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+      {/* Reject Dialog - Archives instead of permanently deleting */}
+      <Dialog open={showRejectDialog} onOpenChange={(open) => {
+        setShowRejectDialog(open);
+        if (!open) {
+          setRejectReason('');
+          setRejectNotes('');
+        }
+      }}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Archive className="w-5 h-5 text-amber-500" />
+              Reject & Archive Opportunity
+            </DialogTitle>
+            <DialogDescription>
+              This opportunity will be archived with all its documents and data preserved. You can restore it from the Archived Deals section at any time.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Reason for Rejection</Label>
+              <Select value={rejectReason} onValueChange={setRejectReason}>
+                <SelectTrigger data-testid="select-reject-reason">
+                  <SelectValue placeholder="Select a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Opportunity Rejected">Opportunity Rejected</SelectItem>
+                  <SelectItem value="Client Declined">Client Declined</SelectItem>
+                  <SelectItem value="Not a Fit">Not a Fit</SelectItem>
+                  <SelectItem value="Market Conditions">Market Conditions</SelectItem>
+                  <SelectItem value="Insufficient Information">Insufficient Information</SelectItem>
+                  <SelectItem value="Duplicate Entry">Duplicate Entry</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes (Optional)</Label>
+              <Textarea
+                placeholder="Add any notes about why this opportunity is being rejected..."
+                value={rejectNotes}
+                onChange={(e) => setRejectNotes(e.target.value)}
+                rows={3}
+                data-testid="textarea-reject-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRejectDialog(false)} disabled={archiveDeal.isPending}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReject}
+              disabled={archiveDeal.isPending}
+              className="bg-amber-600 hover:bg-amber-700"
+              data-testid="button-confirm-reject"
+            >
+              {archiveDeal.isPending ? "Rejecting..." : "Reject & Archive"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Bulk Archive Dialog */}
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              Reject Opportunity
+              <Archive className="w-5 h-5 text-amber-500" />
+              Archive {selectedOpportunities.length} Opportunities
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to reject this opportunity? This action will remove it permanently.
+              These opportunities will be archived with all their documents and data preserved. You can restore them from the Archived Deals section at any time.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleReject} className="bg-red-600 hover:bg-red-700" data-testid="button-confirm-reject">
-              Reject & Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      
-      {/* Bulk Delete Dialog */}
-      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete {selectedOpportunities.length} Opportunities</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete {selectedOpportunities.length} opportunities? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground">
-              Delete All
+            <AlertDialogCancel disabled={isBulkArchiving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleBulkArchive} 
+              disabled={isBulkArchiving}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {isBulkArchiving ? "Archiving..." : "Archive All"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
