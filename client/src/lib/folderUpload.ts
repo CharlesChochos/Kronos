@@ -57,6 +57,8 @@ async function readDirectoryRecursive(
 /**
  * Extract files from a DataTransferItemList (from drag-and-drop)
  * Supports both individual files and folders
+ * IMPORTANT: Must capture entries synchronously before the event handler returns,
+ * as DataTransferItems are cleared after the event completes
  */
 export async function extractFilesFromDataTransfer(
   dataTransfer: DataTransfer
@@ -64,27 +66,41 @@ export async function extractFilesFromDataTransfer(
   const files: FileWithPath[] = [];
   const items = Array.from(dataTransfer.items);
   
+  // Capture all entries synchronously FIRST, before async processing
+  // DataTransferItems get cleared once the event handler returns
+  const entries: Array<{ entry: FileSystemEntry | null; file: File | null }> = [];
+  
   for (const item of items) {
     if (item.kind !== 'file') continue;
     
     // Try to get as entry first (for folder support)
-    const entry = item.webkitGetAsEntry?.();
-    
-    if (entry) {
-      if (entry.isFile) {
-        const fileEntry = entry as FileSystemFileEntry;
-        const file = await new Promise<File>((resolve, reject) => {
-          fileEntry.file(resolve, reject);
-        });
+    const entry = item.webkitGetAsEntry?.() || null;
+    const file = item.getAsFile();
+    entries.push({ entry, file });
+  }
+  
+  // Now process captured entries asynchronously
+  for (const { entry, file } of entries) {
+    try {
+      if (entry) {
+        if (entry.isFile) {
+          const fileEntry = entry as FileSystemFileEntry;
+          const extractedFile = await new Promise<File>((resolve, reject) => {
+            fileEntry.file(resolve, reject);
+          });
+          files.push({ file: extractedFile, relativePath: extractedFile.name });
+        } else if (entry.isDirectory) {
+          const dirEntry = entry as FileSystemDirectoryEntry;
+          const subFiles = await readDirectoryRecursive(dirEntry, entry.name);
+          files.push(...subFiles);
+        }
+      } else if (file) {
+        // Fallback to regular file
         files.push({ file, relativePath: file.name });
-      } else if (entry.isDirectory) {
-        const dirEntry = entry as FileSystemDirectoryEntry;
-        const subFiles = await readDirectoryRecursive(dirEntry, entry.name);
-        files.push(...subFiles);
       }
-    } else {
-      // Fallback to regular file
-      const file = item.getAsFile();
+    } catch (error) {
+      console.error('Error processing entry:', error);
+      // If entry extraction failed but we have the file, use it
       if (file) {
         files.push({ file, relativePath: file.name });
       }

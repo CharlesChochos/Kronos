@@ -514,12 +514,18 @@ export function ObjectUploader({
       const filesWithPaths = await extractFilesFromDataTransfer(e.dataTransfer);
       if (filesWithPaths.length > 0) {
         addFilesWithPaths(filesWithPaths);
-        if (filesWithPaths.length > 1) {
-          toast.success(`Found ${filesWithPaths.length} files (including from folders)`);
+        const folderCount = filesWithPaths.filter(f => f.relativePath.includes('/')).length;
+        if (folderCount > 0) {
+          toast.success(`Found ${filesWithPaths.length} files from folders`);
+        } else if (filesWithPaths.length > 1) {
+          toast.success(`Added ${filesWithPaths.length} files`);
         }
+      } else {
+        toast.error('No files found in the dropped item');
       }
     } catch (err) {
       console.error('Error processing drop:', err);
+      toast.error('Error processing dropped files. Please try again or use the Browse button.');
       // Fallback to regular files
       const files = Array.from(e.dataTransfer.files);
       if (files.length > 0) {
