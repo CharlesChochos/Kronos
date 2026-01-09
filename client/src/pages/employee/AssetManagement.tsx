@@ -4089,14 +4089,14 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                       relativePath: doc.relativePath || doc.filename,
                     }))}
                     onView={(file) => {
-                      if (!file.url?.startsWith('/objects/') && !file.url?.startsWith('data:')) {
+                      if (!file.url?.startsWith('/objects/') && !file.url?.startsWith('/uploads/') && !file.url?.startsWith('data:')) {
                         toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
                         return;
                       }
                       import('@/lib/utils').then(m => m.openUrlInNewTab(file.url));
                     }}
                     onDownload={(file) => {
-                      if (!file.url?.startsWith('/objects/') && !file.url?.startsWith('data:')) {
+                      if (!file.url?.startsWith('/objects/') && !file.url?.startsWith('/uploads/') && !file.url?.startsWith('data:')) {
                         toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
                         return;
                       }
