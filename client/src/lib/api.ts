@@ -429,6 +429,61 @@ export function useBulkMoveToOpportunity() {
   });
 }
 
+export function useArchiveDeal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, reason, notes }: { id: string; reason: string; notes?: string }) => {
+      const res = await fetch(`/api/deals/${id}/archive`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason, notes }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Failed to archive deal" }));
+        throw new Error(errorData.error || "Failed to archive deal");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
+      queryClient.invalidateQueries({ queryKey: ["archived-deals"] });
+    },
+  });
+}
+
+export function useRestoreDeal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/deals/${id}/restore`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Failed to restore deal" }));
+        throw new Error(errorData.error || "Failed to restore deal");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
+      queryClient.invalidateQueries({ queryKey: ["archived-deals"] });
+    },
+  });
+}
+
+export function useArchivedDeals() {
+  return useQuery<Deal[]>({
+    queryKey: ["archived-deals"],
+    queryFn: async () => {
+      const res = await fetch("/api/deals/archived");
+      if (!res.ok) throw new Error("Failed to fetch archived deals");
+      return res.json();
+    },
+  });
+}
+
 // Custom Sectors API
 export type CustomSector = {
   id: string;

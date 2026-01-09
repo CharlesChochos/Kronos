@@ -424,6 +424,7 @@ export class DatabaseStorage implements IStorage {
 
   async getDealsListing(): Promise<Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt' | 'podTeam'>[]> {
     // Return essential fields for listing - includes podTeam for filtering, excludes very large JSON fields like attachments
+    // Also excludes archived deals (archivedAt is not null)
     return await db.select({
       id: schema.deals.id,
       name: schema.deals.name,
@@ -440,7 +441,7 @@ export class DatabaseStorage implements IStorage {
       description: schema.deals.description,
       createdAt: schema.deals.createdAt,
       podTeam: schema.deals.podTeam,
-    }).from(schema.deals);
+    }).from(schema.deals).where(isNull(schema.deals.archivedAt));
   }
 
   async getArchivedDeals(): Promise<Deal[]> {

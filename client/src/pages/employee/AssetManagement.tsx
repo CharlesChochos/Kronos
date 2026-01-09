@@ -32,7 +32,7 @@ import {
   Pencil, Trash2, Eye, Users, Phone, Mail, MessageSquare, Plus, X, 
   Building2, TrendingUp, FileText, Clock, CheckCircle2, ChevronRight,
   UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload, GitCompare, ArrowUpDown, BarChart3,
-  Mic, MicOff, Play, Pause, Square, Volume2, Download, UserCircle, ExternalLink, ArrowLeftCircle
+  Mic, MicOff, Play, Pause, Square, Volume2, Download, UserCircle, ExternalLink, ArrowLeftCircle, Archive
 } from "lucide-react";
 import { 
   useCurrentUser, useDealsListing, useDeal, useCreateDeal, useUpdateDeal, useDeleteDeal, useMoveDealToOpportunity, useBulkDeleteDeals, useBulkMoveToOpportunity, useUsers, useTasks, useCreateDealFee,
@@ -45,7 +45,8 @@ import {
   useCreateDocument,
   useAllInvestors,
   useDealNotes, useCreateDealNote, type DealNoteType,
-  useStartAiDocumentAnalysis, useAiDocumentAnalysis, useSaveAiSummaryAsNote
+  useStartAiDocumentAnalysis, useAiDocumentAnalysis, useSaveAiSummaryAsNote,
+  useArchiveDeal
 } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -1649,6 +1650,7 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
   const createDeal = useCreateDeal();
   const updateDeal = useUpdateDeal();
   const deleteDeal = useDeleteDeal();
+  const archiveDeal = useArchiveDeal();
   const moveDealToOpportunity = useMoveDealToOpportunity();
   const bulkDeleteDeals = useBulkDeleteDeals();
   const bulkMoveToOpportunity = useBulkMoveToOpportunity();
@@ -1725,6 +1727,12 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
   // Delete deal confirmation dialog
   const [showDeleteDealDialog, setShowDeleteDealDialog] = useState(false);
   const [dealToDelete, setDealToDelete] = useState<string | null>(null);
+  
+  // Archive deal dialog state
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
+  const [dealToArchive, setDealToArchive] = useState<string | null>(null);
+  const [archiveReason, setArchiveReason] = useState<string>('');
+  const [archiveNotes, setArchiveNotes] = useState<string>('');
   
   const openTaskDetail = (task: any, deal: Deal) => {
     setSelectedCalendarTask({ ...task, deal });
@@ -1900,6 +1908,10 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
 
   const filteredDeals = useMemo(() => {
     return deals.filter(deal => {
+      // Filter out archived deals
+      const isArchived = deal.status === 'Archived' || (deal as any).archivedAt;
+      if (isArchived) return false;
+      
       const matchesSearch = !debouncedSearchQuery || 
         deal.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
         deal.client.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
@@ -2336,6 +2348,27 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to delete deal");
+    }
+  };
+
+  const handleArchiveDeal = async () => {
+    if (!dealToArchive) return;
+    try {
+      await archiveDeal.mutateAsync({
+        id: dealToArchive,
+        reason: archiveReason || 'Archived',
+        notes: archiveNotes || undefined
+      });
+      toast.success("Deal archived successfully! You can find it in the Archived Deals section.");
+      if (selectedDeal?.id === dealToArchive) {
+        setSelectedDeal(null);
+      }
+      setShowArchiveDialog(false);
+      setDealToArchive(null);
+      setArchiveReason('');
+      setArchiveNotes('');
+    } catch (error: any) {
+      toast.error(error.message || "Failed to archive deal");
     }
   };
 
@@ -2932,6 +2965,15 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                         <Pencil className="w-4 h-4 mr-2" /> Edit Deal
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        className="text-amber-500" 
+                        onClick={() => {
+                          setDealToArchive(deal.id);
+                          setShowArchiveDialog(true);
+                        }}
+                      >
+                        <Archive className="w-4 h-4 mr-2" /> Archive
+                      </DropdownMenuItem>
                       <DropdownMenuItem 
                         className="text-red-500" 
                         onClick={() => {
@@ -4800,6 +4842,73 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Archive Deal Dialog */}
+      <Dialog open={showArchiveDialog} onOpenChange={(open) => {
+        setShowArchiveDialog(open);
+        if (!open) {
+          setDealToArchive(null);
+          setArchiveReason('');
+          setArchiveNotes('');
+        }
+      }}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Archive className="w-5 h-5 text-amber-500" />
+              Archive Deal
+            </DialogTitle>
+            <DialogDescription>
+              Archived deals are preserved with all their documents and data for future reference. You can restore them at any time.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Reason for Archiving</Label>
+              <Select value={archiveReason} onValueChange={setArchiveReason}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Deal Rejected">Deal Rejected</SelectItem>
+                  <SelectItem value="Client Declined">Client Declined</SelectItem>
+                  <SelectItem value="Deal Fell Through">Deal Fell Through</SelectItem>
+                  <SelectItem value="Market Conditions">Market Conditions</SelectItem>
+                  <SelectItem value="Completed">Completed / Closed</SelectItem>
+                  <SelectItem value="On Hold">On Hold</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes (Optional)</Label>
+              <Textarea
+                placeholder="Add any notes about why this deal is being archived, lessons learned, or future reference information..."
+                value={archiveNotes}
+                onChange={(e) => setArchiveNotes(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowArchiveDialog(false);
+              setDealToArchive(null);
+              setArchiveReason('');
+              setArchiveNotes('');
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleArchiveDeal}
+              disabled={archiveDeal.isPending}
+              className="bg-amber-500 hover:bg-amber-600 text-white"
+            >
+              {archiveDeal.isPending ? "Archiving..." : "Archive Deal"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

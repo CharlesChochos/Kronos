@@ -25,7 +25,8 @@ import {
   ClipboardList,
   ClipboardCheck,
   Brain,
-  Clock
+  Clock,
+  Archive
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPreferences, useSaveUserPreferences, useCurrentUser } from "@/lib/api";
@@ -146,6 +147,7 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
         { icon: Target, label: "Opportunities", path: "/ceo/opportunities" },
         { icon: Briefcase, label: "Deal Management", path: "/ceo/deals" },
         ...(isAdmin ? [{ icon: BarChart3, label: "Asset Management", path: "/ceo/asset-management" }] : []),
+        { icon: Archive, label: "Archived Deals", path: "/ceo/archived-deals" },
         { icon: FileText, label: "Documents", path: "/ceo/documents" },
       ]
     },
@@ -211,6 +213,7 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
     { icon: Target, label: "Opportunities", path: "/employee/opportunities" },
     { icon: Briefcase, label: "Deal Management", path: "/employee/deals" },
     ...(canAccessAssetManagement ? [{ icon: BarChart3, label: "Asset Management", path: "/employee/asset-management" }] : []),
+    { icon: Archive, label: "Archived Deals", path: "/employee/archived-deals" },
     { icon: FileText, label: "Documents", path: "/employee/documents" },
     { icon: FolderOpen, label: "Document Library", path: "/employee/document-library" },
   ];

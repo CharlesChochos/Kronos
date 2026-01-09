@@ -26,12 +26,12 @@ import {
   Search, Plus, Lightbulb, CheckCircle, XCircle, Eye, Clock, DollarSign,
   Building2, Users, ArrowRight, Briefcase, TrendingUp, AlertTriangle,
   Upload, FileText, Paperclip, StickyNote, X, Download, Trash2, ExternalLink,
-  Pencil, Save, MessageSquare
+  Pencil, Save, MessageSquare, Archive
 } from "lucide-react";
 import { 
   useCurrentUser, useDealsListing, useDeal, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers,
   useCustomSectors, useCreateCustomSector, useTagDealMember, useRemoveDealMember,
-  useDealNotes, useCreateDealNote, useApproveOpportunity, useBulkDeleteDeals, type DealNoteType
+  useDealNotes, useCreateDealNote, useApproveOpportunity, useBulkDeleteDeals, useArchiveDeal, type DealNoteType
 } from "@/lib/api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -231,6 +231,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const deleteDeal = useDeleteDeal();
   const approveOpportunity = useApproveOpportunity();
   const bulkDeleteDeals = useBulkDeleteDeals();
+  const archiveDeal = useArchiveDeal();
   const tagMember = useTagDealMember();
   const removeMember = useRemoveDealMember();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -292,9 +293,19 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const [selectedOpportunities, setSelectedOpportunities] = useState<string[]>([]);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   
-  // Filter for Opportunity deals only
+  // Archive dialog state
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
+  const [dealToArchive, setDealToArchive] = useState<string | null>(null);
+  const [archiveReason, setArchiveReason] = useState<string>('');
+  const [archiveNotes, setArchiveNotes] = useState<string>('');
+  
+  // Filter for Opportunity deals only (excluding archived)
   const opportunities = useMemo(() => {
-    return deals.filter((deal: Deal) => (deal as any).dealType === 'Opportunity');
+    return deals.filter((deal: Deal) => {
+      const isOpportunity = (deal as any).dealType === 'Opportunity';
+      const isArchived = deal.status === 'Archived' || (deal as any).archivedAt;
+      return isOpportunity && !isArchived;
+    });
   }, [deals]);
 
   // Handle URL query parameter for selecting a specific opportunity
@@ -508,6 +519,28 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
       setSelectedOpportunity(null);
     } catch (error) {
       toast.error("Failed to reject opportunity");
+    }
+  };
+
+  const handleArchiveDeal = async () => {
+    if (!dealToArchive) return;
+    try {
+      await archiveDeal.mutateAsync({
+        id: dealToArchive,
+        reason: archiveReason || 'Archived',
+        notes: archiveNotes || undefined
+      });
+      toast.success("Opportunity archived successfully! You can find it in the Archived Deals section.");
+      if (selectedOpportunity?.id === dealToArchive) {
+        setSelectedOpportunity(null);
+        setShowOpportunityDetail(false);
+      }
+      setShowArchiveDialog(false);
+      setDealToArchive(null);
+      setArchiveReason('');
+      setArchiveNotes('');
+    } catch (error: any) {
+      toast.error(error.message || "Failed to archive opportunity");
     }
   };
   
@@ -1403,6 +1436,20 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                     <CheckCircle className="w-4 h-4 mr-2" />
                     Approve Deal
                   </Button>
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
+                    onClick={() => {
+                      if (selectedOpportunity) {
+                        setDealToArchive(selectedOpportunity.id);
+                        setShowArchiveDialog(true);
+                      }
+                    }}
+                    data-testid="button-detail-archive"
+                  >
+                    <Archive className="w-4 h-4 mr-2" />
+                    Archive
+                  </Button>
                   <Button variant="destructive" className="flex-1"
                     onClick={() => setShowRejectDialog(true)}
                     data-testid="button-detail-reject"
@@ -1509,6 +1556,75 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Archive Deal Dialog */}
+      <Dialog open={showArchiveDialog} onOpenChange={(open) => {
+        setShowArchiveDialog(open);
+        if (!open) {
+          setDealToArchive(null);
+          setArchiveReason('');
+          setArchiveNotes('');
+        }
+      }}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Archive className="w-5 h-5 text-amber-500" />
+              Archive Opportunity
+            </DialogTitle>
+            <DialogDescription>
+              Archived opportunities are preserved with all their documents and data for future reference. You can restore them at any time.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Reason for Archiving</Label>
+              <Select value={archiveReason} onValueChange={setArchiveReason}>
+                <SelectTrigger data-testid="select-archive-reason">
+                  <SelectValue placeholder="Select a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Deal Rejected">Deal Rejected</SelectItem>
+                  <SelectItem value="Client Declined">Client Declined</SelectItem>
+                  <SelectItem value="Deal Fell Through">Deal Fell Through</SelectItem>
+                  <SelectItem value="Market Conditions">Market Conditions</SelectItem>
+                  <SelectItem value="Completed">Completed / Closed</SelectItem>
+                  <SelectItem value="On Hold">On Hold</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes (Optional)</Label>
+              <Textarea
+                placeholder="Add any notes about why this opportunity is being archived, lessons learned, or future reference information..."
+                value={archiveNotes}
+                onChange={(e) => setArchiveNotes(e.target.value)}
+                rows={4}
+                data-testid="textarea-archive-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowArchiveDialog(false);
+              setDealToArchive(null);
+              setArchiveReason('');
+              setArchiveNotes('');
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleArchiveDeal}
+              disabled={archiveDeal.isPending}
+              className="bg-amber-500 hover:bg-amber-600 text-white"
+              data-testid="button-confirm-archive"
+            >
+              {archiveDeal.isPending ? "Archiving..." : "Archive Opportunity"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

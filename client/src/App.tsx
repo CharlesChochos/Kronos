@@ -45,6 +45,7 @@ const DealTemplates = lazy(() => import("@/pages/shared/DealTemplates"));
 const DocumentManagement = lazy(() => import("@/pages/shared/DocumentManagement"));
 const AuditLogs = lazy(() => import("@/pages/ceo/AuditLogs"));
 const Opportunities = lazy(() => import("@/pages/ceo/Opportunities"));
+const ArchivedDeals = lazy(() => import("@/pages/ceo/ArchivedDeals"));
 const AssetManagement = lazy(() => import("@/pages/employee/AssetManagement"));
 const PortalLogin = lazy(() => import("@/pages/portal/PortalLogin"));
 const PortalRegister = lazy(() => import("@/pages/portal/PortalRegister"));
@@ -294,6 +295,9 @@ function Router() {
         <Route path="/ceo/opportunities">
           {() => <ProtectedRoute component={Opportunities} />}
         </Route>
+        <Route path="/ceo/archived-deals">
+          {() => <ProtectedRoute component={ArchivedDeals} />}
+        </Route>
         <Route path="/ceo/asset-management">
           {() => <ProtectedRoute component={() => <AssetManagement role="CEO" />} />}
         </Route>
@@ -325,6 +329,9 @@ function Router() {
         </Route>
         <Route path="/employee/opportunities">
           {() => <ProtectedRoute component={() => <Opportunities role="Employee" />} />}
+        </Route>
+        <Route path="/employee/archived-deals">
+          {() => <ProtectedRoute component={ArchivedDeals} />}
         </Route>
         <Route path="/employee/deals">
           {() => <ProtectedRoute component={EmployeeDealManagement} />}
