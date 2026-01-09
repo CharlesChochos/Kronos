@@ -56,6 +56,8 @@ import { toast } from "sonner";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isToday, isBefore, isAfter, parseISO } from "date-fns";
 import type { Deal, PodTeamMember, TaggedInvestor, AuditEntry } from "@shared/schema";
 import { ObjectUploader, type UploadedFile } from "@/components/ObjectUploader";
+import { DeleteArchiveConfirmation } from "@/components/DeleteArchiveConfirmation";
+import { FolderBrowser, type FileItem } from "@/components/FolderBrowser";
 import {
   RadarChart,
   PolarGrid,
@@ -1045,71 +1047,34 @@ function StageWorkSection({
           </div>
         )}
         
-        <ScrollArea className="h-[100px]">
-          {stageDocuments.length === 0 ? (
-            <div className="text-center text-sm text-muted-foreground py-4">
-              No documents for this stage
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {stageDocuments.map((doc: any) => (
-                <div key={doc.id} className="flex items-center justify-between p-2 bg-secondary/20 rounded text-sm group">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-3 h-3 text-blue-400" />
-                    <span className="truncate">{doc.title}</span>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
-                    {(doc.url || doc.fileData) && (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-6 w-6"
-                        onClick={() => {
-                          const viewUrl = doc.url || doc.fileData;
-                          if (viewUrl) import('@/lib/utils').then(m => m.openUrlInNewTab(viewUrl));
-                        }}
-                        title="View"
-                        data-testid={`view-doc-${doc.id}`}
-                      >
-                        <ExternalLink className="w-3 h-3 text-green-400" />
-                      </Button>
-                    )}
-                    {(doc.url || doc.fileData) && (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-6 w-6"
-                        onClick={() => {
-                          const downloadUrl = doc.url || doc.fileData;
-                          if (downloadUrl) {
-                            const link = document.createElement('a');
-                            link.href = downloadUrl;
-                            link.download = doc.filename || doc.title || 'document';
-                            link.click();
-                          }
-                        }}
-                        title="Download"
-                        data-testid={`download-doc-${doc.id}`}
-                      >
-                        <Download className="w-3 h-3 text-blue-400" />
-                      </Button>
-                    )}
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6"
-                      onClick={() => deleteStageDocument.mutate({ id: doc.id, dealId, stage: activeStageTab })}
-                      title="Delete"
-                      data-testid={`delete-doc-${doc.id}`}
-                    >
-                      <X className="w-3 h-3 text-red-400" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </ScrollArea>
+        <FolderBrowser
+          files={stageDocuments.map((doc: any): FileItem => ({
+            id: doc.id,
+            filename: doc.title || doc.filename || 'Document',
+            url: doc.url || doc.fileData || '',
+            size: doc.fileSize || doc.size,
+            uploadedAt: doc.createdAt || doc.uploadedAt,
+            relativePath: doc.relativePath || doc.title || doc.filename,
+            mimeType: doc.mimeType
+          }))}
+          onView={(file) => {
+            if (file.url) import('@/lib/utils').then(m => m.openUrlInNewTab(file.url));
+          }}
+          onDownload={(file) => {
+            if (file.url) {
+              const link = document.createElement('a');
+              link.href = file.url;
+              link.download = file.filename;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }
+          }}
+          onDelete={(file) => {
+            deleteStageDocument.mutate({ id: file.id, dealId, stage: activeStageTab });
+          }}
+          className="max-h-[150px]"
+        />
       </div>
       
       <div className="space-y-3">
@@ -4786,55 +4751,33 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Deal Confirmation Dialog - Offers Archive Option First */}
-      <AlertDialog open={showDeleteDealDialog} onOpenChange={setShowDeleteDealDialog}>
-        <AlertDialogContent className="bg-card border-border max-w-md overflow-hidden">
-          <AlertDialogHeader className="space-y-3">
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Archive className="w-5 h-5 text-amber-500 flex-shrink-0" />
-              <span>Delete or Archive Deal?</span>
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="text-sm text-muted-foreground space-y-3 break-words whitespace-normal">
-                <p>We recommend <strong>archiving</strong> instead of deleting. Archived deals preserve all documents, notes, and data for future reference and can be restored at any time.</p>
-                <p className="text-red-400"><strong>Permanent deletion</strong> cannot be undone and will remove all associated data including team members, investors, and documents.</p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel onClick={() => setDealToDelete(null)}>Cancel</AlertDialogCancel>
-            <Button
-              variant="outline"
-              className="border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
-              onClick={() => {
-                if (dealToDelete) {
-                  setDealToArchive(dealToDelete);
-                  setShowArchiveDialog(true);
-                  setDealToDelete(null);
-                  setShowDeleteDealDialog(false);
-                }
-              }}
-              data-testid="button-archive-instead"
-            >
-              <Archive className="w-4 h-4 mr-2" />
-              Archive Instead (Recommended)
-            </Button>
-            <AlertDialogAction 
-              onClick={() => {
-                if (dealToDelete) {
-                  handleDeleteDeal(dealToDelete);
-                  setDealToDelete(null);
-                  setShowDeleteDealDialog(false);
-                }
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-permanent-delete"
-            >
-              Delete Permanently
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete Deal Confirmation Dialog */}
+      <DeleteArchiveConfirmation
+        open={showDeleteDealDialog}
+        onOpenChange={(open) => {
+          setShowDeleteDealDialog(open);
+          if (!open) setDealToDelete(null);
+        }}
+        itemType="asset"
+        itemName={deals.find((d: Deal) => d.id === dealToDelete)?.name}
+        onArchive={() => {
+          if (dealToDelete) {
+            setDealToArchive(dealToDelete);
+            setShowArchiveDialog(true);
+            setDealToDelete(null);
+            setShowDeleteDealDialog(false);
+          }
+        }}
+        onDelete={() => {
+          if (dealToDelete) {
+            handleDeleteDeal(dealToDelete);
+            setDealToDelete(null);
+            setShowDeleteDealDialog(false);
+          }
+        }}
+        isArchiving={archiveDeal.isPending}
+        isDeleting={deleteDeal.isPending}
+      />
 
       <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
         <AlertDialogContent>
