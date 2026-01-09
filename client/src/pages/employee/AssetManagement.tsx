@@ -4786,17 +4786,39 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Deal Confirmation Dialog */}
+      {/* Delete Deal Confirmation Dialog - Offers Archive Option First */}
       <AlertDialog open={showDeleteDealDialog} onOpenChange={setShowDeleteDealDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete this deal and all its associated data including team members, investors, and documents.
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Archive className="w-5 h-5 text-amber-500" />
+              Delete or Archive Deal?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-sm text-muted-foreground space-y-3">
+                <p>We recommend <strong>archiving</strong> instead of deleting. Archived deals preserve all documents, notes, and data for future reference and can be restored at any time.</p>
+                <p className="text-red-400"><strong>Permanent deletion</strong> cannot be undone and will remove all associated data including team members, investors, and documents.</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel onClick={() => setDealToDelete(null)}>Cancel</AlertDialogCancel>
+            <Button
+              variant="outline"
+              className="border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
+              onClick={() => {
+                if (dealToDelete) {
+                  setDealToArchive(dealToDelete);
+                  setShowArchiveDialog(true);
+                  setDealToDelete(null);
+                  setShowDeleteDealDialog(false);
+                }
+              }}
+              data-testid="button-archive-instead"
+            >
+              <Archive className="w-4 h-4 mr-2" />
+              Archive Instead (Recommended)
+            </Button>
             <AlertDialogAction 
               onClick={() => {
                 if (dealToDelete) {
@@ -4806,8 +4828,9 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                 }
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-permanent-delete"
             >
-              Delete Deal
+              Delete Permanently
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

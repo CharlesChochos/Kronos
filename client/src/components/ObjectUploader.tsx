@@ -583,6 +583,9 @@ export function ObjectUploader({
             <p className="text-sm text-muted-foreground mb-2">
               {isProcessingDrop ? 'Processing files...' : 'Drag and drop files or folders here'}
             </p>
+            <p className="text-xs text-muted-foreground/70 mb-2">
+              Tip: When using "Browse Folder", navigate inside the folder to select its contents
+            </p>
             <input
               ref={fileInputRef}
               type="file"
