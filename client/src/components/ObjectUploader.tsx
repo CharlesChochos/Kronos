@@ -284,6 +284,9 @@ export function ObjectUploader({
     });
   };
 
+  // For large batches, skip per-file state updates to prevent UI freezing
+  const isLargeBatch = useRef(false);
+  
   const uploadFile = async (pendingFile: PendingFile): Promise<UploadedFile | null> => {
     try {
       let result: { uploadURL: string; objectPath: string } | null = null;
@@ -311,14 +314,17 @@ export function ObjectUploader({
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         
-        xhr.upload.addEventListener('progress', (e) => {
-          if (e.lengthComputable) {
-            const progress = Math.round((e.loaded / e.total) * 100);
-            setPendingFiles(prev => prev.map(f => 
-              f.id === pendingFile.id ? { ...f, progress, status: 'uploading', error: undefined } : f
-            ));
-          }
-        });
+        // Skip per-file progress updates for large batches to prevent UI freezing
+        if (!isLargeBatch.current) {
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+              const progress = Math.round((e.loaded / e.total) * 100);
+              setPendingFiles(prev => prev.map(f => 
+                f.id === pendingFile.id ? { ...f, progress, status: 'uploading', error: undefined } : f
+              ));
+            }
+          });
+        }
 
         xhr.addEventListener('load', () => {
           if (xhr.status >= 200 && xhr.status < 300) {
@@ -362,9 +368,12 @@ export function ObjectUploader({
         throw new Error(getUploadErrorMessage(confirmResponse.status, 'Failed to complete upload'));
       }
 
-      setPendingFiles(prev => prev.map(f => 
-        f.id === pendingFile.id ? { ...f, progress: 100, status: 'success', objectPath, error: undefined } : f
-      ));
+      // Skip state update for large batches - will update in batch at end
+      if (!isLargeBatch.current) {
+        setPendingFiles(prev => prev.map(f => 
+          f.id === pendingFile.id ? { ...f, progress: 100, status: 'success', objectPath, error: undefined } : f
+        ));
+      }
 
       return {
         id: pendingFile.id,
@@ -376,9 +385,12 @@ export function ObjectUploader({
       };
     } catch (error: any) {
       const errorMessage = error.message || 'Upload failed. Please try again.';
-      setPendingFiles(prev => prev.map(f => 
-        f.id === pendingFile.id ? { ...f, status: 'error', error: errorMessage } : f
-      ));
+      // Always track errors even in large batches
+      if (!isLargeBatch.current) {
+        setPendingFiles(prev => prev.map(f => 
+          f.id === pendingFile.id ? { ...f, status: 'error', error: errorMessage } : f
+        ));
+      }
       return null;
     }
   };
@@ -460,6 +472,9 @@ export function ObjectUploader({
 
     setIsUploading(true);
     setUploadStats({ completed: 0, failed: 0, total: filesToUpload.length });
+    
+    // For large batches (100+), skip per-file UI updates to prevent freezing
+    isLargeBatch.current = filesToUpload.length > 100;
     
     // Determine concurrency based on file count
     const concurrency = filesToUpload.length > 500 ? 10 : filesToUpload.length > 100 ? 8 : 6;
