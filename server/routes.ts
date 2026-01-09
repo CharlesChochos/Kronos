@@ -3191,6 +3191,92 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
     }
   });
 
+  // Archive deal - preserves all data and documents for future reference
+  app.post("/api/deals/:id/archive", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const { reason, notes } = req.body;
+      const user = req.user as any;
+      const deal = await storage.getDeal(req.params.id);
+      
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+      
+      if (deal.archivedAt) {
+        return res.status(400).json({ error: "Deal is already archived" });
+      }
+      
+      const updatedDeal = await storage.updateDeal(req.params.id, {
+        archivedAt: new Date(),
+        archivedBy: user.id,
+        archivedReason: reason || 'Archived',
+        archivedNotes: notes || null,
+        status: 'Archived'
+      });
+      
+      await createAuditLog(req, 'deal_archived', 'deal', req.params.id, deal.name, { 
+        client: deal.client, 
+        value: deal.value,
+        dealType: deal.dealType,
+        reason,
+        notes 
+      });
+      
+      res.json(updatedDeal);
+    } catch (error) {
+      console.error('Deal archive error:', error);
+      res.status(500).json({ error: "Failed to archive deal" });
+    }
+  });
+
+  // Restore archived deal
+  app.post("/api/deals/:id/restore", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const deal = await storage.getDeal(req.params.id);
+      
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+      
+      if (!deal.archivedAt) {
+        return res.status(400).json({ error: "Deal is not archived" });
+      }
+      
+      const updatedDeal = await storage.updateDeal(req.params.id, {
+        archivedAt: null,
+        archivedBy: null,
+        archivedReason: null,
+        archivedNotes: null,
+        status: 'Active'
+      });
+      
+      await createAuditLog(req, 'deal_restored', 'deal', req.params.id, deal.name, { 
+        client: deal.client, 
+        value: deal.value,
+        dealType: deal.dealType,
+        previousReason: deal.archivedReason,
+        restoredBy: user.name
+      });
+      
+      res.json(updatedDeal);
+    } catch (error) {
+      console.error('Deal restore error:', error);
+      res.status(500).json({ error: "Failed to restore deal" });
+    }
+  });
+
+  // Get all archived deals
+  app.get("/api/deals/archived", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const archivedDeals = await storage.getArchivedDeals();
+      res.json(archivedDeals);
+    } catch (error) {
+      console.error('Get archived deals error:', error);
+      res.status(500).json({ error: "Failed to get archived deals" });
+    }
+  });
+
   // Bulk delete deals (CEO only)
   app.post("/api/deals/bulk-delete", requireCEO, async (req, res) => {
     try {

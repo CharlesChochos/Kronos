@@ -1,4 +1,4 @@
-import { eq, and, desc, gt, lt, or, ilike, count, isNull } from "drizzle-orm";
+import { eq, and, desc, gt, lt, or, ilike, count, isNull, not } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@shared/schema";
@@ -32,6 +32,7 @@ export interface IStorage {
   getDeal(id: string): Promise<Deal | undefined>;
   getAllDeals(): Promise<Deal[]>;
   getDealsListing(): Promise<Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt' | 'podTeam'>[]>;
+  getArchivedDeals(): Promise<Deal[]>;
   createDeal(deal: InsertDeal): Promise<Deal>;
   updateDeal(id: string, updates: Partial<InsertDeal>): Promise<Deal | undefined>;
   deleteDeal(id: string): Promise<void>;
@@ -440,6 +441,12 @@ export class DatabaseStorage implements IStorage {
       createdAt: schema.deals.createdAt,
       podTeam: schema.deals.podTeam,
     }).from(schema.deals);
+  }
+
+  async getArchivedDeals(): Promise<Deal[]> {
+    return await db.select().from(schema.deals).where(
+      not(isNull(schema.deals.archivedAt))
+    );
   }
 
   async createDeal(insertDeal: InsertDeal): Promise<Deal> {

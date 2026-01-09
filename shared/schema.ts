@@ -106,6 +106,10 @@ export const deals = pgTable("deals", {
   podTeam: jsonb("pod_team").default([]).$type<PodTeamMember[]>(),
   taggedInvestors: jsonb("tagged_investors").default([]).$type<TaggedInvestor[]>(),
   auditTrail: jsonb("audit_trail").default([]).$type<AuditEntry[]>(),
+  archivedAt: timestamp("archived_at"),
+  archivedBy: varchar("archived_by").references(() => users.id),
+  archivedReason: text("archived_reason"),
+  archivedNotes: text("archived_notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
