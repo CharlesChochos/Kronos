@@ -363,6 +363,7 @@ export function useDeleteDeal() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
       queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
+      queryClient.invalidateQueries({ queryKey: ["archived-deals"] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },

@@ -11,10 +11,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Search, Archive, RotateCcw, Calendar, DollarSign, Briefcase, 
-  Building2, FileText, Users, Eye, Clock, MessageSquare, Filter
+  Building2, FileText, Users, Eye, Clock, MessageSquare, Filter, Trash2
 } from "lucide-react";
 import { 
-  useCurrentUser, useArchivedDeals, useRestoreDeal, useDeal, useUsers,
+  useCurrentUser, useArchivedDeals, useRestoreDeal, useDeleteDeal, useDeal, useUsers,
   useStageDocuments, useDealNotes, useStagePodMembers, type DealNoteType
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,7 @@ export default function ArchivedDeals() {
   const { data: archivedDeals = [], isLoading } = useArchivedDeals();
   const { data: allUsers = [] } = useUsers();
   const restoreDeal = useRestoreDeal();
+  const deleteDeal = useDeleteDeal();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
@@ -44,6 +45,8 @@ export default function ArchivedDeals() {
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
   const [dealToRestore, setDealToRestore] = useState<Deal | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [dealToDelete, setDealToDelete] = useState<Deal | null>(null);
   
   const { data: selectedDealFull } = useDeal(selectedDealId || '');
   const { data: dealNotes = [] } = useDealNotes(selectedDealId || '');
@@ -88,6 +91,21 @@ export default function ArchivedDeals() {
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to restore deal");
+    }
+  };
+  
+  const handlePermanentDelete = async () => {
+    if (!dealToDelete) return;
+    try {
+      await deleteDeal.mutateAsync(dealToDelete.id);
+      toast.success(`"${dealToDelete.name}" has been permanently deleted.`);
+      setShowDeleteDialog(false);
+      setDealToDelete(null);
+      if (selectedDealId === dealToDelete.id) {
+        setSelectedDealId(null);
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete deal");
     }
   };
   
@@ -186,19 +204,34 @@ export default function ArchivedDeals() {
                       <CardTitle className="text-lg">{deal.name}</CardTitle>
                       <CardDescription>{deal.client} • {deal.sector}</CardDescription>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-green-500/50 text-green-500 hover:bg-green-500/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDealToRestore(deal);
-                        setShowRestoreDialog(true);
-                      }}
-                      data-testid={`button-restore-${deal.id}`}
-                    >
-                      <RotateCcw className="w-4 h-4 mr-1" /> Restore
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-green-500/50 text-green-500 hover:bg-green-500/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDealToRestore(deal);
+                          setShowRestoreDialog(true);
+                        }}
+                        data-testid={`button-restore-${deal.id}`}
+                      >
+                        <RotateCcw className="w-4 h-4 mr-1" /> Restore
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-destructive/50 text-destructive hover:bg-destructive/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDealToDelete(deal);
+                          setShowDeleteDialog(true);
+                        }}
+                        data-testid={`button-delete-${deal.id}`}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" /> Delete
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
@@ -433,6 +466,64 @@ export default function ArchivedDeals() {
               className="bg-green-500 hover:bg-green-600 text-white"
             >
               {restoreDeal.isPending ? "Restoring..." : "Restore Deal"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              Permanently Delete Deal
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete "{dealToDelete?.name}"? This action cannot be undone and all associated data will be removed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {dealToDelete && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Deal Type:</span>
+                  <Badge className={cn("text-xs", DEAL_TYPE_COLORS[dealToDelete.dealType] || 'bg-gray-500/20 text-gray-400')}>
+                    {dealToDelete.dealType}
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Client:</span>
+                  <span className="text-sm font-medium">{dealToDelete.client}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Value:</span>
+                  <span className="text-sm font-medium">${dealToDelete.value}M</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Archived Reason:</span>
+                  <span className="text-sm font-medium">{dealToDelete.archivedReason || 'Not specified'}</span>
+                </div>
+              </div>
+            )}
+            <p className="text-sm text-destructive mt-4 font-medium">
+              Warning: All documents, notes, team members, and investors associated with this deal will be permanently deleted.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowDeleteDialog(false);
+              setDealToDelete(null);
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handlePermanentDelete}
+              disabled={deleteDeal.isPending}
+              data-testid="button-confirm-permanent-delete"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              {deleteDeal.isPending ? "Deleting..." : "Delete Permanently"}
             </Button>
           </DialogFooter>
         </DialogContent>
