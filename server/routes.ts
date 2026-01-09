@@ -523,6 +523,38 @@ export async function registerRoutes(
     }
   });
 
+  // Bulk upload endpoint - handles up to 100 files at once
+  app.post("/api/upload/bulk", requireAuth, upload.array('files', 100), (req, res) => {
+    try {
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: "No files uploaded" });
+      }
+
+      console.log(`[Bulk Upload] Processing ${files.length} files`);
+      
+      const results = files.map(file => {
+        const base64Content = file.buffer.toString('base64');
+        const dataUrl = `data:${file.mimetype};base64,${base64Content}`;
+        return {
+          id: crypto.randomUUID(),
+          filename: file.originalname,
+          url: dataUrl,
+          content: dataUrl,
+          size: file.size,
+          type: file.mimetype,
+          uploadedAt: new Date().toISOString(),
+        };
+      });
+
+      console.log(`[Bulk Upload] Successfully processed ${results.length} files`);
+      res.json({ files: results, count: results.length });
+    } catch (error) {
+      console.error("Bulk upload error:", error);
+      res.status(500).json({ error: "Failed to upload files" });
+    }
+  });
+
   // Delete file - now handles both filesystem and database-stored files
   app.delete("/api/upload/:filename", requireAuth, async (req, res) => {
     try {

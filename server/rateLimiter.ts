@@ -49,7 +49,7 @@ export const strictLimiter = rateLimit({
 
 export const uploadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // Allow 200 file uploads per 15 minutes for bulk operations
+  max: 2000, // Allow 2000 file uploads per 15 minutes for bulk operations (100+ files at a time)
   standardHeaders,
   legacyHeaders,
   message: { error: 'Too many file uploads, please wait a few minutes and try again.' },

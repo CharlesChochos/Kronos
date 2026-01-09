@@ -49,14 +49,14 @@ app.use(requestIdMiddleware);
 
 app.use(
   express.json({
-    limit: '50mb',
+    limit: '500mb', // Increased for bulk document uploads
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
   }),
 );
 
-app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+app.use(express.urlencoded({ extended: false, limit: '500mb' })); // Increased for bulk uploads
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
