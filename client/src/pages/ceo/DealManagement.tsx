@@ -690,13 +690,14 @@ function StageWorkSection({
           const uploadResult = await uploadResponse.json();
           const fileUrl = uploadResult.url;
           
-          // Save to stage documents with the URL
+          // Save to stage documents with the URL and relativePath for folder structure
           await createStageDocument.mutateAsync({
             dealId,
             doc: {
               stage: activeStageTab,
               title: title,
               filename: file.name,
+              relativePath: relativePath,
               url: fileUrl,
               mimeType: file.type,
               size: file.size,

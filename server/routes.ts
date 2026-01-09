@@ -8403,10 +8403,13 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
   app.get("/api/stakeholders", requireAuth, async (req, res) => {
     try {
       // Support pagination via query params with safe defaults
+      // Allow larger pageSize for investor searches (used in deal tagging)
       const rawPage = parseInt(req.query.page as string);
       const rawPageSize = parseInt(req.query.pageSize as string);
       const page = Math.max(1, isNaN(rawPage) ? 1 : rawPage);
-      const pageSize = Math.max(1, Math.min(isNaN(rawPageSize) ? 50 : rawPageSize, 100));
+      // Allow up to 10000 for bulk investor lookups, default to 50 for regular pagination
+      const maxPageSize = rawPageSize > 100 ? 10000 : 100;
+      const pageSize = Math.max(1, Math.min(isNaN(rawPageSize) ? 50 : rawPageSize, maxPageSize));
       const search = req.query.search as string | undefined;
       const type = req.query.type as string | undefined;
       

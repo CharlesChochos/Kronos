@@ -1011,6 +1011,7 @@ function StageWorkSection({
                       stage: activeStageTab,
                       title: file.filename,
                       filename: file.filename,
+                      relativePath: file.relativePath || file.filename,
                       url: file.objectPath,
                       mimeType: file.type,
                       size: file.size,

@@ -1002,6 +1002,7 @@ export const stageDocuments = pgTable("stage_documents", {
   documentId: varchar("document_id").references(() => documentsTable.id),
   title: text("title").notNull(),
   filename: text("filename"),
+  relativePath: text("relative_path"),
   url: text("url"),
   mimeType: text("mime_type"),
   size: integer("size"),
