@@ -21,7 +21,8 @@ function getOpenAIClient(): OpenAI {
 }
 
 function getAbsoluteUrl(url: string): string {
-  if (url.startsWith('http://') || url.startsWith('https://')) {
+  // Don't modify data URLs or http(s) URLs
+  if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) {
     return url;
   }
   const host = process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000';
@@ -51,13 +52,14 @@ function extractBufferFromDataUrl(dataUrl: string): { buffer: Buffer; mimeType: 
 async function extractTextFromDocument(doc: DocumentInfo): Promise<string> {
   try {
     console.log(`[AI Doc Analyzer] Extracting text from: ${doc.filename}`);
+    console.log(`[AI Doc Analyzer] URL type: ${typeof doc.url}, length: ${doc.url?.length || 0}, starts with: "${doc.url?.substring(0, 30) || 'null'}"`);
     
     let buffer: Buffer;
     let contentType: string;
     
     // Handle base64 data URLs directly (no fetch needed)
-    if (doc.url.startsWith('data:')) {
-      console.log(`[AI Doc Analyzer] Processing base64 data URL for: ${doc.filename}`);
+    if (doc.url && doc.url.startsWith('data:')) {
+      console.log(`[AI Doc Analyzer] Processing base64 data URL for: ${doc.filename} (size: ${doc.url.length} bytes)`);
       try {
         const { buffer: dataBuffer, mimeType } = extractBufferFromDataUrl(doc.url);
         buffer = dataBuffer;
