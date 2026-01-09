@@ -497,18 +497,45 @@ export async function registerRoutes(
     }
   });
 
+  // Multer error handler middleware
+  const handleMulterError = (err: any, req: any, res: any, next: any) => {
+    if (err instanceof multer.MulterError) {
+      console.error('[Upload] Multer error:', err.code, err.message);
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'File too large. Maximum size is 500MB.' });
+      }
+      if (err.code === 'LIMIT_FILE_COUNT') {
+        return res.status(400).json({ error: 'Too many files. Maximum is 100 files at once.' });
+      }
+      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({ error: 'Unexpected field name. Use "file" for single uploads or "files" for bulk.' });
+      }
+      return res.status(400).json({ error: err.message });
+    } else if (err) {
+      console.error('[Upload] General error:', err.message);
+      return res.status(500).json({ error: err.message || 'Upload failed' });
+    }
+    next();
+  };
+
   // Upload file using multer - returns base64 data URL for persistent storage
-  app.post("/api/upload", uploadLimiter, requireAuth, upload.single('file'), (req, res) => {
+  app.post("/api/upload", uploadLimiter, requireAuth, (req, res, next) => {
+    console.log(`[Upload] Incoming upload request from user: ${(req.user as any)?.id || 'unknown'}`);
+    next();
+  }, upload.single('file'), handleMulterError, (req, res) => {
     try {
       if (!req.file) {
+        console.log('[Upload] No file in request');
         return res.status(400).json({ error: "No file uploaded" });
       }
+
+      console.log(`[Upload] Processing file: ${req.file.originalname} (${req.file.size} bytes)`);
 
       // Convert buffer to base64 data URL for persistent database storage
       const base64Content = req.file.buffer.toString('base64');
       const dataUrl = `data:${req.file.mimetype};base64,${base64Content}`;
       
-      res.json({
+      const result = {
         id: crypto.randomUUID(),
         filename: req.file.originalname,
         url: dataUrl, // Return base64 data URL instead of file path
@@ -516,10 +543,13 @@ export async function registerRoutes(
         size: req.file.size,
         type: req.file.mimetype,
         uploadedAt: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error("File upload error:", error);
-      res.status(500).json({ error: "Failed to upload file" });
+      };
+      
+      console.log(`[Upload] Successfully processed: ${req.file.originalname}`);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Upload] Processing error:", error);
+      res.status(500).json({ error: error.message || "Failed to upload file" });
     }
   });
 
