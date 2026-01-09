@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import type { Deal, PodTeamMember } from "@shared/schema";
+import { useLocation } from "wouter";
 
 const DEAL_TYPE_COLORS: Record<string, string> = {
   'M&A': 'bg-blue-500/20 text-blue-400',
@@ -29,6 +31,8 @@ const DEAL_TYPE_COLORS: Record<string, string> = {
 };
 
 export default function ArchivedDeals() {
+  const [location] = useLocation();
+  const role: 'CEO' | 'Employee' = location.startsWith('/ceo') ? 'CEO' : 'Employee';
   const { data: currentUser } = useCurrentUser();
   const { data: archivedDeals = [], isLoading } = useArchivedDeals();
   const { data: allUsers = [] } = useUsers();
@@ -88,7 +92,7 @@ export default function ArchivedDeals() {
   };
   
   return (
-    <div className="min-h-screen bg-background text-foreground p-6">
+    <Layout role={role} pageTitle="Archived Deals" userName={currentUser?.name || ""}>
       <div className="mb-8">
         <h1 className="text-3xl font-bold flex items-center gap-3">
           <Archive className="w-8 h-8 text-amber-500" />
@@ -433,6 +437,6 @@ export default function ArchivedDeals() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </Layout>
   );
 }

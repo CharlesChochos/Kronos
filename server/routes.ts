@@ -2967,6 +2967,17 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
     }
   });
 
+  // Get all archived deals - MUST be before /api/deals/:id to avoid matching "archived" as an ID
+  app.get("/api/deals/archived", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const archivedDeals = await storage.getArchivedDeals();
+      res.json(archivedDeals);
+    } catch (error) {
+      console.error('Get archived deals error:', error);
+      res.status(500).json({ error: "Failed to get archived deals" });
+    }
+  });
+
   app.get("/api/deals/:id", requireAuth, requireInternal, async (req, res) => {
     try {
       const deal = await storage.getDeal(req.params.id);
@@ -3263,17 +3274,6 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
     } catch (error) {
       console.error('Deal restore error:', error);
       res.status(500).json({ error: "Failed to restore deal" });
-    }
-  });
-
-  // Get all archived deals
-  app.get("/api/deals/archived", requireAuth, requireInternal, async (req, res) => {
-    try {
-      const archivedDeals = await storage.getArchivedDeals();
-      res.json(archivedDeals);
-    } catch (error) {
-      console.error('Get archived deals error:', error);
-      res.status(500).json({ error: "Failed to get archived deals" });
     }
   });
 
