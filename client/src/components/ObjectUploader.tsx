@@ -242,14 +242,15 @@ export function ObjectUploader({
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const result = JSON.parse(xhr.responseText);
-            const objectPath = `/uploads/${result.filename}`;
+            // Use the data URL returned by the server (base64 encoded)
+            const objectPath = result.url || result.content || `/uploads/${result.filename}`;
             
             setPendingFiles(prev => prev.map(f => 
               f.id === pendingFile.id ? { ...f, progress: 100, status: 'success', objectPath, error: undefined } : f
             ));
 
             resolve({
-              id: pendingFile.id,
+              id: result.id || pendingFile.id,
               filename: pendingFile.file.name,
               objectPath,
               size: pendingFile.file.size,
