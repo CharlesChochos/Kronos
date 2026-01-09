@@ -155,6 +155,7 @@ export default function TeamAssignment() {
         
         const response = await fetch('/api/upload', {
           method: 'POST',
+          credentials: 'include',
           body: formData,
         });
         

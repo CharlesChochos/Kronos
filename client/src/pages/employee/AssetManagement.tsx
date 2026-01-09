@@ -671,6 +671,7 @@ function StageWorkSection({
           
           const uploadResponse = await fetch('/api/upload', {
             method: 'POST',
+            credentials: 'include',
             body: formData,
           });
           

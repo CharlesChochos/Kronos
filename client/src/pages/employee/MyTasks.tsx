@@ -1047,6 +1047,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
         
         const response = await fetch('/api/upload', {
           method: 'POST',
+          credentials: 'include',
           body: formData,
         });
         
@@ -1997,7 +1998,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                           const formData = new FormData();
                           formData.append('file', file);
                           try {
-                            const response = await fetch('/api/upload', { method: 'POST', body: formData });
+                            const response = await fetch('/api/upload', { method: 'POST', credentials: 'include', body: formData });
                             if (response.ok) {
                               const uploaded = await response.json();
                               setSendWorkAttachments(prev => [...prev, uploaded]);
@@ -2648,6 +2649,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
                         try {
                           const response = await fetch('/api/upload', {
                             method: 'POST',
+                            credentials: 'include',
                             body: formData,
                           });
                           if (response.ok) {

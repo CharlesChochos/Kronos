@@ -723,6 +723,7 @@ export default function Chat({ role }: ChatProps) {
         
         const uploadRes = await fetch('/api/upload', {
           method: 'POST',
+          credentials: 'include',
           body: formData,
         });
         
