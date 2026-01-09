@@ -26,7 +26,7 @@ import {
   Search, Plus, Lightbulb, CheckCircle, XCircle, Eye, Clock, DollarSign,
   Building2, Users, ArrowRight, Briefcase, TrendingUp, AlertTriangle,
   Upload, FileText, Paperclip, StickyNote, X, Download, Trash2, ExternalLink,
-  Pencil, Save, MessageSquare, Archive
+  Pencil, Save, MessageSquare, Archive, Loader2
 } from "lucide-react";
 import { 
   useCurrentUser, useDealsListing, useDeal, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers,
@@ -592,26 +592,32 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
     }
   };
   
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
+  
   const openOpportunityDetail = async (opportunity: DealListing) => {
     setSelectedOpportunity(opportunity);
     setDetailTab('overview');
     setIsEditMode(false);
+    setLoadingAttachments(true);
+    
+    // Initialize with empty state while loading
+    setOpportunityAttachments([]);
+    setOpportunityNotes([]);
     
     // Fetch full deal data to get attachments (listing doesn't include full attachment data)
     try {
-      const res = await fetch(`/api/deals/${opportunity.id}`);
+      const res = await fetch(`/api/deals/${opportunity.id}`, {
+        credentials: 'include',
+      });
       if (res.ok) {
         const fullDeal = await res.json();
         setOpportunityAttachments(fullDeal.attachments || []);
-        setOpportunityNotes(fullDeal.opportunityNotes || []);
-      } else {
-        setOpportunityAttachments([]);
-        setOpportunityNotes([]);
       }
     } catch (error) {
-      console.error("Failed to fetch opportunity details:", error);
-      setOpportunityAttachments([]);
-      setOpportunityNotes([]);
+      console.error("Failed to fetch opportunity attachments:", error);
+      toast.error("Failed to load attachments");
+    } finally {
+      setLoadingAttachments(false);
     }
     
     // Initialize edit form with opportunity data
@@ -1491,6 +1497,11 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    ) : loadingAttachments ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin" />
+                        <p className="text-sm">Loading attachments...</p>
                       </div>
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">
