@@ -110,24 +110,24 @@ export default function ArchivedDeals() {
             data-testid="input-search-archived"
           />
         </div>
-        <Select value={typeFilter || ''} onValueChange={(v) => setTypeFilter(v || null)}>
+        <Select value={typeFilter || 'all'} onValueChange={(v) => setTypeFilter(v === 'all' ? null : v)}>
           <SelectTrigger className="w-[180px] bg-card border-border">
             <SelectValue placeholder="All Deal Types" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Deal Types</SelectItem>
+            <SelectItem value="all">All Deal Types</SelectItem>
             <SelectItem value="M&A">M&A</SelectItem>
             <SelectItem value="Capital Raising">Capital Raising</SelectItem>
             <SelectItem value="Asset Management">Asset Management</SelectItem>
             <SelectItem value="Opportunity">Opportunity</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={reasonFilter || ''} onValueChange={(v) => setReasonFilter(v || null)}>
+        <Select value={reasonFilter || 'all'} onValueChange={(v) => setReasonFilter(v === 'all' ? null : v)}>
           <SelectTrigger className="w-[180px] bg-card border-border">
             <SelectValue placeholder="All Reasons" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Reasons</SelectItem>
+            <SelectItem value="all">All Reasons</SelectItem>
             {uniqueReasons.map(reason => (
               <SelectItem key={reason} value={reason}>{reason}</SelectItem>
             ))}
