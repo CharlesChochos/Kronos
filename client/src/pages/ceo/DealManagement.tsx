@@ -4764,8 +4764,8 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                 <div className="space-y-1">
                   <Label className="text-xs">Engagement Fee ($)</Label>
                   <Input 
-                    type="number" 
-                    placeholder="0" 
+                    type="text" 
+                    placeholder="e.g. 5000 or 5k" 
                     value={newDealFees.engagement}
                     onChange={(e) => setNewDealFees({ ...newDealFees, engagement: e.target.value })}
                   />
@@ -4773,8 +4773,8 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                 <div className="space-y-1">
                   <Label className="text-xs">Monthly Retainer ($)</Label>
                   <Input 
-                    type="number" 
-                    placeholder="0" 
+                    type="text" 
+                    placeholder="e.g. 2500/month" 
                     value={newDealFees.monthly}
                     onChange={(e) => setNewDealFees({ ...newDealFees, monthly: e.target.value })}
                   />
@@ -4784,9 +4784,8 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                 <div className="space-y-1">
                   <Label className="text-xs">Success Fee (%)</Label>
                   <Input 
-                    type="number" 
-                    placeholder="0" 
-                    step="0.1"
+                    type="text" 
+                    placeholder="e.g. 2.5% or TBD" 
                     value={newDealFees.success}
                     onChange={(e) => setNewDealFees({ ...newDealFees, success: e.target.value })}
                   />
@@ -4794,9 +4793,8 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                 <div className="space-y-1">
                   <Label className="text-xs">Transaction Fee (%)</Label>
                   <Input 
-                    type="number" 
-                    placeholder="0" 
-                    step="0.1"
+                    type="text" 
+                    placeholder="e.g. 1.5% or negotiable" 
                     value={newDealFees.transaction}
                     onChange={(e) => setNewDealFees({ ...newDealFees, transaction: e.target.value })}
                   />
@@ -4804,9 +4802,8 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                 <div className="space-y-1">
                   <Label className="text-xs">Spread (%)</Label>
                   <Input 
-                    type="number" 
-                    placeholder="0" 
-                    step="0.1"
+                    type="text" 
+                    placeholder="e.g. 0.5% or variable" 
                     value={newDealFees.spread}
                     onChange={(e) => setNewDealFees({ ...newDealFees, spread: e.target.value })}
                   />
