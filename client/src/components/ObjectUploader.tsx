@@ -57,7 +57,7 @@ function formatFileSize(bytes: number): string {
 }
 
 export function ObjectUploader({
-  maxNumberOfFiles = 100,
+  maxNumberOfFiles = 10000,
   maxFileSize = 500 * 1024 * 1024, // 500MB default
   allowedFileTypes,
   accept,
@@ -72,9 +72,11 @@ export function ObjectUploader({
   const [showModal, setShowModal] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadStats, setUploadStats] = useState({ completed: 0, failed: 0, total: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -383,15 +385,24 @@ export function ObjectUploader({
 
   const uploadWithConcurrency = async (
     files: PendingFile[], 
-    concurrency: number = 4
+    concurrency: number = 8
   ): Promise<UploadedFile[]> => {
     const uploadedFiles: UploadedFile[] = [];
     const queue = [...files];
     let activeCount = 0;
+    let completedCount = 0;
+    let failedCount = 0;
+    const totalCount = files.length;
     let resolveAll: () => void;
     const allDone = new Promise<void>(resolve => { resolveAll = resolve; });
     
+    // Update stats periodically
+    const updateStats = () => {
+      setUploadStats({ completed: completedCount, failed: failedCount, total: totalCount });
+    };
+    
     const checkCompletion = () => {
+      updateStats();
       if (queue.length > 0) {
         processNext();
       } else if (activeCount === 0) {
@@ -400,7 +411,10 @@ export function ObjectUploader({
     };
     
     const processNext = () => {
-      while (activeCount < concurrency && queue.length > 0) {
+      // Dynamically adjust concurrency based on remaining files
+      const effectiveConcurrency = queue.length > 100 ? Math.min(concurrency, 12) : concurrency;
+      
+      while (activeCount < effectiveConcurrency && queue.length > 0) {
         const file = queue.shift()!;
         activeCount++;
         
@@ -412,10 +426,13 @@ export function ObjectUploader({
           .then(result => {
             if (result) {
               uploadedFiles.push(result);
+              completedCount++;
+            } else {
+              failedCount++;
             }
           })
           .catch(() => {
-            // Error already handled in uploadFile, just continue
+            failedCount++;
           })
           .finally(() => {
             activeCount--;
@@ -428,6 +445,7 @@ export function ObjectUploader({
       }
     };
     
+    updateStats();
     processNext();
     await allDone;
     return uploadedFiles;
@@ -441,30 +459,46 @@ export function ObjectUploader({
     }
 
     setIsUploading(true);
+    setUploadStats({ completed: 0, failed: 0, total: filesToUpload.length });
     
-    if (filesToUpload.length > 5) {
-      toast.info(`Uploading ${filesToUpload.length} files with parallel processing...`, { duration: 3000 });
+    // Determine concurrency based on file count
+    const concurrency = filesToUpload.length > 500 ? 10 : filesToUpload.length > 100 ? 8 : 6;
+    
+    if (filesToUpload.length > 10) {
+      toast.info(`Uploading ${filesToUpload.length} files (${concurrency} parallel)...`, { duration: 5000 });
     }
     
-    const uploadedFiles = await uploadWithConcurrency(filesToUpload, 4);
+    const uploadedFiles = await uploadWithConcurrency(filesToUpload, concurrency);
 
     setIsUploading(false);
 
-    const errorCount = pendingFiles.filter(f => f.status === 'error').length;
+    const currentErrorCount = pendingFiles.filter(f => f.status === 'error').length;
     
     if (uploadedFiles.length > 0) {
-      onComplete?.(uploadedFiles);
-      if (errorCount > 0) {
-        toast.success(`${uploadedFiles.length} file(s) uploaded. ${errorCount} failed - you can retry them.`);
+      // Call onComplete with successful uploads in batches to avoid overwhelming the UI
+      if (uploadedFiles.length > 100) {
+        // For large uploads, batch the onComplete calls
+        const batchSize = 50;
+        for (let i = 0; i < uploadedFiles.length; i += batchSize) {
+          const batch = uploadedFiles.slice(i, i + batchSize);
+          onComplete?.(batch);
+        }
+      } else {
+        onComplete?.(uploadedFiles);
+      }
+      
+      if (currentErrorCount > 0) {
+        toast.success(`${uploadedFiles.length} file(s) uploaded. ${currentErrorCount} failed - click "Retry Failed" to try again.`);
       } else {
         toast.success(`${uploadedFiles.length} file(s) uploaded successfully`);
         setTimeout(() => {
           setShowModal(false);
           setPendingFiles([]);
-        }, 1000);
+          setUploadStats({ completed: 0, failed: 0, total: 0 });
+        }, 1500);
       }
     } else {
-      toast.error('Upload failed. Please check the errors and try again.');
+      toast.error('Upload failed. Please check your connection and try again.');
       onError?.(new Error('All uploads failed'));
     }
   };
@@ -642,9 +676,29 @@ export function ObjectUploader({
             </div>
           </div>
 
+          {/* Upload progress stats for large uploads */}
+          {isUploading && uploadStats.total > 10 && (
+            <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="font-medium">Upload Progress</span>
+                <span>{uploadStats.completed + uploadStats.failed} / {uploadStats.total}</span>
+              </div>
+              <Progress value={((uploadStats.completed + uploadStats.failed) / uploadStats.total) * 100} className="h-2" />
+              <div className="flex gap-4 text-xs text-muted-foreground">
+                <span className="text-green-500">{uploadStats.completed} completed</span>
+                {uploadStats.failed > 0 && <span className="text-red-500">{uploadStats.failed} failed</span>}
+                <span>{uploadStats.total - uploadStats.completed - uploadStats.failed} remaining</span>
+              </div>
+            </div>
+          )}
+
           {pendingFiles.length > 0 && (
             <div className="space-y-2 max-h-60 overflow-y-auto">
-              {pendingFiles.map((pf) => (
+              {/* For large lists, only show first 50 and errors */}
+              {(pendingFiles.length > 50 ? 
+                [...pendingFiles.filter(f => f.status === 'error'), ...pendingFiles.filter(f => f.status !== 'error').slice(0, 50 - pendingFiles.filter(f => f.status === 'error').length)] 
+                : pendingFiles
+              ).map((pf) => (
                 <div 
                   key={pf.id} 
                   className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg"
@@ -710,6 +764,11 @@ export function ObjectUploader({
                   )}
                 </div>
               ))}
+              {pendingFiles.length > 50 && (
+                <div className="text-xs text-center text-muted-foreground py-2">
+                  Showing {Math.min(50, pendingFiles.length)} of {pendingFiles.length} files (errors shown first)
+                </div>
+              )}
             </div>
           )}
 
