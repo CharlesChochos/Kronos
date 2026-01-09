@@ -30,27 +30,60 @@ function getAbsoluteUrl(url: string): string {
 }
 
 /**
- * Extract text from a document URL
- * Supports PDF (via pdf-parse) and plain text files
+ * Extract buffer from base64 data URL
+ */
+function extractBufferFromDataUrl(dataUrl: string): { buffer: Buffer; mimeType: string } {
+  // Format: data:application/pdf;base64,JVBERi0x...
+  const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) {
+    throw new Error('Invalid data URL format');
+  }
+  const mimeType = matches[1];
+  const base64Data = matches[2];
+  const buffer = Buffer.from(base64Data, 'base64');
+  return { buffer, mimeType };
+}
+
+/**
+ * Extract text from a document URL or data URL
+ * Supports PDF (via pdf-parse), text files, and base64 data URLs
  */
 async function extractTextFromDocument(doc: DocumentInfo): Promise<string> {
   try {
     console.log(`[AI Doc Analyzer] Extracting text from: ${doc.filename}`);
     
-    const absoluteUrl = getAbsoluteUrl(doc.url);
-    console.log(`[AI Doc Analyzer] Fetching from: ${absoluteUrl}`);
-    const response = await fetch(absoluteUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch document: ${response.statusText}`);
-    }
+    let buffer: Buffer;
+    let contentType: string;
     
-    const contentType = doc.mimeType || response.headers.get('content-type') || '';
+    // Handle base64 data URLs directly (no fetch needed)
+    if (doc.url.startsWith('data:')) {
+      console.log(`[AI Doc Analyzer] Processing base64 data URL for: ${doc.filename}`);
+      try {
+        const { buffer: dataBuffer, mimeType } = extractBufferFromDataUrl(doc.url);
+        buffer = dataBuffer;
+        contentType = doc.mimeType || mimeType;
+      } catch (e: any) {
+        console.error(`[AI Doc Analyzer] Failed to parse data URL:`, e);
+        return `[Error parsing data URL for ${doc.filename}: ${e.message}]`;
+      }
+    } else {
+      // Fetch from URL
+      const absoluteUrl = getAbsoluteUrl(doc.url);
+      console.log(`[AI Doc Analyzer] Fetching from: ${absoluteUrl}`);
+      const response = await fetch(absoluteUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch document: ${response.statusText}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+      contentType = doc.mimeType || response.headers.get('content-type') || '';
+    }
     
     // Handle PDF files
     if (contentType.includes('pdf') || doc.filename.toLowerCase().endsWith('.pdf')) {
-      const buffer = await response.arrayBuffer();
       const pdfParse = await import('pdf-parse');
-      const pdfData = await pdfParse.default(Buffer.from(buffer));
+      const pdfData = await pdfParse.default(buffer);
       return pdfData.text;
     }
     
@@ -59,7 +92,7 @@ async function extractTextFromDocument(doc: DocumentInfo): Promise<string> {
         doc.filename.toLowerCase().endsWith('.txt') ||
         doc.filename.toLowerCase().endsWith('.md') ||
         doc.filename.toLowerCase().endsWith('.csv')) {
-      return await response.text();
+      return buffer.toString('utf-8');
     }
     
     // Handle Word documents (.docx) - basic extraction
@@ -68,9 +101,8 @@ async function extractTextFromDocument(doc: DocumentInfo): Promise<string> {
         doc.filename.toLowerCase().endsWith('.doc')) {
       // For now, try to extract as text - docx is actually a zip with xml
       try {
-        const buffer = await response.arrayBuffer();
         // Simple text extraction - in production you'd use a proper docx parser
-        const text = Buffer.from(buffer).toString('utf-8');
+        const text = buffer.toString('utf-8');
         // Extract readable text between XML tags
         const cleanText = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
         if (cleanText.length > 100) {
@@ -83,16 +115,14 @@ async function extractTextFromDocument(doc: DocumentInfo): Promise<string> {
     
     // Handle JSON files
     if (contentType.includes('json') || doc.filename.toLowerCase().endsWith('.json')) {
-      const jsonText = await response.text();
-      return jsonText;
+      return buffer.toString('utf-8');
     }
     
     // For Excel files, we'd need xlsx library (already installed)
     if (doc.filename.toLowerCase().endsWith('.xlsx') || doc.filename.toLowerCase().endsWith('.xls')) {
       try {
-        const buffer = await response.arrayBuffer();
         const XLSX = await import('xlsx');
-        const workbook = XLSX.read(buffer, { type: 'array' });
+        const workbook = XLSX.read(buffer, { type: 'buffer' });
         let text = '';
         workbook.SheetNames.forEach(sheetName => {
           const sheet = workbook.Sheets[sheetName];
@@ -106,7 +136,7 @@ async function extractTextFromDocument(doc: DocumentInfo): Promise<string> {
     }
     
     // Fallback: try to read as text
-    const text = await response.text();
+    const text = buffer.toString('utf-8');
     if (text.length > 0 && text.length < 1000000) {
       return text;
     }
