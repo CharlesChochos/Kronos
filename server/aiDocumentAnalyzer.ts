@@ -52,16 +52,24 @@ function extractBufferFromDataUrl(dataUrl: string): { buffer: Buffer; mimeType: 
 async function extractTextFromDocument(doc: DocumentInfo): Promise<string> {
   try {
     console.log(`[AI Doc Analyzer] Extracting text from: ${doc.filename}`);
-    console.log(`[AI Doc Analyzer] URL type: ${typeof doc.url}, length: ${doc.url?.length || 0}, starts with: "${doc.url?.substring(0, 30) || 'null'}"`);
+    
+    if (!doc.url) {
+      return `[Error: No URL provided for ${doc.filename}]`;
+    }
+    
+    // Trim any whitespace and get URL info
+    const url = doc.url.trim();
+    const isDataUrl = url.startsWith('data:') || url.includes(';base64,');
+    console.log(`[AI Doc Analyzer] URL length: ${url.length}, isDataUrl: ${isDataUrl}, first 50 chars: "${url.substring(0, 50)}"`);
     
     let buffer: Buffer;
     let contentType: string;
     
     // Handle base64 data URLs directly (no fetch needed)
-    if (doc.url && doc.url.startsWith('data:')) {
-      console.log(`[AI Doc Analyzer] Processing base64 data URL for: ${doc.filename} (size: ${doc.url.length} bytes)`);
+    if (isDataUrl) {
+      console.log(`[AI Doc Analyzer] Processing base64 data URL for: ${doc.filename} (size: ${url.length} bytes)`);
       try {
-        const { buffer: dataBuffer, mimeType } = extractBufferFromDataUrl(doc.url);
+        const { buffer: dataBuffer, mimeType } = extractBufferFromDataUrl(url);
         buffer = dataBuffer;
         contentType = doc.mimeType || mimeType;
       } catch (e: any) {
