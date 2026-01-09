@@ -424,8 +424,8 @@ export class DatabaseStorage implements IStorage {
 
   async getDealsListing(): Promise<Array<Pick<Deal, 'id' | 'name' | 'dealType' | 'stage' | 'value' | 'client' | 'clientContactName' | 'clientContactEmail' | 'sector' | 'lead' | 'progress' | 'status' | 'description' | 'createdAt' | 'podTeam' | 'archivedAt'> & { attachmentCount: number }>> {
     // Return essential fields for listing - includes podTeam for filtering
-    // EXCLUDES full attachments data to prevent 64MB response limit errors
-    // Instead, we compute attachmentCount for display purposes
+    // COMPLETELY EXCLUDES attachments column from SELECT to prevent 64MB database response limit
+    // attachmentCount is set to 0 for now - full attachments are fetched only when viewing deal details
     // Also excludes archived deals (archivedAt is not null)
     const results = await db.select({
       id: schema.deals.id,
@@ -443,29 +443,13 @@ export class DatabaseStorage implements IStorage {
       description: schema.deals.description,
       createdAt: schema.deals.createdAt,
       podTeam: schema.deals.podTeam,
-      attachments: schema.deals.attachments,
       archivedAt: schema.deals.archivedAt,
     }).from(schema.deals).where(isNull(schema.deals.archivedAt));
     
-    // Compute attachment count without returning full attachment data
+    // Return results with attachmentCount set to 0 (full attachments loaded on detail view)
     return results.map(deal => ({
-      id: deal.id,
-      name: deal.name,
-      dealType: deal.dealType,
-      stage: deal.stage,
-      value: deal.value,
-      client: deal.client,
-      clientContactName: deal.clientContactName,
-      clientContactEmail: deal.clientContactEmail,
-      sector: deal.sector,
-      lead: deal.lead,
-      progress: deal.progress,
-      status: deal.status,
-      description: deal.description,
-      createdAt: deal.createdAt,
-      podTeam: deal.podTeam,
-      archivedAt: deal.archivedAt,
-      attachmentCount: Array.isArray(deal.attachments) ? deal.attachments.length : 0,
+      ...deal,
+      attachmentCount: 0,
     }));
   }
 
