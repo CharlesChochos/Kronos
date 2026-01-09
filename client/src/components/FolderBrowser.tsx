@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Folder, FolderOpen, FileText, ChevronRight, ChevronDown, Download, Trash2, Eye, ArrowLeft } from "lucide-react";
+import { Folder, FolderOpen, FileText, ChevronRight, Download, Trash2, Eye, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export interface FileItem {
   id: string;
@@ -84,69 +85,6 @@ function buildFolderTree(files: FileItem[]): FolderNode {
   return root;
 }
 
-function FolderItem({ 
-  folder, 
-  onNavigate,
-  depth = 0 
-}: { 
-  folder: FolderNode; 
-  onNavigate: (folder: FolderNode) => void;
-  depth?: number;
-}) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const totalFiles = countFilesInFolder(folder);
-  
-  return (
-    <div>
-      <div 
-        className="flex items-center gap-2 p-2 rounded-lg hover:bg-secondary/50 cursor-pointer transition-colors group"
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
-        onClick={() => onNavigate(folder)}
-        data-testid={`folder-item-${folder.name}`}
-      >
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsExpanded(!isExpanded);
-          }}
-        >
-          {isExpanded ? (
-            <ChevronDown className="h-4 w-4" />
-          ) : (
-            <ChevronRight className="h-4 w-4" />
-          )}
-        </Button>
-        {isExpanded ? (
-          <FolderOpen className="h-5 w-5 text-amber-500 shrink-0" />
-        ) : (
-          <Folder className="h-5 w-5 text-amber-500 shrink-0" />
-        )}
-        <span className="font-medium truncate flex-1">{folder.name}</span>
-        <span className="text-xs text-muted-foreground shrink-0">
-          {totalFiles} file{totalFiles !== 1 ? 's' : ''}
-        </span>
-        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-      </div>
-      
-      {isExpanded && (
-        <div className="ml-4">
-          {Array.from(folder.folders.values()).map((subFolder) => (
-            <FolderItem
-              key={subFolder.path}
-              folder={subFolder}
-              onNavigate={onNavigate}
-              depth={depth + 1}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function countFilesInFolder(folder: FolderNode): number {
   let count = folder.files.length;
   Array.from(folder.folders.values()).forEach((subFolder) => {
@@ -155,7 +93,42 @@ function countFilesInFolder(folder: FolderNode): number {
   return count;
 }
 
-function FileItemRow({
+function countFoldersInFolder(folder: FolderNode): number {
+  return folder.folders.size;
+}
+
+function FolderCard({
+  folder,
+  onNavigate,
+}: {
+  folder: FolderNode;
+  onNavigate: (folder: FolderNode) => void;
+}) {
+  const totalFiles = countFilesInFolder(folder);
+  const subfolderCount = countFoldersInFolder(folder);
+  
+  return (
+    <div 
+      className="flex items-center gap-3 p-3 rounded-lg bg-secondary/20 hover:bg-secondary/40 cursor-pointer transition-all border border-border/50 hover:border-primary/30 group"
+      onClick={() => onNavigate(folder)}
+      data-testid={`folder-card-${folder.name}`}
+    >
+      <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
+        <Folder className="h-5 w-5 text-amber-500" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="font-medium truncate" title={folder.name}>{folder.name}</p>
+        <p className="text-xs text-muted-foreground">
+          {subfolderCount > 0 && `${subfolderCount} folder${subfolderCount !== 1 ? 's' : ''}, `}
+          {totalFiles} file{totalFiles !== 1 ? 's' : ''}
+        </p>
+      </div>
+      <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+    </div>
+  );
+}
+
+function FileCard({
   file,
   onView,
   onDownload,
@@ -171,22 +144,34 @@ function FileItemRow({
   const dateDisplay = file.uploadedAt ? format(new Date(file.uploadedAt), 'PP') : '';
   const metaDisplay = [sizeDisplay, dateDisplay].filter(Boolean).join(' • ');
   
+  const getFileIcon = () => {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    if (['pdf'].includes(ext || '')) return 'text-red-400';
+    if (['doc', 'docx'].includes(ext || '')) return 'text-blue-400';
+    if (['xls', 'xlsx'].includes(ext || '')) return 'text-green-400';
+    if (['ppt', 'pptx'].includes(ext || '')) return 'text-orange-400';
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) return 'text-purple-400';
+    return 'text-primary';
+  };
+  
   return (
     <div 
-      className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/30 transition-colors group"
-      data-testid={`file-item-${file.id}`}
+      className="flex items-center gap-3 p-3 rounded-lg bg-card border border-border/50 hover:border-border transition-all group"
+      data-testid={`file-card-${file.id}`}
     >
-      <FileText className="h-5 w-5 text-primary shrink-0" />
+      <div className={cn("w-10 h-10 rounded-lg bg-secondary/50 flex items-center justify-center shrink-0")}>
+        <FileText className={cn("h-5 w-5", getFileIcon())} />
+      </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium truncate" title={fileName}>{fileName}</p>
         {metaDisplay && <p className="text-xs text-muted-foreground">{metaDisplay}</p>}
       </div>
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex gap-1">
         {onView && (
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-8 w-8 opacity-60 hover:opacity-100"
             onClick={() => onView(file)}
             title="View"
             data-testid={`view-file-${file.id}`}
@@ -198,7 +183,7 @@ function FileItemRow({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-8 w-8 opacity-60 hover:opacity-100"
             onClick={() => onDownload(file)}
             title="Download"
             data-testid={`download-file-${file.id}`}
@@ -210,7 +195,7 @@ function FileItemRow({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-destructive hover:text-destructive"
+            className="h-8 w-8 text-destructive opacity-60 hover:opacity-100 hover:text-destructive"
             onClick={() => onDelete(file)}
             title="Delete"
             data-testid={`delete-file-${file.id}`}
@@ -251,15 +236,17 @@ export function FolderBrowser({
   const navigateToFolder = (folder: FolderNode) => {
     if (folder.path) {
       setCurrentPath(folder.path.split('/'));
+    } else {
+      setCurrentPath([]);
     }
-  };
-
-  const navigateUp = () => {
-    setCurrentPath(prev => prev.slice(0, -1));
   };
 
   const navigateToRoot = () => {
     setCurrentPath([]);
+  };
+
+  const navigateToPathIndex = (index: number) => {
+    setCurrentPath(currentPath.slice(0, index + 1));
   };
 
   const handleView = (file: FileItem) => {
@@ -290,10 +277,13 @@ export function FolderBrowser({
     setFileToDelete(null);
   };
 
-  const hasNestedContent = folderTree.folders.size > 0;
+  const hasContent = files.length > 0;
+  const hasNestedFolders = folderTree.folders.size > 0;
+  const currentFolders = Array.from(currentFolder.folders.values());
+  const currentFiles = currentFolder.files;
   const isInSubfolder = currentPath.length > 0;
 
-  if (files.length === 0) {
+  if (!hasContent) {
     return (
       <div className={`text-center py-8 text-muted-foreground ${className}`}>
         <Folder className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -304,80 +294,81 @@ export function FolderBrowser({
 
   return (
     <div className={className}>
-      {hasNestedContent && (
-        <div className="flex items-center gap-2 mb-3 pb-3 border-b border-border">
-          {isInSubfolder && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={navigateUp}
-              className="gap-1"
-              data-testid="button-navigate-up"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-          )}
-          <div className="flex items-center gap-1 text-sm text-muted-foreground flex-1 min-w-0">
-            <button 
-              onClick={navigateToRoot}
-              className="hover:text-foreground transition-colors"
-              data-testid="breadcrumb-root"
-            >
-              Root
-            </button>
-            {currentPath.map((part, index) => (
-              <span key={index} className="flex items-center gap-1">
-                <ChevronRight className="h-3 w-3" />
-                <button
-                  onClick={() => setCurrentPath(currentPath.slice(0, index + 1))}
-                  className="hover:text-foreground transition-colors truncate max-w-[100px]"
-                  title={part}
-                  data-testid={`breadcrumb-${index}`}
-                >
-                  {part}
-                </button>
-              </span>
-            ))}
-          </div>
+      {(hasNestedFolders || isInSubfolder) && (
+        <div className="flex items-center gap-1 mb-4 pb-3 border-b border-border overflow-x-auto">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={navigateToRoot}
+            className={cn(
+              "gap-1 shrink-0 h-7 px-2",
+              !isInSubfolder && "text-foreground font-medium"
+            )}
+            data-testid="breadcrumb-root"
+          >
+            <Home className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Files</span>
+          </Button>
+          
+          {currentPath.map((part, index) => (
+            <div key={index} className="flex items-center gap-1 shrink-0">
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigateToPathIndex(index)}
+                className={cn(
+                  "h-7 px-2 max-w-[120px]",
+                  index === currentPath.length - 1 && "text-foreground font-medium"
+                )}
+                title={part}
+                data-testid={`breadcrumb-${index}`}
+              >
+                <span className="truncate">{part}</span>
+              </Button>
+            </div>
+          ))}
         </div>
       )}
 
-      <ScrollArea className="max-h-[400px]">
-        <div className="space-y-1">
-          {!isInSubfolder && Array.from(currentFolder.folders.values()).map((folder) => (
-            <FolderItem
-              key={folder.path}
-              folder={folder}
-              onNavigate={navigateToFolder}
-            />
-          ))}
-          
-          {isInSubfolder && Array.from(currentFolder.folders.values()).map((folder) => (
-            <div
-              key={folder.path}
-              className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/30 cursor-pointer transition-colors"
-              onClick={() => navigateToFolder(folder)}
-              data-testid={`subfolder-${folder.name}`}
-            >
-              <Folder className="h-5 w-5 text-amber-500 shrink-0" />
-              <span className="font-medium flex-1 truncate">{folder.name}</span>
-              <span className="text-xs text-muted-foreground">
-                {countFilesInFolder(folder)} files
-              </span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      <ScrollArea className="max-h-[450px]">
+        <div className="space-y-2">
+          {currentFolders.length > 0 && (
+            <div className="space-y-2">
+              {currentFolders.map((folder) => (
+                <FolderCard
+                  key={folder.path}
+                  folder={folder}
+                  onNavigate={navigateToFolder}
+                />
+              ))}
             </div>
-          ))}
+          )}
+          
+          {currentFolders.length > 0 && currentFiles.length > 0 && (
+            <div className="border-t border-border/50 my-3" />
+          )}
 
-          {currentFolder.files.map((file) => (
-            <FileItemRow
-              key={file.id}
-              file={file}
-              onView={handleView}
-              onDownload={handleDownload}
-              onDelete={onDelete ? () => setFileToDelete(file) : undefined}
-            />
-          ))}
+          {currentFiles.length > 0 && (
+            <div className="space-y-2">
+              {currentFiles.map((file) => (
+                <FileCard
+                  key={file.id}
+                  file={file}
+                  onView={handleView}
+                  onDownload={handleDownload}
+                  onDelete={onDelete ? () => setFileToDelete(file) : undefined}
+                />
+              ))}
+            </div>
+          )}
+
+          {currentFolders.length === 0 && currentFiles.length === 0 && isInSubfolder && (
+            <div className="text-center py-8 text-muted-foreground">
+              <FolderOpen className="w-10 h-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">This folder is empty</p>
+            </div>
+          )}
         </div>
       </ScrollArea>
 
