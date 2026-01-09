@@ -991,8 +991,8 @@ function StageWorkSection({
               </SelectContent>
             </Select>
             <ObjectUploader
-              maxFiles={10}
-              maxSizeBytes={500 * 1024 * 1024}
+              maxNumberOfFiles={100}
+              maxFileSize={500 * 1024 * 1024}
               onComplete={(uploadedFiles: UploadedFile[]) => {
                 const categoryMap: Record<string, string> = {
                   'General': 'Other',
@@ -1037,7 +1037,10 @@ function StageWorkSection({
                 toast.success(`${uploadedFiles.length} document(s) uploaded`);
                 setShowAddDocument(false);
               }}
-            />
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Upload Files or Folders
+            </ObjectUploader>
             <Button size="sm" variant="outline" onClick={() => { setShowAddDocument(false); setDocumentFiles([]); setDocumentTitle(''); }}>Cancel</Button>
           </div>
         )}

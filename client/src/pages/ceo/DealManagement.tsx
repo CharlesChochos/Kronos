@@ -605,7 +605,7 @@ function StageWorkSection({
   const [showTeamPopover, setShowTeamPopover] = useState(false);
   const [documentTitle, setDocumentTitle] = useState("");
   const [documentCategory, setDocumentCategory] = useState("General");
-  const [documentFiles, setDocumentFiles] = useState<File[]>([]);
+  const [documentFilesWithPaths, setDocumentFilesWithPaths] = useState<Array<{ file: File; relativePath: string }>>([]);
   const [isDraggingDoc, setIsDraggingDoc] = useState(false);
   const [isProcessingDrop, setIsProcessingDrop] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
@@ -649,7 +649,7 @@ function StageWorkSection({
   }, [allUsers, memberSearch]);
   
   const handleAddDocument = async () => {
-    if (documentFiles.length === 0) {
+    if (documentFilesWithPaths.length === 0) {
       toast.error("Please select at least one file to upload");
       return;
     }
@@ -666,13 +666,14 @@ function StageWorkSection({
     let failedCount = 0;
     
     try {
-      for (const file of documentFiles) {
+      for (const { file, relativePath } of documentFilesWithPaths) {
         try {
           const title = file.name;
           
           // First upload the file to get a URL
           const formData = new FormData();
           formData.append('file', file);
+          formData.append('relativePath', relativePath);
           
           const uploadResponse = await fetch('/api/upload', {
             method: 'POST',
@@ -745,7 +746,7 @@ function StageWorkSection({
       
       setDocumentTitle("");
       setDocumentCategory("General");
-      setDocumentFiles([]);
+      setDocumentFilesWithPaths([]);
       setShowAddDocument(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (error) {
@@ -990,7 +991,7 @@ function StageWorkSection({
                 try {
                   const filesWithPaths = await extractFilesFromDataTransfer(e.dataTransfer);
                   if (filesWithPaths.length > 0) {
-                    setDocumentFiles(filesWithPaths.map(f => f.file));
+                    setDocumentFilesWithPaths(filesWithPaths);
                     toast.success(`Found ${filesWithPaths.length} file(s) including from folders`);
                   }
                 } catch (err) {
@@ -1021,7 +1022,7 @@ function StageWorkSection({
                 const files = e.target.files;
                 if (files && files.length > 0) {
                   const filesWithPaths = extractFilesFromFileList(files);
-                  setDocumentFiles(filesWithPaths.map(f => f.file));
+                  setDocumentFilesWithPaths(filesWithPaths);
                   if (filesWithPaths.length > 1) {
                     toast.success(`Selected ${filesWithPaths.length} files from folder`);
                   }
@@ -1042,7 +1043,7 @@ function StageWorkSection({
                   input.onchange = (e) => {
                     const files = (e.target as HTMLInputElement).files;
                     if (files) {
-                      setDocumentFiles(prev => [...prev, ...Array.from(files)]);
+                      setDocumentFilesWithPaths(prev => [...prev, ...Array.from(files).map(f => ({ file: f, relativePath: f.name }))]);
                     }
                   };
                   input.click();
@@ -1051,26 +1052,26 @@ function StageWorkSection({
               >
                 + Add Individual Files
               </Button>
-              {documentFiles.length > 0 && (
+              {documentFilesWithPaths.length > 0 && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setDocumentFiles([])}
+                  onClick={() => setDocumentFilesWithPaths([])}
                   className="text-xs text-destructive"
                 >
                   Clear All
                 </Button>
               )}
             </div>
-            {documentFiles.length > 0 && (
+            {documentFilesWithPaths.length > 0 && (
               <div className="text-xs text-muted-foreground max-h-20 overflow-y-auto">
-                <div className="font-medium mb-1">Selected: {documentFiles.length} file(s)</div>
-                {documentFiles.slice(0, 10).map((f, i) => (
-                  <div key={i} className="truncate">• {f.name}</div>
+                <div className="font-medium mb-1">Selected: {documentFilesWithPaths.length} file(s)</div>
+                {documentFilesWithPaths.slice(0, 10).map((f, i) => (
+                  <div key={i} className="truncate" title={f.relativePath}>• {f.relativePath}</div>
                 ))}
-                {documentFiles.length > 10 && (
-                  <div className="text-muted-foreground/70">...and {documentFiles.length - 10} more</div>
+                {documentFilesWithPaths.length > 10 && (
+                  <div className="text-muted-foreground/70">...and {documentFilesWithPaths.length - 10} more</div>
                 )}
               </div>
             )}
@@ -1087,10 +1088,10 @@ function StageWorkSection({
               </SelectContent>
             </Select>
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleAddDocument} className="flex-1" disabled={documentFiles.length === 0} data-testid="button-upload-document">
+              <Button size="sm" onClick={handleAddDocument} className="flex-1" disabled={documentFilesWithPaths.length === 0} data-testid="button-upload-document">
                 Upload
               </Button>
-              <Button size="sm" variant="outline" onClick={() => { setShowAddDocument(false); setDocumentFiles([]); setDocumentTitle(''); }}>Cancel</Button>
+              <Button size="sm" variant="outline" onClick={() => { setShowAddDocument(false); setDocumentFilesWithPaths([]); setDocumentTitle(''); }}>Cancel</Button>
             </div>
           </div>
         )}

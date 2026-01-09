@@ -3,9 +3,10 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { X, Upload, FileIcon, CheckCircle, AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import { X, Upload, FileIcon, CheckCircle, AlertCircle, Loader2, RefreshCw, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 import { triggerSessionExpired } from "@/lib/api";
+import { extractFilesFromDataTransfer, extractFilesFromFileList } from "@/lib/folderUpload";
 
 class NonRetryableError extends Error {
   constructor(message: string) {
@@ -20,6 +21,7 @@ interface UploadedFile {
   objectPath: string;
   size: number;
   type: string;
+  relativePath?: string;
 }
 
 interface PendingFile {
@@ -29,6 +31,7 @@ interface PendingFile {
   status: 'pending' | 'uploading' | 'success' | 'error';
   error?: string;
   objectPath?: string;
+  relativePath?: string;
 }
 
 interface ObjectUploaderProps {
@@ -70,6 +73,7 @@ export function ObjectUploader({
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,7 +85,7 @@ export function ObjectUploader({
     }
   }, [maxNumberOfFiles, maxFileSize, allowedFileTypes]);
 
-  const addFiles = useCallback((files: File[]) => {
+  const addFilesWithPaths = useCallback((filesWithPaths: Array<{ file: File; relativePath?: string }>) => {
     const currentCount = pendingFiles.length;
     const availableSlots = maxNumberOfFiles - currentCount;
     
@@ -90,10 +94,10 @@ export function ObjectUploader({
       return;
     }
 
-    const filesToAdd = files.slice(0, availableSlots);
+    const filesToAdd = filesWithPaths.slice(0, availableSlots);
     const newPendingFiles: PendingFile[] = [];
 
-    for (const file of filesToAdd) {
+    for (const { file, relativePath } of filesToAdd) {
       if (file.size > maxFileSize) {
         toast.error(`${file.name} exceeds ${formatFileSize(maxFileSize)} limit`);
         continue;
@@ -117,6 +121,7 @@ export function ObjectUploader({
         file,
         progress: 0,
         status: 'pending',
+        relativePath,
       });
     }
 
@@ -124,6 +129,10 @@ export function ObjectUploader({
       setPendingFiles(prev => [...prev, ...newPendingFiles]);
     }
   }, [pendingFiles.length, maxNumberOfFiles, maxFileSize, allowedFileTypes]);
+
+  const addFiles = useCallback((files: File[]) => {
+    addFilesWithPaths(files.map(file => ({ file, relativePath: file.name })));
+  }, [addFilesWithPaths]);
 
   const removeFile = useCallback((id: string) => {
     setPendingFiles(prev => prev.filter(f => f.id !== id));
@@ -167,7 +176,10 @@ export function ObjectUploader({
         const urlResponse = await fetch('/api/objects/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: pendingFile.file.name }),
+          body: JSON.stringify({ 
+            filename: pendingFile.file.name,
+            relativePath: pendingFile.relativePath,
+          }),
         });
 
         if (urlResponse.ok) {
@@ -210,6 +222,9 @@ export function ObjectUploader({
   const uploadWithFallback = async (pendingFile: PendingFile): Promise<UploadedFile | null> => {
     const formData = new FormData();
     formData.append('file', pendingFile.file);
+    if (pendingFile.relativePath) {
+      formData.append('relativePath', pendingFile.relativePath);
+    }
 
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -239,6 +254,7 @@ export function ObjectUploader({
               objectPath,
               size: pendingFile.file.size,
               type: pendingFile.file.type,
+              relativePath: pendingFile.relativePath,
             });
           } catch {
             reject(new Error('Failed to parse upload response'));
@@ -331,6 +347,7 @@ export function ObjectUploader({
           filename: pendingFile.file.name,
           size: pendingFile.file.size,
           type: pendingFile.file.type,
+          relativePath: pendingFile.relativePath,
         }),
       });
 
@@ -352,6 +369,7 @@ export function ObjectUploader({
         objectPath,
         size: pendingFile.file.size,
         type: pendingFile.file.type,
+        relativePath: pendingFile.relativePath,
       };
     } catch (error: any) {
       const errorMessage = error.message || 'Upload failed. Please try again.';
@@ -484,15 +502,33 @@ export function ObjectUploader({
     }
   };
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const [isProcessingDrop, setIsProcessingDrop] = useState(false);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
+    setIsProcessingDrop(true);
     
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      addFiles(files);
+    try {
+      // Use folder extraction to recursively get files from dropped folders
+      const filesWithPaths = await extractFilesFromDataTransfer(e.dataTransfer);
+      if (filesWithPaths.length > 0) {
+        addFilesWithPaths(filesWithPaths);
+        if (filesWithPaths.length > 1) {
+          toast.success(`Found ${filesWithPaths.length} files (including from folders)`);
+        }
+      }
+    } catch (err) {
+      console.error('Error processing drop:', err);
+      // Fallback to regular files
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0) {
+        addFiles(files);
+      }
+    } finally {
+      setIsProcessingDrop(false);
     }
-  }, [addFiles]);
+  }, [addFilesWithPaths, addFiles]);
 
   const handleClose = () => {
     if (!isUploading) {
@@ -532,14 +568,14 @@ export function ObjectUploader({
           <div
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
               isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
-            }`}
+            } ${isProcessingDrop ? 'opacity-50 pointer-events-none' : ''}`}
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
             onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
             onDrop={handleDrop}
           >
             <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-4" />
             <p className="text-sm text-muted-foreground mb-2">
-              Drag and drop files here, or click to browse
+              {isProcessingDrop ? 'Processing files...' : 'Drag and drop files or folders here'}
             </p>
             <input
               ref={fileInputRef}
@@ -550,16 +586,50 @@ export function ObjectUploader({
               className="hidden"
               data-testid="input-file-upload"
             />
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading || pendingFiles.length >= maxNumberOfFiles}
-              data-testid="button-browse-files"
-            >
-              Browse Files
-            </Button>
+            <input
+              ref={folderInputRef}
+              type="file"
+              multiple
+              // @ts-ignore - webkitdirectory is a valid attribute for folder selection
+              webkitdirectory=""
+              onChange={(e) => {
+                const files = e.target.files;
+                if (files && files.length > 0) {
+                  const filesWithPaths = extractFilesFromFileList(files);
+                  addFilesWithPaths(filesWithPaths);
+                  if (filesWithPaths.length > 1) {
+                    toast.success(`Selected ${filesWithPaths.length} files from folder`);
+                  }
+                }
+                e.target.value = '';
+              }}
+              className="hidden"
+              data-testid="input-folder-upload"
+            />
+            <div className="flex gap-2 justify-center">
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading || isProcessingDrop || pendingFiles.length >= maxNumberOfFiles}
+                data-testid="button-browse-files"
+              >
+                <FileIcon className="w-4 h-4 mr-1" />
+                Browse Files
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm"
+                onClick={() => folderInputRef.current?.click()}
+                disabled={isUploading || isProcessingDrop || pendingFiles.length >= maxNumberOfFiles}
+                data-testid="button-browse-folder"
+              >
+                <FolderOpen className="w-4 h-4 mr-1" />
+                Browse Folder
+              </Button>
+            </div>
           </div>
 
           {pendingFiles.length > 0 && (
@@ -582,7 +652,7 @@ export function ObjectUploader({
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{pf.file.name}</p>
+                    <p className="text-sm font-medium truncate" title={pf.relativePath || pf.file.name}>{pf.relativePath || pf.file.name}</p>
                     <p className="text-xs text-muted-foreground">{formatFileSize(pf.file.size)}</p>
                     {pf.status === 'uploading' && (
                       <Progress value={pf.progress} className="h-1 mt-1" />
