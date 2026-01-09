@@ -5079,9 +5079,11 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
               <Archive className="w-5 h-5 text-amber-500" />
               Delete or Archive Deal?
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              <p>We recommend <strong>archiving</strong> instead of deleting. Archived deals preserve all documents, notes, and data for future reference and can be restored at any time.</p>
-              <p className="text-red-400"><strong>Permanent deletion</strong> cannot be undone and will remove all associated data including team members, investors, and documents.</p>
+            <AlertDialogDescription asChild>
+              <div className="text-sm text-muted-foreground space-y-3">
+                <p>We recommend <strong>archiving</strong> instead of deleting. Archived deals preserve all documents, notes, and data for future reference and can be restored at any time.</p>
+                <p className="text-red-400"><strong>Permanent deletion</strong> cannot be undone and will remove all associated data including team members, investors, and documents.</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
@@ -5197,9 +5199,11 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
               <Archive className="w-5 h-5 text-amber-500" />
               Delete or Archive {selectedDeals.length} Deals?
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              <p>We recommend <strong>archiving</strong> instead of deleting. Archived deals preserve all documents, notes, and data for future reference and can be restored at any time.</p>
-              <p className="text-red-400"><strong>Permanent deletion</strong> cannot be undone and will remove all associated data.</p>
+            <AlertDialogDescription asChild>
+              <div className="text-sm text-muted-foreground space-y-3">
+                <p>We recommend <strong>archiving</strong> instead of deleting. Archived deals preserve all documents, notes, and data for future reference and can be restored at any time.</p>
+                <p className="text-red-400"><strong>Permanent deletion</strong> cannot be undone and will remove all associated data.</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
@@ -5290,30 +5294,32 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
               <UserCircle className="w-5 h-5" />
               Onboarding Not Complete
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              <p>
-                <strong>{pendingAssignment?.userName}</strong> has not completed the required onboarding steps.
-              </p>
-              <div className="bg-secondary/50 rounded-lg p-3 space-y-2">
-                <p className="text-sm font-medium">Missing steps:</p>
-                <ul className="text-sm space-y-1">
-                  {pendingAssignment?.missingResume && (
-                    <li className="flex items-center gap-2">
-                      <X className="w-4 h-4 text-destructive" />
-                      Resume Onboarding (upload and analysis)
-                    </li>
-                  )}
-                  {pendingAssignment?.missingPersonality && (
-                    <li className="flex items-center gap-2">
-                      <X className="w-4 h-4 text-destructive" />
-                      Personality Assessment
-                    </li>
-                  )}
-                </ul>
+            <AlertDialogDescription asChild>
+              <div className="text-sm text-muted-foreground space-y-3">
+                <p>
+                  <strong>{pendingAssignment?.userName}</strong> has not completed the required onboarding steps.
+                </p>
+                <div className="bg-secondary/50 rounded-lg p-3 space-y-2">
+                  <p className="text-sm font-medium">Missing steps:</p>
+                  <ul className="text-sm space-y-1">
+                    {pendingAssignment?.missingResume && (
+                      <li className="flex items-center gap-2">
+                        <X className="w-4 h-4 text-destructive" />
+                        Resume Onboarding (upload and analysis)
+                      </li>
+                    )}
+                    {pendingAssignment?.missingPersonality && (
+                      <li className="flex items-center gap-2">
+                        <X className="w-4 h-4 text-destructive" />
+                        Personality Assessment
+                      </li>
+                    )}
+                  </ul>
+                </div>
+                <p className="text-sm">
+                  We recommend having this team member complete their onboarding for optimal team assignment. You can still proceed with the assignment if needed.
+                </p>
               </div>
-              <p className="text-sm">
-                We recommend having this team member complete their onboarding for optimal team assignment. You can still proceed with the assignment if needed.
-              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

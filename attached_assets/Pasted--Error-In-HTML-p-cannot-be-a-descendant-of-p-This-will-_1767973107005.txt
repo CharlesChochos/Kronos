@@ -1,0 +1,58 @@
+[Error] In HTML, <p> cannot be a descendant of <p>.
+This will cause a hydration error.
+
+  ...
+    <FocusScope asChild={true} loop={true} trapped={true} onMountAutoFocus={function handleEvent} ...>
+      <Primitive.div tabIndex={-1} asChild={true} ref={function} onKeyDown={function}>
+        <Primitive.div.Slot tabIndex={-1} onKeyDown={function} ref={function}>
+          <Primitive.div.SlotClone tabIndex={-1} onKeyDown={function} ref={function}>
+            <DismissableLayer role="alertdialog" id="radix-_r_40_" aria-describedby="radix-_r_42_" ...>
+              <Primitive.div role="alertdialog" id="radix-_r_40_" aria-describedby="radix-_r_42_" ...>
+                <div role="alertdialog" id="radix-_r_40_" aria-describedby="radix-_r_42_" aria-labelledby="radix-_r_41_" ...>
+                  <AlertDialogContent.Slottable>
+                    <AlertDialogHeader data-replit-metadata="client/src..." data-component-name="AlertDialo...">
+                      <div data-replit-metadata="client/src..." data-component-name="AlertDialo..." ...>
+                        <_c7>
+                        <_c9 data-replit-metadata="client/src..." data-component-name="AlertDialo..." ...>
+                          <AlertDialogDescription data-replit-metadata="client/src..." ...>
+                            <DialogDescription __scopeDialog={{Dialog:[...]}} data-replit-metadata="client/src..." ...>
+                              <Primitive.p id="radix-_r_42_" data-replit-metadata="client/src..." ...>
+>                               <p
+>                                 id="radix-_r_42_"
+>                                 data-replit-metadata="client/src/pages/ceo/DealManagement.tsx:5082:12"
+>                                 data-component-name="AlertDialogDescription"
+>                                 className="text-sm text-muted-foreground space-y-3"
+>                                 ref={null}
+>                               >
+>                                 <p
+>                                   data-replit-metadata="client/src/pages/ceo/DealManagement.tsx:5083:14"
+>                                   data-component-name="p"
+>                                 >
+                                  ...
+                    ...
+                  ...
+    ...
+
+	validateDOMNesting (react-dom_client.js:2156)
+	completeWork (react-dom_client.js:9002)
+	runWithFiberInDEV (react-dom_client.js:999)
+	completeUnitOfWork (react-dom_client.js:12669)
+	performUnitOfWork (react-dom_client.js:12575)
+	workLoopSync (react-dom_client.js:12424)
+	renderRootSync (react-dom_client.js:12408)
+	performWorkOnRoot (react-dom_client.js:11766:204)
+	performSyncWorkOnRoot (react-dom_client.js:13517)
+	flushSyncWorkAcrossRoots_impl (react-dom_client.js:13414:144)
+	flushSyncWork$1 (react-dom_client.js:12076:116)
+	f (react-dom_client.js:19794:93)
+	(anonymous function) (chunk-F5X6INBZ.js:92:108)
+	dispatchDiscreteCustomEvent (chunk-LY64KB5P.js:227)
+	handleSelect (@radix-ui_react-dropdown-menu.js:610)
+	executeDispatch (react-dom_client.js:13622)
+	runWithFiberInDEV (react-dom_client.js:999)
+	processDispatchQueue (react-dom_client.js:13658)
+	(anonymous function) (react-dom_client.js:14071)
+	batchedUpdates$1 (react-dom_client.js:2626)
+	dispatchEventForPluginEventSystem (react-dom_client.js:13763)
+	dispatchEvent (react-dom_client.js:16784)
+	dispatchDiscreteEvent (react-dom_client.js:16765)

@@ -788,21 +788,23 @@ export default function TeamAssignment() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Incomplete Onboarding</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>
-                <strong>{pendingAssignment?.userName}</strong> has not completed their onboarding process:
-              </p>
-              <ul className="list-disc list-inside mt-2 space-y-1">
-                {pendingAssignment?.missingResume && (
-                  <li>Resume Analysis not completed</li>
-                )}
-                {pendingAssignment?.missingPersonality && (
-                  <li>Personality Assessment not completed</li>
-                )}
-              </ul>
-              <p className="mt-3 text-muted-foreground">
-                This may affect optimal team formation and task assignments. You can still proceed, but for best results, have them complete onboarding first.
-              </p>
+            <AlertDialogDescription asChild>
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p>
+                  <strong>{pendingAssignment?.userName}</strong> has not completed their onboarding process:
+                </p>
+                <ul className="list-disc list-inside mt-2 space-y-1">
+                  {pendingAssignment?.missingResume && (
+                    <li>Resume Analysis not completed</li>
+                  )}
+                  {pendingAssignment?.missingPersonality && (
+                    <li>Personality Assessment not completed</li>
+                  )}
+                </ul>
+                <p className="mt-3 text-muted-foreground">
+                  This may affect optimal team formation and task assignments. You can still proceed, but for best results, have them complete onboarding first.
+                </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
