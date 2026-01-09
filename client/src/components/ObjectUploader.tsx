@@ -259,7 +259,7 @@ export function ObjectUploader({
         reject(new Error('Upload timed out. Please try again with a stable connection.'));
       });
 
-      xhr.timeout = 300000;
+      xhr.timeout = 600000;
       xhr.open('POST', '/api/upload');
       xhr.send(formData);
     });
@@ -368,30 +368,49 @@ export function ObjectUploader({
   ): Promise<UploadedFile[]> => {
     const uploadedFiles: UploadedFile[] = [];
     const queue = [...files];
-    const inProgress: Promise<void>[] = [];
+    let activeCount = 0;
+    let resolveAll: () => void;
+    const allDone = new Promise<void>(resolve => { resolveAll = resolve; });
     
-    const processNext = async () => {
-      if (queue.length === 0) return;
-      
-      const file = queue.shift()!;
-      setPendingFiles(prev => prev.map(f => 
-        f.id === file.id ? { ...f, status: 'uploading', progress: 0, error: undefined } : f
-      ));
-      
-      const result = await uploadFile(file);
-      if (result) {
-        uploadedFiles.push(result);
+    const checkCompletion = () => {
+      if (queue.length > 0) {
+        processNext();
+      } else if (activeCount === 0) {
+        resolveAll();
       }
-      
-      await processNext();
     };
     
-    const workers = Math.min(concurrency, files.length);
-    for (let i = 0; i < workers; i++) {
-      inProgress.push(processNext());
-    }
+    const processNext = () => {
+      while (activeCount < concurrency && queue.length > 0) {
+        const file = queue.shift()!;
+        activeCount++;
+        
+        setPendingFiles(prev => prev.map(f => 
+          f.id === file.id ? { ...f, status: 'uploading', progress: 0, error: undefined } : f
+        ));
+        
+        uploadFile(file)
+          .then(result => {
+            if (result) {
+              uploadedFiles.push(result);
+            }
+          })
+          .catch(() => {
+            // Error already handled in uploadFile, just continue
+          })
+          .finally(() => {
+            activeCount--;
+            checkCompletion();
+          });
+      }
+      
+      if (queue.length === 0 && activeCount === 0) {
+        resolveAll();
+      }
+    };
     
-    await Promise.all(inProgress);
+    processNext();
+    await allDone;
     return uploadedFiles;
   };
 
