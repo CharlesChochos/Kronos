@@ -4309,7 +4309,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                   </div>
 
                   <ObjectUploader
-                    maxNumberOfFiles={20}
+                    maxNumberOfFiles={100}
                     maxFileSize={500 * 1024 * 1024}
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,.mp4,.mov,.avi,.mp3,.wav,image/*,video/*,audio/*"
                     onComplete={(files: UploadedFile[]) => {

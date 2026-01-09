@@ -54,7 +54,7 @@ function formatFileSize(bytes: number): string {
 }
 
 export function ObjectUploader({
-  maxNumberOfFiles = 10,
+  maxNumberOfFiles = 100,
   maxFileSize = 500 * 1024 * 1024, // 500MB default
   allowedFileTypes,
   accept,
@@ -317,7 +317,7 @@ export function ObjectUploader({
           reject(new Error('Upload timed out. Please try again with a stable connection.'));
         });
 
-        xhr.timeout = 300000;
+        xhr.timeout = 600000;
         xhr.open('PUT', uploadURL);
         xhr.setRequestHeader('Content-Type', pendingFile.file.type || 'application/octet-stream');
         xhr.send(pendingFile.file);
@@ -362,6 +362,39 @@ export function ObjectUploader({
     }
   };
 
+  const uploadWithConcurrency = async (
+    files: PendingFile[], 
+    concurrency: number = 4
+  ): Promise<UploadedFile[]> => {
+    const uploadedFiles: UploadedFile[] = [];
+    const queue = [...files];
+    const inProgress: Promise<void>[] = [];
+    
+    const processNext = async () => {
+      if (queue.length === 0) return;
+      
+      const file = queue.shift()!;
+      setPendingFiles(prev => prev.map(f => 
+        f.id === file.id ? { ...f, status: 'uploading', progress: 0, error: undefined } : f
+      ));
+      
+      const result = await uploadFile(file);
+      if (result) {
+        uploadedFiles.push(result);
+      }
+      
+      await processNext();
+    };
+    
+    const workers = Math.min(concurrency, files.length);
+    for (let i = 0; i < workers; i++) {
+      inProgress.push(processNext());
+    }
+    
+    await Promise.all(inProgress);
+    return uploadedFiles;
+  };
+
   const handleUpload = async () => {
     const filesToUpload = pendingFiles.filter(f => f.status === 'pending' || f.status === 'error');
     if (filesToUpload.length === 0) {
@@ -370,18 +403,12 @@ export function ObjectUploader({
     }
 
     setIsUploading(true);
-    const uploadedFiles: UploadedFile[] = [];
-
-    for (const file of filesToUpload) {
-      setPendingFiles(prev => prev.map(f => 
-        f.id === file.id ? { ...f, status: 'uploading', progress: 0, error: undefined } : f
-      ));
-
-      const result = await uploadFile(file);
-      if (result) {
-        uploadedFiles.push(result);
-      }
+    
+    if (filesToUpload.length > 5) {
+      toast.info(`Uploading ${filesToUpload.length} files with parallel processing...`, { duration: 3000 });
     }
+    
+    const uploadedFiles = await uploadWithConcurrency(filesToUpload, 4);
 
     setIsUploading(false);
 
@@ -427,18 +454,8 @@ export function ObjectUploader({
     if (failedFiles.length === 0) return;
 
     setIsUploading(true);
-    const uploadedFiles: UploadedFile[] = [];
-
-    for (const file of failedFiles) {
-      setPendingFiles(prev => prev.map(f => 
-        f.id === file.id ? { ...f, status: 'uploading', progress: 0, error: undefined } : f
-      ));
-
-      const result = await uploadFile(file);
-      if (result) {
-        uploadedFiles.push(result);
-      }
-    }
+    
+    const uploadedFiles = await uploadWithConcurrency(failedFiles, 4);
 
     setIsUploading(false);
 

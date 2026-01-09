@@ -923,7 +923,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
               </Label>
               <div className="mt-2 space-y-3">
                 <ObjectUploader
-                  maxNumberOfFiles={10}
+                  maxNumberOfFiles={100}
                   maxFileSize={500 * 1024 * 1024}
                   accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,.mp4,.mov,.avi,.mp3,.wav,image/*,video/*,audio/*"
                   onComplete={(files: UploadedFile[]) => {
