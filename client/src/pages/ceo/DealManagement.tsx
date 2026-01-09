@@ -4369,6 +4369,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       const newAttachments = files.map(f => ({
                         id: f.id,
                         filename: f.filename,
+                        relativePath: f.relativePath || f.filename,
                         url: f.objectPath,
                         objectPath: f.objectPath,
                         size: f.size,
@@ -4400,94 +4401,50 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     buttonVariant="outline"
                   >
                     <Upload className="w-4 h-4 mr-2" />
-                    Upload Files (up to 500MB)
+                    Upload Files or Folders
                   </ObjectUploader>
                   <p className="text-xs text-muted-foreground">
-                    Supports documents, images, videos, and audio files
+                    Supports documents, images, videos, and audio files. Upload entire folders to preserve structure.
                   </p>
 
-                  <ScrollArea className="h-[300px]">
-                    <div className="space-y-2">
-                      {((selectedDealWithAttachments?.attachments as any[] || [])).map((doc: any) => (
-                        <div key={doc.id} className="p-3 bg-secondary/30 rounded-lg flex items-center justify-between group">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center">
-                              <FileText className="w-5 h-5 text-primary" />
-                            </div>
-                            <div>
-                              <div className="font-medium text-sm">{doc.filename}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {(doc.size / 1024).toFixed(1)} KB • {format(new Date(doc.uploadedAt), 'MMM d, yyyy')}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8"
-                              onClick={() => {
-                                const fileUrl = doc.objectPath || doc.url;
-                                if (doc.contentUnavailable || (!fileUrl?.startsWith('/objects/') && !fileUrl?.startsWith('data:'))) {
-                                  toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
-                                  return;
-                                }
-                                import('@/lib/utils').then(m => m.openUrlInNewTab(fileUrl));
-                              }}
-                              title="View"
-                              data-testid={`button-view-doc-${doc.id}`}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8"
-                              onClick={() => {
-                                const fileUrl = doc.objectPath || doc.url;
-                                if (doc.contentUnavailable || (!fileUrl?.startsWith('/objects/') && !fileUrl?.startsWith('data:'))) {
-                                  toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
-                                  return;
-                                }
-                                const link = document.createElement('a');
-                                link.href = fileUrl;
-                                link.download = doc.filename || 'document';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                              }}
-                              title="Download"
-                              data-testid={`button-download-doc-${doc.id}`}
-                            >
-                              <Download className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-red-400 hover:text-red-300"
-                              onClick={() => {
-                                const updatedAttachments = (selectedDealWithAttachments?.attachments as any[] || [])
-                                  .filter((a: any) => a.id !== doc.id);
-                                updateDeal.mutate({
-                                  id: selectedDeal.id,
-                                  attachments: updatedAttachments,
-                                });
-                              }}
-                              title="Delete"
-                              data-testid={`button-delete-doc-${doc.id}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                      {((selectedDealWithAttachments?.attachments as any[] || [])).length === 0 && (
-                        <div className="text-center py-8 text-muted-foreground text-sm">
-                          No documents uploaded yet
-                        </div>
-                      )}
-                    </div>
-                  </ScrollArea>
+                  <FolderBrowser
+                    files={((selectedDealWithAttachments?.attachments as any[] || [])).map((doc: any): FileItem => ({
+                      id: doc.id,
+                      filename: doc.filename,
+                      url: doc.objectPath || doc.url,
+                      size: doc.size,
+                      mimeType: doc.type,
+                      uploadedAt: doc.uploadedAt,
+                      relativePath: doc.relativePath || doc.filename,
+                    }))}
+                    onView={(file) => {
+                      if (!file.url?.startsWith('/objects/') && !file.url?.startsWith('data:')) {
+                        toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
+                        return;
+                      }
+                      import('@/lib/utils').then(m => m.openUrlInNewTab(file.url));
+                    }}
+                    onDownload={(file) => {
+                      if (!file.url?.startsWith('/objects/') && !file.url?.startsWith('data:')) {
+                        toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
+                        return;
+                      }
+                      const link = document.createElement('a');
+                      link.href = file.url;
+                      link.download = file.filename;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                    onDelete={(file) => {
+                      const updatedAttachments = (selectedDealWithAttachments?.attachments as any[] || [])
+                        .filter((a: any) => a.id !== file.id);
+                      updateDeal.mutate({
+                        id: selectedDeal.id,
+                        attachments: updatedAttachments,
+                      });
+                    }}
+                  />
                 </TabsContent>
 
                 {/* Voice Notes Tab */}
