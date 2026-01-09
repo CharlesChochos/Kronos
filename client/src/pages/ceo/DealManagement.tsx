@@ -60,6 +60,7 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInte
 import type { Deal, PodTeamMember, TaggedInvestor, AuditEntry } from "@shared/schema";
 import { isDealEligibleUser } from "@shared/schema";
 import { ObjectUploader, type UploadedFile } from "@/components/ObjectUploader";
+import { extractFilesFromDataTransfer, extractFilesFromFileList, type FileWithPath } from "@/lib/folderUpload";
 import {
   RadarChart,
   PolarGrid,
@@ -605,6 +606,8 @@ function StageWorkSection({
   const [documentTitle, setDocumentTitle] = useState("");
   const [documentCategory, setDocumentCategory] = useState("General");
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
+  const [isDraggingDoc, setIsDraggingDoc] = useState(false);
+  const [isProcessingDrop, setIsProcessingDrop] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [memberRole, setMemberRole] = useState("");
@@ -971,22 +974,104 @@ function StageWorkSection({
         
         {showAddDocument && (
           <div className="p-3 bg-secondary/30 rounded-lg space-y-2">
+            <div
+              className={cn(
+                "border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer",
+                isDraggingDoc ? "border-primary bg-primary/10" : "border-muted-foreground/30 hover:border-primary/50",
+                isProcessingDrop && "opacity-50 pointer-events-none"
+              )}
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingDoc(true); }}
+              onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingDoc(false); }}
+              onDrop={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDraggingDoc(false);
+                setIsProcessingDrop(true);
+                try {
+                  const filesWithPaths = await extractFilesFromDataTransfer(e.dataTransfer);
+                  if (filesWithPaths.length > 0) {
+                    setDocumentFiles(filesWithPaths.map(f => f.file));
+                    toast.success(`Found ${filesWithPaths.length} file(s) including from folders`);
+                  }
+                } catch (err) {
+                  console.error('Error processing drop:', err);
+                  toast.error('Failed to process dropped files');
+                } finally {
+                  setIsProcessingDrop(false);
+                }
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              data-testid="drop-zone-documents"
+            >
+              <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+              <div className="text-sm font-medium">
+                {isProcessingDrop ? "Processing files..." : "Drop files or folders here"}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                or click to browse • Supports folder uploads
+              </div>
+            </div>
             <input
               ref={fileInputRef}
               type="file"
               multiple
-              onChange={(e) => {
+              // @ts-ignore - webkitdirectory is a valid attribute for folder selection
+              webkitdirectory=""
+              onChange={async (e) => {
                 const files = e.target.files;
                 if (files && files.length > 0) {
-                  setDocumentFiles(Array.from(files));
+                  const filesWithPaths = extractFilesFromFileList(files);
+                  setDocumentFiles(filesWithPaths.map(f => f.file));
+                  if (filesWithPaths.length > 1) {
+                    toast.success(`Selected ${filesWithPaths.length} files from folder`);
+                  }
                 }
               }}
-              className="w-full text-sm file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+              className="hidden"
               data-testid="input-file-upload"
             />
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.multiple = true;
+                  input.onchange = (e) => {
+                    const files = (e.target as HTMLInputElement).files;
+                    if (files) {
+                      setDocumentFiles(prev => [...prev, ...Array.from(files)]);
+                    }
+                  };
+                  input.click();
+                }}
+                className="text-xs"
+              >
+                + Add Individual Files
+              </Button>
+              {documentFiles.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDocumentFiles([])}
+                  className="text-xs text-destructive"
+                >
+                  Clear All
+                </Button>
+              )}
+            </div>
             {documentFiles.length > 0 && (
-              <div className="text-xs text-muted-foreground">
-                Selected: {documentFiles.length} file(s) - {documentFiles.map(f => f.name).join(', ')}
+              <div className="text-xs text-muted-foreground max-h-20 overflow-y-auto">
+                <div className="font-medium mb-1">Selected: {documentFiles.length} file(s)</div>
+                {documentFiles.slice(0, 10).map((f, i) => (
+                  <div key={i} className="truncate">• {f.name}</div>
+                ))}
+                {documentFiles.length > 10 && (
+                  <div className="text-muted-foreground/70">...and {documentFiles.length - 10} more</div>
+                )}
               </div>
             )}
             <Select value={documentCategory} onValueChange={setDocumentCategory}>
