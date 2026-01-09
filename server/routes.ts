@@ -10649,6 +10649,10 @@ Only include entries with both name AND company. Extract ALL rows.`
       const validDocs: { url: string; filename: string; mimeType?: string }[] = [];
       const validDocIds: string[] = [];
       
+      // Fetch all documents from library for fallback lookup
+      const allLibraryDocs = await storage.getAllDocuments();
+      const dealLibraryDocs = allLibraryDocs.filter((d: any) => d.dealId === req.params.id);
+      
       for (const docRef of docRefs) {
         if (docRef.source === 'stage') {
           // Stage document - look up in stageDocuments table
@@ -10656,9 +10660,29 @@ Only include entries with both name AND company. Extract ALL rows.`
           if (!doc) {
             return res.status(400).json({ error: `Stage document ${docRef.id} does not belong to this deal` });
           }
+          
+          // If stage document has no URL, try to find content from document library
+          let docUrl = doc.url;
+          if (!docUrl) {
+            // Try to find matching document in library by title/filename
+            const matchingLibDoc = dealLibraryDocs.find((d: any) => 
+              (d.title?.includes(doc.title) || doc.title?.includes(d.title?.split(' - ').pop() || '')) ||
+              (d.filename?.includes(doc.filename) || doc.filename === d.filename)
+            );
+            if (matchingLibDoc && matchingLibDoc.content) {
+              docUrl = matchingLibDoc.content;
+              console.log(`[AI Summary] Found content in library for stage doc "${doc.title}"`);
+            }
+          }
+          
+          if (!docUrl) {
+            console.warn(`[AI Summary] Stage document "${doc.title}" has no accessible content - skipping`);
+            continue; // Skip documents without content rather than failing
+          }
+          
           validDocs.push({
-            url: doc.url,
-            filename: doc.fileName || 'Document',
+            url: docUrl,
+            filename: doc.filename || doc.title || 'Document',
             mimeType: doc.mimeType || undefined,
           });
           validDocIds.push(`stage:${docRef.id}`);
@@ -10670,7 +10694,8 @@ Only include entries with both name AND company. Extract ALL rows.`
           }
           const url = attachment.objectPath || attachment.url;
           if (!url) {
-            return res.status(400).json({ error: `Attachment ${docRef.id} has no valid URL` });
+            console.warn(`[AI Summary] Attachment "${attachment.filename}" has no accessible content - skipping`);
+            continue; // Skip attachments without content rather than failing
           }
           validDocs.push({
             url: url,
@@ -10681,6 +10706,13 @@ Only include entries with both name AND company. Extract ALL rows.`
         } else {
           return res.status(400).json({ error: `Invalid document source: ${docRef.source}` });
         }
+      }
+      
+      // Ensure we have at least one document with content
+      if (validDocs.length === 0) {
+        return res.status(400).json({ 
+          error: "None of the selected documents have accessible content. Please upload documents with file content first." 
+        });
       }
       
       // Create analysis record with validated document IDs
