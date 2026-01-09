@@ -2545,15 +2545,13 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            {currentUser?.accessLevel === 'admin' && (
-              <Button 
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-                onClick={() => setShowNewDealModal(true)}
-                data-testid="button-new-deal"
-              >
-                <Plus className="w-4 h-4 mr-1" /> New Deal
-              </Button>
-            )}
+            <Button 
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => setShowNewDealModal(true)}
+              data-testid="button-new-deal"
+            >
+              <Plus className="w-4 h-4 mr-1" /> New Deal
+            </Button>
           </div>
         </div>
 
