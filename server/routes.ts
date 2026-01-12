@@ -11018,7 +11018,46 @@ Only include entries with both name AND company. Extract ALL rows.`
         });
       }
 
-      res.json({ review, members });
+      // Create Google Calendar event if meeting date is provided
+      let calendarEventId: string | null = null;
+      if (meetingDate) {
+        try {
+          const { isUserConnected, createUserCalendarEvent } = await import('./googleCalendar');
+          
+          // Check if current user has Google Calendar connected
+          const connected = await isUserConnected(user.id);
+          if (connected) {
+            // Get emails of all committee members
+            const memberEmails: string[] = [];
+            for (const memberId of memberIds) {
+              const memberUser = await storage.getUser(memberId);
+              if (memberUser?.email) {
+                memberEmails.push(memberUser.email);
+              }
+            }
+
+            const startDate = new Date(meetingDate);
+            const endDate = new Date(startDate);
+            endDate.setHours(endDate.getHours() + 1); // 1 hour meeting
+
+            const calendarEvent = await createUserCalendarEvent(user.id, {
+              summary: `Deal Committee Review: ${deal.name}`,
+              description: `Committee review meeting for opportunity "${deal.name}".\n\nClient: ${deal.client}\nValue: $${deal.value?.toLocaleString() || 'N/A'}\n\nPlease review the opportunity and cast your vote.${meetingLink ? `\n\nMeeting Link: ${meetingLink}` : ''}`,
+              location: meetingLink || undefined,
+              start: startDate,
+              end: endDate,
+              attendees: memberEmails,
+              addMeetLink: !meetingLink, // Add Google Meet link if no custom link provided
+            });
+            calendarEventId = calendarEvent.id || null;
+          }
+        } catch (calendarError) {
+          console.error('Failed to create calendar event for committee:', calendarError);
+          // Don't fail the entire request if calendar event creation fails
+        }
+      }
+
+      res.json({ review, members, calendarEventId });
     } catch (error) {
       console.error('Create committee review error:', error);
       res.status(500).json({ error: "Failed to create committee review" });
