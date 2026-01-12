@@ -671,7 +671,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
         const error = await res.json();
         throw new Error(error.error || "Failed to cast vote");
       }
-      toast.success(`Vote cast: ${vote}`);
+      toast.success(`Your vote "${vote}" has been recorded!`);
       if (selectedOpportunity) {
         fetchCommitteeReview(selectedOpportunity.id);
       }
@@ -696,6 +696,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
         const error = await res.json();
         throw new Error(error.error || "Failed to add comment");
       }
+      toast.success("Comment added successfully!");
       setNewCommitteeComment('');
       if (selectedOpportunity) {
         fetchCommitteeReview(selectedOpportunity.id);
@@ -1654,7 +1655,15 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
               </Tabs>
               
               {/* Committee Review Status */}
-              {committeeReview && (
+              {loadingCommitteeReview && (
+                <div className="pt-4 border-t border-border mt-4">
+                  <div className="flex items-center justify-center gap-2 py-4 text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">Loading committee review...</span>
+                  </div>
+                </div>
+              )}
+              {!loadingCommitteeReview && committeeReview && (
                 <div className="pt-4 border-t border-border space-y-3 mt-4">
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium text-sm flex items-center gap-2">
@@ -1714,36 +1723,98 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                   </div>
 
                   {/* Cast Vote - show only if current user is a member who hasn't voted */}
-                  {currentUser && committeeReview.members?.some((m: any) => String(m.userId) === String(currentUser.id) && !m.vote) && (
-                    <div className="space-y-2 pt-2">
-                      <p className="text-sm font-medium">Cast Your Vote:</p>
-                      <div className="flex gap-2">
-                        <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => handleVote('approve')} disabled={isVoting}>
-                          <ThumbsUp className="w-4 h-4 mr-1" /> Approve
-                        </Button>
-                        <Button size="sm" variant="destructive" className="flex-1" onClick={() => handleVote('reject')} disabled={isVoting}>
-                          <ThumbsDown className="w-4 h-4 mr-1" /> Reject
-                        </Button>
-                        <Button size="sm" variant="outline" className="flex-1" onClick={() => handleVote('abstain')} disabled={isVoting}>
-                          <Minus className="w-4 h-4 mr-1" /> Abstain
-                        </Button>
+                  {currentUser && (() => {
+                    const userMember = committeeReview.members?.find((m: any) => String(m.userId) === String(currentUser.id));
+                    const hasVoted = userMember?.vote;
+                    const isMember = !!userMember;
+                    
+                    if (!isMember) return null;
+                    
+                    if (hasVoted) {
+                      // Show confirmation of their vote
+                      return (
+                        <div className="space-y-2 pt-2">
+                          <div className={cn(
+                            "rounded-lg p-3 text-sm flex items-center gap-2",
+                            userMember.vote === 'approve' && "bg-green-500/10 border border-green-500/30 text-green-500",
+                            userMember.vote === 'reject' && "bg-red-500/10 border border-red-500/30 text-red-500",
+                            userMember.vote === 'abstain' && "bg-muted border border-border text-muted-foreground"
+                          )}>
+                            {userMember.vote === 'approve' && <ThumbsUp className="w-4 h-4" />}
+                            {userMember.vote === 'reject' && <ThumbsDown className="w-4 h-4" />}
+                            {userMember.vote === 'abstain' && <Minus className="w-4 h-4" />}
+                            <span className="font-medium">
+                              You voted: {userMember.vote.charAt(0).toUpperCase() + userMember.vote.slice(1)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    // Show vote buttons
+                    return (
+                      <div className="space-y-2 pt-2">
+                        <p className="text-sm font-medium">Cast Your Vote:</p>
+                        <div className="flex gap-2">
+                          <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => handleVote('approve')} disabled={isVoting}>
+                            {isVoting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <ThumbsUp className="w-4 h-4 mr-1" />}
+                            Approve
+                          </Button>
+                          <Button size="sm" variant="destructive" className="flex-1" onClick={() => handleVote('reject')} disabled={isVoting}>
+                            {isVoting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <ThumbsDown className="w-4 h-4 mr-1" />}
+                            Reject
+                          </Button>
+                          <Button size="sm" variant="outline" className="flex-1" onClick={() => handleVote('abstain')} disabled={isVoting}>
+                            {isVoting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Minus className="w-4 h-4 mr-1" />}
+                            Abstain
+                          </Button>
+                        </div>
                       </div>
+                    );
+                  })()}
+
+                  {/* Overall Result - shown when voting is complete */}
+                  {committeeReview.voteSummary?.pending === 0 && committeeReview.voteSummary?.total > 0 && (
+                    <div className={cn(
+                      "rounded-lg p-3 text-center",
+                      committeeReview.voteSummary?.majorityDecision === 'approve' && "bg-green-500/20 border border-green-500/50",
+                      committeeReview.voteSummary?.majorityDecision === 'reject' && "bg-red-500/20 border border-red-500/50",
+                      !committeeReview.voteSummary?.majorityReached && "bg-amber-500/20 border border-amber-500/50"
+                    )}>
+                      <p className="font-medium text-sm">
+                        {committeeReview.voteSummary?.majorityReached 
+                          ? `Committee Decision: ${committeeReview.voteSummary.majorityDecision?.charAt(0).toUpperCase()}${committeeReview.voteSummary.majorityDecision?.slice(1)}`
+                          : 'No Majority Reached'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        All {committeeReview.voteSummary?.total} members have voted
+                      </p>
                     </div>
                   )}
 
-                  {/* Comments Section */}
-                  {committeeReview.comments?.length > 0 && (
-                    <div className="space-y-2 pt-2">
-                      <p className="text-xs text-muted-foreground">Discussion:</p>
-                      <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {/* Comments Section - always show */}
+                  <div className="space-y-2 pt-2">
+                    <p className="text-xs text-muted-foreground">Discussion ({committeeReview.comments?.length || 0} comments):</p>
+                    {committeeReview.comments?.length > 0 ? (
+                      <div className="space-y-2 max-h-40 overflow-y-auto bg-muted/20 rounded-lg p-2">
                         {committeeReview.comments.map((comment: any) => (
-                          <div key={comment.id} className="bg-muted/30 rounded p-2 text-xs">
-                            <span className="font-medium">{comment.user?.name || 'Unknown'}:</span> {comment.content}
+                          <div key={comment.id} className="bg-background rounded p-2 text-xs border border-border/50">
+                            <div className="flex justify-between items-start">
+                              <span className="font-medium text-foreground">{comment.user?.name || 'Unknown'}</span>
+                              {comment.createdAt && (
+                                <span className="text-[10px] text-muted-foreground">
+                                  {new Date(comment.createdAt).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-muted-foreground">{comment.content}</p>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-xs text-muted-foreground/70 italic py-2">No comments yet. Be the first to start the discussion.</p>
+                    )}
+                  </div>
 
                   {/* Add Comment */}
                   <div className="flex gap-2">
@@ -1752,9 +1823,15 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                       value={newCommitteeComment}
                       onChange={(e) => setNewCommitteeComment(e.target.value)}
                       className="flex-1 h-8 text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && newCommitteeComment.trim()) {
+                          e.preventDefault();
+                          handleAddComment();
+                        }
+                      }}
                     />
                     <Button size="sm" onClick={handleAddComment} disabled={isSubmittingComment || !newCommitteeComment.trim()}>
-                      <Send className="w-4 h-4" />
+                      {isSubmittingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     </Button>
                   </div>
                 </div>
