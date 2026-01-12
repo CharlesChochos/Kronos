@@ -26,7 +26,8 @@ import {
   Search, Plus, Lightbulb, CheckCircle, XCircle, Eye, Clock, DollarSign,
   Building2, Users, ArrowRight, Briefcase, TrendingUp, AlertTriangle,
   Upload, FileText, Paperclip, StickyNote, X, Download, Trash2, ExternalLink,
-  Pencil, Save, MessageSquare, Archive, Loader2
+  Pencil, Save, MessageSquare, Archive, Loader2, UsersRound, Calendar, Vote,
+  ThumbsUp, ThumbsDown, Minus, Send
 } from "lucide-react";
 import { 
   useCurrentUser, useDealsListing, useDeal, useCreateDeal, useUpdateDeal, useDeleteDeal, useUsers,
@@ -302,6 +303,19 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const [dealToArchive, setDealToArchive] = useState<string | null>(null);
   const [archiveReason, setArchiveReason] = useState<string>('');
   const [archiveNotes, setArchiveNotes] = useState<string>('');
+  
+  // Committee review state
+  const [showCommitteeDialog, setShowCommitteeDialog] = useState(false);
+  const [selectedCommitteeMembers, setSelectedCommitteeMembers] = useState<string[]>([]);
+  const [committeeDeadline, setCommitteeDeadline] = useState<string>('');
+  const [committeeMeetingDate, setCommitteeMeetingDate] = useState<string>('');
+  const [committeeMeetingLink, setCommitteeMeetingLink] = useState<string>('');
+  const [isCreatingCommittee, setIsCreatingCommittee] = useState(false);
+  const [committeeReview, setCommitteeReview] = useState<any>(null);
+  const [loadingCommitteeReview, setLoadingCommitteeReview] = useState(false);
+  const [newCommitteeComment, setNewCommitteeComment] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [isVoting, setIsVoting] = useState(false);
   
   // Filter for Opportunity deals only (excluding archived)
   const opportunities = useMemo(() => {
@@ -591,6 +605,122 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
       toast.error(error.message || "Failed to archive opportunity");
     }
   };
+
+  // Committee review functions
+  const fetchCommitteeReview = async (dealId: string) => {
+    setLoadingCommitteeReview(true);
+    try {
+      const res = await fetch(`/api/deals/${dealId}/committee-review`, {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCommitteeReview(data.review);
+      }
+    } catch (error) {
+      console.error("Failed to fetch committee review:", error);
+    } finally {
+      setLoadingCommitteeReview(false);
+    }
+  };
+
+  const handleCreateCommitteeReview = async () => {
+    if (!selectedOpportunity || selectedCommitteeMembers.length === 0) {
+      toast.error("Please select at least one committee member");
+      return;
+    }
+    setIsCreatingCommittee(true);
+    try {
+      const res = await fetch(`/api/deals/${selectedOpportunity.id}/committee-review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          memberIds: selectedCommitteeMembers,
+          deadline: committeeDeadline || null,
+          meetingDate: committeeMeetingDate || null,
+          meetingLink: committeeMeetingLink || null,
+        }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create committee review");
+      }
+      toast.success("Committee review initiated! Members have been notified.");
+      setShowCommitteeDialog(false);
+      resetCommitteeForm();
+      fetchCommitteeReview(selectedOpportunity.id);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create committee review");
+    } finally {
+      setIsCreatingCommittee(false);
+    }
+  };
+
+  const handleVote = async (vote: 'approve' | 'reject' | 'abstain') => {
+    if (!committeeReview) return;
+    setIsVoting(true);
+    try {
+      const res = await fetch(`/api/committee-reviews/${committeeReview.id}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ vote }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to cast vote");
+      }
+      toast.success(`Vote cast: ${vote}`);
+      if (selectedOpportunity) {
+        fetchCommitteeReview(selectedOpportunity.id);
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to cast vote");
+    } finally {
+      setIsVoting(false);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!committeeReview || !newCommitteeComment.trim()) return;
+    setIsSubmittingComment(true);
+    try {
+      const res = await fetch(`/api/committee-reviews/${committeeReview.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ content: newCommitteeComment.trim() }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to add comment");
+      }
+      setNewCommitteeComment('');
+      if (selectedOpportunity) {
+        fetchCommitteeReview(selectedOpportunity.id);
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add comment");
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const resetCommitteeForm = () => {
+    setSelectedCommitteeMembers([]);
+    setCommitteeDeadline('');
+    setCommitteeMeetingDate('');
+    setCommitteeMeetingLink('');
+  };
+
+  const toggleCommitteeMember = (userId: string) => {
+    setSelectedCommitteeMembers(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
   
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   
@@ -599,6 +729,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
     setDetailTab('overview');
     setIsEditMode(false);
     setLoadingAttachments(true);
+    setCommitteeReview(null);
     
     // Initialize with empty state while loading
     setOpportunityAttachments([]);
@@ -619,6 +750,9 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
     } finally {
       setLoadingAttachments(false);
     }
+    
+    // Fetch committee review if any
+    fetchCommitteeReview(opportunity.id);
     
     // Initialize edit form with opportunity data
     setEditForm({
@@ -1519,20 +1653,137 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                 </ScrollArea>
               </Tabs>
               
+              {/* Committee Review Status */}
+              {committeeReview && (
+                <div className="pt-4 border-t border-border space-y-3 mt-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-sm flex items-center gap-2">
+                      <UsersRound className="w-4 h-4" />
+                      Committee Review
+                    </h4>
+                    <Badge variant={
+                      committeeReview.status === 'pending' ? 'secondary' :
+                      committeeReview.status === 'approved' ? 'default' : 'destructive'
+                    }>
+                      {committeeReview.status === 'pending' ? 'In Progress' : committeeReview.status}
+                    </Badge>
+                  </div>
+                  
+                  {/* Vote Summary */}
+                  <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Votes: {committeeReview.voteSummary?.total - committeeReview.voteSummary?.pending} / {committeeReview.voteSummary?.total}</span>
+                      {committeeReview.voteSummary?.majorityReached && (
+                        <Badge variant={committeeReview.voteSummary.majorityDecision === 'approve' ? 'default' : 'destructive'}>
+                          Majority: {committeeReview.voteSummary.majorityDecision}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex gap-4 text-xs">
+                      <span className="text-green-500 flex items-center gap-1">
+                        <ThumbsUp className="w-3 h-3" /> {committeeReview.voteSummary?.approved || 0}
+                      </span>
+                      <span className="text-red-500 flex items-center gap-1">
+                        <ThumbsDown className="w-3 h-3" /> {committeeReview.voteSummary?.rejected || 0}
+                      </span>
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <Minus className="w-3 h-3" /> {committeeReview.voteSummary?.abstained || 0}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Committee Members */}
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Members:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {committeeReview.members?.map((member: any) => (
+                        <Badge 
+                          key={member.id} 
+                          variant="outline"
+                          className={cn(
+                            member.vote === 'approve' && 'border-green-500 text-green-500',
+                            member.vote === 'reject' && 'border-red-500 text-red-500',
+                            member.vote === 'abstain' && 'border-muted-foreground',
+                            !member.vote && 'border-muted'
+                          )}
+                        >
+                          {member.user?.name || 'Unknown'}{member.vote ? ` (${member.vote})` : ' (pending)'}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Cast Vote - show only if current user is a member who hasn't voted */}
+                  {currentUser && committeeReview.members?.some((m: any) => m.userId === currentUser.id && !m.vote) && (
+                    <div className="space-y-2 pt-2">
+                      <p className="text-sm font-medium">Cast Your Vote:</p>
+                      <div className="flex gap-2">
+                        <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => handleVote('approve')} disabled={isVoting}>
+                          <ThumbsUp className="w-4 h-4 mr-1" /> Approve
+                        </Button>
+                        <Button size="sm" variant="destructive" className="flex-1" onClick={() => handleVote('reject')} disabled={isVoting}>
+                          <ThumbsDown className="w-4 h-4 mr-1" /> Reject
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1" onClick={() => handleVote('abstain')} disabled={isVoting}>
+                          <Minus className="w-4 h-4 mr-1" /> Abstain
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Comments Section */}
+                  {committeeReview.comments?.length > 0 && (
+                    <div className="space-y-2 pt-2">
+                      <p className="text-xs text-muted-foreground">Discussion:</p>
+                      <div className="space-y-2 max-h-32 overflow-y-auto">
+                        {committeeReview.comments.map((comment: any) => (
+                          <div key={comment.id} className="bg-muted/30 rounded p-2 text-xs">
+                            <span className="font-medium">{comment.user?.name || 'Unknown'}:</span> {comment.content}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add Comment */}
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder="Add a comment..." 
+                      value={newCommitteeComment}
+                      onChange={(e) => setNewCommitteeComment(e.target.value)}
+                      className="flex-1 h-8 text-sm"
+                    />
+                    <Button size="sm" onClick={handleAddComment} disabled={isSubmittingComment || !newCommitteeComment.trim()}>
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
               {/* Action Buttons */}
               <div className="pt-4 border-t border-border space-y-3 mt-4">
                 <h4 className="font-medium text-sm">Take Action</h4>
-                <div className="flex gap-2">
-                  <Button className="flex-1 bg-green-600 hover:bg-green-700" 
+                <div className="flex flex-wrap gap-2">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 min-w-[120px] border-blue-500/50 text-blue-500 hover:bg-blue-500/10"
+                    onClick={() => setShowCommitteeDialog(true)}
+                    disabled={!!committeeReview}
+                    data-testid="button-detail-committee"
+                  >
+                    <UsersRound className="w-4 h-4 mr-2" />
+                    {committeeReview ? 'Review Active' : 'Deal Committee'}
+                  </Button>
+                  <Button className="flex-1 min-w-[120px] bg-green-600 hover:bg-green-700" 
                     onClick={() => setShowApproveDialog(true)}
                     data-testid="button-detail-approve"
                   >
                     <CheckCircle className="w-4 h-4 mr-2" />
-                    Approve Deal
+                    Approve
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="flex-1 border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
+                    className="flex-1 min-w-[100px] border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
                     onClick={() => {
                       if (selectedOpportunity) {
                         setDealToArchive(selectedOpportunity.id);
@@ -1544,7 +1795,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                     <Archive className="w-4 h-4 mr-2" />
                     Archive
                   </Button>
-                  <Button variant="destructive" className="flex-1"
+                  <Button variant="destructive" className="flex-1 min-w-[100px]"
                     onClick={() => setShowRejectDialog(true)}
                     data-testid="button-detail-reject"
                   >
@@ -1764,6 +2015,134 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
               data-testid="button-confirm-archive"
             >
               {archiveDeal.isPending ? "Archiving..." : "Archive Opportunity"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Committee Review Dialog */}
+      <Dialog open={showCommitteeDialog} onOpenChange={(open) => {
+        setShowCommitteeDialog(open);
+        if (!open) {
+          resetCommitteeForm();
+        }
+      }}>
+        <DialogContent className="bg-card border-border max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UsersRound className="w-5 h-5 text-blue-500" />
+              Create Deal Committee Review
+            </DialogTitle>
+            <DialogDescription>
+              Select committee members to review this opportunity. They will vote and the decision will be based on majority.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Committee Members Selection */}
+            <div className="space-y-2">
+              <Label>Select Committee Members *</Label>
+              <div className="border border-border rounded-lg max-h-48 overflow-y-auto">
+                {users.filter(u => u.accessLevel === 'admin' || u.role === 'CEO').map((user) => (
+                  <div 
+                    key={user.id} 
+                    className={cn(
+                      "flex items-center gap-3 p-2 hover:bg-muted/50 cursor-pointer border-b border-border last:border-0",
+                      selectedCommitteeMembers.includes(user.id) && "bg-blue-500/10"
+                    )}
+                    onClick={() => toggleCommitteeMember(user.id)}
+                  >
+                    <Checkbox 
+                      checked={selectedCommitteeMembers.includes(user.id)}
+                      onCheckedChange={() => toggleCommitteeMember(user.id)}
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{user.name}</p>
+                      <p className="text-xs text-muted-foreground">{user.jobTitle || user.role}</p>
+                    </div>
+                  </div>
+                ))}
+                {users.filter(u => u.accessLevel !== 'admin' && u.role !== 'CEO').slice(0, 10).map((user) => (
+                  <div 
+                    key={user.id} 
+                    className={cn(
+                      "flex items-center gap-3 p-2 hover:bg-muted/50 cursor-pointer border-b border-border last:border-0",
+                      selectedCommitteeMembers.includes(user.id) && "bg-blue-500/10"
+                    )}
+                    onClick={() => toggleCommitteeMember(user.id)}
+                  >
+                    <Checkbox 
+                      checked={selectedCommitteeMembers.includes(user.id)}
+                      onCheckedChange={() => toggleCommitteeMember(user.id)}
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{user.name}</p>
+                      <p className="text-xs text-muted-foreground">{user.jobTitle || user.role}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {selectedCommitteeMembers.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedCommitteeMembers.length} member(s) selected - majority: {Math.floor(selectedCommitteeMembers.length / 2) + 1} votes needed
+                </p>
+              )}
+            </div>
+
+            {/* Deadline */}
+            <div className="space-y-2">
+              <Label>Voting Deadline (Optional)</Label>
+              <Input 
+                type="datetime-local"
+                value={committeeDeadline}
+                onChange={(e) => setCommitteeDeadline(e.target.value)}
+                className="bg-background"
+              />
+            </div>
+
+            {/* Meeting Date */}
+            <div className="space-y-2">
+              <Label>Committee Meeting Date (Optional)</Label>
+              <Input 
+                type="datetime-local"
+                value={committeeMeetingDate}
+                onChange={(e) => setCommitteeMeetingDate(e.target.value)}
+                className="bg-background"
+              />
+            </div>
+
+            {/* Meeting Link */}
+            <div className="space-y-2">
+              <Label>Meeting Link (Optional)</Label>
+              <Input 
+                type="url"
+                placeholder="https://meet.google.com/..."
+                value={committeeMeetingLink}
+                onChange={(e) => setCommitteeMeetingLink(e.target.value)}
+                className="bg-background"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCommitteeDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateCommitteeReview}
+              disabled={isCreatingCommittee || selectedCommitteeMembers.length === 0}
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="button-create-committee"
+            >
+              {isCreatingCommittee ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <UsersRound className="w-4 h-4 mr-2" />
+                  Create Committee Review
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
