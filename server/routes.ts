@@ -3100,13 +3100,22 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
     }
   });
 
-  // Create deal (CEO only)
-  app.post("/api/deals", generalLimiter, requireCEO, async (req, res) => {
+  // Create deal (all authenticated users can create opportunities, admins can create any deal type)
+  app.post("/api/deals", generalLimiter, requireAuth, requireInternal, async (req, res) => {
     try {
+      const user = req.user as any;
       const result = insertDealSchema.safeParse(req.body);
       if (!result.success) {
         return res.status(400).json({ error: fromError(result.error).toString() });
       }
+      
+      // Non-admin users can only create opportunities - always force opportunity type regardless of input
+      if (user.accessLevel !== 'admin') {
+        result.data.dealType = 'Opportunity';
+        result.data.status = 'Opportunity';
+        result.data.stage = 'Initial Review'; // Opportunities start at Initial Review
+      }
+      
       const deal = await storage.createDeal(result.data);
       await createAuditLog(req, 'deal_created', 'deal', deal.id, deal.name, { value: deal.value, client: deal.client, sector: deal.sector, stage: deal.stage });
       
@@ -3162,7 +3171,7 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
     }
   });
 
-  // Update deal (CEO can update any deal, employees can only update deals they're assigned to)
+  // Update deal (all users can update opportunities, admins can update any deal, employees can update deals they're assigned to)
   app.patch("/api/deals/:id", requireAuth, requireInternal, async (req, res) => {
     try {
       const user = req.user as any;
@@ -3172,9 +3181,12 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
         return res.status(404).json({ error: "Deal not found" });
       }
       
-      // Admins can update any deal
-      if (user.accessLevel !== 'admin') {
-        // Non-admin users can only update deals they're assigned to (in pod team)
+      // All users can edit opportunities (dealType === 'Opportunity' or status === 'Opportunity')
+      const isOpportunity = deal.dealType === 'Opportunity' || deal.status === 'Opportunity';
+      
+      // Admins can update any deal, and all users can update opportunities
+      if (user.accessLevel !== 'admin' && !isOpportunity) {
+        // Non-admin users can only update active deals they're assigned to (in pod team)
         const podTeam = (deal as any).podTeam || [];
         const isAssigned = podTeam.some((member: any) => 
           (user.id && (member.userId === user.id || member.id === user.id)) ||
@@ -3190,6 +3202,14 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       const result = insertDealSchema.partial().safeParse(req.body);
       if (!result.success) {
         return res.status(400).json({ error: fromError(result.error).toString() });
+      }
+      
+      // Security: Non-admin users cannot change dealType or status to promote opportunities to active deals
+      if (user.accessLevel !== 'admin' && isOpportunity) {
+        // Strip any attempts to change dealType or status from opportunities
+        delete result.data.dealType;
+        delete result.data.status;
+        delete result.data.stage; // Stage changes for opportunities should also be admin-only
       }
       const updatedDeal = await storage.updateDeal(req.params.id, result.data);
       if (!updatedDeal) {
