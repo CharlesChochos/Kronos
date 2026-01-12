@@ -551,6 +551,16 @@ export class DatabaseStorage implements IStorage {
     await db.delete(schema.dealNotes).where(eq(schema.dealNotes.dealId, id));
     await db.delete(schema.aiDocumentAnalyses).where(eq(schema.aiDocumentAnalyses.dealId, id));
     
+    // Delete committee review related records
+    const committeeReviews = await db.select({ id: schema.dealCommitteeReviews.id })
+      .from(schema.dealCommitteeReviews)
+      .where(eq(schema.dealCommitteeReviews.dealId, id));
+    for (const review of committeeReviews) {
+      await db.delete(schema.dealCommitteeComments).where(eq(schema.dealCommitteeComments.reviewId, review.id));
+      await db.delete(schema.dealCommitteeMembers).where(eq(schema.dealCommitteeMembers.reviewId, review.id));
+    }
+    await db.delete(schema.dealCommitteeReviews).where(eq(schema.dealCommitteeReviews.dealId, id));
+    
     // Set dealId to null for related records with nullable FK
     await db.update(schema.investorInteractions).set({ dealId: null }).where(eq(schema.investorInteractions.dealId, id));
     await db.update(schema.timeEntries).set({ dealId: null }).where(eq(schema.timeEntries.dealId, id));
