@@ -1714,7 +1714,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                   </div>
 
                   {/* Cast Vote - show only if current user is a member who hasn't voted */}
-                  {currentUser && committeeReview.members?.some((m: any) => m.userId === currentUser.id && !m.vote) && (
+                  {currentUser && committeeReview.members?.some((m: any) => String(m.userId) === String(currentUser.id) && !m.vote) && (
                     <div className="space-y-2 pt-2">
                       <p className="text-sm font-medium">Cast Your Vote:</p>
                       <div className="flex gap-2">
