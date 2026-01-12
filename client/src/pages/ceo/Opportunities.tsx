@@ -1220,6 +1220,90 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
           
           {selectedOpportunity && (
             <div className="mt-6 flex-1 overflow-y-auto pr-2">
+              {/* Committee Review Banner - Prominent at top */}
+              {committeeReview && (
+                <div className={cn(
+                  "mb-4 rounded-lg p-4 border-2",
+                  committeeReview.status === 'approved' && "bg-green-500/10 border-green-500/50",
+                  committeeReview.status === 'rejected' && "bg-red-500/10 border-red-500/50",
+                  committeeReview.status === 'pending' && "bg-blue-500/10 border-blue-500/50"
+                )}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-10 h-10 rounded-full flex items-center justify-center",
+                        committeeReview.status === 'approved' && "bg-green-500/20",
+                        committeeReview.status === 'rejected' && "bg-red-500/20",
+                        committeeReview.status === 'pending' && "bg-blue-500/20"
+                      )}>
+                        {committeeReview.status === 'approved' && <ThumbsUp className="w-5 h-5 text-green-500" />}
+                        {committeeReview.status === 'rejected' && <ThumbsDown className="w-5 h-5 text-red-500" />}
+                        {committeeReview.status === 'pending' && <Vote className="w-5 h-5 text-blue-500" />}
+                      </div>
+                      <div>
+                        <h3 className={cn(
+                          "font-semibold text-lg",
+                          committeeReview.status === 'approved' && "text-green-500",
+                          committeeReview.status === 'rejected' && "text-red-500",
+                          committeeReview.status === 'pending' && "text-blue-500"
+                        )}>
+                          {committeeReview.status === 'approved' && "Committee Approved"}
+                          {committeeReview.status === 'rejected' && "Committee Rejected"}
+                          {committeeReview.status === 'pending' && "Committee Review In Progress"}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {committeeReview.voteSummary 
+                            ? (committeeReview.voteSummary.pending === 0 
+                                ? `All ${committeeReview.voteSummary.total} members voted`
+                                : `${(committeeReview.voteSummary.total || 0) - (committeeReview.voteSummary.pending || 0)} of ${committeeReview.voteSummary.total || 0} members voted`)
+                            : 'Loading vote summary...'
+                          }
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 text-sm">
+                      <span className="flex items-center gap-1 text-green-500">
+                        <ThumbsUp className="w-4 h-4" /> {committeeReview.voteSummary?.approved || 0}
+                      </span>
+                      <span className="flex items-center gap-1 text-red-500">
+                        <ThumbsDown className="w-4 h-4" /> {committeeReview.voteSummary?.rejected || 0}
+                      </span>
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <Minus className="w-4 h-4" /> {committeeReview.voteSummary?.abstained || 0}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Show user's vote status if they are a member */}
+                  {currentUser && (() => {
+                    const userMember = committeeReview.members?.find((m: any) => String(m.userId) === String(currentUser.id));
+                    if (!userMember) return null;
+                    
+                    return (
+                      <div className="mt-3 pt-3 border-t border-border/50">
+                        {userMember.vote ? (
+                          <p className="text-sm">
+                            <span className="text-muted-foreground">Your vote: </span>
+                            <span className={cn(
+                              "font-medium",
+                              userMember.vote === 'approve' && "text-green-500",
+                              userMember.vote === 'reject' && "text-red-500",
+                              userMember.vote === 'abstain' && "text-muted-foreground"
+                            )}>
+                              {userMember.vote.charAt(0).toUpperCase() + userMember.vote.slice(1)}
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="text-sm text-amber-500 font-medium">
+                            Your vote is pending - scroll down to cast your vote
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+              
               <Tabs value={detailTab} onValueChange={(v) => setDetailTab(v as any)}>
                 <TabsList className="w-full grid grid-cols-4">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
