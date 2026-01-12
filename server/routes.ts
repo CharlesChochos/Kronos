@@ -11249,15 +11249,40 @@ Only include entries with both name AND company. Extract ALL rows.`
       const user = req.user as any;
       const reviews = await storage.getPendingCommitteeReviewsForUser(user.id);
       
-      // Enrich with deal info
-      const reviewsWithDeals = await Promise.all(
+      // Enrich with deal info and vote summary
+      const reviewsWithDetails = await Promise.all(
         reviews.map(async (review) => {
           const deal = await storage.getDeal(review.dealId);
-          return { ...review, deal };
+          const members = await storage.getDealCommitteeMembers(review.id);
+          
+          // Calculate vote summary
+          const total = members.length;
+          const approved = members.filter(m => m.vote === 'approve').length;
+          const rejected = members.filter(m => m.vote === 'reject').length;
+          const abstained = members.filter(m => m.vote === 'abstain').length;
+          const pending = members.filter(m => !m.vote).length;
+          const majorityThreshold = Math.floor(total / 2) + 1;
+          const majorityReached = approved >= majorityThreshold || rejected >= majorityThreshold;
+          const majorityDecision = approved >= majorityThreshold ? 'approve' : 
+                                   rejected >= majorityThreshold ? 'reject' : null;
+          
+          return { 
+            ...review, 
+            deal,
+            voteSummary: {
+              total,
+              approved,
+              rejected,
+              abstained,
+              pending,
+              majorityReached,
+              majorityDecision
+            }
+          };
         })
       );
 
-      res.json({ reviews: reviewsWithDeals });
+      res.json({ reviews: reviewsWithDetails });
     } catch (error) {
       console.error('Get pending reviews error:', error);
       res.status(500).json({ error: "Failed to get pending reviews" });

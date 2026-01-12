@@ -2344,6 +2344,80 @@ export function useDeleteCalendarEvent() {
   });
 }
 
+// ===== COMMITTEE REVIEW HOOKS =====
+
+export type CommitteeReviewMember = {
+  id: string;
+  reviewId: string;
+  userId: string;
+  vote: string | null;
+  votedAt: string | null;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    jobTitle?: string;
+  };
+};
+
+export type CommitteeReviewComment = {
+  id: string;
+  reviewId: string;
+  userId: string;
+  content: string;
+  createdAt: string;
+  user?: {
+    id: string;
+    name: string;
+  };
+};
+
+export type CommitteeReview = {
+  id: string;
+  dealId: string;
+  requestedBy: string;
+  status: string;
+  deadline: string | null;
+  meetingDate: string | null;
+  meetingLink: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  deal?: {
+    id: string;
+    name: string;
+    client: string;
+    value: number;
+  };
+  requestedByUser?: {
+    id: string;
+    name: string;
+  };
+  members?: CommitteeReviewMember[];
+  comments?: CommitteeReviewComment[];
+  voteSummary?: {
+    total: number;
+    approved: number;
+    rejected: number;
+    abstained: number;
+    pending: number;
+    majorityReached: boolean;
+    majorityDecision: string | null;
+  };
+};
+
+export function usePendingCommitteeReviews() {
+  return useQuery({
+    queryKey: ["committee-reviews", "pending"],
+    queryFn: async () => {
+      const res = await fetch("/api/committee-reviews/pending");
+      if (!res.ok) throw new Error("Failed to fetch pending committee reviews");
+      const data = await res.json();
+      return (data.reviews || []) as CommitteeReview[];
+    },
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+}
+
 // ===== TASK ATTACHMENT HOOKS =====
 
 export type TaskAttachmentType = {
