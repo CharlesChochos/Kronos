@@ -296,7 +296,9 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   // Bulk selection state
   const [selectedOpportunities, setSelectedOpportunities] = useState<string[]>([]);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [showBulkPermanentDeleteDialog, setShowBulkPermanentDeleteDialog] = useState(false);
   const [isBulkArchiving, setIsBulkArchiving] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   
   // Archive dialog state
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
@@ -405,6 +407,20 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
       setSelectedOpportunities(selectedOpportunities.filter(id => !successfulIds.includes(id)));
     } else {
       toast.error(`Failed to archive opportunities: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? '...' : ''}`);
+    }
+  };
+
+  const handleBulkPermanentDelete = async () => {
+    setIsBulkDeleting(true);
+    try {
+      await bulkDeleteDeals.mutateAsync(selectedOpportunities);
+      toast.success(`${selectedOpportunities.length} opportunities permanently deleted.`);
+      setSelectedOpportunities([]);
+      setShowBulkPermanentDeleteDialog(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete opportunities");
+    } finally {
+      setIsBulkDeleting(false);
     }
   };
   
@@ -885,6 +901,9 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" className="border-amber-500/50 text-amber-500 hover:bg-amber-500/10" onClick={() => setShowBulkDeleteDialog(true)} data-testid="button-bulk-archive-opportunities">
                 <Archive className="w-4 h-4 mr-1" /> Archive Selected
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => setShowBulkPermanentDeleteDialog(true)} data-testid="button-bulk-delete-opportunities">
+                <Trash2 className="w-4 h-4 mr-1" /> Delete Permanently
               </Button>
               <Button variant="outline" size="sm" onClick={() => setSelectedOpportunities([])} data-testid="button-clear-selection">
                 Clear Selection
@@ -2023,6 +2042,32 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
               className="bg-amber-600 hover:bg-amber-700"
             >
               {isBulkArchiving ? "Archiving..." : "Archive All"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Permanent Delete Dialog */}
+      <AlertDialog open={showBulkPermanentDeleteDialog} onOpenChange={setShowBulkPermanentDeleteDialog}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              Permanently Delete {selectedOpportunities.length} Opportunities
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>This action <strong>cannot be undone</strong>. These opportunities and all their associated data will be permanently removed.</p>
+              <p className="text-amber-500">If you want to keep the data for future reference, use "Archive Selected" instead.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBulkDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleBulkPermanentDelete} 
+              disabled={isBulkDeleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isBulkDeleting ? "Deleting..." : "Delete Permanently"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
