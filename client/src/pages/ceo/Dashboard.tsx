@@ -180,16 +180,33 @@ export default function Dashboard() {
     return widgets;
   };
   
+  // Merge saved widgets with default widgets (add any new widgets that were added after user saved preferences)
+  const mergeWidgetsWithDefaults = (savedWidgets: WidgetConfig[]): WidgetConfig[] => {
+    const savedIds = new Set(savedWidgets.map(w => w.id));
+    const newWidgets = DEFAULT_WIDGETS.filter(w => !savedIds.has(w.id));
+    
+    if (newWidgets.length === 0) return savedWidgets;
+    
+    // Insert new widgets after upcomingMeetings (or at the end of the right column widgets)
+    const result = [...savedWidgets];
+    const upcomingMeetingsIndex = result.findIndex(w => w.id === 'upcomingMeetings');
+    const insertPosition = upcomingMeetingsIndex >= 0 ? upcomingMeetingsIndex + 1 : result.length;
+    
+    result.splice(insertPosition, 0, ...newWidgets);
+    return result;
+  };
+
   // Load widget config from user preferences when available
   useEffect(() => {
     if (!prefsLoading && userPrefs?.dashboardWidgets && userPrefs.dashboardWidgets.length > 0 && !widgetsInitialized) {
-      // Normalize the order to ensure Recent Activity comes before Capital At Work and Fee Summary
+      // Merge with defaults to add any new widgets, then normalize order
       const loadedWidgets = userPrefs.dashboardWidgets as WidgetConfig[];
-      const normalizedWidgets = normalizeWidgetOrder(loadedWidgets);
+      const mergedWidgets = mergeWidgetsWithDefaults(loadedWidgets);
+      const normalizedWidgets = normalizeWidgetOrder(mergedWidgets);
       setWidgets(normalizedWidgets);
       setWidgetsInitialized(true);
       
-      // If order was changed, save the corrected order
+      // If widgets were changed (new ones added or order corrected), save the updated preferences
       if (JSON.stringify(loadedWidgets) !== JSON.stringify(normalizedWidgets)) {
         saveUserPrefs.mutateAsync({ dashboardWidgets: normalizedWidgets });
       }
