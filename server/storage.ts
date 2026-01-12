@@ -359,6 +359,27 @@ export interface IStorage {
   getLatestAiDocumentAnalysis(dealId: string): Promise<schema.AiDocumentAnalysis | undefined>;
   createAiDocumentAnalysis(analysis: schema.InsertAiDocumentAnalysis): Promise<schema.AiDocumentAnalysis>;
   updateAiDocumentAnalysis(id: string, updates: Partial<schema.InsertAiDocumentAnalysis & { completedAt?: Date }>): Promise<schema.AiDocumentAnalysis | undefined>;
+  
+  // Deal Committee Review operations
+  getDealCommitteeReview(id: string): Promise<schema.DealCommitteeReview | undefined>;
+  getDealCommitteeReviewByDeal(dealId: string): Promise<schema.DealCommitteeReview | undefined>;
+  getDealCommitteeReviewsByUser(userId: string): Promise<schema.DealCommitteeReview[]>;
+  getPendingCommitteeReviewsForUser(userId: string): Promise<schema.DealCommitteeReview[]>;
+  getAllDealCommitteeReviews(): Promise<schema.DealCommitteeReview[]>;
+  createDealCommitteeReview(review: schema.InsertDealCommitteeReview): Promise<schema.DealCommitteeReview>;
+  updateDealCommitteeReview(id: string, updates: Partial<schema.InsertDealCommitteeReview>): Promise<schema.DealCommitteeReview | undefined>;
+  
+  // Deal Committee Member operations
+  getDealCommitteeMembers(reviewId: string): Promise<schema.DealCommitteeMember[]>;
+  getDealCommitteeMember(id: string): Promise<schema.DealCommitteeMember | undefined>;
+  createDealCommitteeMember(member: schema.InsertDealCommitteeMember): Promise<schema.DealCommitteeMember>;
+  updateDealCommitteeMember(id: string, updates: Partial<schema.InsertDealCommitteeMember>): Promise<schema.DealCommitteeMember | undefined>;
+  deleteDealCommitteeMember(id: string): Promise<void>;
+  
+  // Deal Committee Comment operations
+  getDealCommitteeComments(reviewId: string): Promise<schema.DealCommitteeComment[]>;
+  createDealCommitteeComment(comment: schema.InsertDealCommitteeComment): Promise<schema.DealCommitteeComment>;
+  deleteDealCommitteeComment(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2416,6 +2437,126 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.aiDocumentAnalyses.id, id))
       .returning();
     return updated;
+  }
+
+  // ================================
+  // DEAL COMMITTEE REVIEW OPERATIONS
+  // ================================
+
+  async getDealCommitteeReview(id: string): Promise<schema.DealCommitteeReview | undefined> {
+    const [review] = await db.select().from(schema.dealCommitteeReviews)
+      .where(eq(schema.dealCommitteeReviews.id, id));
+    return review;
+  }
+
+  async getDealCommitteeReviewByDeal(dealId: string): Promise<schema.DealCommitteeReview | undefined> {
+    const [review] = await db.select().from(schema.dealCommitteeReviews)
+      .where(and(
+        eq(schema.dealCommitteeReviews.dealId, dealId),
+        eq(schema.dealCommitteeReviews.status, 'pending')
+      ));
+    return review;
+  }
+
+  async getDealCommitteeReviewsByUser(userId: string): Promise<schema.DealCommitteeReview[]> {
+    return await db.select().from(schema.dealCommitteeReviews)
+      .where(eq(schema.dealCommitteeReviews.requestedBy, userId))
+      .orderBy(desc(schema.dealCommitteeReviews.createdAt));
+  }
+
+  async getPendingCommitteeReviewsForUser(userId: string): Promise<schema.DealCommitteeReview[]> {
+    // Get reviews where this user is a committee member with pending vote
+    const memberReviews = await db.select({
+      reviewId: schema.dealCommitteeMembers.reviewId
+    }).from(schema.dealCommitteeMembers)
+      .where(and(
+        eq(schema.dealCommitteeMembers.userId, userId),
+        isNull(schema.dealCommitteeMembers.vote)
+      ));
+    
+    const reviewIds = memberReviews.map(m => m.reviewId);
+    if (reviewIds.length === 0) return [];
+    
+    const reviews: schema.DealCommitteeReview[] = [];
+    for (const reviewId of reviewIds) {
+      const [review] = await db.select().from(schema.dealCommitteeReviews)
+        .where(and(
+          eq(schema.dealCommitteeReviews.id, reviewId),
+          eq(schema.dealCommitteeReviews.status, 'pending')
+        ));
+      if (review) reviews.push(review);
+    }
+    return reviews;
+  }
+
+  async getAllDealCommitteeReviews(): Promise<schema.DealCommitteeReview[]> {
+    return await db.select().from(schema.dealCommitteeReviews)
+      .orderBy(desc(schema.dealCommitteeReviews.createdAt));
+  }
+
+  async createDealCommitteeReview(review: schema.InsertDealCommitteeReview): Promise<schema.DealCommitteeReview> {
+    const [created] = await db.insert(schema.dealCommitteeReviews).values(review).returning();
+    return created;
+  }
+
+  async updateDealCommitteeReview(id: string, updates: Partial<schema.InsertDealCommitteeReview>): Promise<schema.DealCommitteeReview | undefined> {
+    const [updated] = await db.update(schema.dealCommitteeReviews)
+      .set(updates)
+      .where(eq(schema.dealCommitteeReviews.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ================================
+  // DEAL COMMITTEE MEMBER OPERATIONS
+  // ================================
+
+  async getDealCommitteeMembers(reviewId: string): Promise<schema.DealCommitteeMember[]> {
+    return await db.select().from(schema.dealCommitteeMembers)
+      .where(eq(schema.dealCommitteeMembers.reviewId, reviewId))
+      .orderBy(schema.dealCommitteeMembers.createdAt);
+  }
+
+  async getDealCommitteeMember(id: string): Promise<schema.DealCommitteeMember | undefined> {
+    const [member] = await db.select().from(schema.dealCommitteeMembers)
+      .where(eq(schema.dealCommitteeMembers.id, id));
+    return member;
+  }
+
+  async createDealCommitteeMember(member: schema.InsertDealCommitteeMember): Promise<schema.DealCommitteeMember> {
+    const [created] = await db.insert(schema.dealCommitteeMembers).values(member).returning();
+    return created;
+  }
+
+  async updateDealCommitteeMember(id: string, updates: Partial<schema.InsertDealCommitteeMember>): Promise<schema.DealCommitteeMember | undefined> {
+    const [updated] = await db.update(schema.dealCommitteeMembers)
+      .set(updates)
+      .where(eq(schema.dealCommitteeMembers.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDealCommitteeMember(id: string): Promise<void> {
+    await db.delete(schema.dealCommitteeMembers).where(eq(schema.dealCommitteeMembers.id, id));
+  }
+
+  // ================================
+  // DEAL COMMITTEE COMMENT OPERATIONS
+  // ================================
+
+  async getDealCommitteeComments(reviewId: string): Promise<schema.DealCommitteeComment[]> {
+    return await db.select().from(schema.dealCommitteeComments)
+      .where(eq(schema.dealCommitteeComments.reviewId, reviewId))
+      .orderBy(schema.dealCommitteeComments.createdAt);
+  }
+
+  async createDealCommitteeComment(comment: schema.InsertDealCommitteeComment): Promise<schema.DealCommitteeComment> {
+    const [created] = await db.insert(schema.dealCommitteeComments).values(comment).returning();
+    return created;
+  }
+
+  async deleteDealCommitteeComment(id: string): Promise<void> {
+    await db.delete(schema.dealCommitteeComments).where(eq(schema.dealCommitteeComments.id, id));
   }
 }
 

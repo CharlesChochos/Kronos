@@ -10964,6 +10964,297 @@ Only include entries with both name AND company. Extract ALL rows.`
     }
   });
 
+  // ================================
+  // DEAL COMMITTEE REVIEW ROUTES
+  // ================================
+
+  // Create a committee review for a deal/opportunity
+  app.post("/api/deals/:dealId/committee-review", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { dealId } = req.params;
+      const { memberIds, deadline, meetingDate, meetingLink } = req.body;
+
+      // Check if deal exists
+      const deal = await storage.getDeal(dealId);
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      // Check if there's already a pending review
+      const existingReview = await storage.getDealCommitteeReviewByDeal(dealId);
+      if (existingReview) {
+        return res.status(400).json({ error: "A committee review is already pending for this deal" });
+      }
+
+      // Create the review
+      const review = await storage.createDealCommitteeReview({
+        dealId,
+        requestedBy: user.id,
+        status: 'pending',
+        deadline: deadline ? new Date(deadline) : null,
+        meetingDate: meetingDate ? new Date(meetingDate) : null,
+        meetingLink: meetingLink || null,
+      });
+
+      // Add committee members
+      const members = [];
+      for (const memberId of memberIds) {
+        const member = await storage.createDealCommitteeMember({
+          reviewId: review.id,
+          userId: memberId,
+        });
+        members.push(member);
+      }
+
+      // Create notifications for all committee members
+      for (const memberId of memberIds) {
+        await storage.createNotification({
+          userId: memberId,
+          title: "Committee Review Request",
+          message: `You have been added to the deal committee for "${deal.name}". Please review and cast your vote.`,
+          type: "info",
+          link: `/ceo/opportunities`
+        });
+      }
+
+      res.json({ review, members });
+    } catch (error) {
+      console.error('Create committee review error:', error);
+      res.status(500).json({ error: "Failed to create committee review" });
+    }
+  });
+
+  // Get committee review for a deal
+  app.get("/api/deals/:dealId/committee-review", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const { dealId } = req.params;
+      
+      const review = await storage.getDealCommitteeReviewByDeal(dealId);
+      if (!review) {
+        return res.json({ review: null });
+      }
+
+      // Get members with user details
+      const members = await storage.getDealCommitteeMembers(review.id);
+      const membersWithUsers = await Promise.all(
+        members.map(async (member) => {
+          const user = await storage.getUser(member.userId);
+          return { ...member, user };
+        })
+      );
+
+      // Get comments with user details
+      const comments = await storage.getDealCommitteeComments(review.id);
+      const commentsWithUsers = await Promise.all(
+        comments.map(async (comment) => {
+          const user = await storage.getUser(comment.userId);
+          return { ...comment, user };
+        })
+      );
+
+      // Get requestedBy user
+      const requestedByUser = await storage.getUser(review.requestedBy);
+
+      // Calculate vote summary
+      const total = membersWithUsers.length;
+      const approved = membersWithUsers.filter(m => m.vote === 'approve').length;
+      const rejected = membersWithUsers.filter(m => m.vote === 'reject').length;
+      const abstained = membersWithUsers.filter(m => m.vote === 'abstain').length;
+      const pending = membersWithUsers.filter(m => !m.vote).length;
+      const majorityThreshold = Math.floor(total / 2) + 1;
+      const majorityReached = approved >= majorityThreshold || rejected >= majorityThreshold;
+      const majorityDecision = approved >= majorityThreshold ? 'approve' : 
+                               rejected >= majorityThreshold ? 'reject' : null;
+
+      res.json({
+        review: {
+          ...review,
+          requestedByUser,
+          members: membersWithUsers,
+          comments: commentsWithUsers,
+          voteSummary: {
+            total,
+            approved,
+            rejected,
+            abstained,
+            pending,
+            majorityReached,
+            majorityDecision,
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Get committee review error:', error);
+      res.status(500).json({ error: "Failed to get committee review" });
+    }
+  });
+
+  // Cast a vote on a committee review
+  app.post("/api/committee-reviews/:reviewId/vote", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { reviewId } = req.params;
+      const { vote, notes } = req.body;
+
+      if (!['approve', 'reject', 'abstain'].includes(vote)) {
+        return res.status(400).json({ error: "Invalid vote. Must be 'approve', 'reject', or 'abstain'" });
+      }
+
+      // Get the review
+      const review = await storage.getDealCommitteeReview(reviewId);
+      if (!review) {
+        return res.status(404).json({ error: "Review not found" });
+      }
+
+      if (review.status !== 'pending') {
+        return res.status(400).json({ error: "This review has already been finalized" });
+      }
+
+      // Find the member entry for this user
+      const members = await storage.getDealCommitteeMembers(reviewId);
+      const memberEntry = members.find(m => m.userId === user.id);
+      
+      if (!memberEntry) {
+        return res.status(403).json({ error: "You are not a member of this committee" });
+      }
+
+      // Update the vote
+      const updatedMember = await storage.updateDealCommitteeMember(memberEntry.id, {
+        vote,
+        voteNotes: notes || null,
+        votedAt: new Date(),
+      });
+
+      // Check if majority has been reached
+      const allMembers = await storage.getDealCommitteeMembers(reviewId);
+      const total = allMembers.length;
+      const approvals = allMembers.filter(m => m.vote === 'approve').length + (vote === 'approve' ? 0 : 0);
+      const rejections = allMembers.filter(m => m.vote === 'reject').length + (vote === 'reject' ? 0 : 0);
+      const majorityThreshold = Math.floor(total / 2) + 1;
+
+      // Recalculate with updated vote
+      const updatedMembers = await storage.getDealCommitteeMembers(reviewId);
+      const updatedApprovals = updatedMembers.filter(m => m.vote === 'approve').length;
+      const updatedRejections = updatedMembers.filter(m => m.vote === 'reject').length;
+
+      if (updatedApprovals >= majorityThreshold || updatedRejections >= majorityThreshold) {
+        const decision = updatedApprovals >= majorityThreshold ? 'approved' : 'rejected';
+        await storage.updateDealCommitteeReview(reviewId, {
+          status: decision,
+          finalDecision: decision,
+          finalDecisionDate: new Date(),
+        });
+
+        // Notify the person who requested the review
+        const deal = await storage.getDeal(review.dealId);
+        await storage.createNotification({
+          userId: review.requestedBy,
+          title: `Committee Decision: ${decision.charAt(0).toUpperCase() + decision.slice(1)}`,
+          message: `The deal committee has ${decision} "${deal?.name || 'the deal'}".`,
+          type: decision === 'approved' ? 'success' : 'warning',
+          link: `/ceo/opportunities`
+        });
+      }
+
+      res.json({ success: true, member: updatedMember });
+    } catch (error) {
+      console.error('Cast vote error:', error);
+      res.status(500).json({ error: "Failed to cast vote" });
+    }
+  });
+
+  // Add a comment to a committee review
+  app.post("/api/committee-reviews/:reviewId/comments", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { reviewId } = req.params;
+      const { content } = req.body;
+
+      if (!content?.trim()) {
+        return res.status(400).json({ error: "Comment content is required" });
+      }
+
+      const review = await storage.getDealCommitteeReview(reviewId);
+      if (!review) {
+        return res.status(404).json({ error: "Review not found" });
+      }
+
+      // Check if user is a member of this committee
+      const members = await storage.getDealCommitteeMembers(reviewId);
+      const isMember = members.some(m => m.userId === user.id);
+      const isRequester = review.requestedBy === user.id;
+
+      if (!isMember && !isRequester) {
+        return res.status(403).json({ error: "You are not authorized to comment on this review" });
+      }
+
+      const comment = await storage.createDealCommitteeComment({
+        reviewId,
+        userId: user.id,
+        content: content.trim(),
+      });
+
+      const commentWithUser = { ...comment, user: { id: user.id, name: user.name, avatar: user.avatar } };
+
+      res.json({ comment: commentWithUser });
+    } catch (error) {
+      console.error('Add comment error:', error);
+      res.status(500).json({ error: "Failed to add comment" });
+    }
+  });
+
+  // Get pending committee reviews for current user
+  app.get("/api/committee-reviews/pending", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const reviews = await storage.getPendingCommitteeReviewsForUser(user.id);
+      
+      // Enrich with deal info
+      const reviewsWithDeals = await Promise.all(
+        reviews.map(async (review) => {
+          const deal = await storage.getDeal(review.dealId);
+          return { ...review, deal };
+        })
+      );
+
+      res.json({ reviews: reviewsWithDeals });
+    } catch (error) {
+      console.error('Get pending reviews error:', error);
+      res.status(500).json({ error: "Failed to get pending reviews" });
+    }
+  });
+
+  // Cancel a committee review (only by requester)
+  app.delete("/api/committee-reviews/:reviewId", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { reviewId } = req.params;
+
+      const review = await storage.getDealCommitteeReview(reviewId);
+      if (!review) {
+        return res.status(404).json({ error: "Review not found" });
+      }
+
+      if (review.requestedBy !== user.id && user.accessLevel !== 'admin') {
+        return res.status(403).json({ error: "Only the requester or admin can cancel this review" });
+      }
+
+      if (review.status !== 'pending') {
+        return res.status(400).json({ error: "Cannot cancel a finalized review" });
+      }
+
+      await storage.updateDealCommitteeReview(reviewId, {
+        status: 'cancelled',
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Cancel review error:', error);
+      res.status(500).json({ error: "Failed to cancel review" });
+    }
+  });
+
   return httpServer;
 }
 
