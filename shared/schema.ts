@@ -1704,6 +1704,83 @@ export const insertAiDocumentAnalysisSchema = createInsertSchema(aiDocumentAnaly
 export type InsertAiDocumentAnalysis = z.infer<typeof insertAiDocumentAnalysisSchema>;
 export type AiDocumentAnalysis = typeof aiDocumentAnalyses.$inferSelect;
 
+// Deal Committee Reviews table - tracks committee review requests for deals/opportunities
+export const dealCommitteeReviews = pgTable("deal_committee_reviews", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  requestedBy: varchar("requested_by").references(() => users.id).notNull(),
+  status: text("status").notNull().default('pending'), // pending, approved, rejected, cancelled
+  deadline: timestamp("deadline"),
+  meetingDate: timestamp("meeting_date"),
+  meetingCalendarEventId: text("meeting_calendar_event_id"), // Google Calendar event ID
+  meetingLink: text("meeting_link"), // Video conference link
+  finalDecision: text("final_decision"), // approved, rejected
+  finalDecisionDate: timestamp("final_decision_date"),
+  finalDecisionNotes: text("final_decision_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDealCommitteeReviewSchema = createInsertSchema(dealCommitteeReviews).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDealCommitteeReview = z.infer<typeof insertDealCommitteeReviewSchema>;
+export type DealCommitteeReview = typeof dealCommitteeReviews.$inferSelect;
+
+// Deal Committee Members table - tracks individual committee members and their votes
+export const dealCommitteeMembers = pgTable("deal_committee_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reviewId: varchar("review_id").references(() => dealCommitteeReviews.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  vote: text("vote"), // null (not voted), 'approve', 'reject', 'abstain'
+  votedAt: timestamp("voted_at"),
+  voteNotes: text("vote_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDealCommitteeMemberSchema = createInsertSchema(dealCommitteeMembers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDealCommitteeMember = z.infer<typeof insertDealCommitteeMemberSchema>;
+export type DealCommitteeMember = typeof dealCommitteeMembers.$inferSelect;
+
+// Deal Committee Comments table - discussion thread for each review
+export const dealCommitteeComments = pgTable("deal_committee_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reviewId: varchar("review_id").references(() => dealCommitteeReviews.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDealCommitteeCommentSchema = createInsertSchema(dealCommitteeComments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDealCommitteeComment = z.infer<typeof insertDealCommitteeCommentSchema>;
+export type DealCommitteeComment = typeof dealCommitteeComments.$inferSelect;
+
+// Extended type for committee review with related data
+export type DealCommitteeReviewWithDetails = DealCommitteeReview & {
+  deal: Deal;
+  requestedByUser: User;
+  members: (DealCommitteeMember & { user: User })[];
+  comments: (DealCommitteeComment & { user: User })[];
+  voteSummary: {
+    total: number;
+    approved: number;
+    rejected: number;
+    abstained: number;
+    pending: number;
+    majorityReached: boolean;
+    majorityDecision: 'approve' | 'reject' | null;
+  };
+};
+
 // Job titles that are NOT eligible for deal work (support roles)
 export const NON_DEAL_ELIGIBLE_JOB_TITLES = [
   'AI Engineer',
