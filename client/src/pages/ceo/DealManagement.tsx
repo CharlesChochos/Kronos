@@ -33,7 +33,7 @@ import {
   Pencil, Trash2, Eye, Users, Phone, Mail, MessageSquare, Plus, X, 
   Building2, TrendingUp, FileText, Clock, CheckCircle2, ChevronRight,
   UserPlus, History, LayoutGrid, CalendarDays, ChevronLeft, Upload, GitCompare, ArrowUpDown, BarChart3,
-  Mic, MicOff, Play, Pause, Square, Volume2, Download, UserCircle, ExternalLink, ArrowLeftCircle, Archive
+  Mic, MicOff, Play, Pause, Square, Volume2, Download, UserCircle, ExternalLink, ArrowLeftCircle, Archive, Loader2
 } from "lucide-react";
 import { 
   useCurrentUser, useDealsListing, useDeal, useCreateDeal, useUpdateDeal, useDeleteDeal, useMoveDealToOpportunity, useUsers, useTasks, useCreateDealFee,
@@ -597,7 +597,7 @@ function StageWorkSection({
   onboardingStatus = {},
   onShowOnboardingWarning
 }: StageWorkSectionProps) {
-  const { data: stageDocuments = [] } = useStageDocuments(dealId, activeStageTab);
+  const { data: stageDocuments = [], isLoading: isLoadingDocuments } = useStageDocuments(dealId, activeStageTab);
   const { data: stagePodMembers = [] } = useStagePodMembers(dealId, activeStageTab);
   const { data: stageVoiceNotes = [] } = useStageVoiceNotes(dealId, activeStageTab);
   
@@ -909,7 +909,9 @@ function StageWorkSection({
         <Card className="bg-secondary/20">
           <CardContent className="p-3 text-center">
             <FileText className="w-4 h-4 mx-auto mb-1 text-blue-400" />
-            <div className="text-lg font-bold">{stageDocuments.length}</div>
+            <div className="text-lg font-bold">
+              {isLoadingDocuments ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : stageDocuments.length}
+            </div>
             <div className="text-xs text-muted-foreground">Documents</div>
           </CardContent>
         </Card>
@@ -1099,34 +1101,41 @@ function StageWorkSection({
           </div>
         )}
         
-        <FolderBrowser
-          files={stageDocuments.map((doc: any): FileItem => ({
-            id: doc.id,
-            filename: doc.title || doc.filename || 'Document',
-            url: doc.url || doc.fileData || '',
-            size: doc.fileSize || doc.size,
-            uploadedAt: doc.createdAt || doc.uploadedAt,
-            relativePath: doc.relativePath || doc.title || doc.filename,
-            mimeType: doc.mimeType
-          }))}
-          onView={(file) => {
-            if (file.url) import('@/lib/utils').then(m => m.openUrlInNewTab(file.url));
-          }}
-          onDownload={(file) => {
-            if (file.url) {
-              const link = document.createElement('a');
-              link.href = file.url;
-              link.download = file.filename;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-            }
-          }}
-          onDelete={(file) => {
-            deleteStageDocument.mutate({ id: file.id, dealId, stage: activeStageTab });
-          }}
-          className="max-h-[150px]"
-        />
+        {isLoadingDocuments ? (
+          <div className="flex items-center justify-center py-8 text-muted-foreground">
+            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+            <span className="text-sm">Loading documents...</span>
+          </div>
+        ) : (
+          <FolderBrowser
+            files={stageDocuments.map((doc: any): FileItem => ({
+              id: doc.id,
+              filename: doc.title || doc.filename || 'Document',
+              url: doc.url || doc.fileData || '',
+              size: doc.fileSize || doc.size,
+              uploadedAt: doc.createdAt || doc.uploadedAt,
+              relativePath: doc.relativePath || doc.title || doc.filename,
+              mimeType: doc.mimeType
+            }))}
+            onView={(file) => {
+              if (file.url) import('@/lib/utils').then(m => m.openUrlInNewTab(file.url));
+            }}
+            onDownload={(file) => {
+              if (file.url) {
+                const link = document.createElement('a');
+                link.href = file.url;
+                link.download = file.filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }
+            }}
+            onDelete={(file) => {
+              deleteStageDocument.mutate({ id: file.id, dealId, stage: activeStageTab });
+            }}
+            className="max-h-[150px]"
+          />
+        )}
       </div>
       
       <div className="space-y-3">
