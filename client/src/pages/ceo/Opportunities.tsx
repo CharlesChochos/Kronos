@@ -1189,8 +1189,8 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
       
       {/* Opportunity Detail Sheet - Enhanced with Tabs */}
       <Sheet open={showOpportunityDetail} onOpenChange={setShowOpportunityDetail}>
-        <SheetContent className="bg-card border-border w-[600px] sm:max-w-[600px]">
-          <SheetHeader>
+        <SheetContent className="bg-card border-border w-[600px] sm:max-w-[600px] flex flex-col overflow-hidden">
+          <SheetHeader className="flex-shrink-0">
             <SheetTitle className="flex items-center gap-2">
               <Lightbulb className="w-5 h-5 text-amber-500" />
               {selectedOpportunity?.name}
@@ -1199,7 +1199,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
           </SheetHeader>
           
           {selectedOpportunity && (
-            <div className="mt-6">
+            <div className="mt-6 flex-1 overflow-y-auto pr-2">
               <Tabs value={detailTab} onValueChange={(v) => setDetailTab(v as any)}>
                 <TabsList className="w-full grid grid-cols-4">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -1223,7 +1223,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                   </TabsTrigger>
                 </TabsList>
                 
-                <ScrollArea className="h-[calc(100vh-350px)] mt-4">
+                <ScrollArea className="h-auto max-h-[400px] mt-4">
                   <TabsContent value="overview" className="space-y-4 pr-4 mt-0">
                     {isEditMode ? (
                       <div className="space-y-4">
