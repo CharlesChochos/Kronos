@@ -3918,35 +3918,36 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
   app.get("/api/deals/:dealId/stage-documents", requireAuth, requireInternal, async (req, res) => {
     try {
       const { stage } = req.query;
-      const docs = await storage.getStageDocuments(req.params.dealId, stage as string | undefined);
+      const dealId = req.params.dealId;
       
-      // Enrich documents that don't have URLs with data from document library
-      const enrichedDocs = await Promise.all(docs.map(async (doc: any) => {
+      // Get stage documents from stage_documents table
+      const stageDocs = await storage.getStageDocuments(dealId, stage as string | undefined);
+      
+      // Also get documents from the documents table for this deal
+      const allDocuments = await storage.getAllDocuments();
+      const dealDocuments = allDocuments.filter((d: any) => d.dealId === dealId);
+      
+      // Track which document IDs are already in stage docs (by filename match)
+      const stageDocFilenames = new Set(stageDocs.map((d: any) => d.filename || d.title));
+      
+      // Enrich stage documents that don't have URLs
+      const enrichedStageDocs = await Promise.all(stageDocs.map(async (doc: any) => {
         let enrichedDoc = doc;
         
         if (!doc.url) {
           // Try to find matching document in document library
-          try {
-            const allDocuments = await storage.getAllDocuments();
-            // Match by dealId and title similarity
-            const matchingDoc = allDocuments.find((d: any) => 
-              d.dealId === req.params.dealId && (
-                d.title?.includes(doc.title) ||
-                doc.title?.includes(d.title?.split(' - ').pop() || '') ||
-                d.filename?.includes(doc.filename) ||
-                doc.filename === d.filename
-              )
-            );
-            
-            if (matchingDoc && matchingDoc.content) {
-              // The content field can be a file path (/uploads/...) or base64 data
-              enrichedDoc = {
-                ...doc,
-                url: matchingDoc.content, // Use content as URL (works for both file paths and data URLs)
-              };
-            }
-          } catch (e) {
-            console.error('Failed to enrich stage document:', e);
+          const matchingDoc = dealDocuments.find((d: any) => 
+            d.title?.includes(doc.title) ||
+            doc.title?.includes(d.title?.split(' - ').pop() || '') ||
+            d.filename?.includes(doc.filename) ||
+            doc.filename === d.filename
+          );
+          
+          if (matchingDoc && matchingDoc.content) {
+            enrichedDoc = {
+              ...doc,
+              url: matchingDoc.content,
+            };
           }
         }
         
@@ -3959,11 +3960,33 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
           }
         }
         
-        return { ...enrichedDoc, contentUnavailable };
+        return { ...enrichedDoc, contentUnavailable, source: 'stage_documents' };
       }));
       
-      res.json(enrichedDocs);
+      // Add documents from documents table that aren't already in stage docs
+      const additionalDocs = dealDocuments
+        .filter((d: any) => !stageDocFilenames.has(d.filename) && !stageDocFilenames.has(d.title))
+        .map((d: any) => ({
+          id: d.id,
+          dealId: d.dealId,
+          title: d.title || d.filename,
+          filename: d.filename || d.title,
+          url: d.content, // Content field contains the file data/path
+          category: d.category,
+          mimeType: d.type,
+          stage: stage || 'General', // Default to query stage or General
+          fileSize: d.size,
+          createdAt: d.createdAt,
+          uploadedBy: d.uploadedBy,
+          relativePath: d.relativePath || d.filename || d.title,
+          contentUnavailable: false,
+          source: 'documents'
+        }));
+      
+      const allDocs = [...enrichedStageDocs, ...additionalDocs];
+      res.json(allDocs);
     } catch (error) {
+      console.error('Failed to fetch stage documents:', error);
       res.status(500).json({ error: "Failed to fetch stage documents" });
     }
   });
