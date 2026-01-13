@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Folder, FolderOpen, FileText, ChevronRight, Download, Trash2, Eye, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -217,6 +217,15 @@ export function FolderBrowser({
 }: FolderBrowserProps) {
   const [currentPath, setCurrentPath] = useState<string[]>([]);
   const [fileToDelete, setFileToDelete] = useState<FileItem | null>(null);
+  const prevFilesCount = useRef(files.length);
+
+  // Reset to root when new files are added so users can see their uploads
+  useEffect(() => {
+    if (files.length > prevFilesCount.current) {
+      setCurrentPath([]);
+    }
+    prevFilesCount.current = files.length;
+  }, [files.length]);
 
   const folderTree = useMemo(() => buildFolderTree(files), [files]);
 
