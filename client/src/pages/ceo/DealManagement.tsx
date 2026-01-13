@@ -4461,7 +4461,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       size: doc.size,
                       mimeType: doc.type,
                       uploadedAt: doc.uploadedAt,
-                      relativePath: doc.relativePath || doc.filename,
+                      relativePath: doc.filename,
                     }))}
                     onView={(file) => {
                       if (!file.url?.startsWith('/objects/') && !file.url?.startsWith('/uploads/') && !file.url?.startsWith('data:')) {
