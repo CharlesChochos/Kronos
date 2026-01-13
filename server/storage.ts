@@ -35,6 +35,7 @@ export interface IStorage {
   getArchivedDeals(): Promise<Deal[]>;
   createDeal(deal: InsertDeal): Promise<Deal>;
   updateDeal(id: string, updates: Partial<InsertDeal>): Promise<Deal | undefined>;
+  appendDealAttachments(id: string, newAttachments: any[]): Promise<Deal | undefined>;
   deleteDeal(id: string): Promise<void>;
   
   // Task operations
@@ -492,6 +493,19 @@ export class DatabaseStorage implements IStorage {
       .set(updates)
       .where(eq(schema.deals.id, id))
       .returning();
+    return deal;
+  }
+
+  async appendDealAttachments(id: string, newAttachments: any[]): Promise<Deal | undefined> {
+    // Use raw SQL with JSONB concatenation operator for atomic append
+    // This prevents race conditions by doing read-modify-write in a single atomic operation
+    await sql`
+      UPDATE deals 
+      SET attachments = COALESCE(attachments, '[]'::jsonb) || ${JSON.stringify(newAttachments)}::jsonb
+      WHERE id = ${id}
+    `;
+    // Reload and return the authoritative deal record to ensure consistency
+    const [deal] = await db.select().from(schema.deals).where(eq(schema.deals.id, id));
     return deal;
   }
 

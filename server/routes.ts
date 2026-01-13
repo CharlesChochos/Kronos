@@ -3317,6 +3317,29 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
     }
   });
 
+  // Append attachments to deal (atomic server-side operation to prevent race conditions)
+  app.post("/api/deals/:id/attachments", requireAuth, requireInternal, async (req, res) => {
+    try {
+      const { attachments } = req.body;
+      if (!Array.isArray(attachments) || attachments.length === 0) {
+        return res.status(400).json({ error: "attachments array is required" });
+      }
+      
+      // Use atomic JSONB concatenation - prevents race conditions entirely
+      const updatedDeal = await storage.appendDealAttachments(req.params.id, attachments);
+      
+      if (!updatedDeal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+      
+      // Return the updated deal with authoritative attachment list
+      res.json(updatedDeal);
+    } catch (error) {
+      console.error('Append attachments error:', error);
+      res.status(500).json({ error: "Failed to append attachments" });
+    }
+  });
+
   // Delete deal (CEO only)
   app.delete("/api/deals/:id", requireCEO, async (req, res) => {
     try {

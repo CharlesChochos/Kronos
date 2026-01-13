@@ -4035,8 +4035,12 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                     maxNumberOfFiles={100}
                     maxFileSize={500 * 1024 * 1024}
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,.mp4,.mov,.avi,.mp3,.wav,image/*,video/*,audio/*"
-                    onComplete={(files: UploadedFile[]) => {
-                      const existingAttachments = (selectedDealWithAttachments?.attachments as any[] || []);
+                    onComplete={async (files: UploadedFile[]) => {
+                      if (!selectedDeal?.id) {
+                        toast.error("Please select a deal first");
+                        return;
+                      }
+                      
                       const newAttachments = files.map(f => ({
                         id: f.id,
                         filename: f.filename,
@@ -4048,26 +4052,47 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                         uploadedAt: new Date().toISOString(),
                       }));
                       
-                      updateDeal.mutate({
-                        id: selectedDeal.id,
-                        attachments: [...existingAttachments, ...newAttachments],
-                      });
-                      
-                      newAttachments.forEach(doc => {
-                        createDocument.mutate({
-                          title: doc.filename,
-                          type: doc.type || 'application/octet-stream',
-                          category: 'Other',
-                          filename: doc.filename,
-                          originalName: doc.filename,
-                          mimeType: doc.type,
-                          size: doc.size,
-                          content: doc.objectPath,
-                          dealId: selectedDeal.id,
-                          dealName: selectedDeal.name,
-                          tags: ['Deal Document'],
+                      try {
+                        // Use atomic server-side append endpoint to prevent race conditions
+                        const res = await fetch(`/api/deals/${selectedDeal.id}/attachments`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({ attachments: newAttachments }),
                         });
-                      });
+                        
+                        if (!res.ok) throw new Error("Failed to save attachments");
+                        
+                        // Force refetch of deal data to update the UI with server's authoritative data
+                        await queryClient.invalidateQueries({ queryKey: ["deals"] });
+                        await queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
+                        await queryClient.invalidateQueries({ queryKey: ["deals", selectedDeal.id] });
+                        await queryClient.refetchQueries({ queryKey: ["deals", selectedDeal.id] });
+                        
+                        // Create document records in parallel (fire and forget for speed)
+                        newAttachments.forEach(doc => {
+                          createDocument.mutate({
+                            title: doc.filename,
+                            type: doc.type || 'application/octet-stream',
+                            category: 'Other',
+                            filename: doc.filename,
+                            originalName: doc.filename,
+                            mimeType: doc.type,
+                            size: doc.size,
+                            content: doc.objectPath,
+                            dealId: selectedDeal.id,
+                            dealName: selectedDeal.name,
+                            tags: ['Deal Document'],
+                          });
+                        });
+                        
+                        toast.success(`${files.length} file(s) uploaded successfully`);
+                      } catch (error) {
+                        console.error("Failed to save attachments:", error);
+                        toast.error("Files uploaded but failed to save. Please try again.");
+                        // Force refetch to sync UI with server state
+                        queryClient.invalidateQueries({ queryKey: ["deals", selectedDeal.id] });
+                      }
                     }}
                     buttonVariant="outline"
                   >

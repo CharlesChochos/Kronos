@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -223,6 +224,7 @@ function DealNotesSection({ dealId, allUsers }: { dealId: string; allUsers: any[
 export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const [location] = useLocation();
   const searchString = typeof window !== 'undefined' ? window.location.search : '';
+  const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const { data: deals = [], isLoading } = useDealsListing();
   const { data: users = [] } = useUsers();
@@ -1670,18 +1672,40 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                           uploadedAt: new Date().toISOString(),
                         }));
                         
-                        const mergedAttachments = [...opportunityAttachments, ...newAttachments];
-                        setOpportunityAttachments(mergedAttachments);
-                        
                         try {
-                          await updateDeal.mutateAsync({
-                            id: selectedOpportunity.id,
-                            attachments: mergedAttachments,
-                          } as any);
+                          // Use atomic server-side append endpoint to prevent race conditions
+                          const res = await fetch(`/api/deals/${selectedOpportunity.id}/attachments`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ attachments: newAttachments }),
+                          });
+                          
+                          if (!res.ok) throw new Error("Failed to save attachments");
+                          
+                          // Get the authoritative attachment list from server response
+                          const updatedDeal = await res.json();
+                          setOpportunityAttachments(updatedDeal.attachments || []);
+                          
+                          // Invalidate React Query cache so other components see the update
+                          await queryClient.invalidateQueries({ queryKey: ["deals"] });
+                          await queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
+                          await queryClient.invalidateQueries({ queryKey: ["deals", selectedOpportunity.id] });
+                          
                           toast.success(`${files.length} file(s) uploaded and saved`);
                         } catch (error) {
                           console.error("Failed to persist attachments:", error);
                           toast.error("Files uploaded but failed to save. Please try again.");
+                          // Refetch to sync with server state
+                          try {
+                            const syncRes = await fetch(`/api/deals/${selectedOpportunity.id}`, { credentials: 'include' });
+                            if (syncRes.ok) {
+                              const deal = await syncRes.json();
+                              setOpportunityAttachments(deal.attachments || []);
+                            }
+                          } catch (e) {
+                            console.error("Failed to refresh attachments:", e);
+                          }
                         }
                       }}
                       buttonVariant="outline"
