@@ -4455,7 +4455,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                         return url && (url.startsWith('/objects/') || url.startsWith('/uploads/') || url.startsWith('data:'));
                       })
                       .map((doc: any, index: number): FileItem => ({
-                      id: doc.id || doc.objectPath || doc.url || `file-${index}-${doc.filename}`,
+                      id: doc.objectPath || doc.url || `file-${index}-${doc.filename}`,
                       filename: doc.filename,
                       url: doc.objectPath || doc.url,
                       size: doc.size,
