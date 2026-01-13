@@ -3344,7 +3344,10 @@ export default function AssetManagement({ role = 'CEO' }: DealManagementProps) {
                             <td className="py-3 px-4 text-sm text-muted-foreground">Documents</td>
                             {selectedDealsData.map(deal => (
                               <td key={deal.id} className="py-3 px-4">
-                                {((deal.attachments as any[]) || []).length} files
+                                {((deal.attachments as any[]) || []).filter((doc: any) => {
+                                  const url = doc.objectPath || doc.url;
+                                  return url && (url.startsWith('/objects/') || url.startsWith('/uploads/') || url.startsWith('data:'));
+                                }).length} files
                               </td>
                             ))}
                           </tr>

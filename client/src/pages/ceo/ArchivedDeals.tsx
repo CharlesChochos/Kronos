@@ -354,9 +354,14 @@ export default function ArchivedDeals() {
                     
                     <TabsContent value="documents" className="mt-4">
                       <ScrollArea className="h-[300px]">
-                        {(selectedDealFull.attachments as any[])?.length > 0 || stageDocs.length > 0 ? (
+                        {(() => {
+                          const validAttachments = ((selectedDealFull.attachments as any[]) || []).filter((att: any) => {
+                            const url = att.objectPath || att.url;
+                            return url && (url.startsWith('/objects/') || url.startsWith('/uploads/') || url.startsWith('data:'));
+                          });
+                          return validAttachments.length > 0 || stageDocs.length > 0 ? (
                           <div className="space-y-2">
-                            {(selectedDealFull.attachments as any[])?.map((att: any, i: number) => (
+                            {validAttachments.map((att: any, i: number) => (
                               <div key={i} className="flex items-center gap-2 p-2 bg-muted/50 rounded">
                                 <FileText className="w-4 h-4 text-muted-foreground" />
                                 <span className="text-sm truncate">{att.filename || att.name}</span>
@@ -375,7 +380,8 @@ export default function ArchivedDeals() {
                             <FileText className="w-8 h-8 mx-auto mb-2" />
                             <p className="text-sm">No documents attached</p>
                           </div>
-                        )}
+                        );
+                        })()}
                       </ScrollArea>
                     </TabsContent>
                     
