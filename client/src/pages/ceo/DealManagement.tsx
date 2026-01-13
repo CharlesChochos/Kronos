@@ -1109,7 +1109,8 @@ function StageWorkSection({
         ) : (
           <FolderBrowser
             files={stageDocuments.map((doc: any, index: number): FileItem => ({
-              id: doc.id || `file-${index}-${doc.title || doc.filename || 'doc'}`,
+              id: `stage-${index}-${doc.id || doc.url || doc.title || doc.filename || 'doc'}`,
+              originalId: doc.id,
               filename: doc.title || doc.filename || 'Document',
               url: doc.url || doc.fileData || '',
               size: doc.fileSize || doc.size,
@@ -1131,7 +1132,8 @@ function StageWorkSection({
               }
             }}
             onDelete={(file) => {
-              deleteStageDocument.mutate({ id: file.id, dealId, stage: activeStageTab });
+              const deleteId = file.originalId || file.id;
+              deleteStageDocument.mutate({ id: deleteId, dealId, stage: activeStageTab });
             }}
             className="max-h-[150px]"
           />
@@ -4455,7 +4457,8 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                         return url && (url.startsWith('/objects/') || url.startsWith('/uploads/') || url.startsWith('data:'));
                       })
                       .map((doc: any, index: number): FileItem => ({
-                      id: doc.objectPath || doc.url || `file-${index}-${doc.filename}`,
+                      id: `file-${index}-${doc.objectPath || doc.url || doc.filename}`,
+                      originalId: doc.id,
                       filename: doc.filename,
                       url: doc.objectPath || doc.url,
                       size: doc.size,
@@ -4483,8 +4486,9 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       document.body.removeChild(link);
                     }}
                     onDelete={(file) => {
+                      const deleteId = file.originalId || file.id;
                       const updatedAttachments = (selectedDealWithAttachments?.attachments as any[] || [])
-                        .filter((a: any) => a.id !== file.id);
+                        .filter((a: any) => a.id !== deleteId && (a.objectPath || a.url) !== file.url);
                       updateDeal.mutate({
                         id: selectedDeal.id,
                         attachments: updatedAttachments,

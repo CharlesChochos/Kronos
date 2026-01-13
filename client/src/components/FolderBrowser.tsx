@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 
 export interface FileItem {
   id: string;
+  originalId?: string; // Original database ID for deletion operations
   filename: string;
   url: string;
   size?: number;
