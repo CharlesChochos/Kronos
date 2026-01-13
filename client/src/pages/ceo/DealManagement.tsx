@@ -43,7 +43,7 @@ import {
   useTaskComments, useCreateTaskComment, useCreateTask, useDeleteTask,
   useCustomSectors, useCreateCustomSector,
   useDealFees, type DealFeeType,
-  useCreateDocument,
+  useCreateDocument, useDocumentsByDeal, useDeleteDocument, type DocumentRecord,
   useAllInvestors,
   useDealNotes, useCreateDealNote, type DealNoteType,
   useOnboardingStatus, type OnboardingStatus,
@@ -1749,6 +1749,10 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   
   // Use fullDealData for attachments display (includes large fields excluded from listing)
   const selectedDealWithAttachments = fullDealData || selectedDeal;
+  
+  // Fetch documents from the documents table for this deal
+  const { data: dealDocuments = [], isLoading: isLoadingDealDocuments } = useDocumentsByDeal(selectedDeal?.id || null);
+  const deleteDocument = useDeleteDocument();
   
   // Fetch fees for the selected deal
   const { data: selectedDealFees = [] } = useDealFees(selectedDeal?.id || '');
@@ -4370,10 +4374,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium">Deal Documents</h4>
                     <Badge variant="secondary">
-                      {((selectedDealWithAttachments?.attachments as any[] || [])).filter((doc: any) => {
-                        const url = doc.objectPath || doc.url;
-                        return url && (url.startsWith('/objects/') || url.startsWith('/uploads/') || url.startsWith('data:'));
-                      }).length} files
+                      {isLoadingDealDocuments ? "..." : `${dealDocuments.length} files`}
                     </Badge>
                   </div>
 
@@ -4399,25 +4400,9 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       }));
                       
                       try {
-                        // Use atomic server-side append endpoint to prevent race conditions
-                        const res = await fetch(`/api/deals/${selectedDeal.id}/attachments`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          credentials: 'include',
-                          body: JSON.stringify({ attachments: newAttachments }),
-                        });
-                        
-                        if (!res.ok) throw new Error("Failed to save attachments");
-                        
-                        // Force refetch of deal data to update the UI with server's authoritative data
-                        await queryClient.invalidateQueries({ queryKey: ["deals"] });
-                        await queryClient.invalidateQueries({ queryKey: ["deals-listing"] });
-                        await queryClient.invalidateQueries({ queryKey: ["deals", selectedDeal.id] });
-                        await queryClient.refetchQueries({ queryKey: ["deals", selectedDeal.id] });
-                        
-                        // Create document records in parallel (fire and forget for speed)
-                        newAttachments.forEach(doc => {
-                          createDocument.mutate({
+                        // Create document records in parallel and wait for all to complete
+                        await Promise.all(newAttachments.map(doc => 
+                          createDocument.mutateAsync({
                             title: doc.filename,
                             type: doc.type || 'application/octet-stream',
                             category: 'Other',
@@ -4429,15 +4414,19 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                             dealId: selectedDeal.id,
                             dealName: selectedDeal.name,
                             tags: ['Deal Document'],
-                          });
-                        });
+                          })
+                        ));
+                        
+                        // Refetch deal documents to show the new files
+                        await queryClient.invalidateQueries({ queryKey: ["documents", "deal", selectedDeal.id] });
+                        await queryClient.refetchQueries({ queryKey: ["documents", "deal", selectedDeal.id] });
                         
                         toast.success(`${files.length} file(s) uploaded successfully`);
                       } catch (error) {
-                        console.error("Failed to save attachments:", error);
+                        console.error("Failed to save documents:", error);
                         toast.error("Files uploaded but failed to save. Please try again.");
                         // Force refetch to sync UI with server state
-                        queryClient.invalidateQueries({ queryKey: ["deals", selectedDeal.id] });
+                        queryClient.invalidateQueries({ queryKey: ["documents", "deal", selectedDeal.id] });
                       }
                     }}
                     buttonVariant="outline"
@@ -4449,52 +4438,55 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                     Supports documents, images, videos, and audio files. Upload entire folders to preserve structure.
                   </p>
 
-                  <FolderBrowser
-                    files={((selectedDealWithAttachments?.attachments as any[] || []))
-                      .filter((doc: any) => {
-                        // Filter out files with expired/invalid URLs
-                        const url = doc.objectPath || doc.url;
-                        return url && (url.startsWith('/objects/') || url.startsWith('/uploads/') || url.startsWith('data:'));
-                      })
-                      .map((doc: any, index: number): FileItem => ({
-                      id: `file-${index}-${doc.objectPath || doc.url || doc.filename}`,
-                      originalId: doc.id,
-                      filename: doc.filename,
-                      url: doc.objectPath || doc.url,
-                      size: doc.size,
-                      mimeType: doc.type,
-                      uploadedAt: doc.uploadedAt,
-                      relativePath: doc.filename,
-                    }))}
-                    onView={(file) => {
-                      if (!file.url?.startsWith('/objects/') && !file.url?.startsWith('/uploads/') && !file.url?.startsWith('data:')) {
-                        toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
-                        return;
-                      }
-                      import('@/lib/utils').then(m => m.openUrlInNewTab(file.url));
-                    }}
-                    onDownload={(file) => {
-                      if (!file.url?.startsWith('/objects/') && !file.url?.startsWith('/uploads/') && !file.url?.startsWith('data:')) {
-                        toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
-                        return;
-                      }
-                      const link = document.createElement('a');
-                      link.href = file.url;
-                      link.download = file.filename;
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                    }}
-                    onDelete={(file) => {
-                      const deleteId = file.originalId || file.id;
-                      const updatedAttachments = (selectedDealWithAttachments?.attachments as any[] || [])
-                        .filter((a: any) => a.id !== deleteId && (a.objectPath || a.url) !== file.url);
-                      updateDeal.mutate({
-                        id: selectedDeal.id,
-                        attachments: updatedAttachments,
-                      });
-                    }}
-                  />
+                  {isLoadingDealDocuments ? (
+                    <div className="flex items-center justify-center py-8 text-muted-foreground">
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                      <span className="text-sm">Loading documents...</span>
+                    </div>
+                  ) : (
+                    <FolderBrowser
+                      files={dealDocuments.map((doc: DocumentRecord, index: number): FileItem => ({
+                        id: `file-${index}-${doc.id}`,
+                        originalId: doc.id,
+                        filename: doc.filename || doc.title,
+                        url: doc.content || '',
+                        size: doc.size,
+                        mimeType: doc.mimeType || doc.type,
+                        uploadedAt: doc.createdAt,
+                        relativePath: doc.filename || doc.title,
+                      }))}
+                      onView={(file) => {
+                        if (!file.url?.startsWith('/objects/') && !file.url?.startsWith('/uploads/') && !file.url?.startsWith('data:')) {
+                          toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
+                          return;
+                        }
+                        import('@/lib/utils').then(m => m.openUrlInNewTab(file.url));
+                      }}
+                      onDownload={(file) => {
+                        if (!file.url?.startsWith('/objects/') && !file.url?.startsWith('/uploads/') && !file.url?.startsWith('data:')) {
+                          toast.error("This file was stored in temporary storage and is no longer available. Please re-upload the document.");
+                          return;
+                        }
+                        const link = document.createElement('a');
+                        link.href = file.url;
+                        link.download = file.filename;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
+                      onDelete={(file) => {
+                        const deleteId = file.originalId || file.id;
+                        deleteDocument.mutate({ id: deleteId, dealId: selectedDeal.id }, {
+                          onSuccess: () => {
+                            toast.success("Document deleted");
+                          },
+                          onError: () => {
+                            toast.error("Failed to delete document");
+                          }
+                        });
+                      }}
+                    />
+                  )}
                 </TabsContent>
 
                 {/* Voice Notes Tab */}

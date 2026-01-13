@@ -1955,8 +1955,11 @@ export function useCreateDocument() {
       }
       return res.json() as Promise<DocumentRecord>;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["documents"], refetchType: 'all' });
+      if (data?.dealId) {
+        queryClient.invalidateQueries({ queryKey: ["documents", "deal", data.dealId], refetchType: 'all' });
+      }
     },
   });
 }
@@ -1986,13 +1989,16 @@ export function useUpdateDocument() {
 export function useDeleteDocument() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, dealId }: { id: string; dealId?: string }) => {
       const res = await fetch(`/api/documents/${id}`, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete document");
-      return res.json();
+      return { ...await res.json(), dealId };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["documents"], refetchType: 'all' });
+      if (data?.dealId) {
+        queryClient.invalidateQueries({ queryKey: ["documents", "deal", data.dealId], refetchType: 'all' });
+      }
     },
   });
 }
