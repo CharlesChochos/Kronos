@@ -38,6 +38,7 @@ interface FolderBrowserProps {
   onDownload?: (file: FileItem) => void;
   onDelete?: (file: FileItem) => void;
   className?: string;
+  flatView?: boolean;
 }
 
 function formatFileSize(bytes: number): string {
@@ -214,6 +215,7 @@ export function FolderBrowser({
   onDownload,
   onDelete,
   className = "",
+  flatView = true,
 }: FolderBrowserProps) {
   const [currentPath, setCurrentPath] = useState<string[]>([]);
   const [fileToDelete, setFileToDelete] = useState<FileItem | null>(null);
@@ -227,7 +229,15 @@ export function FolderBrowser({
     prevFilesCount.current = files.length;
   }, [files.length]);
 
-  const folderTree = useMemo(() => buildFolderTree(files), [files]);
+  // In flat view, strip folder paths so all files appear at root level
+  const processedFiles = useMemo(() => {
+    if (flatView) {
+      return files.map(f => ({ ...f, relativePath: f.filename }));
+    }
+    return files;
+  }, [files, flatView]);
+
+  const folderTree = useMemo(() => buildFolderTree(processedFiles), [processedFiles]);
 
   const currentFolder = useMemo(() => {
     let folder = folderTree;
