@@ -168,12 +168,12 @@ function FileCard({
         <p className="text-sm font-medium truncate" title={fileName}>{fileName}</p>
         {metaDisplay && <p className="text-xs text-muted-foreground">{metaDisplay}</p>}
       </div>
-      <div className="flex gap-1">
+      <div className="flex gap-1 shrink-0 ml-2">
         {onView && (
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 opacity-60 hover:opacity-100"
+            className="h-8 w-8 opacity-80 hover:opacity-100"
             onClick={() => onView(file)}
             title="View"
             data-testid={`view-file-${file.id}`}
@@ -185,7 +185,7 @@ function FileCard({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 opacity-60 hover:opacity-100"
+            className="h-8 w-8 opacity-80 hover:opacity-100"
             onClick={() => onDownload(file)}
             title="Download"
             data-testid={`download-file-${file.id}`}
@@ -197,7 +197,7 @@ function FileCard({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-destructive opacity-60 hover:opacity-100 hover:text-destructive"
+            className="h-8 w-8 text-destructive opacity-80 hover:opacity-100 hover:text-destructive"
             onClick={() => onDelete(file)}
             title="Delete"
             data-testid={`delete-file-${file.id}`}
