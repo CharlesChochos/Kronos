@@ -329,6 +329,14 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
       return isOpportunity && !isArchived;
     });
   }, [deals]);
+  
+  // Filter attachments to only show valid/available files
+  const validAttachments = useMemo(() => {
+    return opportunityAttachments.filter(attachment => {
+      const url = attachment.objectPath || attachment.url;
+      return url && (url.startsWith('/objects/') || url.startsWith('/uploads/') || url.startsWith('data:'));
+    });
+  }, [opportunityAttachments]);
 
   // Handle URL query parameter for selecting a specific opportunity
   useEffect(() => {
@@ -1317,8 +1325,8 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                   </TabsTrigger>
                   <TabsTrigger value="attachments">
                     Attach.
-                    {opportunityAttachments.length > 0 && (
-                      <Badge variant="secondary" className="ml-1 h-5 px-1.5">{opportunityAttachments.length}</Badge>
+                    {validAttachments.length > 0 && (
+                      <Badge variant="secondary" className="ml-1 h-5 px-1.5">{validAttachments.length}</Badge>
                     )}
                   </TabsTrigger>
                   <TabsTrigger value="notes">
@@ -1715,9 +1723,9 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                       Upload Attachments
                     </ObjectUploader>
                     
-                    {opportunityAttachments.length > 0 ? (
+                    {validAttachments.length > 0 ? (
                       <div className="space-y-2">
-                        {opportunityAttachments.map((file) => (
+                        {validAttachments.map((file) => (
                           <div key={file.id} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
                             <div className="flex items-center gap-3 min-w-0">
                               <FileText className="w-5 h-5 text-primary shrink-0" />
@@ -1730,7 +1738,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                             </div>
                             <div className="flex gap-1">
                               <Button variant="ghost" size="icon" className="h-8 w-8"
-                                onClick={() => import('@/lib/utils').then(m => m.openUrlInNewTab(file.url))}
+                                onClick={() => import('@/lib/utils').then(m => m.openUrlInNewTab(file.objectPath || file.url))}
                                 title="View"
                                 data-testid={`view-attachment-${file.id}`}
                               >
@@ -1739,7 +1747,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                               <Button variant="ghost" size="icon" className="h-8 w-8"
                                 onClick={() => {
                                   const link = document.createElement('a');
-                                  link.href = file.url;
+                                  link.href = file.objectPath || file.url;
                                   link.download = file.filename;
                                   document.body.appendChild(link);
                                   link.click();

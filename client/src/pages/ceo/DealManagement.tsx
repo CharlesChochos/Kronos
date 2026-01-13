@@ -4365,7 +4365,10 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium">Deal Documents</h4>
                     <Badge variant="secondary">
-                      {((selectedDealWithAttachments?.attachments as any[] || [])).length} files
+                      {((selectedDealWithAttachments?.attachments as any[] || [])).filter((doc: any) => {
+                        const url = doc.objectPath || doc.url;
+                        return url && (url.startsWith('/objects/') || url.startsWith('/uploads/') || url.startsWith('data:'));
+                      }).length} files
                     </Badge>
                   </div>
 
@@ -4442,7 +4445,13 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                   </p>
 
                   <FolderBrowser
-                    files={((selectedDealWithAttachments?.attachments as any[] || [])).map((doc: any): FileItem => ({
+                    files={((selectedDealWithAttachments?.attachments as any[] || []))
+                      .filter((doc: any) => {
+                        // Filter out files with expired/invalid URLs
+                        const url = doc.objectPath || doc.url;
+                        return url && (url.startsWith('/objects/') || url.startsWith('/uploads/') || url.startsWith('data:'));
+                      })
+                      .map((doc: any): FileItem => ({
                       id: doc.id,
                       filename: doc.filename,
                       url: doc.objectPath || doc.url,
