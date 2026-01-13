@@ -1049,8 +1049,8 @@ function StageWorkSection({
         )}
         
         <FolderBrowser
-          files={stageDocuments.map((doc: any): FileItem => ({
-            id: doc.id,
+          files={stageDocuments.map((doc: any, index: number): FileItem => ({
+            id: doc.id || `file-${index}-${doc.title || doc.filename || 'doc'}`,
             filename: doc.title || doc.filename || 'Document',
             url: doc.url || doc.fileData || '',
             size: doc.fileSize || doc.size,
