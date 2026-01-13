@@ -1247,7 +1247,7 @@ function StageWorkSection({
                     {member.userName?.charAt(0) || '?'}
                   </div>
                   <span>{member.userName || 'Unknown'}</span>
-                  <span className="text-muted-foreground">({member.role})</span>
+                  <span className="text-muted-foreground">({member.jobTitle || member.role})</span>
                   <Button 
                     variant="ghost" 
                     size="icon" 
@@ -4001,7 +4001,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                                     {memberName}
                                     {member.isLead && <Badge variant="secondary" className="text-xs">Lead</Badge>}
                                   </div>
-                                  <div className="text-xs text-muted-foreground">{member.role}</div>
+                                  <div className="text-xs text-muted-foreground">{member.jobTitle || member.role}</div>
                                 </div>
                               </div>
                               <div className="flex items-center gap-1">

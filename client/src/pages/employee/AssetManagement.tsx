@@ -1167,7 +1167,7 @@ function StageWorkSection({
                     {member.userName?.charAt(0) || '?'}
                   </div>
                   <span>{member.userName || 'Unknown'}</span>
-                  <span className="text-muted-foreground">({member.role})</span>
+                  <span className="text-muted-foreground">({member.jobTitle || member.role})</span>
                   <Button 
                     variant="ghost" 
                     size="icon" 

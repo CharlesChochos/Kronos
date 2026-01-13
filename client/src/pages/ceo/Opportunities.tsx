@@ -1592,7 +1592,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                                   <div className="text-sm font-medium truncate">{user.name}</div>
                                   <div className="text-xs text-muted-foreground truncate">{user.jobTitle || user.role}</div>
                                 </div>
-                                <Badge variant="secondary" className="text-xs shrink-0">{user.role}</Badge>
+                                <Badge variant="secondary" className="text-xs shrink-0">{user.jobTitle || user.role}</Badge>
                               </div>
                             ))}
                           {users.filter(user => {
@@ -1626,7 +1626,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                                 </div>
                                 <div>
                                   <p className="text-sm font-medium">{member.name}</p>
-                                  <p className="text-xs text-muted-foreground">{member.role}</p>
+                                  <p className="text-xs text-muted-foreground">{member.jobTitle || member.role}</p>
                                 </div>
                               </div>
                               <Button

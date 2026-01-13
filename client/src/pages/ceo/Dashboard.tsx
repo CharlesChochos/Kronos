@@ -785,7 +785,7 @@ export default function Dashboard() {
         
         doc.setTextColor(...mutedColor);
         doc.setFont('helvetica', 'normal');
-        doc.text(`(${u.role})`, margin + 50, y);
+        doc.text(`(${u.jobTitle || u.role})`, margin + 50, y);
         
         doc.setTextColor(...accentColor);
         doc.text(`Score: ${u.velocityScore}`, margin + 100, y);
@@ -2577,7 +2577,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <div>{selectedEmployee?.name}</div>
-                <div className="text-sm font-normal text-muted-foreground">{selectedEmployee?.role}</div>
+                <div className="text-sm font-normal text-muted-foreground">{selectedEmployee?.jobTitle || selectedEmployee?.role}</div>
               </div>
             </DialogTitle>
           </DialogHeader>
