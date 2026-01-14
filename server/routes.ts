@@ -3104,9 +3104,19 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
   app.post("/api/deals", generalLimiter, requireAuth, requireInternal, async (req, res) => {
     try {
       const user = req.user as any;
-      const result = insertDealSchema.safeParse(req.body);
+      
+      // Set default values for optional fields if not provided
+      const dealData = {
+        ...req.body,
+        lead: req.body.lead || user.name || 'Unassigned',
+        value: typeof req.body.value === 'number' ? req.body.value : (parseInt(req.body.value) || 0),
+      };
+      
+      const result = insertDealSchema.safeParse(dealData);
       if (!result.success) {
-        return res.status(400).json({ error: fromError(result.error).toString() });
+        const errorDetails = fromError(result.error).toString();
+        console.error('[Deal Creation] Validation failed:', errorDetails, 'Input:', dealData);
+        return res.status(400).json({ error: errorDetails });
       }
       
       // Non-admin users can only create opportunities - always force opportunity type regardless of input
@@ -3167,7 +3177,9 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
       
       res.json(deal);
     } catch (error) {
-      res.status(500).json({ error: "Failed to create deal" });
+      console.error('[Deal Creation] Error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create deal';
+      res.status(500).json({ error: errorMessage });
     }
   });
 

@@ -553,8 +553,10 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
         name: "", client: "", sector: "Technology", customSector: "", value: "", 
         description: "", lead: "", notes: "", attachments: [] 
       });
-    } catch (error) {
-      toast.error("Failed to create opportunity");
+    } catch (error: any) {
+      console.error("Failed to create opportunity:", error);
+      const errorMessage = error?.message || "Failed to create opportunity. Please check all required fields.";
+      toast.error(errorMessage);
     }
   };
   
