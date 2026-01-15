@@ -1519,16 +1519,6 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                             <p className="text-sm">{format(new Date((selectedOpportunity as any).createdAt), 'PPp')}</p>
                           </div>
                         )}
-                        
-                        <Button
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => setIsEditMode(true)}
-                          data-testid="button-edit-opportunity"
-                        >
-                          <Pencil className="w-4 h-4 mr-2" />
-                          Edit Opportunity
-                        </Button>
                       </>
                     )}
                   </TabsContent>
@@ -1975,9 +1965,20 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
               )}
               
               {/* Action Buttons */}
-              <div className="pt-4 border-t border-border space-y-3 mt-4">
+              <div className="pt-4 border-t border-border space-y-3 mt-4 flex-shrink-0">
                 <h4 className="font-medium text-sm">Take Action</h4>
                 <div className="flex flex-wrap gap-2">
+                  {!isEditMode && (
+                    <Button
+                      variant="outline"
+                      className="flex-1 min-w-[100px]"
+                      onClick={() => setIsEditMode(true)}
+                      data-testid="button-edit-opportunity"
+                    >
+                      <Pencil className="w-4 h-4 mr-2" />
+                      Edit
+                    </Button>
+                  )}
                   <Button 
                     variant="outline" 
                     className="flex-1 min-w-[120px] border-blue-500/50 text-blue-500 hover:bg-blue-500/10"
