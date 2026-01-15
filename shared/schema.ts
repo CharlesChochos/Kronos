@@ -1781,6 +1781,25 @@ export type DealCommitteeReviewWithDetails = DealCommitteeReview & {
   };
 };
 
+// Push Notification Subscriptions table - stores user push notification subscriptions
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(), // Public key
+  auth: text("auth").notNull(), // Auth secret
+  userAgent: text("user_agent"), // Device info
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+
 // Job titles that are NOT eligible for deal work (support roles)
 export const NON_DEAL_ELIGIBLE_JOB_TITLES = [
   'AI Engineer',

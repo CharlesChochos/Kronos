@@ -50,3 +50,6 @@ PRODUCTION_URL = "https://kronos--chochoscharles0.replit.app"
 [userenv.shared]
 PRIVATE_OBJECT_DIR = "/kronos-uploads"
 PUBLIC_OBJECT_SEARCH_PATHS = "/kronos-uploads/public"
+VAPID_PUBLIC_KEY = "BGdDtOMSQX27WHmTjg8p2VLYlRNA4DpwVyr6sDrhtvoA8KhJ2bJlwYXHoQfTvstNU2qBjWtACRpcrKWchGUG-mY"
+VAPID_PRIVATE_KEY = "QnR-ezvYWtFFckW3RsUK3UvKqyqf3tU4lqmt7Yeg19o"
+VAPID_SUBJECT = "mailto:admin@kronos.app"
