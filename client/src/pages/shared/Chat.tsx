@@ -937,12 +937,8 @@ export default function Chat({ role }: ChatProps) {
     clearUnreadMessages();
   }, [clearUnreadMessages]);
 
-  // Auto-select first conversation if none selected
-  useEffect(() => {
-    if (conversations.length > 0 && !selectedConversationId) {
-      setSelectedConversationId(conversations[0].id);
-    }
-  }, [conversations, selectedConversationId]);
+  // No auto-select - always start with the conversation list visible
+  // Users must explicitly tap/click a conversation to open it
 
   const handleSendMessage = async () => {
     if (!messageInput.trim() || !selectedConversationId) return;
@@ -1137,93 +1133,115 @@ export default function Chat({ role }: ChatProps) {
                   </div>
                 ) : filteredConversations.length > 0 ? (
                   filteredConversations.map(conv => (
-                    <div key={conv.id} className="group relative mb-1">
-                      <button
-                        onClick={() => handleSelectConversation(conv.id)}
-                        className={cn(
-                          "w-full p-4 md:p-3 rounded-xl md:rounded-lg flex items-center gap-3 transition-all text-left active:scale-[0.98]",
-                          selectedConversationId === conv.id 
-                            ? "bg-primary/10 border border-primary/20" 
-                            : "hover:bg-secondary/50 active:bg-secondary"
+                    <div 
+                      key={conv.id} 
+                      role="button"
+                      tabIndex={0}
+                      className={cn(
+                        "group relative mb-1 p-4 md:p-3 rounded-xl md:rounded-lg flex items-center gap-3 transition-all cursor-pointer active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                        selectedConversationId === conv.id 
+                          ? "bg-primary/10 border border-primary/20" 
+                          : "hover:bg-secondary/50 active:bg-secondary"
+                      )}
+                      onClick={() => handleSelectConversation(conv.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSelectConversation(conv.id);
+                        }
+                      }}
+                      data-testid={`conversation-item-${conv.id}`}
+                    >
+                      <div className="relative">
+                        <Avatar className="w-12 h-12 md:w-10 md:h-10 flex-shrink-0">
+                          <AvatarFallback className={cn(
+                            "text-sm md:text-xs font-medium",
+                            conv.isGroup ? "bg-primary/20 text-primary" : "bg-blue-500/20 text-blue-500"
+                          )}>
+                            {getConversationDisplayName(conv).split(' ').map(n => n[0]).join('').slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        {!conv.isGroup && conv.members.some(m => m.id !== currentUser?.id && m.isOnline) && (
+                          <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full" />
                         )}
-                        data-testid={`conversation-item-${conv.id}`}
-                      >
-                        <div className="relative">
-                          <Avatar className="w-12 h-12 md:w-10 md:h-10 flex-shrink-0">
-                            <AvatarFallback className={cn(
-                              "text-sm md:text-xs font-medium",
-                              conv.isGroup ? "bg-primary/20 text-primary" : "bg-blue-500/20 text-blue-500"
-                            )}>
-                              {getConversationDisplayName(conv).split(' ').map(n => n[0]).join('').slice(0, 2)}
-                            </AvatarFallback>
-                          </Avatar>
-                          {!conv.isGroup && conv.members.some(m => m.id !== currentUser?.id && m.isOnline) && (
-                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {conv.isPinned && (
+                              <Pin className="w-3 h-3 text-primary flex-shrink-0" />
+                            )}
+                            <p className="font-medium text-base md:text-sm truncate">{getConversationDisplayName(conv)}</p>
+                          </div>
+                          {conv.lastMessage?.createdAt && (
+                            <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
+                              {format(new Date(conv.lastMessage.createdAt), 'HH:mm')}
+                            </span>
                           )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              {conv.isPinned && (
-                                <Pin className="w-3 h-3 text-primary flex-shrink-0" />
-                              )}
-                              <p className="font-medium text-base md:text-sm truncate">{getConversationDisplayName(conv)}</p>
-                            </div>
-                            {conv.lastMessage?.createdAt && (
-                              <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
-                                {format(new Date(conv.lastMessage.createdAt), 'HH:mm')}
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-sm md:text-xs text-muted-foreground truncate pr-2">
+                            {conv.lastMessage?.content || "No messages yet"}
+                          </p>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {conv.isGroup && (
+                              <span className="text-xs text-muted-foreground hidden md:inline-flex items-center gap-1">
+                                <Users className="w-3 h-3" />
+                                {conv.members.length}
                               </span>
                             )}
-                          </div>
-                          <div className="flex items-center justify-between mt-1">
-                            <p className="text-sm md:text-xs text-muted-foreground truncate pr-2">
-                              {conv.lastMessage?.content || "No messages yet"}
-                            </p>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              {conv.isGroup && (
-                                <span className="text-xs text-muted-foreground hidden md:inline-flex items-center gap-1">
-                                  <Users className="w-3 h-3" />
-                                  {conv.members.length}
-                                </span>
-                              )}
-                              {conv.unreadCount > 0 && (
-                                <Badge variant="default" className="h-5 min-w-5 text-xs px-1.5 rounded-full">
-                                  {conv.unreadCount}
-                                </Badge>
-                              )}
-                            </div>
+                            {conv.unreadCount > 0 && (
+                              <Badge variant="default" className="h-5 min-w-5 text-xs px-1.5 rounded-full">
+                                {conv.unreadCount}
+                              </Badge>
+                            )}
                           </div>
                         </div>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground md:hidden flex-shrink-0" />
-                      </button>
-                      
-                      {/* Quick action buttons - visible on hover/focus */}
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-card/90 rounded-lg p-1 shadow-sm">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePinConversation(conv.id, !conv.isPinned);
-                          }}
-                          data-testid={`button-pin-${conv.id}`}
-                        >
-                          {conv.isPinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleArchiveConversation(conv.id, !conv.isArchived);
-                          }}
-                          data-testid={`button-archive-${conv.id}`}
-                        >
-                          {conv.isArchived ? <ArchiveX className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
-                        </Button>
                       </div>
+                      
+                      {/* Navigation affordance - mobile only */}
+                      <ChevronRight className="w-4 h-4 text-muted-foreground md:hidden flex-shrink-0" />
+                      
+                      {/* Quick action menu - visible on mobile, hover on desktop */}
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`button-conv-actions-${conv.id}`}
+                          >
+                            <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-40 p-1" align="end" side="bottom">
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start gap-2 h-9 text-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePinConversation(conv.id, !conv.isPinned);
+                            }}
+                            data-testid={`button-pin-${conv.id}`}
+                          >
+                            {conv.isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+                            {conv.isPinned ? "Unpin" : "Pin"}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start gap-2 h-9 text-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleArchiveConversation(conv.id, !conv.isArchived);
+                            }}
+                            data-testid={`button-archive-${conv.id}`}
+                          >
+                            {conv.isArchived ? <ArchiveX className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+                            {conv.isArchived ? "Unarchive" : "Archive"}
+                          </Button>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   ))
                 ) : (
