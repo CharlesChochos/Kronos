@@ -41,8 +41,8 @@ export function MobileBottomNav() {
   if (!user) return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-t border-border md:hidden safe-area-bottom">
-      <div className="flex items-center justify-around h-16 px-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 dark:bg-card/95 backdrop-blur-lg border-t border-border/50 md:hidden pb-[env(safe-area-inset-bottom)]">
+      <div className="flex items-center justify-around h-16 px-1">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
@@ -52,15 +52,30 @@ export function MobileBottomNav() {
               key={item.path}
               onClick={() => setLocation(item.path)}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 flex-1 h-full transition-colors",
-                active ? "text-primary" : "text-muted-foreground"
+                "relative flex flex-col items-center justify-center gap-0.5 flex-1 min-w-[56px] min-h-[48px] py-2 rounded-lg transition-all duration-200 active:scale-95",
+                active 
+                  ? "text-primary dark:text-primary bg-primary/10 dark:bg-primary/20" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50 dark:text-muted-foreground dark:hover:text-foreground"
               )}
               data-testid={`mobile-nav-${item.label.toLowerCase()}`}
             >
-              <Icon className={cn("w-5 h-5", active && "scale-110")} />
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <Icon 
+                className={cn(
+                  "transition-transform duration-200",
+                  active ? "w-6 h-6" : "w-5 h-5"
+                )} 
+                strokeWidth={active ? 2.5 : 2}
+              />
+              <span 
+                className={cn(
+                  "text-[10px] leading-tight transition-all duration-200",
+                  active ? "font-semibold" : "font-medium opacity-80"
+                )}
+              >
+                {item.label}
+              </span>
               {active && (
-                <div className="absolute bottom-1 w-1 h-1 bg-primary rounded-full" />
+                <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary rounded-full" />
               )}
             </button>
           );

@@ -961,17 +961,17 @@ export default function Dashboard() {
   const renderAnalyticsView = () => (
     <div className="space-y-6">
       {/* Key Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <Card className="bg-card border-border">
-          <CardContent className="p-3 md:p-4">
-            <div className="flex items-center gap-2 md:gap-3">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <DollarSign className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <DollarSign className="w-5 h-5 md:w-6 md:h-6 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] md:text-xs text-muted-foreground uppercase truncate">Total Pipeline</p>
-                <p className="text-2xl font-bold">${totalValue.toLocaleString()}M</p>
-                <div className="flex gap-2 mt-1 text-[10px]">
+                <p className="text-xs md:text-sm text-muted-foreground uppercase tracking-wide truncate">Total Pipeline</p>
+                <p className="text-2xl md:text-3xl font-bold text-foreground leading-tight">${totalValue.toLocaleString()}M</p>
+                <div className="flex gap-3 mt-1.5 text-xs">
                   <span className="text-blue-400">IB: ${ibDeals.reduce((s, d) => s + d.value, 0).toLocaleString()}M</span>
                   <span className="text-emerald-400">AM: ${amDeals.reduce((s, d) => s + d.value, 0).toLocaleString()}M</span>
                 </div>
@@ -980,15 +980,15 @@ export default function Dashboard() {
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                <Briefcase className="w-5 h-5 text-green-500" />
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                <Briefcase className="w-5 h-5 md:w-6 md:h-6 text-green-500" />
               </div>
-              <div className="flex-1">
-                <p className="text-xs text-muted-foreground uppercase">Active Deals</p>
-                <p className="text-2xl font-bold">{activeDeals.length}</p>
-                <div className="flex gap-2 mt-1 text-[10px]">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs md:text-sm text-muted-foreground uppercase tracking-wide">Active Deals</p>
+                <p className="text-2xl md:text-3xl font-bold text-foreground leading-tight">{activeDeals.length}</p>
+                <div className="flex gap-3 mt-1.5 text-xs">
                   <span className="text-blue-400">IB: {ibActiveDeals.length}</span>
                   <span className="text-emerald-400">AM: {amActiveDeals.length}</span>
                 </div>
@@ -997,27 +997,27 @@ export default function Dashboard() {
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-blue-500" />
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                <Users className="w-5 h-5 md:w-6 md:h-6 text-blue-500" />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground uppercase">Team Members</p>
-                <p className="text-2xl font-bold">{users.length}</p>
+              <div className="min-w-0">
+                <p className="text-xs md:text-sm text-muted-foreground uppercase tracking-wide">Team Members</p>
+                <p className="text-2xl md:text-3xl font-bold text-foreground leading-tight">{users.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
-                <CheckSquare className="w-5 h-5 text-yellow-500" />
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-yellow-500/10 flex items-center justify-center flex-shrink-0">
+                <CheckSquare className="w-5 h-5 md:w-6 md:h-6 text-yellow-500" />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground uppercase">Task Completion</p>
-                <p className="text-2xl font-bold">{tasks.length > 0 ? Math.round((taskCompletion[0].count / tasks.length) * 100) : 0}%</p>
+              <div className="min-w-0">
+                <p className="text-xs md:text-sm text-muted-foreground uppercase tracking-wide">Task Completion</p>
+                <p className="text-2xl md:text-3xl font-bold text-foreground leading-tight">{tasks.length > 0 ? Math.round((taskCompletion[0].count / tasks.length) * 100) : 0}%</p>
               </div>
             </div>
           </CardContent>
@@ -1028,14 +1028,14 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* IB Deal Pipeline by Stage */}
         <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-blue-500" />
               Investment Banking Pipeline
             </CardTitle>
-            <CardDescription>{ibActiveDeals.length} active deals across {IB_STAGES.length} stages</CardDescription>
+            <CardDescription className="text-sm mt-1">{ibActiveDeals.length} active deals across {IB_STAGES.length} stages</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <ChartContainer config={chartConfig} className="h-[200px] w-full">
               <BarChart data={ibDealsByStage} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -1054,14 +1054,14 @@ export default function Dashboard() {
 
         {/* AM Deal Pipeline by Stage */}
         <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-emerald-500" />
               Asset Management Pipeline
             </CardTitle>
-            <CardDescription>{amActiveDeals.length} active deals across {AM_STAGES.length} stages</CardDescription>
+            <CardDescription className="text-sm mt-1">{amActiveDeals.length} active deals across {AM_STAGES.length} stages</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <ChartContainer config={chartConfig} className="h-[200px] w-full">
               <BarChart data={amDealsByStage} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -1084,14 +1084,14 @@ export default function Dashboard() {
 
         {/* IB Deals by Sector */}
         <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
               <PieChart className="w-5 h-5 text-blue-500" />
               IB Deals by Sector
             </CardTitle>
-            <CardDescription>Investment Banking sector breakdown ({ibActiveDeals.length} active deals, ${ibActiveValue.toLocaleString()}M)</CardDescription>
+            <CardDescription className="text-sm mt-1">Investment Banking sector breakdown ({ibActiveDeals.length} active deals, ${ibActiveValue.toLocaleString()}M)</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div className="flex flex-col lg:flex-row items-center gap-4">
               <ChartContainer config={chartConfig} className="h-[180px] w-full lg:w-1/2">
                 <RechartsPieChart>
@@ -1132,14 +1132,14 @@ export default function Dashboard() {
 
         {/* AM Deals by Sector */}
         <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
               <PieChart className="w-5 h-5 text-emerald-500" />
               AM Deals by Sector
             </CardTitle>
-            <CardDescription>Asset Management sector breakdown ({amActiveDeals.length} active deals, ${amActiveValue.toLocaleString()}M)</CardDescription>
+            <CardDescription className="text-sm mt-1">Asset Management sector breakdown ({amActiveDeals.length} active deals, ${amActiveValue.toLocaleString()}M)</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div className="flex flex-col lg:flex-row items-center gap-4">
               <ChartContainer config={chartConfig} className="h-[180px] w-full lg:w-1/2">
                 <RechartsPieChart>
@@ -1181,14 +1181,14 @@ export default function Dashboard() {
 
       {/* Division Distribution */}
       <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
             <Briefcase className="w-5 h-5 text-primary" />
             Division Distribution
           </CardTitle>
-          <CardDescription>Active deals split by Investment Banking and Asset Management</CardDescription>
+          <CardDescription className="text-sm mt-1">Active deals split by Investment Banking and Asset Management</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <div className="grid grid-cols-2 gap-6">
             <div className="text-center p-6 bg-blue-500/10 rounded-xl border border-blue-500/20">
               <div className="text-4xl font-bold text-blue-400">{ibActiveDeals.length}</div>
@@ -1208,14 +1208,14 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Weekly Activity - Split by Division */}
         <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
               <Activity className="w-5 h-5 text-primary" />
               Weekly Deal Activity
             </CardTitle>
-            <CardDescription>Deal activity by division over the last 7 days</CardDescription>
+            <CardDescription className="text-sm mt-1">Deal activity by division over the last 7 days</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div className="space-y-4">
               {/* Legend */}
               <div className="flex gap-4 justify-center text-xs">
@@ -1254,14 +1254,14 @@ export default function Dashboard() {
 
         {/* Task Completion Status - Split by Division */}
         <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
               <CheckSquare className="w-5 h-5 text-primary" />
               Task Status Overview
             </CardTitle>
-            <CardDescription>Task status by division</CardDescription>
+            <CardDescription className="text-sm mt-1">Task status by division</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div className="space-y-4">
               {/* IB Tasks */}
               <div>
@@ -1323,14 +1323,14 @@ export default function Dashboard() {
 
       {/* Top Performers */}
       <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
             <Zap className="w-5 h-5 text-primary" />
             Top Performers
           </CardTitle>
-          <CardDescription>Team members with highest velocity scores</CardDescription>
+          <CardDescription className="text-sm mt-1">Team members with highest velocity scores</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <ChartContainer config={chartConfig} className="h-[200px] w-full">
             <BarChart data={topPerformers} margin={{ top: 10, right: 30, left: 40, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -1377,10 +1377,10 @@ export default function Dashboard() {
             <div className="col-span-12 md:col-span-3 space-y-6">
           {widgets.find(w => w.id === 'quickActions')?.enabled && (
               <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Quick Actions</CardTitle>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold text-foreground">Quick Actions</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-2 pt-0">
                   <Button 
                     variant="outline" 
                     className="w-full justify-start gap-2 bg-secondary/50 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/20 transition-all"
@@ -1423,8 +1423,8 @@ export default function Dashboard() {
                 onClick={() => setActiveDealsModalOpen(true)}
                 data-testid="card-active-deals"
               >
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider truncate">
+                <CardHeader className="flex flex-row items-center justify-between pb-3">
+                  <CardTitle className="text-base font-semibold text-foreground truncate">
                     Active Deals
                   </CardTitle>
                   <div className="flex items-center gap-1">
@@ -1456,35 +1456,35 @@ export default function Dashboard() {
                     </Button>
                   </div>
                 </CardHeader>
-              <CardContent className="space-y-4 overflow-hidden">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-secondary/30 rounded-lg p-2 text-center overflow-hidden">
-                    <div className="text-xl font-bold text-primary truncate">
+              <CardContent className="space-y-4 overflow-hidden pt-0">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-secondary/30 rounded-lg p-3 text-center overflow-hidden">
+                    <div className="text-2xl font-bold text-primary truncate leading-tight">
                       {activeDealsFilter === 'IB' ? ibActiveDeals.length : activeDealsFilter === 'AM' ? amActiveDeals.length : displayActiveDeals.length}
                     </div>
-                    <div className="text-[9px] text-muted-foreground uppercase truncate">Active</div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wide mt-0.5 truncate">Active</div>
                   </div>
-                  <div className="bg-secondary/30 rounded-lg p-2 text-center overflow-hidden">
-                    <div className="text-xl font-bold text-green-400 truncate">
+                  <div className="bg-secondary/30 rounded-lg p-3 text-center overflow-hidden">
+                    <div className="text-2xl font-bold text-green-400 truncate leading-tight">
                       ${(activeDealsFilter === 'IB' ? ibActiveValue : activeDealsFilter === 'AM' ? amActiveValue : displayActiveValue).toLocaleString()}M
                     </div>
-                    <div className="text-[9px] text-muted-foreground uppercase truncate">Value</div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wide mt-0.5 truncate">Value</div>
                   </div>
                 </div>
 
                 <Separator className="bg-border/50" />
                 
                 <div className="overflow-hidden">
-                  <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                    <PieChart className="w-3 h-3 flex-shrink-0" /> <span className="truncate">By Sector</span>
+                  <div className="text-sm font-medium text-foreground mb-2.5 flex items-center gap-1.5">
+                    <PieChart className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" /> <span className="truncate">By Sector</span>
                   </div>
-                  <div className="space-y-1.5 max-h-24 overflow-y-auto">
+                  <div className="space-y-2 max-h-28 overflow-y-auto pr-1">
                     {Object.entries(activeDealsFilter === 'IB' ? ibSectorStats : activeDealsFilter === 'AM' ? amSectorStats : sectorStats).map(([sector, stats]) => (
-                      <div key={sector} className="flex items-center justify-between text-xs gap-1">
+                      <div key={sector} className="flex items-center justify-between text-sm gap-2">
                         <span className="text-muted-foreground truncate flex-1 min-w-0">{sector}</span>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <Badge variant="secondary" className="text-[9px] px-1">{stats.count}</Badge>
-                          <span className="text-green-400 font-mono text-[10px]">${stats.value}M</span>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Badge variant="secondary" className="text-[10px] px-1.5">{stats.count}</Badge>
+                          <span className="text-green-400 font-mono text-xs">${stats.value}M</span>
                         </div>
                       </div>
                     ))}
@@ -1494,22 +1494,22 @@ export default function Dashboard() {
                 <Separator className="bg-border/50" />
                 
                 <div className="overflow-hidden">
-                  <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                    <BarChart3 className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{activeDealsFilter === 'AM' ? 'AM Stages' : 'IB Stages'}</span>
+                  <div className="text-sm font-medium text-foreground mb-2.5 flex items-center gap-1.5">
+                    <BarChart3 className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" /> <span className="truncate">{activeDealsFilter === 'AM' ? 'AM Stages' : 'IB Stages'}</span>
                   </div>
-                  <div className="space-y-1 max-h-24 overflow-y-auto">
+                  <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
                     {(activeDealsFilter === 'AM' ? amStageStats : ibStageStats).map(({ stage, count }: { stage: string; count: number }) => {
                       const totalDeals = activeDealsFilter === 'AM' ? amActiveDeals.length : ibActiveDeals.length;
                       return (
-                        <div key={stage} className="flex items-center gap-1">
-                          <span className="text-[9px] text-muted-foreground w-16 truncate flex-shrink-0">{stage}</span>
-                          <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden min-w-0">
+                        <div key={stage} className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground w-20 truncate flex-shrink-0">{stage}</span>
+                          <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden min-w-0">
                             <div 
                               className={cn("h-full rounded-full transition-all", activeDealsFilter === 'AM' ? "bg-emerald-500/60" : "bg-blue-500/60")}
                               style={{ width: `${totalDeals > 0 ? (count / totalDeals) * 100 : 0}%` }}
                             />
                           </div>
-                          <span className="text-[10px] font-mono w-4 text-right flex-shrink-0">{count}</span>
+                          <span className="text-xs font-mono w-5 text-right flex-shrink-0 text-foreground">{count}</span>
                         </div>
                       );
                     })}
@@ -1521,8 +1521,8 @@ export default function Dashboard() {
           
           {widgets.find(w => w.id === 'marketPulse')?.enabled && (
             <Card className="bg-card border-border">
-               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Market Pulse</CardTitle>
+               <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-base font-semibold text-foreground">Market Pulse</CardTitle>
                 <div className="flex items-center gap-2">
                   <Button 
                     variant="ghost" 
@@ -1539,7 +1539,7 @@ export default function Dashboard() {
                   <div className={cn("w-2 h-2 rounded-full animate-pulse", marketSource === 'live' ? "bg-green-500" : "bg-yellow-500")}></div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-3 pt-0">
                 {showMarketSearch && (
                   <div className="space-y-2 pb-2 border-b border-border/50">
                     <div className="relative">
@@ -1682,21 +1682,21 @@ export default function Dashboard() {
         {/* Middle Column: Main Content */}
         <div className="col-span-12 md:col-span-6 space-y-6">
           {/* Welcome Banner */}
-          <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-6 border border-primary/20">
-            <p className="text-sm text-muted-foreground mb-1">
+          <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-4 md:p-6 lg:p-8 border border-primary/20">
+            <p className="text-sm text-muted-foreground mb-1.5">
               {format(new Date(), 'EEEE, MMMM d, yyyy')}
             </p>
-            <h1 className="text-3xl font-display font-bold">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl font-display font-bold text-foreground leading-tight">
               Welcome back, {currentUser?.name?.split(' ')[0]}!
             </h1>
-            <p className="text-muted-foreground mt-1">Here's your personalized command center.</p>
+            <p className="text-muted-foreground mt-2 text-sm md:text-base leading-relaxed">Here's your personalized command center.</p>
           </div>
 
           {/* Team Task Progress */}
           {widgets.find(w => w.id === 'teamTaskProgress')?.enabled && (
             <Card className="bg-card border-border h-[500px] overflow-hidden flex flex-col">
-              <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-border/50">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Team Task Progress</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-border/50">
+                <CardTitle className="text-base font-semibold text-foreground">Team Task Progress</CardTitle>
                 <div className="text-[10px] text-green-400 flex items-center gap-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-green-400"></div> Live
                 </div>
@@ -1765,8 +1765,8 @@ export default function Dashboard() {
           {/* Market Intelligence Widget - Moved to middle column */}
           {widgets.find(w => w.id === 'marketIntelligence')?.enabled && (
             <Card className="bg-card border-border">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Market Intelligence</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-base font-semibold text-foreground">Market Intelligence</CardTitle>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
                     {newsSource === 'live' ? (
@@ -1835,13 +1835,13 @@ export default function Dashboard() {
             
             return (
               <Card className="bg-card border-border">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Upcoming</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between pb-3">
+                  <CardTitle className="text-base font-semibold text-foreground">Upcoming</CardTitle>
                   <Link href="/ceo/calendar" className="hover:text-primary transition-colors">
                     <Calendar className="w-4 h-4 text-muted-foreground hover:text-primary cursor-pointer" />
                   </Link>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-3 pt-0">
                   {!hasItems ? (
                     <div className="text-center py-4 text-muted-foreground text-xs">No upcoming meetings or events</div>
                   ) : (
@@ -1904,8 +1904,8 @@ export default function Dashboard() {
           {/* Pending Committee Reviews Widget */}
           {widgets.find(w => w.id === 'pendingReviews')?.enabled && (
             <Card className="bg-card border-border">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Pending Reviews</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-base font-semibold text-foreground">Pending Reviews</CardTitle>
                 <div className="flex items-center gap-2">
                   {pendingReviews.length > 0 && (
                     <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
@@ -1915,26 +1915,26 @@ export default function Dashboard() {
                   <Users className="w-4 h-4 text-muted-foreground" />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3 pt-0">
                 {pendingReviews.length === 0 ? (
-                  <div className="text-center py-4 text-muted-foreground text-xs">No pending committee reviews</div>
+                  <div className="text-center py-6 text-muted-foreground text-sm">No pending committee reviews</div>
                 ) : (
                   <>
                     {pendingReviews.slice(0, 3).map((review) => (
                       <div 
                         key={review.id} 
-                        className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs hover:bg-blue-500/20 transition-colors cursor-pointer"
+                        className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm hover:bg-blue-500/20 transition-colors cursor-pointer"
                         onClick={() => setLocation('/ceo/opportunities')}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
-                            <div className="font-medium truncate">{review.deal?.name || 'Unknown Deal'}</div>
-                            <div className="text-muted-foreground text-[10px] truncate">{review.deal?.client}</div>
+                            <div className="font-medium text-foreground truncate leading-snug">{review.deal?.name || 'Unknown Deal'}</div>
+                            <div className="text-muted-foreground text-xs mt-0.5 truncate">{review.deal?.client}</div>
                           </div>
                           <Badge 
                             variant="secondary" 
                             className={cn(
-                              "text-[9px] shrink-0",
+                              "text-[10px] shrink-0",
                               review.voteSummary?.majorityReached && "bg-green-500/20 text-green-400"
                             )}
                           >
@@ -1942,7 +1942,7 @@ export default function Dashboard() {
                           </Badge>
                         </div>
                         {review.deadline && (
-                          <div className="text-[10px] text-amber-400 mt-1 flex items-center gap-1">
+                          <div className="text-xs text-amber-400 mt-1.5 flex items-center gap-1">
                             <Clock className="w-3 h-3" />
                             Due: {format(new Date(review.deadline), 'MMM d, h:mm a')}
                           </div>
@@ -1953,7 +1953,7 @@ export default function Dashboard() {
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="w-full text-xs text-muted-foreground hover:text-primary"
+                        className="w-full text-sm text-muted-foreground hover:text-primary"
                         onClick={() => setLocation('/ceo/opportunities')}
                       >
                         View all {pendingReviews.length} reviews
@@ -1968,32 +1968,32 @@ export default function Dashboard() {
           {/* Recent Activity Widget */}
           {widgets.find(w => w.id === 'recentActivity')?.enabled && (
             <Card className="bg-card border-border">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Activity</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-base font-semibold text-foreground">Recent Activity</CardTitle>
                 <Activity className="w-4 h-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3 pt-0">
                 {notifications.length === 0 ? (
-                  <div className="text-center py-4 text-muted-foreground text-xs">No recent activity</div>
+                  <div className="text-center py-6 text-muted-foreground text-sm">No recent activity</div>
                 ) : (
                   notifications.slice(0, 4).map((notification) => (
                     <div 
                       key={notification.id} 
                       className={cn(
-                        "p-2 rounded-lg text-xs",
+                        "p-3 rounded-lg text-sm",
                         notification.read ? "bg-secondary/20" : "bg-primary/10 border border-primary/20"
                       )}
                     >
-                      <div className="flex items-start gap-2">
+                      <div className="flex items-start gap-2.5">
                         <div className={cn(
-                          "w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0",
+                          "w-2 h-2 rounded-full mt-1.5 flex-shrink-0",
                           notification.type === 'success' ? "bg-green-500" :
                           notification.type === 'warning' ? "bg-yellow-500" :
                           notification.type === 'alert' ? "bg-red-500" : "bg-blue-500"
                         )} />
                         <div className="min-w-0 flex-1">
-                          <div className="font-medium truncate">{notification.title}</div>
-                          <div className="text-muted-foreground text-[10px] truncate">{notification.message}</div>
+                          <div className="font-medium text-foreground truncate leading-snug">{notification.title}</div>
+                          <div className="text-muted-foreground text-xs mt-0.5 truncate leading-relaxed">{notification.message}</div>
                         </div>
                       </div>
                     </div>
@@ -2010,8 +2010,8 @@ export default function Dashboard() {
               onClick={() => setCapitalAtWorkModalOpen(true)}
               data-testid="card-capital-at-work"
             >
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-base font-semibold text-foreground">
                   Capital At Work
                 </CardTitle>
                 <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -2036,42 +2036,42 @@ export default function Dashboard() {
                   <DollarSign className="w-4 h-4 text-primary" />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-center py-2">
-                  <div className={cn("text-3xl font-bold", capitalAtWorkFilter === 'AM' ? "text-emerald-400" : capitalAtWorkFilter === 'IB' ? "text-blue-400" : "text-primary")}>
+              <CardContent className="space-y-4 pt-0">
+                <div className="text-center py-3">
+                  <div className={cn("text-3xl md:text-4xl font-bold leading-tight", capitalAtWorkFilter === 'AM' ? "text-emerald-400" : capitalAtWorkFilter === 'IB' ? "text-blue-400" : "text-primary")}>
                     ${(capitalAtWorkFilter === 'IB' ? ibActiveValue : capitalAtWorkFilter === 'AM' ? amActiveValue : displayActiveValue).toLocaleString()}M
                   </div>
-                  <div className="text-xs text-muted-foreground mt-1">
+                  <div className="text-sm text-muted-foreground mt-1.5">
                     {capitalAtWorkFilter === 'IB' ? 'IB' : capitalAtWorkFilter === 'AM' ? 'AM' : 'Total'} Active Deal Value
                   </div>
                 </div>
                 <Separator className="bg-border/50" />
-                <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="grid grid-cols-3 gap-3 text-center py-1">
                   <div>
-                    <div className="text-lg font-semibold text-green-400">
+                    <div className="text-xl font-semibold text-green-400">
                       {capitalAtWorkFilter === 'IB' ? ibActiveDeals.length : capitalAtWorkFilter === 'AM' ? amActiveDeals.length : activeDeals.length}
                     </div>
-                    <div className="text-[9px] text-muted-foreground uppercase">Active</div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wide mt-0.5">Active</div>
                   </div>
                   <div>
-                    <div className="text-lg font-semibold text-yellow-400">
+                    <div className="text-xl font-semibold text-yellow-400">
                       {capitalAtWorkFilter === 'IB' 
                         ? ibDeals.filter(d => d.status === 'On Hold').length 
                         : capitalAtWorkFilter === 'AM' 
                           ? amDeals.filter(d => d.status === 'On Hold').length 
                           : nonOpportunityDeals.filter(d => d.status === 'On Hold').length}
                     </div>
-                    <div className="text-[9px] text-muted-foreground uppercase">On Hold</div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wide mt-0.5">On Hold</div>
                   </div>
                   <div>
-                    <div className="text-lg font-semibold text-muted-foreground">
+                    <div className="text-xl font-semibold text-muted-foreground">
                       {capitalAtWorkFilter === 'IB' 
                         ? ibDeals.filter(d => d.status === 'Closed').length 
                         : capitalAtWorkFilter === 'AM' 
                           ? amDeals.filter(d => d.status === 'Closed').length 
                           : nonOpportunityDeals.filter(d => d.status === 'Closed').length}
                     </div>
-                    <div className="text-[9px] text-muted-foreground uppercase">Closed</div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wide mt-0.5">Closed</div>
                   </div>
                 </div>
               </CardContent>
@@ -2085,13 +2085,13 @@ export default function Dashboard() {
               onClick={() => setFeeSummaryModalOpen(true)}
               data-testid="card-fee-summary"
             >
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-base font-semibold text-foreground">
                   Fee Summary
                 </CardTitle>
                 <Briefcase className="w-4 h-4 text-primary" />
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4 pt-0">
                 {(() => {
                   // Calculate fees for IB deals only
                   const ibDealIds = new Set(ibDeals.map(d => d.id));
@@ -2119,19 +2119,19 @@ export default function Dashboard() {
                   
                   return (
                     <>
-                      <div className="text-center py-2">
-                        <div className="text-2xl font-bold text-green-400">
+                      <div className="text-center py-3">
+                        <div className="text-2xl md:text-3xl font-bold text-green-400 leading-tight">
                           ${totalFees.toLocaleString()}
                         </div>
-                        <div className="text-xs text-muted-foreground">IB Fixed Fees</div>
+                        <div className="text-sm text-muted-foreground mt-1">IB Fixed Fees</div>
                       </div>
                       <Separator className="bg-border/50" />
-                      <div className="space-y-2">
+                      <div className="space-y-2.5">
                         {Object.entries(feesByType).map(([type, data]) => (
-                          <div key={type} className="flex items-center justify-between text-xs">
+                          <div key={type} className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground truncate">{feeLabels[type] || type}</span>
                             <div className="flex items-center gap-2">
-                              <Badge variant="secondary" className="text-[9px] px-1">{data.count}</Badge>
+                              <Badge variant="secondary" className="text-[10px] px-1.5">{data.count}</Badge>
                               <span className="font-mono text-green-400">${data.total.toLocaleString()}</span>
                             </div>
                           </div>

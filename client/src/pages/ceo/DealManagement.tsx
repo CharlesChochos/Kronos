@@ -2565,21 +2565,21 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
       <div className="space-y-6">
         {/* Bulk Actions Bar */}
         {selectedDeals.length > 0 && (
-          <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/30 rounded-lg mb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-primary/10 border border-primary/30 rounded-lg mb-4">
             <div className="flex items-center gap-3">
               <Checkbox
                 checked={selectedDeals.length === filteredDeals.length}
                 onCheckedChange={selectAllDeals}
                 data-testid="checkbox-select-all-deals"
               />
-              <span className="text-sm font-medium">{selectedDeals.length} selected</span>
+              <span className="text-sm font-medium text-foreground">{selectedDeals.length} selected</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setShowBulkMoveDialog(true)} data-testid="button-bulk-move-deals">
-                <ArrowLeftCircle className="w-4 h-4 mr-1" /> Move to Opportunities
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => setShowBulkMoveDialog(true)} data-testid="button-bulk-move-deals">
+                <ArrowLeftCircle className="w-4 h-4 mr-1.5" /> <span className="hidden sm:inline">Move to</span> Opportunities
               </Button>
-              <Button variant="destructive" size="sm" onClick={() => setShowBulkDeleteDialog(true)} data-testid="button-bulk-delete-deals">
-                <Trash2 className="w-4 h-4 mr-1" /> Delete Selected
+              <Button variant="destructive" size="sm" className="text-xs sm:text-sm" onClick={() => setShowBulkDeleteDialog(true)} data-testid="button-bulk-delete-deals">
+                <Trash2 className="w-4 h-4 mr-1.5" /> Delete<span className="hidden sm:inline"> Selected</span>
               </Button>
               <Button variant="outline" size="sm" onClick={() => setSelectedDeals([])} data-testid="button-clear-deal-selection">
                 Clear
@@ -2588,24 +2588,24 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
           </div>
         )}
         {/* Header & Filters */}
-        <div className="flex flex-col md:flex-row justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
+        <div className="flex flex-col lg:flex-row justify-between gap-4">
+          <div className="relative flex-1 max-w-full lg:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
               placeholder="Search deals by name, client, or sector..." 
-              className="pl-9 bg-card border-border"
+              className="pl-10 h-10 bg-card border-border text-sm"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               data-testid="input-search-deals"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             {/* View Mode Toggle */}
-            <div className="flex items-center bg-card border border-border rounded-md overflow-hidden">
+            <div className="flex items-center bg-card border border-border rounded-lg overflow-hidden">
               <Button 
                 variant="ghost" 
                 size="sm"
-                className={cn("rounded-none border-r border-border", viewMode === 'grid' && "bg-primary/10 text-primary")}
+                className={cn("rounded-none border-r border-border h-10 px-3", viewMode === 'grid' && "bg-primary/10 text-primary")}
                 onClick={() => setViewMode('grid')}
                 data-testid="button-view-grid"
               >
@@ -2614,7 +2614,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
               <Button 
                 variant="ghost" 
                 size="sm"
-                className={cn("rounded-none border-r border-border", viewMode === 'calendar' && "bg-primary/10 text-primary")}
+                className={cn("rounded-none border-r border-border h-10 px-3", viewMode === 'calendar' && "bg-primary/10 text-primary")}
                 onClick={() => setViewMode('calendar')}
                 data-testid="button-view-calendar"
               >
@@ -2623,7 +2623,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
               <Button 
                 variant="ghost" 
                 size="sm"
-                className={cn("rounded-none", viewMode === 'compare' && "bg-primary/10 text-primary")}
+                className={cn("rounded-none h-10 px-3", viewMode === 'compare' && "bg-primary/10 text-primary")}
                 onClick={() => setViewMode('compare')}
                 data-testid="button-view-compare"
               >
@@ -2632,11 +2632,11 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="bg-card border-border gap-2">
-                  <Filter className="w-4 h-4" /> {stageFilter || 'All Stages'}
+                <Button variant="outline" className="h-10 bg-card border-border gap-2 min-w-[120px]">
+                  <Filter className="w-4 h-4" /> <span className="truncate">{stageFilter || 'All Stages'}</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent>
+              <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setStageFilter(null)}>All Stages</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {DEAL_STAGES.map(stage => (
@@ -2645,11 +2645,11 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
               </DropdownMenuContent>
             </DropdownMenu>
             <Button 
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              className="h-10 bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={() => setShowNewDealModal(true)}
               data-testid="button-new-deal"
             >
-              <Plus className="w-4 h-4 mr-1" /> New Deal
+              <Plus className="w-4 h-4 mr-1.5" /> New Deal
             </Button>
           </div>
         </div>
@@ -3047,77 +3047,77 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
 
         {/* Deals Grid */}
         {viewMode === 'grid' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
           {filteredDeals.map((deal) => (
             <Card 
               key={deal.id} 
               className="bg-card border-border hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group" 
               data-testid={`card-deal-${deal.id}`}
             >
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-start gap-2">
+              <CardHeader className="p-4 sm:p-5 pb-3 sm:pb-4">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="flex items-start gap-2.5">
                     <Checkbox
                       checked={selectedDeals.includes(deal.id)}
                       onCheckedChange={() => toggleDealSelection(deal.id)}
                       onClick={(e) => e.stopPropagation()}
-                      className="mt-1"
+                      className="mt-0.5"
                       data-testid={`checkbox-deal-${deal.id}`}
                     />
                     <Badge variant="outline" className={cn(
-                      "border-0 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider",
-                      deal.stage === 'Origination' ? "bg-blue-500/20 text-blue-400" :
-                      deal.stage === 'Structuring' ? "bg-indigo-500/20 text-indigo-400" :
-                      deal.stage === 'Diligence' ? "bg-orange-500/20 text-orange-400" :
-                      deal.stage === 'Legal' ? "bg-purple-500/20 text-purple-400" :
-                      "bg-green-500/20 text-green-400"
+                      "border-0 px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wide",
+                      deal.stage === 'Origination' ? "bg-blue-500/20 text-blue-400 dark:text-blue-300" :
+                      deal.stage === 'Structuring' ? "bg-indigo-500/20 text-indigo-400 dark:text-indigo-300" :
+                      deal.stage === 'Diligence' ? "bg-orange-500/20 text-orange-500 dark:text-orange-300" :
+                      deal.stage === 'Legal' ? "bg-purple-500/20 text-purple-400 dark:text-purple-300" :
+                      "bg-green-500/20 text-green-500 dark:text-green-300"
                     )}>
                       {deal.stage}
                     </Badge>
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 -mr-1">
                         <MoreVertical className="w-4 h-4 text-muted-foreground" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => { setSelectedDeal(deal); setActiveTab("overview"); }}>
-                        <Eye className="w-4 h-4 mr-2" /> View Details
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem className="py-2.5" onClick={() => { setSelectedDeal(deal); setActiveTab("overview"); }}>
+                        <Eye className="w-4 h-4 mr-2.5" /> View Details
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => openEditModal(deal)}>
-                        <Pencil className="w-4 h-4 mr-2" /> Edit Deal
+                      <DropdownMenuItem className="py-2.5" onClick={() => openEditModal(deal)}>
+                        <Pencil className="w-4 h-4 mr-2.5" /> Edit Deal
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem 
-                        className="text-amber-500" 
+                        className="text-amber-500 py-2.5" 
                         onClick={() => {
                           setDealToArchive(deal.id);
                           setShowArchiveDialog(true);
                         }}
                       >
-                        <Archive className="w-4 h-4 mr-2" /> Archive
+                        <Archive className="w-4 h-4 mr-2.5" /> Archive
                       </DropdownMenuItem>
                       <DropdownMenuItem 
-                        className="text-red-500" 
+                        className="text-red-500 py-2.5" 
                         onClick={() => {
                           setDealToDelete(deal.id);
                           setShowDeleteDealDialog(true);
                         }}
                       >
-                        <Trash2 className="w-4 h-4 mr-2" /> Delete
+                        <Trash2 className="w-4 h-4 mr-2.5" /> Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-                <CardTitle className="text-xl mt-2 group-hover:text-primary transition-colors">{deal.name}</CardTitle>
-                <CardDescription>{deal.client}{deal.sector ? <> • <span className="font-medium">{deal.sector}</span></> : ''}</CardDescription>
+                <CardTitle className="text-lg sm:text-xl mt-3 leading-tight group-hover:text-primary transition-colors line-clamp-2">{deal.name}</CardTitle>
+                <CardDescription className="text-sm mt-1.5 text-muted-foreground">{deal.client}{deal.sector ? <> • <span className="font-medium text-foreground/70">{deal.sector}</span></> : ''}</CardDescription>
               </CardHeader>
               
-              <CardContent className="space-y-4">
+              <CardContent className="p-4 sm:p-5 pt-0 space-y-4">
                 {/* Stage Progress Bar - Click icons to change stage */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
+                <div className="space-y-2.5 pt-1">
+                  <div className="flex justify-between items-center gap-1">
                     {DEAL_STAGES.map((stage, index) => {
                       const isActive = getStageIndex(deal.stage) >= index;
                       const isCurrent = deal.stage === stage;
@@ -3129,16 +3129,16 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                           data-testid={`stage-icon-${deal.id}-${stage.toLowerCase().replace(' ', '-')}`}
                         >
                           <div className={cn(
-                            "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all",
+                            "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all",
                             isCurrent ? "bg-primary text-primary-foreground ring-2 ring-primary/30" :
                             isActive ? "bg-primary/60 text-primary-foreground" :
                             "bg-secondary text-muted-foreground",
                             "group-hover/stage:ring-2 group-hover/stage:ring-primary/50 group-hover/stage:scale-110"
                           )}>
-                            {isActive ? <CheckCircle2 className="w-3.5 h-3.5" /> : index + 1}
+                            {isActive ? <CheckCircle2 className="w-4 h-4" /> : index + 1}
                           </div>
                           <span className={cn(
-                            "text-[8px] mt-1 truncate max-w-full transition-colors",
+                            "text-[10px] mt-1.5 truncate max-w-full transition-colors",
                             isCurrent ? "text-primary font-bold" :
                             isActive ? "text-foreground" : "text-muted-foreground",
                             "group-hover/stage:text-primary"
@@ -3147,41 +3147,43 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       );
                     })}
                   </div>
-                  <div className="h-1 bg-secondary rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-primary transition-all duration-500" 
                       style={{ width: `${getStageProgress(deal.stage)}%` }}
                     />
                   </div>
-                  <p className="text-[9px] text-muted-foreground text-center">Click any stage to update</p>
+                  <p className="text-[10px] text-muted-foreground text-center">Click any stage to update</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                      <DollarSign className="w-3 h-3" /> Value
+                <div className="grid grid-cols-2 gap-4 pt-1">
+                  <div className="space-y-1.5 p-3 bg-secondary/30 rounded-lg">
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <DollarSign className="w-3.5 h-3.5" /> Value
                     </div>
-                    <div className="font-mono font-bold text-lg">${deal.value}M</div>
+                    <div className="font-mono font-bold text-lg text-foreground">${deal.value}M</div>
                   </div>
-                  <div className="space-y-1">
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                      <Users className="w-3 h-3" /> Team
+                  <div className="space-y-1.5 p-3 bg-secondary/30 rounded-lg">
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5" /> Team
                     </div>
-                    <DealTotalTeamCount dealId={deal.id} stage={deal.stage} />
+                    <div className="font-bold text-lg text-foreground">
+                      <DealTotalTeamCount dealId={deal.id} stage={deal.stage} />
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 pt-2">
-                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">
+                <div className="flex items-center gap-2.5 pt-2 border-t border-border/50">
+                  <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
                     {(deal.lead || "?").split(' ').map(n => n[0]).join('')}
                   </div>
-                  <span className="text-xs text-muted-foreground">Lead: {deal.lead}</span>
+                  <span className="text-sm text-muted-foreground">Lead: <span className="text-foreground font-medium">{deal.lead}</span></span>
                 </div>
               </CardContent>
               
-              <CardFooter className="pt-2">
+              <CardFooter className="p-4 sm:p-5 pt-0">
                 <Button 
-                  className="w-full bg-secondary hover:bg-primary hover:text-primary-foreground text-secondary-foreground transition-colors gap-2"
+                  className="w-full h-10 bg-secondary hover:bg-primary hover:text-primary-foreground text-secondary-foreground transition-colors gap-2"
                   onClick={() => { setSelectedDeal(deal); setActiveTab("overview"); }}
                   data-testid={`button-view-deal-${deal.id}`}
                 >
@@ -3519,31 +3521,31 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
 
       {/* Deal Room Sheet */}
       <Sheet open={!!selectedDeal} onOpenChange={() => setSelectedDeal(null)}>
-        <SheetContent className="w-full sm:max-w-2xl bg-card border-border overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-2xl bg-card border-border overflow-y-auto p-0">
           {selectedDeal && (
             <>
-              <SheetHeader className="pb-4 border-b border-border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <SheetTitle className="text-2xl">{selectedDeal.name}</SheetTitle>
-                    <SheetDescription>{selectedDeal.client} • {selectedDeal.sector}</SheetDescription>
+              <SheetHeader className="p-5 sm:p-6 pb-4 border-b border-border sticky top-0 bg-card z-10">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <SheetTitle className="text-xl sm:text-2xl leading-tight">{selectedDeal.name}</SheetTitle>
+                    <SheetDescription className="text-sm mt-1.5 text-muted-foreground">{selectedDeal.client} • {selectedDeal.sector}</SheetDescription>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm" data-testid="button-move-to-opportunities">
-                          <ArrowLeftCircle className="w-4 h-4 mr-2" />
-                          Move to Opportunities
+                        <Button variant="outline" size="sm" className="text-xs sm:text-sm h-9" data-testid="button-move-to-opportunities">
+                          <ArrowLeftCircle className="w-4 h-4 mr-1.5" />
+                          <span className="hidden sm:inline">Move to</span> Opportunities
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent>
+                      <AlertDialogContent className="max-w-md">
                         <AlertDialogHeader>
                           <AlertDialogTitle>Move to Opportunities?</AlertDialogTitle>
-                          <AlertDialogDescription>
+                          <AlertDialogDescription className="text-sm leading-relaxed">
                             This will move "{selectedDeal.name}" back to the Opportunities page. The deal stage will be reset to "Origination".
                           </AlertDialogDescription>
                         </AlertDialogHeader>
-                        <AlertDialogFooter>
+                        <AlertDialogFooter className="gap-2 sm:gap-0">
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={() => {
@@ -3564,10 +3566,10 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                       </AlertDialogContent>
                     </AlertDialog>
                     <Badge className={cn(
-                      "px-3 py-1",
-                      selectedDeal.status === 'Active' ? "bg-green-500/20 text-green-400" :
-                      selectedDeal.status === 'On Hold' ? "bg-yellow-500/20 text-yellow-400" :
-                      "bg-gray-500/20 text-gray-400"
+                      "px-3 py-1.5 text-xs font-medium",
+                      selectedDeal.status === 'Active' ? "bg-green-500/20 text-green-500 dark:text-green-400" :
+                      selectedDeal.status === 'On Hold' ? "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400" :
+                      "bg-gray-500/20 text-gray-600 dark:text-gray-400"
                     )}>
                       {selectedDeal.status}
                     </Badge>
@@ -3576,9 +3578,9 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
               </SheetHeader>
 
               {/* Stage Progress */}
-              <div className="py-6 border-b border-border">
-                <h4 className="text-sm font-medium text-muted-foreground mb-4">DEAL STAGE</h4>
-                <div className="flex items-center gap-2">
+              <div className="px-5 sm:px-6 py-5 border-b border-border">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">Deal Stage</h4>
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   {DEAL_STAGES.map((stage, index) => {
                     const isActive = getStageIndex(selectedDeal.stage) >= index;
                     const isCurrent = selectedDeal.stage === stage;
@@ -3588,19 +3590,20 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                         variant={isCurrent ? "default" : isActive ? "secondary" : "outline"}
                         size="sm"
                         className={cn(
-                          "flex-1 text-xs",
+                          "flex-1 text-[10px] sm:text-xs h-8 sm:h-9 px-1 sm:px-3",
                           isCurrent && "ring-2 ring-primary/30",
                           !isActive && "opacity-50"
                         )}
                         onClick={() => handleStageChange(selectedDeal, stage)}
                         data-testid={`button-stage-${stage.toLowerCase()}`}
                       >
-                        {stage}
+                        <span className="hidden sm:inline">{stage}</span>
+                        <span className="sm:hidden">{stage.slice(0, 4)}</span>
                       </Button>
                     );
                   })}
                 </div>
-                <div className="mt-3 h-2 bg-secondary rounded-full overflow-hidden">
+                <div className="mt-4 h-2 bg-secondary rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-primary transition-all duration-500" 
                     style={{ width: `${getStageProgress(selectedDeal.stage)}%` }}
@@ -3609,50 +3612,51 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
               </div>
 
               {/* Tabs */}
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
-                <TabsList className="grid grid-cols-8 bg-secondary/50">
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="stages">Stage Work</TabsTrigger>
-                  <TabsTrigger value="team">Pod Team</TabsTrigger>
-                  <TabsTrigger value="investors">Investors</TabsTrigger>
-                  <TabsTrigger value="documents">Docs</TabsTrigger>
-                  <TabsTrigger value="voice">Voice</TabsTrigger>
-                  <TabsTrigger value="notes">Notes</TabsTrigger>
-                  <TabsTrigger value="audit">Audit</TabsTrigger>
+              <div className="px-5 sm:px-6">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-5">
+                <TabsList className="w-full h-auto flex flex-wrap gap-1 bg-secondary/50 p-1.5 rounded-lg">
+                  <TabsTrigger value="overview" className="text-xs sm:text-sm py-2 px-2 sm:px-3">Overview</TabsTrigger>
+                  <TabsTrigger value="stages" className="text-xs sm:text-sm py-2 px-2 sm:px-3">Stage Work</TabsTrigger>
+                  <TabsTrigger value="team" className="text-xs sm:text-sm py-2 px-2 sm:px-3">Team</TabsTrigger>
+                  <TabsTrigger value="investors" className="text-xs sm:text-sm py-2 px-2 sm:px-3">Investors</TabsTrigger>
+                  <TabsTrigger value="documents" className="text-xs sm:text-sm py-2 px-2 sm:px-3">Docs</TabsTrigger>
+                  <TabsTrigger value="voice" className="text-xs sm:text-sm py-2 px-2 sm:px-3">Voice</TabsTrigger>
+                  <TabsTrigger value="notes" className="text-xs sm:text-sm py-2 px-2 sm:px-3">Notes</TabsTrigger>
+                  <TabsTrigger value="audit" className="text-xs sm:text-sm py-2 px-2 sm:px-3">Audit</TabsTrigger>
                 </TabsList>
 
                 {/* Overview Tab */}
-                <TabsContent value="overview" className="mt-4 space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
-                    <Card className="bg-secondary/30">
-                      <CardContent className="p-4 text-center">
-                        <DollarSign className="w-5 h-5 mx-auto mb-1 text-primary" />
-                        <div className="text-2xl font-bold text-primary">${selectedDeal.value}M</div>
-                        <div className="text-xs text-muted-foreground">Deal Value</div>
+                <TabsContent value="overview" className="mt-5 space-y-5 pb-6">
+                  <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                    <Card className="bg-secondary/30 border-border/50">
+                      <CardContent className="p-3 sm:p-4 text-center">
+                        <DollarSign className="w-5 h-5 mx-auto mb-1.5 text-primary" />
+                        <div className="text-xl sm:text-2xl font-bold text-foreground">${selectedDeal.value}M</div>
+                        <div className="text-xs text-muted-foreground mt-1">Deal Value</div>
                       </CardContent>
                     </Card>
-                    <Card className="bg-secondary/30">
-                      <CardContent className="p-4 text-center">
-                        <Users className="w-5 h-5 mx-auto mb-1 text-primary" />
-                        <div className="text-2xl font-bold text-primary"><DealTotalTeamCountNumber dealId={selectedDeal.id} stage={selectedDeal.stage} /></div>
-                        <div className="text-xs text-muted-foreground">Team Members</div>
+                    <Card className="bg-secondary/30 border-border/50">
+                      <CardContent className="p-3 sm:p-4 text-center">
+                        <Users className="w-5 h-5 mx-auto mb-1.5 text-primary" />
+                        <div className="text-xl sm:text-2xl font-bold text-foreground"><DealTotalTeamCountNumber dealId={selectedDeal.id} stage={selectedDeal.stage} /></div>
+                        <div className="text-xs text-muted-foreground mt-1">Team Members</div>
                       </CardContent>
                     </Card>
-                    <Card className="bg-secondary/30">
-                      <CardContent className="p-4 text-center">
-                        <Building2 className="w-5 h-5 mx-auto mb-1 text-primary" />
-                        <div className="text-2xl font-bold text-primary">{(selectedDeal.taggedInvestors as TaggedInvestor[] || []).length}</div>
-                        <div className="text-xs text-muted-foreground">Investors</div>
+                    <Card className="bg-secondary/30 border-border/50">
+                      <CardContent className="p-3 sm:p-4 text-center">
+                        <Building2 className="w-5 h-5 mx-auto mb-1.5 text-primary" />
+                        <div className="text-xl sm:text-2xl font-bold text-foreground">{(selectedDeal.taggedInvestors as TaggedInvestor[] || []).length}</div>
+                        <div className="text-xs text-muted-foreground mt-1">Investors</div>
                       </CardContent>
                     </Card>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="p-3 bg-secondary/30 rounded-lg">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
+                    <div className="p-3.5 bg-secondary/30 rounded-lg">
                       <span className="text-muted-foreground">Sector:</span>
-                      <span className="ml-2 font-medium">{selectedDeal.sector}</span>
+                      <span className="ml-2 font-medium text-foreground">{selectedDeal.sector}</span>
                     </div>
-                    <div className="p-3 bg-secondary/30 rounded-lg group relative">
+                    <div className="p-3.5 bg-secondary/30 rounded-lg group relative">
                       <span className="text-muted-foreground">Lead:</span>
                       {editingLeadDealId === selectedDeal.id ? (
                         <div className="mt-1">
@@ -4626,6 +4630,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
                   </ScrollArea>
                 </TabsContent>
               </Tabs>
+              </div>
             </>
           )}
         </SheetContent>
@@ -4633,34 +4638,37 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
 
       {/* New Deal Modal */}
       <Dialog open={showNewDealModal} onOpenChange={setShowNewDealModal}>
-        <DialogContent className="bg-card border-border">
-          <DialogHeader>
-            <DialogTitle>Create New Deal</DialogTitle>
-            <DialogDescription>Enter the details for the new deal below.</DialogDescription>
+        <DialogContent className="bg-card border-border max-w-lg sm:max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-xl">Create New Deal</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">Enter the details for the new deal below.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Deal Name *</Label>
+          <div className="space-y-5 py-4">
+            <div className="space-y-2.5">
+              <Label className="text-sm font-medium">Deal Name *</Label>
               <Input 
                 placeholder="Project Codename" 
+                className="h-10"
                 value={newDeal.name}
                 onChange={(e) => setNewDeal({ ...newDeal, name: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Client *</Label>
+            <div className="space-y-2.5">
+              <Label className="text-sm font-medium">Client *</Label>
               <Input 
                 placeholder="Client Company Name" 
+                className="h-10"
                 value={newDeal.client}
                 onChange={(e) => setNewDeal({ ...newDeal, client: e.target.value })}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Value (in millions) *</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2.5">
+                <Label className="text-sm font-medium">Value (in millions) *</Label>
                 <Input 
                   type="number" 
-                  placeholder="100" 
+                  placeholder="100"
+                  className="h-10"
                   value={newDeal.value}
                   onChange={(e) => setNewDeal({ ...newDeal, value: e.target.value })}
                 />

@@ -313,18 +313,18 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
                   <button
                     onClick={() => toggleCategory(group.category)}
                     className={cn(
-                      "w-full flex items-center justify-between px-3 py-2 mb-1 text-xs font-semibold uppercase tracking-wider rounded-md transition-colors",
+                      "w-full flex items-center justify-between px-3 py-2.5 mb-1 text-xs font-semibold uppercase tracking-wider rounded-md transition-colors",
                       isGroupActive 
-                        ? "text-primary bg-primary/5" 
-                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
+                        ? "text-primary bg-primary/10" 
+                        : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
                     )}
                     data-testid={`sidebar-category-${group.category.toLowerCase()}`}
                   >
                     <span>{group.category}</span>
                     {isExpanded ? (
-                      <ChevronDown className="w-3 h-3" />
+                      <ChevronDown className="w-3.5 h-3.5" />
                     ) : (
-                      <ChevronRight className="w-3 h-3" />
+                      <ChevronRight className="w-3.5 h-3.5" />
                     )}
                   </button>
                   
@@ -346,15 +346,15 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
                           >
                             <div
                               className={cn(
-                                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer group relative",
+                                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer group relative",
                                 isActive(link.path)
-                                  ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_0_hsl(var(--primary))]"
-                                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                                  ? "bg-primary/15 text-primary shadow-[inset_3px_0_0_0_hsl(var(--primary))] dark:bg-primary/20"
+                                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                               )}
                               data-testid={`sidebar-link-${link.path.split('/').pop()}`}
                             >
                               <div className="relative">
-                                <link.icon className={cn("w-4 h-4 flex-shrink-0", isActive(link.path) ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+                                <link.icon className={cn("w-4 h-4 flex-shrink-0 transition-colors", isActive(link.path) ? "text-primary" : "text-sidebar-foreground/60 group-hover:text-sidebar-foreground")} />
                                 {showBadge && (
                                   <div className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
                                     {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
@@ -392,16 +392,16 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
                       >
                         <div
                           className={cn(
-                            "flex items-center justify-center px-2 py-3 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer group relative",
+                            "flex items-center justify-center px-2 py-3 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer group relative",
                             isActive(link.path)
-                              ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_0_hsl(var(--primary))]"
-                              : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                              ? "bg-primary/15 text-primary shadow-[inset_3px_0_0_0_hsl(var(--primary))] dark:bg-primary/20"
+                              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                           )}
                           data-testid={`sidebar-link-${link.path.split('/').pop()}`}
                           title={link.label}
                         >
                           <div className="relative">
-                            <link.icon className={cn("w-4 h-4 flex-shrink-0", isActive(link.path) ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+                            <link.icon className={cn("w-4 h-4 flex-shrink-0 transition-colors", isActive(link.path) ? "text-primary" : "text-sidebar-foreground/60 group-hover:text-sidebar-foreground")} />
                             {showBadge && (
                               <div className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
                                 {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
@@ -427,15 +427,17 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
             else setTheme("light");
           }}
           className={cn(
-            "flex items-center rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-sidebar-accent cursor-pointer transition-all w-full",
+            "flex items-center rounded-lg text-sm font-medium cursor-pointer transition-all w-full border",
+            "text-sidebar-foreground/80 hover:text-sidebar-foreground",
+            "bg-sidebar-accent/50 hover:bg-sidebar-accent border-sidebar-border",
             showCollapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5 text-left"
           )}
           data-testid="sidebar-theme-toggle"
           title={showCollapsed ? (theme === "dark" ? "Dark Mode" : theme === "light" ? "Light Mode" : "System Theme") : undefined}
         >
           <div className="relative w-4 h-4">
-            <Sun className="w-4 h-4 absolute rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="w-4 h-4 absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <Sun className="w-4 h-4 absolute rotate-0 scale-100 transition-all text-amber-500 dark:-rotate-90 dark:scale-0" />
+            <Moon className="w-4 h-4 absolute rotate-90 scale-0 transition-all text-blue-400 dark:rotate-0 dark:scale-100" />
           </div>
           {!showCollapsed && (
             <span>{theme === "dark" ? "Dark Mode" : theme === "light" ? "Light Mode" : "System Theme"}</span>

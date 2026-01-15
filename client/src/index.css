@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  /* Fintech Navy Theme */
+  /* Fintech Navy Theme - Dark Mode (default) */
   --color-background: hsl(222 47% 11%); /* Deep Navy #0f172a */
   --color-foreground: hsl(210 40% 98%); /* White-ish */
 
@@ -43,10 +43,11 @@
   --color-sidebar-foreground: hsl(210 40% 98%);
   --color-sidebar-primary: hsl(217 91% 60%);
   --color-sidebar-primary-foreground: hsl(0 0% 100%);
-  --color-sidebar-accent: hsl(217 33% 15%);
+  --color-sidebar-accent: hsl(217 33% 18%);
   --color-sidebar-accent-foreground: hsl(210 40% 98%);
   --color-sidebar-border: hsl(217 33% 20%);
   --color-sidebar-ring: hsl(217 91% 60%);
+  --color-sidebar-muted: hsl(215 20% 55%);
 
   --font-sans: 'Inter', sans-serif;
   --font-display: 'Plus Jakarta Sans', sans-serif;
@@ -64,6 +65,48 @@
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-display tracking-tight;
+  }
+  
+  /* Light Mode Theme Overrides */
+  .light {
+    --color-background: hsl(0 0% 100%);
+    --color-foreground: hsl(222 47% 11%);
+    
+    --color-card: hsl(0 0% 100%);
+    --color-card-foreground: hsl(222 47% 11%);
+    
+    --color-popover: hsl(0 0% 100%);
+    --color-popover-foreground: hsl(222 47% 11%);
+    
+    --color-primary: hsl(217 91% 50%);
+    --color-primary-foreground: hsl(0 0% 100%);
+    
+    --color-secondary: hsl(220 14% 96%);
+    --color-secondary-foreground: hsl(222 47% 11%);
+    
+    --color-muted: hsl(220 14% 96%);
+    --color-muted-foreground: hsl(215 16% 47%);
+    
+    --color-accent: hsl(220 14% 96%);
+    --color-accent-foreground: hsl(222 47% 11%);
+    
+    --color-destructive: hsl(0 84% 60%);
+    --color-destructive-foreground: hsl(0 0% 100%);
+    
+    --color-border: hsl(220 13% 91%);
+    --color-input: hsl(220 13% 91%);
+    --color-ring: hsl(217 91% 50%);
+    
+    /* Light mode sidebar colors */
+    --color-sidebar: hsl(220 14% 97%);
+    --color-sidebar-foreground: hsl(222 47% 11%);
+    --color-sidebar-primary: hsl(217 91% 50%);
+    --color-sidebar-primary-foreground: hsl(0 0% 100%);
+    --color-sidebar-accent: hsl(220 14% 92%);
+    --color-sidebar-accent-foreground: hsl(222 47% 11%);
+    --color-sidebar-border: hsl(220 13% 88%);
+    --color-sidebar-ring: hsl(217 91% 50%);
+    --color-sidebar-muted: hsl(215 16% 55%);
   }
 }
 
