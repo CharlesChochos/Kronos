@@ -7833,6 +7833,334 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
     }
   });
 
+  // ======== ENHANCED MESSAGING FEATURES ========
+  
+  // Typing indicator - set typing status
+  app.post("/api/chat/conversations/:id/typing", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { isTyping } = req.body;
+      
+      // Verify user is a member
+      const members = await storage.getConversationMembers(req.params.id);
+      if (!members.some(m => m.userId === currentUser.id)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Broadcast typing status via WebSocket if available
+      // For now, just return success - WebSocket implementation is in websocket handler
+      res.json({ 
+        conversationId: req.params.id, 
+        userId: currentUser.id, 
+        userName: currentUser.name,
+        isTyping: !!isTyping 
+      });
+    } catch (error) {
+      console.error('Error setting typing status:', error);
+      res.status(500).json({ error: "Failed to set typing status" });
+    }
+  });
+  
+  // Mark messages as read
+  app.post("/api/chat/conversations/:id/read", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { messageId } = req.body; // Optional - if provided, mark up to this message
+      
+      // Verify user is a member
+      const members = await storage.getConversationMembers(req.params.id);
+      const member = members.find(m => m.userId === currentUser.id);
+      if (!member) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Update last read timestamp and message ID
+      await storage.updateConversationMember(member.id, {
+        lastReadAt: new Date(),
+        lastReadMessageId: messageId || null,
+        unreadCount: 0,
+      });
+      
+      // If messageId provided, mark all messages up to that point as read by this user
+      if (messageId) {
+        const messages = await storage.getMessages(req.params.id);
+        for (const msg of messages) {
+          if (msg.senderId !== currentUser.id) {
+            const readBy = (msg.readBy as any[]) || [];
+            if (!readBy.some(r => r.userId === currentUser.id)) {
+              readBy.push({
+                userId: currentUser.id,
+                userName: currentUser.name,
+                readAt: new Date().toISOString(),
+              });
+              await storage.updateMessage(msg.id, { 
+                readBy,
+                deliveryStatus: 'read'
+              });
+            }
+          }
+          if (msg.id === messageId) break;
+        }
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+      res.status(500).json({ error: "Failed to mark as read" });
+    }
+  });
+  
+  // Edit a message
+  app.patch("/api/chat/conversations/:conversationId/messages/:messageId", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { conversationId, messageId } = req.params;
+      const { content } = req.body;
+      
+      if (!content || typeof content !== 'string' || content.trim().length === 0) {
+        return res.status(400).json({ error: "Message content is required" });
+      }
+      
+      // Verify message exists and belongs to this user
+      const message = await storage.getMessage(messageId);
+      if (!message || message.conversationId !== conversationId) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      if (message.senderId !== currentUser.id) {
+        return res.status(403).json({ error: "You can only edit your own messages" });
+      }
+      
+      // Update message with edited content
+      const updated = await storage.updateMessage(messageId, {
+        content: content.trim(),
+        isEdited: true,
+        editedAt: new Date(),
+      });
+      
+      res.json({
+        ...updated,
+        senderName: currentUser.name,
+      });
+    } catch (error) {
+      console.error('Error editing message:', error);
+      res.status(500).json({ error: "Failed to edit message" });
+    }
+  });
+  
+  // Pin/unpin a conversation
+  app.post("/api/chat/conversations/:id/pin", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { isPinned } = req.body;
+      
+      // Verify user is a member
+      const members = await storage.getConversationMembers(req.params.id);
+      const member = members.find(m => m.userId === currentUser.id);
+      if (!member) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      await storage.updateConversationMember(member.id, {
+        isPinned: !!isPinned,
+      });
+      
+      res.json({ success: true, isPinned: !!isPinned });
+    } catch (error) {
+      console.error('Error pinning conversation:', error);
+      res.status(500).json({ error: "Failed to pin conversation" });
+    }
+  });
+  
+  // Archive/unarchive a conversation
+  app.post("/api/chat/conversations/:id/archive", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { isArchived } = req.body;
+      
+      // Verify user is a member
+      const members = await storage.getConversationMembers(req.params.id);
+      const member = members.find(m => m.userId === currentUser.id);
+      if (!member) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      await storage.updateConversationMember(member.id, {
+        isArchived: !!isArchived,
+      });
+      
+      res.json({ success: true, isArchived: !!isArchived });
+    } catch (error) {
+      console.error('Error archiving conversation:', error);
+      res.status(500).json({ error: "Failed to archive conversation" });
+    }
+  });
+  
+  // Mute/unmute a conversation
+  app.post("/api/chat/conversations/:id/mute", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { isMuted } = req.body;
+      
+      // Verify user is a member
+      const members = await storage.getConversationMembers(req.params.id);
+      const member = members.find(m => m.userId === currentUser.id);
+      if (!member) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      await storage.updateConversationMember(member.id, {
+        isMuted: !!isMuted,
+      });
+      
+      res.json({ success: true, isMuted: !!isMuted });
+    } catch (error) {
+      console.error('Error muting conversation:', error);
+      res.status(500).json({ error: "Failed to mute conversation" });
+    }
+  });
+  
+  // Search messages in a conversation
+  app.get("/api/chat/conversations/:id/search", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { q } = req.query;
+      
+      if (!q || typeof q !== 'string') {
+        return res.status(400).json({ error: "Search query is required" });
+      }
+      
+      // Verify user is a member
+      const members = await storage.getConversationMembers(req.params.id);
+      if (!members.some(m => m.userId === currentUser.id)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const messages = await storage.getMessages(req.params.id);
+      const query = q.toLowerCase();
+      
+      // Filter messages by content
+      const results = messages
+        .filter(msg => 
+          !msg.isDeleted && 
+          msg.content.toLowerCase().includes(query)
+        )
+        .slice(0, 50); // Limit to 50 results
+      
+      // Enrich with sender details
+      const enriched = await Promise.all(
+        results.map(async (msg) => {
+          const sender = await storage.getUser(msg.senderId);
+          return {
+            ...msg,
+            senderName: sender?.name || 'Unknown',
+            senderAvatar: sender?.avatar,
+          };
+        })
+      );
+      
+      res.json(enriched);
+    } catch (error) {
+      console.error('Error searching messages:', error);
+      res.status(500).json({ error: "Failed to search messages" });
+    }
+  });
+  
+  // Forward a message to another conversation
+  app.post("/api/chat/messages/:messageId/forward", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { messageId } = req.params;
+      const { targetConversationId } = req.body;
+      
+      if (!targetConversationId) {
+        return res.status(400).json({ error: "Target conversation is required" });
+      }
+      
+      // Get original message
+      const originalMessage = await storage.getMessage(messageId);
+      if (!originalMessage) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      // Verify user is member of both conversations
+      const sourceMembers = await storage.getConversationMembers(originalMessage.conversationId);
+      const targetMembers = await storage.getConversationMembers(targetConversationId);
+      
+      if (!sourceMembers.some(m => m.userId === currentUser.id)) {
+        return res.status(403).json({ error: "Access denied to source conversation" });
+      }
+      if (!targetMembers.some(m => m.userId === currentUser.id)) {
+        return res.status(403).json({ error: "Access denied to target conversation" });
+      }
+      
+      // Create forwarded message
+      const forwardedMessage = await storage.createMessage({
+        conversationId: targetConversationId,
+        senderId: currentUser.id,
+        content: originalMessage.content,
+        attachments: originalMessage.attachments,
+        forwardedFrom: messageId,
+        messageType: originalMessage.messageType || 'text',
+      });
+      
+      res.json({
+        ...forwardedMessage,
+        senderName: currentUser.name,
+      });
+    } catch (error) {
+      console.error('Error forwarding message:', error);
+      res.status(500).json({ error: "Failed to forward message" });
+    }
+  });
+  
+  // Update user online status
+  app.post("/api/user/online-status", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { isOnline } = req.body;
+      
+      await storage.updateUser(currentUser.id, {
+        isOnline: !!isOnline,
+        lastSeenAt: new Date(),
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating online status:', error);
+      res.status(500).json({ error: "Failed to update online status" });
+    }
+  });
+  
+  // Get online status of users
+  app.get("/api/users/online-status", requireAuth, async (req, res) => {
+    try {
+      const { userIds } = req.query;
+      
+      if (!userIds || typeof userIds !== 'string') {
+        return res.status(400).json({ error: "User IDs required" });
+      }
+      
+      const ids = userIds.split(',');
+      const statuses: Record<string, { isOnline: boolean; lastSeenAt: string | null }> = {};
+      
+      for (const id of ids) {
+        const user = await storage.getUser(id);
+        if (user) {
+          statuses[id] = {
+            isOnline: user.isOnline || false,
+            lastSeenAt: user.lastSeenAt?.toISOString() || null,
+          };
+        }
+      }
+      
+      res.json(statuses);
+    } catch (error) {
+      console.error('Error fetching online status:', error);
+      res.status(500).json({ error: "Failed to fetch online status" });
+    }
+  });
+
   // Send message to user by name (for Reaper assistant integration)
   app.post("/api/chat/send-to-user", requireAuth, async (req, res) => {
     try {

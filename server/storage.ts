@@ -80,6 +80,7 @@ export interface IStorage {
   updateConversation(id: string, updates: Partial<InsertConversation>): Promise<Conversation | undefined>;
   addConversationMember(conversationId: string, userId: string): Promise<ConversationMember>;
   getConversationMembers(conversationId: string): Promise<ConversationMember[]>;
+  updateConversationMember(id: string, updates: Partial<ConversationMember>): Promise<ConversationMember | undefined>;
   
   // Chat message operations
   getMessages(conversationId: string): Promise<Message[]>;
@@ -847,6 +848,14 @@ export class DatabaseStorage implements IStorage {
     return await db.select()
       .from(schema.conversationMembers)
       .where(eq(schema.conversationMembers.conversationId, conversationId));
+  }
+
+  async updateConversationMember(id: string, updates: Partial<ConversationMember>): Promise<ConversationMember | undefined> {
+    const [updated] = await db.update(schema.conversationMembers)
+      .set(updates as any)
+      .where(eq(schema.conversationMembers.id, id))
+      .returning();
+    return updated;
   }
   
   // Chat message operations

@@ -25,6 +25,7 @@ import {
   MessageCircle,
   X,
   Check,
+  CheckCheck,
   Loader2,
   Download,
   Trash2,
@@ -39,6 +40,7 @@ import {
   Play,
   Pause,
   Pin,
+  PinOff,
   ImageIcon,
   Link,
   FileText,
@@ -46,7 +48,13 @@ import {
   ChevronDown,
   Volume2,
   ArrowLeft,
-  ChevronRight
+  ChevronRight,
+  Archive,
+  ArchiveX,
+  Forward,
+  Reply,
+  Circle,
+  Clock
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCurrentUser, useUsers } from "@/lib/api";
@@ -67,6 +75,12 @@ type MessageReaction = {
   createdAt: string;
 };
 
+type MessageReadReceipt = {
+  userId: string;
+  userName: string;
+  readAt: string;
+};
+
 type Message = {
   id: string;
   senderId: string;
@@ -76,13 +90,22 @@ type Message = {
   createdAt: string;
   attachments?: { id: string; filename: string; url: string; size: number; type: string }[];
   reactions?: MessageReaction[];
+  readBy?: MessageReadReceipt[];
   replyToMessageId?: string | null;
+  messageType?: string;
+  deliveryStatus?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+  isEdited?: boolean;
+  editedAt?: string;
+  isDeleted?: boolean;
+  forwardedFrom?: string | null;
 };
 
 type ConversationMember = {
   id: string;
   name: string;
   avatar?: string;
+  isOnline?: boolean;
+  lastSeenAt?: string;
 };
 
 type Conversation = {
@@ -97,6 +120,14 @@ type Conversation = {
     createdAt: string;
   } | null;
   unreadCount: number;
+  isPinned?: boolean;
+  isArchived?: boolean;
+  isMuted?: boolean;
+};
+
+type TypingUser = {
+  id: string;
+  name: string;
 };
 
 export default function Chat({ role }: ChatProps) {
@@ -179,6 +210,16 @@ export default function Chat({ role }: ChatProps) {
   
   // Reaction details popover
   const [showReactionDetails, setShowReactionDetails] = useState<string | null>(null);
+  
+  // Enhanced messaging features
+  const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [messageSearchQuery, setMessageSearchQuery] = useState("");
+  const [isSearchingMessages, setIsSearchingMessages] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTypingRef = useRef<number>(0);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -303,6 +344,90 @@ export default function Chat({ role }: ChatProps) {
     },
   });
 
+  // Edit message mutation
+  const editMessageMutation = useMutation({
+    mutationFn: async ({ conversationId, messageId, content }: { conversationId: string; messageId: string; content: string }) => {
+      const res = await fetch(`/api/chat/conversations/${conversationId}/messages/${messageId}`, { 
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) throw new Error("Failed to edit message");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/chat/conversations/${selectedConversationId}/messages`] });
+      setEditingMessage(null);
+      setEditContent("");
+      toast.success("Message edited");
+    },
+  });
+
+  // Pin conversation mutation
+  const pinConversationMutation = useMutation({
+    mutationFn: async ({ conversationId, isPinned }: { conversationId: string; isPinned: boolean }) => {
+      const res = await fetch(`/api/chat/conversations/${conversationId}/pin`, { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPinned }),
+      });
+      if (!res.ok) throw new Error("Failed to pin conversation");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      toast.success(variables.isPinned ? "Conversation pinned" : "Conversation unpinned");
+    },
+  });
+
+  // Archive conversation mutation
+  const archiveConversationMutation = useMutation({
+    mutationFn: async ({ conversationId, isArchived }: { conversationId: string; isArchived: boolean }) => {
+      const res = await fetch(`/api/chat/conversations/${conversationId}/archive`, { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isArchived }),
+      });
+      if (!res.ok) throw new Error("Failed to archive conversation");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      toast.success(variables.isArchived ? "Conversation archived" : "Conversation unarchived");
+    },
+  });
+
+  // Mark messages as read mutation
+  const markAsReadMutation = useMutation({
+    mutationFn: async ({ conversationId, messageId }: { conversationId: string; messageId?: string }) => {
+      const res = await fetch(`/api/chat/conversations/${conversationId}/read`, { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId }),
+      });
+      if (!res.ok) throw new Error("Failed to mark as read");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/chat/conversations/${selectedConversationId}/messages`] });
+    },
+  });
+
+  // Send typing indicator
+  const sendTypingIndicator = async (isTyping: boolean) => {
+    if (!selectedConversationId) return;
+    try {
+      await fetch(`/api/chat/conversations/${selectedConversationId}/typing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isTyping }),
+      });
+    } catch (error) {
+      console.error('Failed to send typing indicator');
+    }
+  };
+
   const handleUnsendMessage = async (messageId: string) => {
     if (!selectedConversationId) return;
     try {
@@ -373,6 +498,154 @@ export default function Chat({ role }: ChatProps) {
     if (!replyToMessageId) return null;
     return messages.find(m => m.id === replyToMessageId);
   };
+
+  // Date grouping helper
+  const getDateLabel = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (date.toDateString() === today.toDateString()) return "Today";
+    if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+    
+    const diffDays = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays < 7) {
+      return format(date, 'EEEE');
+    }
+    return format(date, 'MMMM d, yyyy');
+  };
+
+  // Group messages by date
+  const messagesWithDateHeaders = useMemo(() => {
+    if (!messages.length) return [];
+    
+    const result: { type: 'date' | 'message'; date?: string; message?: Message }[] = [];
+    let lastDate = '';
+    
+    for (const msg of messages) {
+      const msgDate = new Date(msg.createdAt).toDateString();
+      if (msgDate !== lastDate) {
+        result.push({ type: 'date', date: getDateLabel(msg.createdAt) });
+        lastDate = msgDate;
+      }
+      result.push({ type: 'message', message: msg });
+    }
+    
+    return result;
+  }, [messages]);
+
+  // Handle edit message
+  const handleEditMessage = async () => {
+    if (!editingMessage || !selectedConversationId || !editContent.trim()) return;
+    try {
+      await editMessageMutation.mutateAsync({
+        conversationId: selectedConversationId,
+        messageId: editingMessage.id,
+        content: editContent.trim(),
+      });
+    } catch (error) {
+      toast.error("Failed to edit message");
+    }
+  };
+
+  // Handle pin/unpin conversation
+  const handlePinConversation = async (conversationId: string, isPinned: boolean) => {
+    try {
+      await pinConversationMutation.mutateAsync({ conversationId, isPinned });
+    } catch (error) {
+      toast.error("Failed to update pin status");
+    }
+  };
+
+  // Handle archive/unarchive conversation  
+  const handleArchiveConversation = async (conversationId: string, isArchived: boolean) => {
+    try {
+      await archiveConversationMutation.mutateAsync({ conversationId, isArchived });
+    } catch (error) {
+      toast.error("Failed to archive conversation");
+    }
+  };
+
+  // Handle typing on message input
+  const handleTypingInput = (value: string) => {
+    setMessageInput(value);
+    
+    const now = Date.now();
+    if (now - lastTypingRef.current > 2000) {
+      sendTypingIndicator(true);
+      lastTypingRef.current = now;
+    }
+    
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    typingTimeoutRef.current = setTimeout(() => {
+      sendTypingIndicator(false);
+    }, 3000);
+  };
+
+  // Get delivery status icon
+  const getDeliveryStatusIcon = (status: string | undefined, readBy: MessageReadReceipt[] | undefined) => {
+    if (readBy && readBy.length > 0) {
+      return <CheckCheck className="w-3.5 h-3.5 text-blue-500" />;
+    }
+    switch (status) {
+      case 'sending':
+        return <Clock className="w-3 h-3 text-muted-foreground animate-pulse" />;
+      case 'sent':
+        return <Check className="w-3.5 h-3.5 text-muted-foreground" />;
+      case 'delivered':
+        return <CheckCheck className="w-3.5 h-3.5 text-muted-foreground" />;
+      case 'read':
+        return <CheckCheck className="w-3.5 h-3.5 text-blue-500" />;
+      case 'failed':
+        return <X className="w-3 h-3 text-red-500" />;
+      default:
+        return <Check className="w-3.5 h-3.5 text-muted-foreground" />;
+    }
+  };
+
+  // Filter conversations by pinned/archived
+  const filteredConversations = useMemo(() => {
+    let filtered = conversations;
+    
+    if (!showArchived) {
+      filtered = filtered.filter(c => !c.isArchived);
+    } else {
+      filtered = filtered.filter(c => c.isArchived);
+    }
+    
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(c => 
+        c.name?.toLowerCase().includes(query) ||
+        c.members.some(m => m.name.toLowerCase().includes(query))
+      );
+    }
+    
+    // Sort: pinned first, then by last message
+    return filtered.sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      const aTime = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
+      const bTime = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
+      return bTime - aTime;
+    });
+  }, [conversations, searchQuery, showArchived]);
+
+  // Mark conversation as read when opened
+  useEffect(() => {
+    if (selectedConversationId && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.senderId !== currentUser?.id) {
+        markAsReadMutation.mutate({
+          conversationId: selectedConversationId,
+          messageId: lastMessage.id,
+        });
+      }
+    }
+  }, [selectedConversationId, messages.length]);
 
   // Voice recording handlers
   const startRecording = async () => {
@@ -844,17 +1117,27 @@ export default function Chat({ role }: ChatProps) {
                       )}
                       data-testid={`conversation-item-${conv.id}`}
                     >
-                      <Avatar className="w-12 h-12 md:w-10 md:h-10 flex-shrink-0">
-                        <AvatarFallback className={cn(
-                          "text-sm md:text-xs font-medium",
-                          conv.isGroup ? "bg-primary/20 text-primary" : "bg-blue-500/20 text-blue-500"
-                        )}>
-                          {getConversationDisplayName(conv).split(' ').map(n => n[0]).join('').slice(0, 2)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <div className="relative">
+                        <Avatar className="w-12 h-12 md:w-10 md:h-10 flex-shrink-0">
+                          <AvatarFallback className={cn(
+                            "text-sm md:text-xs font-medium",
+                            conv.isGroup ? "bg-primary/20 text-primary" : "bg-blue-500/20 text-blue-500"
+                          )}>
+                            {getConversationDisplayName(conv).split(' ').map(n => n[0]).join('').slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        {!conv.isGroup && conv.members.some(m => m.id !== currentUser?.id && m.isOnline) && (
+                          <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full" />
+                        )}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <p className="font-medium text-base md:text-sm truncate">{getConversationDisplayName(conv)}</p>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {conv.isPinned && (
+                              <Pin className="w-3 h-3 text-primary flex-shrink-0" />
+                            )}
+                            <p className="font-medium text-base md:text-sm truncate">{getConversationDisplayName(conv)}</p>
+                          </div>
                           {conv.lastMessage?.createdAt && (
                             <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
                               {format(new Date(conv.lastMessage.createdAt), 'HH:mm')}
@@ -1099,12 +1382,40 @@ export default function Chat({ role }: ChatProps) {
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                     </div>
-                  ) : messages.length > 0 ? (
+                  ) : messagesWithDateHeaders.length > 0 ? (
                     <div className="space-y-4">
-                      {messages.map(message => {
+                      {messagesWithDateHeaders.map((item, idx) => {
+                        if (item.type === 'date') {
+                          return (
+                            <div key={`date-${idx}`} className="flex justify-center my-4">
+                              <span className="px-3 py-1 text-xs font-medium text-muted-foreground bg-secondary/50 rounded-full">
+                                {item.date}
+                              </span>
+                            </div>
+                          );
+                        }
+                        
+                        const message = item.message!;
                         const isOwnMessage = message.senderId === currentUser?.id;
                         const replyMessage = getReplyMessage(message.replyToMessageId);
                         const groupedReactions = groupReactions(message.reactions);
+                        
+                        if (message.isDeleted) {
+                          return (
+                            <div 
+                              key={message.id}
+                              className={cn("flex gap-2 md:gap-3 px-2 md:px-0", isOwnMessage && "flex-row-reverse")}
+                            >
+                              <div className={cn(
+                                "px-4 py-2.5 rounded-[20px] italic text-muted-foreground bg-secondary/30",
+                                isOwnMessage ? "rounded-br-md" : "rounded-bl-md"
+                              )}>
+                                This message was deleted
+                              </div>
+                            </div>
+                          );
+                        }
+                        
                         return (
                           <div 
                             key={message.id} 
@@ -1245,6 +1556,22 @@ export default function Chat({ role }: ChatProps) {
                                     <Pin className="w-3 h-3" />
                                   </Button>
                                   
+                                  {/* Edit button (own messages only) */}
+                                  {isOwnMessage && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                      onClick={() => {
+                                        setEditingMessage(message);
+                                        setEditContent(message.content);
+                                      }}
+                                      data-testid={`button-edit-${message.id}`}
+                                    >
+                                      <Pencil className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                  
                                   {/* Unsend button (own messages only) */}
                                   {isOwnMessage && (
                                     <Button
@@ -1255,7 +1582,7 @@ export default function Chat({ role }: ChatProps) {
                                       disabled={deleteMessageMutation.isPending}
                                       data-testid={`button-unsend-${message.id}`}
                                     >
-                                      <X className="w-3 h-3" />
+                                      <Trash2 className="w-3 h-3" />
                                     </Button>
                                   )}
                                 </div>
@@ -1309,12 +1636,22 @@ export default function Chat({ role }: ChatProps) {
                               )}
                               
                               {chatSettings.showTimestamps && (
-                                <p className={cn(
-                                  "text-xs text-muted-foreground mt-1",
-                                  isOwnMessage && "text-right"
+                                <div className={cn(
+                                  "flex items-center gap-1.5 text-xs text-muted-foreground mt-1",
+                                  isOwnMessage && "justify-end"
                                 )}>
-                                  {format(new Date(message.createdAt), 'HH:mm')}
-                                </p>
+                                  {message.isEdited && (
+                                    <span className="italic text-[10px]">edited</span>
+                                  )}
+                                  {message.forwardedFrom && (
+                                    <span className="flex items-center gap-0.5 text-[10px]">
+                                      <Forward className="w-2.5 h-2.5" />
+                                      forwarded
+                                    </span>
+                                  )}
+                                  <span>{format(new Date(message.createdAt), 'HH:mm')}</span>
+                                  {isOwnMessage && getDeliveryStatusIcon(message.deliveryStatus, message.readBy)}
+                                </div>
                               )}
                             </div>
                           </div>
@@ -1332,13 +1669,63 @@ export default function Chat({ role }: ChatProps) {
                 </ScrollArea>
               </div>
 
+              {/* Typing Indicator */}
+              {typingUsers.length > 0 && (
+                <div className="px-4 py-1.5 text-sm text-muted-foreground flex items-center gap-2">
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                  <span className="text-xs">
+                    {typingUsers.length === 1 
+                      ? `${typingUsers[0].name} is typing...`
+                      : `${typingUsers.length} people are typing...`
+                    }
+                  </span>
+                </div>
+              )}
+
               {/* Message Input - Mobile optimized with safe area */}
               <div className="p-3 md:p-4 border-t border-border bg-card pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-4">
+                {/* Edit message indicator */}
+                {editingMessage && (
+                  <div className="flex items-center justify-between bg-primary/10 border border-primary/20 rounded-lg px-3 py-2 mb-2">
+                    <div className="flex items-center gap-2 text-sm min-w-0">
+                      <Pencil className="w-4 h-4 text-primary flex-shrink-0" />
+                      <span className="text-primary font-medium">Editing message</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          setEditingMessage(null);
+                          setEditContent("");
+                        }}
+                        data-testid="button-cancel-edit"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={handleEditMessage}
+                        disabled={!editContent.trim() || editMessageMutation.isPending}
+                        data-testid="button-save-edit"
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
                 {/* Reply indicator */}
-                {replyToMessage && (
+                {replyToMessage && !editingMessage && (
                   <div className="flex items-center justify-between bg-secondary/50 rounded-lg px-3 py-2 mb-2">
                     <div className="flex items-center gap-2 text-sm min-w-0">
-                      <MessageCircle className="w-4 h-4 text-primary flex-shrink-0" />
+                      <Reply className="w-4 h-4 text-primary flex-shrink-0" />
                       <span className="text-muted-foreground hidden sm:inline">Replying to</span>
                       <span className="font-medium truncate">{replyToMessage.senderName}</span>
                       <span className="text-muted-foreground truncate hidden md:inline max-w-[200px]">
