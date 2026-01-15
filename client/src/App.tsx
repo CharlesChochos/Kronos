@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { WelcomeModal } from "@/components/WelcomeModal";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { NotificationPermissionPrompt } from "@/components/NotificationPermissionPrompt";
 
 // Loading component for lazy-loaded routes
 const PageLoader = () => (
@@ -403,6 +404,7 @@ function App() {
             </WelcomeModalWrapper>
             <PWAInstallPrompt />
             <MobileBottomNav />
+            <NotificationPermissionPrompt />
           </TooltipProvider>
         </DashboardProvider>
       </QueryClientProvider>

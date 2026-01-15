@@ -4485,12 +4485,24 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
   // Create task (any authenticated user)
   app.post("/api/tasks", generalLimiter, requireAuth, async (req, res) => {
     try {
+      const currentUser = req.user as any;
       const result = insertTaskSchema.safeParse(req.body);
       if (!result.success) {
         return res.status(400).json({ error: fromError(result.error).toString() });
       }
       const task = await storage.createTask(result.data);
       await createAuditLog(req, 'task_created', 'task', task.id, task.title, { priority: task.priority, assignedTo: task.assignedTo, dueDate: task.dueDate });
+      
+      // Send push notification to assigned user
+      if (task.assignedTo && task.assignedTo !== currentUser.id) {
+        try {
+          const { notifyTaskAssignment } = await import('./services/pushNotifications');
+          await notifyTaskAssignment(task.assignedTo, currentUser.name, task.title, task.id);
+        } catch (pushError) {
+          console.error('Push notification error:', pushError);
+        }
+      }
+      
       res.json(task);
     } catch (error) {
       res.status(500).json({ error: "Failed to create task" });
@@ -4590,6 +4602,16 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
           onTaskCompleted(existingTask.dealId, currentUser.id, existingTask.id).catch(err => {
             console.error('[AI Reoptimization] Error on task completion:', err);
           });
+        }
+        
+        // Send push notification if task was reassigned
+        if (changes.assignedTo && changes.assignedTo.to !== currentUser.id) {
+          try {
+            const { notifyTaskAssignment } = await import('./services/pushNotifications');
+            await notifyTaskAssignment(changes.assignedTo.to, currentUser.name, existingTask.title, existingTask.id);
+          } catch (pushError) {
+            console.error('Push notification error:', pushError);
+          }
         }
       }
       res.json(task);
@@ -7544,6 +7566,37 @@ ${Object.entries(investors.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0)
             link: '/ceo/chat',
           });
         }
+      }
+      
+      // Send push notifications to all recipients
+      try {
+        const { notifyNewMessage, notifyMention } = await import('./services/pushNotifications');
+        
+        // Push for mentions (high priority)
+        for (const mentionedUserId of mentionedSet) {
+          if (mentionedUserId !== currentUser.id) {
+            await notifyMention(
+              mentionedUserId,
+              currentUser.name,
+              content.slice(0, 100),
+              '/employee/chat'
+            );
+          }
+        }
+        
+        // Push for regular messages
+        for (const member of members) {
+          if (member.userId !== currentUser.id && !mentionedSet.has(member.userId)) {
+            await notifyNewMessage(
+              member.userId,
+              currentUser.name,
+              content.slice(0, 100),
+              req.params.id
+            );
+          }
+        }
+      } catch (pushError) {
+        console.error('Push notification error:', pushError);
       }
       
       res.json({
@@ -11405,6 +11458,99 @@ Only include entries with both name AND company. Extract ALL rows.`
     } catch (error) {
       console.error('Cancel review error:', error);
       res.status(500).json({ error: "Failed to cancel review" });
+    }
+  });
+
+  // =============================================
+  // Push Notification Routes
+  // =============================================
+
+  // Get VAPID public key for client-side subscription
+  app.get("/api/push/vapid-public-key", async (req, res) => {
+    const publicKey = process.env.VAPID_PUBLIC_KEY || '';
+    res.json({ publicKey });
+  });
+
+  // Subscribe to push notifications
+  app.post("/api/push/subscribe", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { subscription } = req.body;
+
+      if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
+        return res.status(400).json({ error: "Invalid subscription data" });
+      }
+
+      // Check if subscription already exists
+      const existing = await storage.getPushSubscriptionByEndpoint(subscription.endpoint);
+      if (existing) {
+        return res.json({ success: true, message: "Already subscribed" });
+      }
+
+      await storage.createPushSubscription({
+        userId: user.id,
+        endpoint: subscription.endpoint,
+        p256dh: subscription.keys.p256dh,
+        auth: subscription.keys.auth,
+        userAgent: req.headers['user-agent'] || null,
+      });
+
+      res.json({ success: true, message: "Subscribed to notifications" });
+    } catch (error) {
+      console.error('Push subscribe error:', error);
+      res.status(500).json({ error: "Failed to subscribe" });
+    }
+  });
+
+  // Unsubscribe from push notifications
+  app.post("/api/push/unsubscribe", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { endpoint } = req.body;
+
+      if (!endpoint) {
+        return res.status(400).json({ error: "Endpoint is required" });
+      }
+
+      await storage.deletePushSubscriptionByEndpoint(endpoint);
+      res.json({ success: true, message: "Unsubscribed from notifications" });
+    } catch (error) {
+      console.error('Push unsubscribe error:', error);
+      res.status(500).json({ error: "Failed to unsubscribe" });
+    }
+  });
+
+  // Get user's push subscription status
+  app.get("/api/push/status", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const subscriptions = await storage.getUserPushSubscriptions(user.id);
+      res.json({ 
+        subscribed: subscriptions.length > 0,
+        subscriptionCount: subscriptions.length 
+      });
+    } catch (error) {
+      console.error('Push status error:', error);
+      res.status(500).json({ error: "Failed to get status" });
+    }
+  });
+
+  // Test push notification (for debugging)
+  app.post("/api/push/test", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { sendPushNotification } = await import('./services/pushNotifications');
+      
+      const result = await sendPushNotification(user.id, {
+        title: 'Test Notification',
+        body: 'Push notifications are working!',
+        url: '/'
+      });
+
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error('Test push error:', error);
+      res.status(500).json({ error: "Failed to send test notification" });
     }
   });
 

@@ -381,6 +381,12 @@ export interface IStorage {
   getDealCommitteeComments(reviewId: string): Promise<schema.DealCommitteeComment[]>;
   createDealCommitteeComment(comment: schema.InsertDealCommitteeComment): Promise<schema.DealCommitteeComment>;
   deleteDealCommitteeComment(id: string): Promise<void>;
+  
+  // Push Subscription operations
+  getPushSubscriptionByEndpoint(endpoint: string): Promise<schema.PushSubscription | undefined>;
+  getUserPushSubscriptions(userId: string): Promise<schema.PushSubscription[]>;
+  createPushSubscription(subscription: schema.InsertPushSubscription): Promise<schema.PushSubscription>;
+  deletePushSubscriptionByEndpoint(endpoint: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2581,6 +2587,30 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDealCommitteeComment(id: string): Promise<void> {
     await db.delete(schema.dealCommitteeComments).where(eq(schema.dealCommitteeComments.id, id));
+  }
+
+  // ================================
+  // PUSH SUBSCRIPTION OPERATIONS
+  // ================================
+
+  async getPushSubscriptionByEndpoint(endpoint: string): Promise<schema.PushSubscription | undefined> {
+    const [subscription] = await db.select().from(schema.pushSubscriptions)
+      .where(eq(schema.pushSubscriptions.endpoint, endpoint));
+    return subscription;
+  }
+
+  async getUserPushSubscriptions(userId: string): Promise<schema.PushSubscription[]> {
+    return await db.select().from(schema.pushSubscriptions)
+      .where(eq(schema.pushSubscriptions.userId, userId));
+  }
+
+  async createPushSubscription(subscription: schema.InsertPushSubscription): Promise<schema.PushSubscription> {
+    const [created] = await db.insert(schema.pushSubscriptions).values(subscription).returning();
+    return created;
+  }
+
+  async deletePushSubscriptionByEndpoint(endpoint: string): Promise<void> {
+    await db.delete(schema.pushSubscriptions).where(eq(schema.pushSubscriptions.endpoint, endpoint));
   }
 }
 
