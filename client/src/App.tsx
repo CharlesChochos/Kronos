@@ -9,6 +9,8 @@ import { useEffect, lazy, Suspense, useCallback, useRef, useState } from "react"
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { toast } from "sonner";
 import { WelcomeModal } from "@/components/WelcomeModal";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 
 // Loading component for lazy-loaded routes
 const PageLoader = () => (
@@ -399,6 +401,8 @@ function App() {
             <WelcomeModalWrapper>
               <Router />
             </WelcomeModalWrapper>
+            <PWAInstallPrompt />
+            <MobileBottomNav />
           </TooltipProvider>
         </DashboardProvider>
       </QueryClientProvider>
