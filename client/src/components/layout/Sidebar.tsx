@@ -26,8 +26,11 @@ import {
   ClipboardCheck,
   Brain,
   Clock,
-  Archive
+  Archive,
+  Moon,
+  Sun
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { useUserPreferences, useSaveUserPreferences, useCurrentUser } from "@/lib/api";
 import { useDashboardContext } from "@/contexts/DashboardContext";
@@ -60,6 +63,7 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
   const queryClient = useQueryClient();
   const { data: userPrefs, isLoading: prefsLoading } = useUserPreferences();
   const saveUserPrefs = useSaveUserPreferences();
+  const { setTheme, theme } = useTheme();
   
   // Expanded categories state - persist to user_preferences.settings.sidebarCategories
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
@@ -415,7 +419,28 @@ export function Sidebar({ role, collapsed = false, inMobileDrawer = false }: Sid
         })}
       </div>
 
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="p-4 border-t border-sidebar-border space-y-3">
+        <button
+          onClick={() => {
+            if (theme === "light") setTheme("dark");
+            else if (theme === "dark") setTheme("system");
+            else setTheme("light");
+          }}
+          className={cn(
+            "flex items-center rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-sidebar-accent cursor-pointer transition-all w-full",
+            showCollapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5 text-left"
+          )}
+          data-testid="sidebar-theme-toggle"
+          title={showCollapsed ? (theme === "dark" ? "Dark Mode" : theme === "light" ? "Light Mode" : "System Theme") : undefined}
+        >
+          <div className="relative w-4 h-4">
+            <Sun className="w-4 h-4 absolute rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="w-4 h-4 absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          </div>
+          {!showCollapsed && (
+            <span>{theme === "dark" ? "Dark Mode" : theme === "light" ? "Light Mode" : "System Theme"}</span>
+          )}
+        </button>
         <button
           onClick={openAIAssistant}
           className={cn(

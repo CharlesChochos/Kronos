@@ -3,6 +3,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "next-themes";
 import { useCurrentUser, onSessionExpired, useUserPreferences, useUpdateUserPreferences } from "@/lib/api";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useEffect, lazy, Suspense, useCallback, useRef, useState } from "react";
@@ -397,18 +398,20 @@ function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <DashboardProvider>
-          <TooltipProvider>
-            <Toaster />
-            <WelcomeModalWrapper>
-              <Router />
-            </WelcomeModalWrapper>
-            <PWAInstallPrompt />
-            <MobileBottomNav />
-            <NotificationPermissionPrompt />
-            <PWAFeatures />
-          </TooltipProvider>
-        </DashboardProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <DashboardProvider>
+            <TooltipProvider>
+              <Toaster />
+              <WelcomeModalWrapper>
+                <Router />
+              </WelcomeModalWrapper>
+              <PWAInstallPrompt />
+              <MobileBottomNav />
+              <NotificationPermissionPrompt />
+              <PWAFeatures />
+            </TooltipProvider>
+          </DashboardProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );
