@@ -3105,12 +3105,23 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
     try {
       const user = req.user as any;
       
-      // Set default values for optional fields if not provided
+      console.log('[Deal Creation] Incoming request body:', JSON.stringify(req.body));
+      
+      // Set default values for all required fields if not provided
       const dealData = {
         ...req.body,
+        name: req.body.name || 'Untitled Opportunity',
+        client: req.body.client || 'Unknown Client',
+        sector: req.body.sector || 'Technology',
         lead: req.body.lead || user.name || 'Unassigned',
         value: typeof req.body.value === 'number' ? req.body.value : (parseInt(req.body.value) || 0),
+        dealType: req.body.dealType || 'Opportunity',
+        stage: req.body.stage || 'Origination',
+        status: req.body.status || 'Active',
+        progress: typeof req.body.progress === 'number' ? req.body.progress : 0,
       };
+      
+      console.log('[Deal Creation] Processed deal data:', JSON.stringify(dealData));
       
       const result = insertDealSchema.safeParse(dealData);
       if (!result.success) {
