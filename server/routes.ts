@@ -4262,13 +4262,55 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
   app.post("/api/tasks/:taskId/comments", requireAuth, requireInternal, async (req, res) => {
     try {
       const user = req.user as any;
+      const content = req.body.content;
       const comment = await storage.createTaskComment({
         taskId: req.params.taskId,
         userId: user.id,
         userName: user.name,
         userAvatar: user.avatar,
-        content: req.body.content,
+        content,
       });
+      
+      // Parse @mentions and create notifications + push notifications
+      const mentionMatches = content.match(/@(\w+)/g);
+      if (mentionMatches) {
+        const allUsers = await storage.getAllUsers();
+        const task = await storage.getTask(req.params.taskId);
+        const taskTitle = task?.title || 'a task';
+        const uniqueMentions = [...new Set(mentionMatches)];
+        
+        for (const mention of uniqueMentions) {
+          const mentionName = mention.slice(1).toLowerCase();
+          const mentionedUser = allUsers.find(u => 
+            u.name.replace(/\s+/g, '').toLowerCase() === mentionName
+          );
+          
+          if (mentionedUser && mentionedUser.id !== user.id) {
+            // Create in-app notification
+            await storage.createNotification({
+              userId: mentionedUser.id,
+              title: 'You were mentioned',
+              message: `${user.name} mentioned you in a comment on "${taskTitle}"`,
+              type: 'info',
+              link: `/employee/tasks?taskId=${req.params.taskId}`,
+            });
+            
+            // Send push notification
+            try {
+              const { notifyMention } = await import('./services/pushNotifications');
+              await notifyMention(
+                mentionedUser.id,
+                user.name,
+                `Mentioned you in a comment on "${taskTitle}"`,
+                `/employee/tasks?taskId=${req.params.taskId}`
+              );
+            } catch (pushError) {
+              console.error('Push notification error:', pushError);
+            }
+          }
+        }
+      }
+      
       res.json(comment);
     } catch (error) {
       res.status(500).json({ error: "Failed to create task comment" });
@@ -4350,6 +4392,19 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
               type: 'info',
               link: notificationLink,
             });
+            
+            // Send push notification
+            try {
+              const { notifyMention } = await import('./services/pushNotifications');
+              await notifyMention(
+                mentionedUser.id,
+                user.name,
+                `Mentioned you in a note on "${dealName}"`,
+                notificationLink
+              );
+            } catch (pushError) {
+              console.error('Push notification error:', pushError);
+            }
           }
         }
       }
@@ -11377,6 +11432,46 @@ Only include entries with both name AND company. Extract ALL rows.`
       });
 
       const commentWithUser = { ...comment, user: { id: user.id, name: user.name, avatar: user.avatar } };
+      
+      // Parse @mentions and send push notifications
+      const mentionMatches = content.match(/@(\w+)/g);
+      if (mentionMatches) {
+        const allUsers = await storage.getAllUsers();
+        const deal = review.dealId ? await storage.getDeal(review.dealId) : null;
+        const dealName = deal?.name || 'a deal';
+        const uniqueMentions = [...new Set(mentionMatches)];
+        
+        for (const mention of uniqueMentions) {
+          const mentionName = mention.slice(1).toLowerCase();
+          const mentionedUser = allUsers.find(u => 
+            u.name.replace(/\s+/g, '').toLowerCase() === mentionName
+          );
+          
+          if (mentionedUser && mentionedUser.id !== user.id) {
+            // Create in-app notification
+            await storage.createNotification({
+              userId: mentionedUser.id,
+              title: 'You were mentioned',
+              message: `${user.name} mentioned you in a committee comment on "${dealName}"`,
+              type: 'info',
+              link: `/ceo/deals?id=${review.dealId}`,
+            });
+            
+            // Send push notification
+            try {
+              const { notifyMention } = await import('./services/pushNotifications');
+              await notifyMention(
+                mentionedUser.id,
+                user.name,
+                `Mentioned you in a committee comment on "${dealName}"`,
+                `/ceo/deals?id=${review.dealId}`
+              );
+            } catch (pushError) {
+              console.error('Push notification error:', pushError);
+            }
+          }
+        }
+      }
 
       res.json({ comment: commentWithUser });
     } catch (error) {
