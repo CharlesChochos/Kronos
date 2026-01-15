@@ -1,5 +1,5 @@
 import { useLocation } from 'wouter';
-import { Home, Briefcase, CheckSquare, User, Lightbulb } from 'lucide-react';
+import { Home, Briefcase, CheckSquare, Lightbulb, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCurrentUser } from '@/lib/api';
 
@@ -7,7 +7,6 @@ interface NavItem {
   icon: React.ElementType;
   label: string;
   path: string;
-  adminOnly?: boolean;
 }
 
 export function MobileBottomNav() {
@@ -22,14 +21,15 @@ export function MobileBottomNav() {
         { icon: Home, label: 'Home', path: '/ceo/dashboard' },
         { icon: Lightbulb, label: 'Opportunities', path: '/ceo/opportunities' },
         { icon: Briefcase, label: 'Deals', path: '/ceo/deals' },
+        { icon: Building2, label: 'Assets', path: '/employee/asset-management' },
         { icon: CheckSquare, label: 'Tasks', path: '/ceo/tasks' },
-        { icon: User, label: 'Profile', path: '/ceo/dashboard' },
       ]
     : [
         { icon: Home, label: 'Home', path: '/employee/home' },
-        { icon: Briefcase, label: 'Deals', path: '/employee/deals' },
+        { icon: Lightbulb, label: 'Opportunities', path: '/ceo/opportunities' },
+        { icon: Briefcase, label: 'Deals', path: '/ceo/deals' },
+        { icon: Building2, label: 'Assets', path: '/employee/asset-management' },
         { icon: CheckSquare, label: 'Tasks', path: '/employee/tasks' },
-        { icon: User, label: 'Profile', path: '/employee/home' },
       ];
 
   const isActive = (path: string) => {
