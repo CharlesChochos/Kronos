@@ -1044,11 +1044,6 @@ export default function Chat({ role }: ChatProps) {
     }
   };
 
-  const filteredConversations = conversations.filter(conv =>
-    (conv.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-    conv.members.some(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-
   const selectedConversation = conversations.find(c => c.id === selectedConversationId);
 
   const getConversationDisplayName = (conv: Conversation) => {
