@@ -73,9 +73,8 @@ export async function registerRoutes(
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-        sameSite: 'strict', // Stricter CSRF protection
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours max session lifetime
-        // No maxAge set by default = session cookie that expires on browser close
+        sameSite: 'lax', // Allow navigation from external links (push notifications)
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days persistent login for PWA
       },
     })
   );
@@ -292,16 +291,9 @@ export async function registerRoutes(
           return res.status(500).json({ error: "Login error" });
         }
         
-        // Configure session cookie based on rememberMe
-        // If rememberMe is true, session persists for 7 days
-        // Otherwise, session expires when browser closes (session cookie)
-        if (rememberMe) {
-          req.session.cookie.maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
-        } else {
-          // Explicitly set to session cookie (expires on browser close)
-          req.session.cookie.maxAge = null as any;
-          req.session.cookie.expires = false as any;
-        }
+        // Configure session cookie - always 30 days for PWA mobile experience
+        // Users shouldn't have to log in repeatedly when opening the app
+        req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
         
         await createAuditLog(req, 'login', 'user', user.id, user.name, { method: 'password' });
         res.json(sanitizeUser(user));
@@ -5229,15 +5221,8 @@ Evidence check, every major conclusion is anchored to resume evidence, and any a
           return res.status(500).json({ error: "Failed to complete login" });
         }
         
-        // Configure session cookie based on rememberMe
-        // If rememberMe is true, session persists for 7 days
-        // Otherwise, session expires when browser closes (session cookie)
-        if (rememberMe) {
-          req.session.cookie.maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
-        } else {
-          req.session.cookie.maxAge = null as any;
-          req.session.cookie.expires = false as any;
-        }
+        // Configure session cookie - always 30 days for PWA mobile experience
+        req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
         
         await createAuditLog(req, 'login_2fa', 'user', user.id, user.name, { method: 'totp' });
         res.json(sanitizeUser(user));
