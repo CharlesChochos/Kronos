@@ -45,7 +45,10 @@ export function NotificationPermissionPrompt() {
     setIsSubscribing(true);
     
     try {
+      console.log('[Push] Starting notification setup...');
+      
       const permission = await Notification.requestPermission();
+      console.log('[Push] Permission result:', permission);
       
       if (permission !== 'granted') {
         toast({
@@ -57,27 +60,48 @@ export function NotificationPermissionPrompt() {
         return;
       }
 
+      console.log('[Push] Fetching VAPID public key...');
       const vapidResponse = await fetch('/api/push/vapid-public-key');
       const { publicKey } = await vapidResponse.json();
+      console.log('[Push] VAPID key received:', publicKey ? 'Yes' : 'No');
 
       if (!publicKey) {
         console.error('[Push] No VAPID public key available');
+        toast({
+          title: 'Configuration Error',
+          description: 'Push notifications are not configured on the server.',
+          variant: 'destructive'
+        });
         setShowPrompt(false);
         return;
       }
 
+      console.log('[Push] Waiting for service worker...');
       const registration = await navigator.serviceWorker.ready;
+      console.log('[Push] Service worker ready, subscribing to push...');
       
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey)
       });
+      console.log('[Push] Push subscription created:', subscription.endpoint.substring(0, 50) + '...');
 
-      await apiRequest('/api/push/subscribe', {
+      console.log('[Push] Sending subscription to server...');
+      const response = await fetch('/api/push/subscribe', {
         method: 'POST',
         body: JSON.stringify({ subscription: subscription.toJSON() }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[Push] Server subscription failed:', response.status, errorData);
+        throw new Error(errorData.error || 'Server rejected subscription');
+      }
+      
+      const result = await response.json();
+      console.log('[Push] Server subscription result:', result);
 
       toast({
         title: 'Notifications Enabled',
@@ -85,13 +109,14 @@ export function NotificationPermissionPrompt() {
       });
 
       setShowPrompt(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('[Push] Subscription error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to enable notifications. Please try again.',
+        description: error.message || 'Failed to enable notifications. Please try again.',
         variant: 'destructive'
       });
+      setShowPrompt(false);
     } finally {
       setIsSubscribing(false);
     }
