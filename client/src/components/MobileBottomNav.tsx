@@ -17,13 +17,20 @@ export function MobileBottomNav() {
   const isAdmin = user?.accessLevel === 'admin';
   const basePath = isAdmin ? '/ceo' : '/employee';
 
-  const navItems: NavItem[] = [
-    { icon: Home, label: 'Home', path: `${basePath}/dashboard` },
-    { icon: Lightbulb, label: 'Opportunities', path: `${basePath}/opportunities` },
-    { icon: Briefcase, label: 'Deals', path: isAdmin ? '/ceo/deals' : '/employee/deals' },
-    { icon: CheckSquare, label: 'Tasks', path: '/employee/tasks' },
-    { icon: User, label: 'Profile', path: `${basePath}/dashboard` },
-  ];
+  const navItems: NavItem[] = isAdmin 
+    ? [
+        { icon: Home, label: 'Home', path: '/ceo/dashboard' },
+        { icon: Lightbulb, label: 'Opportunities', path: '/ceo/opportunities' },
+        { icon: Briefcase, label: 'Deals', path: '/ceo/deals' },
+        { icon: CheckSquare, label: 'Tasks', path: '/ceo/tasks' },
+        { icon: User, label: 'Profile', path: '/ceo/dashboard' },
+      ]
+    : [
+        { icon: Home, label: 'Home', path: '/employee/home' },
+        { icon: Briefcase, label: 'Deals', path: '/employee/deals' },
+        { icon: CheckSquare, label: 'Tasks', path: '/employee/tasks' },
+        { icon: User, label: 'Profile', path: '/employee/home' },
+      ];
 
   const isActive = (path: string) => {
     if (path === location) return true;
