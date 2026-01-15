@@ -1055,6 +1055,13 @@ export default function Chat({ role }: ChatProps) {
   // Mobile view state - controls which panel is shown on mobile
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
   
+  // Reset to list view when page loads or no conversation is selected
+  useEffect(() => {
+    if (!selectedConversationId) {
+      setMobileView('list');
+    }
+  }, [selectedConversationId]);
+  
   // When selecting a conversation on mobile, switch to chat view
   const handleSelectConversation = (id: string) => {
     setSelectedConversationId(id);
@@ -1074,8 +1081,20 @@ export default function Chat({ role }: ChatProps) {
           {/* Mobile Header */}
           <div className="p-4 border-b border-border">
             <div className="flex items-center justify-between mb-3">
-              <h1 className="text-xl font-semibold">Messages</h1>
+              <h1 className="text-xl font-semibold">
+                {showArchived ? "Archived" : "Messages"}
+              </h1>
               <div className="flex gap-1">
+                {/* Archive toggle */}
+                <Button 
+                  variant={showArchived ? "secondary" : "ghost"}
+                  size="icon" 
+                  className="h-10 w-10 md:h-8 md:w-8"
+                  onClick={() => setShowArchived(!showArchived)}
+                  data-testid="button-toggle-archived"
+                >
+                  {showArchived ? <ArchiveX className="w-5 h-5 md:w-4 md:h-4" /> : <Archive className="w-5 h-5 md:w-4 md:h-4" />}
+                </Button>
                 <Button 
                   variant="ghost" 
                   size="icon" 
@@ -1118,65 +1137,94 @@ export default function Chat({ role }: ChatProps) {
                   </div>
                 ) : filteredConversations.length > 0 ? (
                   filteredConversations.map(conv => (
-                    <button
-                      key={conv.id}
-                      onClick={() => handleSelectConversation(conv.id)}
-                      className={cn(
-                        "w-full p-4 md:p-3 rounded-xl md:rounded-lg flex items-center gap-3 transition-all text-left active:scale-[0.98] mb-1",
-                        selectedConversationId === conv.id 
-                          ? "bg-primary/10 border border-primary/20" 
-                          : "hover:bg-secondary/50 active:bg-secondary"
-                      )}
-                      data-testid={`conversation-item-${conv.id}`}
-                    >
-                      <div className="relative">
-                        <Avatar className="w-12 h-12 md:w-10 md:h-10 flex-shrink-0">
-                          <AvatarFallback className={cn(
-                            "text-sm md:text-xs font-medium",
-                            conv.isGroup ? "bg-primary/20 text-primary" : "bg-blue-500/20 text-blue-500"
-                          )}>
-                            {getConversationDisplayName(conv).split(' ').map(n => n[0]).join('').slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
-                        {!conv.isGroup && conv.members.some(m => m.id !== currentUser?.id && m.isOnline) && (
-                          <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full" />
+                    <div key={conv.id} className="group relative mb-1">
+                      <button
+                        onClick={() => handleSelectConversation(conv.id)}
+                        className={cn(
+                          "w-full p-4 md:p-3 rounded-xl md:rounded-lg flex items-center gap-3 transition-all text-left active:scale-[0.98]",
+                          selectedConversationId === conv.id 
+                            ? "bg-primary/10 border border-primary/20" 
+                            : "hover:bg-secondary/50 active:bg-secondary"
                         )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            {conv.isPinned && (
-                              <Pin className="w-3 h-3 text-primary flex-shrink-0" />
-                            )}
-                            <p className="font-medium text-base md:text-sm truncate">{getConversationDisplayName(conv)}</p>
-                          </div>
-                          {conv.lastMessage?.createdAt && (
-                            <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
-                              {format(new Date(conv.lastMessage.createdAt), 'HH:mm')}
-                            </span>
+                        data-testid={`conversation-item-${conv.id}`}
+                      >
+                        <div className="relative">
+                          <Avatar className="w-12 h-12 md:w-10 md:h-10 flex-shrink-0">
+                            <AvatarFallback className={cn(
+                              "text-sm md:text-xs font-medium",
+                              conv.isGroup ? "bg-primary/20 text-primary" : "bg-blue-500/20 text-blue-500"
+                            )}>
+                              {getConversationDisplayName(conv).split(' ').map(n => n[0]).join('').slice(0, 2)}
+                            </AvatarFallback>
+                          </Avatar>
+                          {!conv.isGroup && conv.members.some(m => m.id !== currentUser?.id && m.isOnline) && (
+                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full" />
                           )}
                         </div>
-                        <div className="flex items-center justify-between mt-1">
-                          <p className="text-sm md:text-xs text-muted-foreground truncate pr-2">
-                            {conv.lastMessage?.content || "No messages yet"}
-                          </p>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {conv.isGroup && (
-                              <span className="text-xs text-muted-foreground hidden md:inline-flex items-center gap-1">
-                                <Users className="w-3 h-3" />
-                                {conv.members.length}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {conv.isPinned && (
+                                <Pin className="w-3 h-3 text-primary flex-shrink-0" />
+                              )}
+                              <p className="font-medium text-base md:text-sm truncate">{getConversationDisplayName(conv)}</p>
+                            </div>
+                            {conv.lastMessage?.createdAt && (
+                              <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
+                                {format(new Date(conv.lastMessage.createdAt), 'HH:mm')}
                               </span>
                             )}
-                            {conv.unreadCount > 0 && (
-                              <Badge variant="default" className="h-5 min-w-5 text-xs px-1.5 rounded-full">
-                                {conv.unreadCount}
-                              </Badge>
-                            )}
+                          </div>
+                          <div className="flex items-center justify-between mt-1">
+                            <p className="text-sm md:text-xs text-muted-foreground truncate pr-2">
+                              {conv.lastMessage?.content || "No messages yet"}
+                            </p>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {conv.isGroup && (
+                                <span className="text-xs text-muted-foreground hidden md:inline-flex items-center gap-1">
+                                  <Users className="w-3 h-3" />
+                                  {conv.members.length}
+                                </span>
+                              )}
+                              {conv.unreadCount > 0 && (
+                                <Badge variant="default" className="h-5 min-w-5 text-xs px-1.5 rounded-full">
+                                  {conv.unreadCount}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground md:hidden flex-shrink-0" />
+                      </button>
+                      
+                      {/* Quick action buttons - visible on hover/focus */}
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-card/90 rounded-lg p-1 shadow-sm">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePinConversation(conv.id, !conv.isPinned);
+                          }}
+                          data-testid={`button-pin-${conv.id}`}
+                        >
+                          {conv.isPinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleArchiveConversation(conv.id, !conv.isArchived);
+                          }}
+                          data-testid={`button-archive-${conv.id}`}
+                        >
+                          {conv.isArchived ? <ArchiveX className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+                        </Button>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground md:hidden flex-shrink-0" />
-                    </button>
+                    </div>
                   ))
                 ) : (
                   <div className="text-center py-12 text-muted-foreground">
@@ -1242,13 +1290,13 @@ export default function Chat({ role }: ChatProps) {
                     </div>
                   </div>
                   <div className="flex items-center gap-0.5 md:gap-1">
-                    {/* Search in conversation - hidden on mobile */}
+                    {/* Search in conversation */}
                     <Button 
                       variant="ghost" 
                       size="icon"
                       onClick={() => setShowConversationSearch(!showConversationSearch)}
                       className={cn(
-                        "hidden md:flex h-9 w-9 text-muted-foreground",
+                        "h-9 w-9 text-muted-foreground",
                         showConversationSearch && "text-primary bg-primary/10"
                       )}
                       data-testid="button-conversation-search"
@@ -1256,13 +1304,13 @@ export default function Chat({ role }: ChatProps) {
                       <Search className="w-4 h-4" />
                     </Button>
                     
-                    {/* Pinned messages - hidden on mobile */}
+                    {/* Pinned messages */}
                     <Button 
                       variant="ghost" 
                       size="icon"
                       onClick={() => setShowPinnedMessages(!showPinnedMessages)}
                       className={cn(
-                        "hidden md:flex h-9 w-9 text-muted-foreground relative",
+                        "h-9 w-9 text-muted-foreground relative",
                         showPinnedMessages && "text-yellow-500 bg-yellow-500/10"
                       )}
                       data-testid="button-pinned-messages"
@@ -1275,41 +1323,69 @@ export default function Chat({ role }: ChatProps) {
                       )}
                     </Button>
                     
-                    {/* Media gallery - hidden on mobile */}
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => setShowMediaGallery(true)}
-                      className="hidden md:flex h-9 w-9 text-muted-foreground hover:text-primary"
-                      data-testid="button-media-gallery"
-                    >
-                      <ImageIcon className="w-4 h-4" />
-                    </Button>
-                    
-                    {/* Settings */}
-                    {selectedConversation && (
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => {
-                          setNewConversationName(getConversationDisplayName(selectedConversation));
-                          setShowSettingsSheet(true);
-                        }}
-                        className="h-10 w-10 md:h-9 md:w-9 text-muted-foreground hover:text-primary"
-                        data-testid="button-chat-settings"
-                      >
-                        <Settings className="w-5 h-5 md:w-4 md:h-4" />
-                      </Button>
-                    )}
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => handleDeleteConversation(selectedConversation.id)}
-                      className="hidden md:flex h-9 w-9 text-muted-foreground hover:text-destructive"
-                      data-testid="button-delete-conversation"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {/* More options popover for mobile */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-9 w-9 text-muted-foreground"
+                          data-testid="button-more-options"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-48 p-1" align="end">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start gap-2 h-10"
+                          onClick={() => setShowMediaGallery(true)}
+                          data-testid="button-media-gallery"
+                        >
+                          <ImageIcon className="w-4 h-4" />
+                          Media & Files
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start gap-2 h-10"
+                          onClick={() => {
+                            setNewConversationName(getConversationDisplayName(selectedConversation));
+                            setShowSettingsSheet(true);
+                          }}
+                          data-testid="button-chat-settings"
+                        >
+                          <Settings className="w-4 h-4" />
+                          Chat Settings
+                        </Button>
+                        <Separator className="my-1" />
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start gap-2 h-10"
+                          onClick={() => handlePinConversation(selectedConversation.id, !selectedConversation.isPinned)}
+                        >
+                          {selectedConversation.isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+                          {selectedConversation.isPinned ? "Unpin" : "Pin"} Chat
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start gap-2 h-10"
+                          onClick={() => handleArchiveConversation(selectedConversation.id, !selectedConversation.isArchived)}
+                        >
+                          {selectedConversation.isArchived ? <ArchiveX className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+                          {selectedConversation.isArchived ? "Unarchive" : "Archive"}
+                        </Button>
+                        <Separator className="my-1" />
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start gap-2 h-10 text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteConversation(selectedConversation.id)}
+                          data-testid="button-delete-conversation"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete Chat
+                        </Button>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
                 
