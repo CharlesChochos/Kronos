@@ -252,6 +252,9 @@ function Router() {
         <Route path="/ceo/chat">
           {() => <ProtectedRoute component={CeoChat} />}
         </Route>
+        <Route path="/ceo/messages">
+          {() => <ProtectedRoute component={CeoChat} />}
+        </Route>
         <Route path="/ceo/team-performance">
           {() => <ProtectedRoute component={TeamPerformance} />}
         </Route>
@@ -345,6 +348,9 @@ function Router() {
           {() => <ProtectedRoute component={EmployeeInvestorMatching} />}
         </Route>
         <Route path="/employee/chat">
+          {() => <ProtectedRoute component={EmployeeChat} />}
+        </Route>
+        <Route path="/employee/messages">
           {() => <ProtectedRoute component={EmployeeChat} />}
         </Route>
         <Route path="/employee/calendar">

@@ -1,5 +1,5 @@
 import { useLocation } from 'wouter';
-import { Home, Briefcase, CheckSquare, Lightbulb, Building2 } from 'lucide-react';
+import { Home, Briefcase, CheckSquare, Lightbulb, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCurrentUser } from '@/lib/api';
 
@@ -21,14 +21,14 @@ export function MobileBottomNav() {
         { icon: Home, label: 'Home', path: '/ceo/dashboard' },
         { icon: Lightbulb, label: 'Opportunities', path: '/ceo/opportunities' },
         { icon: Briefcase, label: 'Deals', path: '/ceo/deals' },
-        { icon: Building2, label: 'Assets', path: '/employee/asset-management' },
+        { icon: MessageCircle, label: 'Messages', path: '/ceo/messages' },
         { icon: CheckSquare, label: 'Tasks', path: '/ceo/tasks' },
       ]
     : [
         { icon: Home, label: 'Home', path: '/employee/home' },
         { icon: Lightbulb, label: 'Opportunities', path: '/ceo/opportunities' },
         { icon: Briefcase, label: 'Deals', path: '/ceo/deals' },
-        { icon: Building2, label: 'Assets', path: '/employee/asset-management' },
+        { icon: MessageCircle, label: 'Messages', path: '/employee/messages' },
         { icon: CheckSquare, label: 'Tasks', path: '/employee/tasks' },
       ];
 

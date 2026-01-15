@@ -44,7 +44,9 @@ import {
   FileText,
   Sticker,
   ChevronDown,
-  Volume2
+  Volume2,
+  ArrowLeft,
+  ChevronRight
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCurrentUser, useUsers } from "@/lib/api";
@@ -765,52 +767,66 @@ export default function Chat({ role }: ChatProps) {
     return otherMember?.name || conv.name || "Direct Message";
   };
 
+  // Mobile view state - controls which panel is shown on mobile
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
+  
+  // When selecting a conversation on mobile, switch to chat view
+  const handleSelectConversation = (id: string) => {
+    setSelectedConversationId(id);
+    setMobileView('chat');
+  };
+
   return (
     <Layout role={role} pageTitle="Messages" userName={currentUser?.name || ""}>
-      <div className="flex gap-4 h-[calc(100vh-8rem)]">
-        {/* Conversations List */}
-        <Card className="w-80 bg-card border-border flex flex-col">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <MessageCircle className="w-5 h-5 text-primary" />
-                Chats
-              </CardTitle>
+      <div className="flex h-[calc(100vh-8rem)] md:h-[calc(100vh-8rem)] relative overflow-hidden">
+        
+        {/* Conversations List - Full screen on mobile, sidebar on desktop */}
+        <div className={cn(
+          "w-full md:w-80 bg-card md:border-r border-border flex flex-col transition-transform duration-300 ease-out",
+          "absolute md:relative inset-0 z-10",
+          mobileView === 'chat' && "translate-x-[-100%] md:translate-x-0"
+        )}>
+          {/* Mobile Header */}
+          <div className="p-4 border-b border-border">
+            <div className="flex items-center justify-between mb-3">
+              <h1 className="text-xl font-semibold">Messages</h1>
               <div className="flex gap-1">
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="h-8 w-8"
+                  className="h-10 w-10 md:h-8 md:w-8"
                   onClick={() => setShowNewChatModal(true)}
                   data-testid="button-new-chat"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-5 h-5 md:w-4 md:h-4" />
                 </Button>
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="h-8 w-8"
+                  className="h-10 w-10 md:h-8 md:w-8"
                   onClick={() => setShowNewGroupModal(true)}
                   data-testid="button-new-group"
                 >
-                  <Users className="w-4 h-4" />
+                  <Users className="w-5 h-5 md:w-4 md:h-4" />
                 </Button>
               </div>
             </div>
-            <div className="relative mt-2">
+            <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search conversations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 bg-secondary/50"
+                className="pl-9 bg-secondary/50 h-11 md:h-10"
                 data-testid="input-search-conversations"
               />
             </div>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-hidden p-0">
+          </div>
+          
+          {/* Conversation List */}
+          <div className="flex-1 overflow-hidden">
             <ScrollArea className="h-full">
-              <div className="px-2 pb-2">
+              <div className="p-2">
                 {conversationsLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -819,18 +835,18 @@ export default function Chat({ role }: ChatProps) {
                   filteredConversations.map(conv => (
                     <button
                       key={conv.id}
-                      onClick={() => setSelectedConversationId(conv.id)}
+                      onClick={() => handleSelectConversation(conv.id)}
                       className={cn(
-                        "w-full p-3 rounded-lg flex items-start gap-3 transition-colors text-left",
+                        "w-full p-4 md:p-3 rounded-xl md:rounded-lg flex items-center gap-3 transition-all text-left active:scale-[0.98] mb-1",
                         selectedConversationId === conv.id 
                           ? "bg-primary/10 border border-primary/20" 
-                          : "hover:bg-secondary/50"
+                          : "hover:bg-secondary/50 active:bg-secondary"
                       )}
                       data-testid={`conversation-item-${conv.id}`}
                     >
-                      <Avatar className="w-10 h-10">
+                      <Avatar className="w-12 h-12 md:w-10 md:h-10 flex-shrink-0">
                         <AvatarFallback className={cn(
-                          "text-xs",
+                          "text-sm md:text-xs font-medium",
                           conv.isGroup ? "bg-primary/20 text-primary" : "bg-blue-500/20 text-blue-500"
                         )}>
                           {getConversationDisplayName(conv).split(' ').map(n => n[0]).join('').slice(0, 2)}
@@ -838,62 +854,81 @@ export default function Chat({ role }: ChatProps) {
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <p className="font-medium text-sm truncate">{getConversationDisplayName(conv)}</p>
+                          <p className="font-medium text-base md:text-sm truncate">{getConversationDisplayName(conv)}</p>
                           {conv.lastMessage?.createdAt && (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
                               {format(new Date(conv.lastMessage.createdAt), 'HH:mm')}
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">
-                          {conv.lastMessage?.content || "No messages yet"}
-                        </p>
-                        {conv.isGroup && (
-                          <div className="flex items-center gap-1 mt-1">
-                            <Users className="w-3 h-3 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">
-                              {conv.members.length} members
-                            </span>
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-sm md:text-xs text-muted-foreground truncate pr-2">
+                            {conv.lastMessage?.content || "No messages yet"}
+                          </p>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {conv.isGroup && (
+                              <span className="text-xs text-muted-foreground hidden md:inline-flex items-center gap-1">
+                                <Users className="w-3 h-3" />
+                                {conv.members.length}
+                              </span>
+                            )}
+                            {conv.unreadCount > 0 && (
+                              <Badge variant="default" className="h-5 min-w-5 text-xs px-1.5 rounded-full">
+                                {conv.unreadCount}
+                              </Badge>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
-                      {conv.unreadCount > 0 && (
-                        <Badge variant="default" className="h-5 min-w-5 text-xs px-1.5">
-                          {conv.unreadCount}
-                        </Badge>
-                      )}
+                      <ChevronRight className="w-4 h-4 text-muted-foreground md:hidden flex-shrink-0" />
                     </button>
                   ))
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No conversations yet</p>
+                  <div className="text-center py-12 text-muted-foreground">
+                    <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p className="text-base font-medium">No conversations yet</p>
+                    <p className="text-sm mt-1">Start chatting with your team</p>
                     <Button 
-                      variant="link" 
-                      size="sm" 
-                      className="mt-2"
+                      variant="default" 
+                      size="default" 
+                      className="mt-4"
                       onClick={() => setShowNewChatModal(true)}
                     >
+                      <Plus className="w-4 h-4 mr-2" />
                       Start a new chat
                     </Button>
                   </div>
                 )}
               </div>
             </ScrollArea>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Chat Window */}
-        <Card className="flex-1 bg-card border-border flex flex-col">
+        {/* Chat Window - Full screen on mobile, main area on desktop */}
+        <div className={cn(
+          "flex-1 bg-card flex flex-col transition-transform duration-300 ease-out",
+          "absolute md:relative inset-0 z-20",
+          mobileView === 'list' && "translate-x-full md:translate-x-0"
+        )}>
           {selectedConversation ? (
             <>
               {/* Chat Header */}
-              <CardHeader className="pb-3 border-b border-border">
+              <div className="px-2 py-3 md:px-4 md:py-3 border-b border-border bg-card/95 backdrop-blur-sm">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 md:gap-3">
+                    {/* Back button - mobile only */}
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => setMobileView('list')}
+                      className="md:hidden h-10 w-10 -ml-1"
+                      data-testid="button-back-to-list"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </Button>
                     <Avatar className="w-10 h-10">
                       <AvatarFallback className={cn(
-                        "text-xs",
+                        "text-xs font-medium",
                         selectedConversation.isGroup 
                           ? "bg-primary/20 text-primary" 
                           : "bg-blue-500/20 text-blue-500"
@@ -902,7 +937,7 @@ export default function Chat({ role }: ChatProps) {
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium">{getConversationDisplayName(selectedConversation)}</p>
+                      <p className="font-medium text-base md:text-sm">{getConversationDisplayName(selectedConversation)}</p>
                       <p className="text-xs text-muted-foreground">
                         {selectedConversation.isGroup 
                           ? `${selectedConversation.members.length} members`
@@ -911,14 +946,14 @@ export default function Chat({ role }: ChatProps) {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {/* Search in conversation */}
+                  <div className="flex items-center gap-0.5 md:gap-1">
+                    {/* Search in conversation - hidden on mobile */}
                     <Button 
                       variant="ghost" 
                       size="icon"
                       onClick={() => setShowConversationSearch(!showConversationSearch)}
                       className={cn(
-                        "text-muted-foreground",
+                        "hidden md:flex h-9 w-9 text-muted-foreground",
                         showConversationSearch && "text-primary bg-primary/10"
                       )}
                       data-testid="button-conversation-search"
@@ -926,13 +961,13 @@ export default function Chat({ role }: ChatProps) {
                       <Search className="w-4 h-4" />
                     </Button>
                     
-                    {/* Pinned messages */}
+                    {/* Pinned messages - hidden on mobile */}
                     <Button 
                       variant="ghost" 
                       size="icon"
                       onClick={() => setShowPinnedMessages(!showPinnedMessages)}
                       className={cn(
-                        "text-muted-foreground relative",
+                        "hidden md:flex h-9 w-9 text-muted-foreground relative",
                         showPinnedMessages && "text-yellow-500 bg-yellow-500/10"
                       )}
                       data-testid="button-pinned-messages"
@@ -945,17 +980,18 @@ export default function Chat({ role }: ChatProps) {
                       )}
                     </Button>
                     
-                    {/* Media gallery */}
+                    {/* Media gallery - hidden on mobile */}
                     <Button 
                       variant="ghost" 
                       size="icon"
                       onClick={() => setShowMediaGallery(true)}
-                      className="text-muted-foreground hover:text-primary"
+                      className="hidden md:flex h-9 w-9 text-muted-foreground hover:text-primary"
                       data-testid="button-media-gallery"
                     >
                       <ImageIcon className="w-4 h-4" />
                     </Button>
                     
+                    {/* Settings */}
                     {selectedConversation && (
                       <Button 
                         variant="ghost" 
@@ -964,17 +1000,17 @@ export default function Chat({ role }: ChatProps) {
                           setNewConversationName(getConversationDisplayName(selectedConversation));
                           setShowSettingsSheet(true);
                         }}
-                        className="text-muted-foreground hover:text-primary"
+                        className="h-10 w-10 md:h-9 md:w-9 text-muted-foreground hover:text-primary"
                         data-testid="button-chat-settings"
                       >
-                        <Settings className="w-4 h-4" />
+                        <Settings className="w-5 h-5 md:w-4 md:h-4" />
                       </Button>
                     )}
                     <Button 
                       variant="ghost" 
                       size="icon"
                       onClick={() => handleDeleteConversation(selectedConversation.id)}
-                      className="text-muted-foreground hover:text-destructive"
+                      className="hidden md:flex h-9 w-9 text-muted-foreground hover:text-destructive"
                       data-testid="button-delete-conversation"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1046,10 +1082,10 @@ export default function Chat({ role }: ChatProps) {
                     </div>
                   </div>
                 )}
-              </CardHeader>
+              </div>
 
               {/* Messages */}
-              <CardContent className={cn(
+              <div className={cn(
                 "flex-1 overflow-hidden p-0 transition-colors",
                 chatSettings.chatTheme === "default" && "bg-card",
                 chatSettings.chatTheme === "dark" && "bg-zinc-900",
@@ -1073,20 +1109,20 @@ export default function Chat({ role }: ChatProps) {
                           <div 
                             key={message.id} 
                             data-message-id={message.id}
-                            className={cn("flex gap-3", isOwnMessage && "flex-row-reverse")}
+                            className={cn("flex gap-2 md:gap-3 px-2 md:px-0", isOwnMessage && "flex-row-reverse")}
                           >
-                            <Avatar className="w-8 h-8">
+                            <Avatar className="w-8 h-8 flex-shrink-0 hidden md:flex">
                               <AvatarFallback className="text-xs bg-secondary">
                                 {message.senderName?.split(' ').map(n => n[0]).join('').slice(0, 2) || '??'}
                               </AvatarFallback>
                             </Avatar>
-                            <div className={cn("max-w-[70%] group", isOwnMessage && "text-right")}>
+                            <div className={cn("max-w-[85%] md:max-w-[70%] group", isOwnMessage && "text-right")}>
                               <div className="relative">
                                 <div className={cn(
-                                  "rounded-lg p-3",
+                                  "px-4 py-2.5 md:p-3",
                                   isOwnMessage 
-                                    ? "bg-primary text-primary-foreground" 
-                                    : "bg-secondary"
+                                    ? "bg-primary text-primary-foreground rounded-[20px] rounded-br-md" 
+                                    : "bg-secondary rounded-[20px] rounded-bl-md"
                                 )}>
                                   {/* Reply indicator */}
                                   {replyMessage && (
@@ -1294,33 +1330,33 @@ export default function Chat({ role }: ChatProps) {
                     </div>
                   )}
                 </ScrollArea>
-              </CardContent>
+              </div>
 
-              {/* Message Input */}
-              <div className="p-4 border-t border-border">
+              {/* Message Input - Mobile optimized with safe area */}
+              <div className="p-3 md:p-4 border-t border-border bg-card pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-4">
                 {/* Reply indicator */}
                 {replyToMessage && (
                   <div className="flex items-center justify-between bg-secondary/50 rounded-lg px-3 py-2 mb-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <MessageCircle className="w-4 h-4 text-primary" />
-                      <span className="text-muted-foreground">Replying to</span>
-                      <span className="font-medium">{replyToMessage.senderName}</span>
-                      <span className="text-muted-foreground truncate max-w-[200px]">
+                    <div className="flex items-center gap-2 text-sm min-w-0">
+                      <MessageCircle className="w-4 h-4 text-primary flex-shrink-0" />
+                      <span className="text-muted-foreground hidden sm:inline">Replying to</span>
+                      <span className="font-medium truncate">{replyToMessage.senderName}</span>
+                      <span className="text-muted-foreground truncate hidden md:inline max-w-[200px]">
                         {replyToMessage.content.slice(0, 40)}{replyToMessage.content.length > 40 ? '...' : ''}
                       </span>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
+                      className="h-8 w-8 flex-shrink-0"
                       onClick={() => setReplyToMessage(null)}
                       data-testid="button-cancel-reply"
                     >
-                      <X className="w-3 h-3" />
+                      <X className="w-4 h-4" />
                     </Button>
                   </div>
                 )}
-                <div className="flex gap-2">
+                <div className="flex items-center gap-1 md:gap-2">
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -1329,24 +1365,27 @@ export default function Chat({ role }: ChatProps) {
                     multiple
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,image/*"
                   />
+                  {/* Attachment button - always visible */}
                   <Button 
                     variant="ghost" 
                     size="icon"
+                    className="h-10 w-10 flex-shrink-0"
                     onClick={() => fileInputRef.current?.click()}
                     data-testid="button-attach-file"
                   >
-                    <Paperclip className="w-4 h-4" />
+                    <Paperclip className="w-5 h-5" />
                   </Button>
                   
-                  {/* Emoji Picker */}
+                  {/* Emoji Picker - hidden on mobile, shown via popover on desktop */}
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button 
                         variant="ghost" 
                         size="icon"
+                        className="hidden md:flex h-10 w-10"
                         data-testid="button-emoji-picker"
                       >
-                        <Smile className="w-4 h-4" />
+                        <Smile className="w-5 h-5" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-80 p-2" align="start">
@@ -1376,10 +1415,11 @@ export default function Chat({ role }: ChatProps) {
                     </PopoverContent>
                   </Popover>
                   
-                  {/* @ Mention Button */}
+                  {/* @ Mention Button - hidden on mobile */}
                   <Button 
                     variant="ghost" 
                     size="icon"
+                    className="hidden md:flex h-10 w-10"
                     onClick={() => {
                       setMessageInput(prev => prev + '@');
                       setShowMentionDropdown(true);
@@ -1389,18 +1429,19 @@ export default function Chat({ role }: ChatProps) {
                     }}
                     data-testid="button-mention"
                   >
-                    <AtSign className="w-4 h-4" />
+                    <AtSign className="w-5 h-5" />
                   </Button>
                   
-                  {/* Sticker Picker */}
+                  {/* Sticker Picker - hidden on mobile */}
                   <Popover open={showStickerPicker} onOpenChange={setShowStickerPicker}>
                     <PopoverTrigger asChild>
                       <Button 
                         variant="ghost" 
                         size="icon"
+                        className="hidden md:flex h-10 w-10"
                         data-testid="button-sticker-picker"
                       >
-                        <Sticker className="w-4 h-4" />
+                        <Sticker className="w-5 h-5" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-72 p-3" align="start">
@@ -1421,14 +1462,15 @@ export default function Chat({ role }: ChatProps) {
                     </PopoverContent>
                   </Popover>
                   
+                  {/* Message Input */}
                   <div className="flex-1 relative">
                     <Input
                       ref={inputRef}
-                      placeholder="Type a message..."
+                      placeholder="Message..."
                       value={messageInput}
                       onChange={handleMessageInputChange}
                       onKeyDown={handleMentionKeyDown}
-                      className="w-full"
+                      className="w-full h-11 rounded-full px-4 text-base"
                       data-testid="input-message"
                     />
                     
@@ -1523,36 +1565,41 @@ export default function Chat({ role }: ChatProps) {
                     </div>
                   ) : null}
                   
+                  {/* Send Button - circular on mobile */}
                   <Button 
                     onClick={handleSendMessage}
                     disabled={!messageInput.trim() || sendMessageMutation.isPending}
+                    className="h-10 w-10 md:h-10 md:w-auto md:px-4 rounded-full md:rounded-md flex-shrink-0"
                     data-testid="button-send-message"
                   >
                     {sendMessageMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
-                      <Send className="w-4 h-4" />
+                      <Send className="w-5 h-5" />
                     )}
                   </Button>
                 </div>
               </div>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">
               <MessageCircle className="w-16 h-16 mb-4 opacity-50" />
-              <p className="text-lg font-medium">Select a conversation</p>
-              <p className="text-sm">Choose from your existing chats or start a new one</p>
+              <p className="text-lg font-medium text-center">Select a conversation</p>
+              <p className="text-sm text-center mt-1">Choose from your existing chats or start a new one</p>
               <Button 
-                variant="outline" 
-                className="mt-4"
-                onClick={() => setShowNewChatModal(true)}
+                variant="default" 
+                className="mt-6 h-12 px-6"
+                onClick={() => {
+                  setMobileView('list');
+                  setShowNewChatModal(true);
+                }}
               >
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="w-5 h-5 mr-2" />
                 New Chat
               </Button>
             </div>
           )}
-        </Card>
+        </div>
       </div>
 
       {/* New Chat Modal */}
