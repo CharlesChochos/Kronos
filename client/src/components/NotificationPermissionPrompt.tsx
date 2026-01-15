@@ -1,25 +1,106 @@
-import { useState, useEffect } from 'react';
-import { Bell, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { isMobile, isStandalone } from '@/lib/pwa';
-import { apiRequest } from '@/lib/queryClient';
+import { useCurrentUser } from '@/lib/api';
 
 export function NotificationPermissionPrompt() {
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [isSubscribing, setIsSubscribing] = useState(false);
+  const { data: user } = useCurrentUser();
   const { toast } = useToast();
+  const hasSubscribed = useRef(false);
+  const hasAttempted = useRef(false);
+  const listenerAttached = useRef(false);
 
-  useEffect(() => {
-    checkNotificationStatus();
+  const subscribeToNotifications = useCallback(async () => {
+    if (hasSubscribed.current) return;
+    
+    try {
+      console.log('[Push] Fetching VAPID public key...');
+      const vapidResponse = await fetch('/api/push/vapid-public-key');
+      const { publicKey } = await vapidResponse.json();
+
+      if (!publicKey) {
+        console.error('[Push] No VAPID public key available');
+        return;
+      }
+
+      console.log('[Push] Waiting for service worker...');
+      const registration = await navigator.serviceWorker.ready;
+      
+      const existingSubscription = await registration.pushManager.getSubscription();
+      if (existingSubscription) {
+        console.log('[Push] Already subscribed, checking server...');
+        const statusResponse = await fetch('/api/push/status', { credentials: 'include' });
+        if (statusResponse.ok) {
+          const { subscribed } = await statusResponse.json();
+          if (subscribed) {
+            console.log('[Push] Already subscribed on server');
+            hasSubscribed.current = true;
+            return;
+          }
+        }
+        const success = await sendSubscriptionToServer(existingSubscription);
+        if (success) hasSubscribed.current = true;
+        return;
+      }
+
+      console.log('[Push] Subscribing to push...');
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey)
+      });
+
+      const success = await sendSubscriptionToServer(subscription);
+      if (success) hasSubscribed.current = true;
+    } catch (error) {
+      console.error('[Push] Subscription error:', error);
+    }
   }, []);
 
-  const checkNotificationStatus = async () => {
+  const requestNotificationPermission = useCallback(async () => {
+    if (hasAttempted.current) return;
+
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      console.log('[Push] Notifications not supported in this browser');
+      hasAttempted.current = true;
+      return;
+    }
+
+    if (Notification.permission === 'denied') {
+      console.log('[Push] Notifications previously denied by user');
+      hasAttempted.current = true;
+      return;
+    }
+
+    if (Notification.permission === 'granted') {
+      hasAttempted.current = true;
+      await subscribeToNotifications();
+      return;
+    }
+
+    console.log('[Push] Requesting notification permission...');
+    const permission = await Notification.requestPermission();
+    console.log('[Push] Permission result:', permission);
+
+    if (permission === 'granted') {
+      hasAttempted.current = true;
+      await subscribeToNotifications();
+      toast({
+        title: 'Notifications Enabled',
+        description: "You'll receive alerts for messages, tasks, and mentions.",
+      });
+    } else if (permission === 'denied') {
+      hasAttempted.current = true;
+    }
+  }, [toast, subscribeToNotifications]);
+
+  useEffect(() => {
+    if (!user || hasAttempted.current) return;
+
     if (!('Notification' in window) || !('serviceWorker' in navigator)) {
       return;
     }
 
     if (Notification.permission === 'granted') {
+      subscribeToNotifications();
       return;
     }
 
@@ -27,156 +108,50 @@ export function NotificationPermissionPrompt() {
       return;
     }
 
-    const wasDismissed = localStorage.getItem('notification-prompt-dismissed');
-    if (wasDismissed) {
-      const dismissedAt = parseInt(wasDismissed, 10);
-      const daysSinceDismissed = (Date.now() - dismissedAt) / (1000 * 60 * 60 * 24);
-      if (daysSinceDismissed < 14) {
-        return;
-      }
+    if (listenerAttached.current) return;
+    listenerAttached.current = true;
+
+    const handleUserInteraction = () => {
+      requestNotificationPermission();
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('keydown', handleUserInteraction);
+    };
+
+    document.addEventListener('click', handleUserInteraction, { once: true });
+    document.addEventListener('keydown', handleUserInteraction, { once: true });
+
+    return () => {
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('keydown', handleUserInteraction);
+    };
+  }, [user, requestNotificationPermission, subscribeToNotifications]);
+
+  return null;
+}
+
+async function sendSubscriptionToServer(subscription: PushSubscription): Promise<boolean> {
+  console.log('[Push] Sending subscription to server...');
+  try {
+    const response = await fetch('/api/push/subscribe', {
+      method: 'POST',
+      body: JSON.stringify({ subscription: subscription.toJSON() }),
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[Push] Server subscription failed:', response.status, errorData);
+      return false;
     }
 
-    setTimeout(() => {
-      setShowPrompt(true);
-    }, 5000);
-  };
-
-  const handleEnable = async () => {
-    setIsSubscribing(true);
-    
-    try {
-      console.log('[Push] Starting notification setup...');
-      
-      const permission = await Notification.requestPermission();
-      console.log('[Push] Permission result:', permission);
-      
-      if (permission !== 'granted') {
-        toast({
-          title: 'Notifications Blocked',
-          description: 'You can enable notifications in your browser settings.',
-          variant: 'destructive'
-        });
-        setShowPrompt(false);
-        return;
-      }
-
-      console.log('[Push] Fetching VAPID public key...');
-      const vapidResponse = await fetch('/api/push/vapid-public-key');
-      const { publicKey } = await vapidResponse.json();
-      console.log('[Push] VAPID key received:', publicKey ? 'Yes' : 'No');
-
-      if (!publicKey) {
-        console.error('[Push] No VAPID public key available');
-        toast({
-          title: 'Configuration Error',
-          description: 'Push notifications are not configured on the server.',
-          variant: 'destructive'
-        });
-        setShowPrompt(false);
-        return;
-      }
-
-      console.log('[Push] Waiting for service worker...');
-      const registration = await navigator.serviceWorker.ready;
-      console.log('[Push] Service worker ready, subscribing to push...');
-      
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey)
-      });
-      console.log('[Push] Push subscription created:', subscription.endpoint.substring(0, 50) + '...');
-
-      console.log('[Push] Sending subscription to server...');
-      const response = await fetch('/api/push/subscribe', {
-        method: 'POST',
-        body: JSON.stringify({ subscription: subscription.toJSON() }),
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('[Push] Server subscription failed:', response.status, errorData);
-        throw new Error(errorData.error || 'Server rejected subscription');
-      }
-      
-      const result = await response.json();
-      console.log('[Push] Server subscription result:', result);
-
-      toast({
-        title: 'Notifications Enabled',
-        description: "You'll receive alerts for messages, tasks, and assignments.",
-      });
-
-      setShowPrompt(false);
-    } catch (error: any) {
-      console.error('[Push] Subscription error:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to enable notifications. Please try again.',
-        variant: 'destructive'
-      });
-      setShowPrompt(false);
-    } finally {
-      setIsSubscribing(false);
-    }
-  };
-
-  const handleDismiss = () => {
-    setShowPrompt(false);
-    localStorage.setItem('notification-prompt-dismissed', Date.now().toString());
-  };
-
-  if (!showPrompt) {
-    return null;
+    const result = await response.json();
+    console.log('[Push] Server subscription result:', result);
+    return true;
+  } catch (error) {
+    console.error('[Push] Server subscription error:', error);
+    return false;
   }
-
-  return (
-    <div className="fixed top-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-96">
-      <div className="bg-card border border-border rounded-xl shadow-2xl p-4 animate-in slide-in-from-top-5">
-        <div className="flex items-start gap-3">
-          <div className="p-2 bg-primary/10 rounded-lg shrink-0">
-            <Bell className="w-6 h-6 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-sm">Enable Notifications</h3>
-            <p className="text-xs text-muted-foreground mt-1">
-              Get instant alerts when you receive messages, are assigned tasks, or mentioned by colleagues.
-            </p>
-            <div className="flex gap-2 mt-3">
-              <Button 
-                size="sm" 
-                onClick={handleEnable} 
-                disabled={isSubscribing}
-                className="h-8"
-                data-testid="button-enable-notifications"
-              >
-                {isSubscribing ? 'Enabling...' : 'Enable'}
-              </Button>
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                onClick={handleDismiss}
-                className="h-8"
-                data-testid="button-dismiss-notifications"
-              >
-                Not now
-              </Button>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 shrink-0"
-            onClick={handleDismiss}
-            data-testid="button-close-notification-prompt"
-          >
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
