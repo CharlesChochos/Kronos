@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/layout/Layout";
@@ -226,7 +227,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
   const searchString = typeof window !== 'undefined' ? window.location.search : '';
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
-  const { data: deals = [], isLoading } = useDealsListing();
+  const { data: deals = [], isLoading, refetch: refetchDeals } = useDealsListing();
   const { data: users = [] } = useUsers();
   const { data: customSectors = [] } = useCustomSectors();
   const createCustomSector = useCreateCustomSector();
@@ -855,6 +856,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
 
   return (
     <Layout role={role} pageTitle="Potential Opportunities">
+      <PullToRefresh onRefresh={refetchDeals}>
       <div className="space-y-6">
         {/* Header Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1021,6 +1023,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
           </Card>
         )}
       </div>
+      </PullToRefresh>
       
       {/* New Opportunity Dialog - Enhanced */}
       <Dialog open={showNewOpportunityDialog} onOpenChange={setShowNewOpportunityDialog}>

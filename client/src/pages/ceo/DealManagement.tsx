@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearch } from "wouter";
@@ -1667,7 +1668,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
   const searchString = useSearch();
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
-  const { data: allDeals = [], isLoading } = useDealsListing();
+  const { data: allDeals = [], isLoading, refetch: refetchDeals } = useDealsListing();
   const { data: allUsers = [] } = useUsers();
   const { data: allTasks = [] } = useTasks();
   const { data: stakeholders = [] } = useAllInvestors();
@@ -2560,6 +2561,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
 
   return (
     <Layout role={role} pageTitle="Deal Management" userName={currentUser?.name || ""}>
+      <PullToRefresh onRefresh={refetchDeals}>
       <div className="space-y-6">
         {/* Bulk Actions Bar */}
         {selectedDeals.length > 0 && (
@@ -3513,6 +3515,7 @@ export default function DealManagement({ role = 'CEO' }: DealManagementProps) {
           );
         })()}
       </div>
+      </PullToRefresh>
 
       {/* Deal Room Sheet */}
       <Sheet open={!!selectedDeal} onOpenChange={() => setSelectedDeal(null)}>

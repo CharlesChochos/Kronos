@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { useSearch, useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -246,7 +247,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
   const [, setLocation] = useLocation();
   const searchString = useSearch();
   const { data: currentUser } = useCurrentUser();
-  const { data: allTasks = [], isLoading } = useTasks();
+  const { data: allTasks = [], isLoading, refetch: refetchTasks } = useTasks();
   const { data: deals = [] } = useDealsListing();
   const { data: users = [] } = useUsers();
   const { data: stakeholdersData } = useStakeholders({ pageSize: 1000 });
@@ -1227,6 +1228,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
 
   return (
     <Layout role={role} pageTitle="My Tasks" userName={currentUser?.name || ""}>
+      <PullToRefresh onRefresh={refetchTasks}>
       <div className="space-y-6">
         
         {/* Search Bar */}
@@ -1648,6 +1650,7 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
           </div>
         </div>
       </div>
+      </PullToRefresh>
 
       {/* Task Detail Modal */}
       <Dialog open={showTaskDetailModal} onOpenChange={setShowTaskDetailModal}>
