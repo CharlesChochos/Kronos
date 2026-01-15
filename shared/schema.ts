@@ -27,6 +27,9 @@ export const users = pgTable("users", {
   invitedBy: varchar("invited_by"), // User ID who invited this external user
   // Asset Management access flag (for standard users who need AM visibility)
   hasAssetManagementAccess: boolean("has_asset_management_access").default(false),
+  // Presence/online status fields for messaging
+  lastSeenAt: timestamp("last_seen_at"),
+  isOnline: boolean("is_online").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -254,6 +257,8 @@ export const conversations = pgTable("conversations", {
   name: text("name"),
   isGroup: boolean("is_group").default(false),
   createdBy: varchar("created_by").references(() => users.id),
+  lastMessageAt: timestamp("last_message_at"),
+  lastMessagePreview: text("last_message_preview"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -274,6 +279,11 @@ export const conversationMembers = pgTable("conversation_members", {
   userId: varchar("user_id").references(() => users.id).notNull(),
   joinedAt: timestamp("joined_at").defaultNow(),
   lastReadAt: timestamp("last_read_at"),
+  lastReadMessageId: varchar("last_read_message_id"),
+  isPinned: boolean("is_pinned").default(false),
+  isArchived: boolean("is_archived").default(false),
+  isMuted: boolean("is_muted").default(false),
+  unreadCount: integer("unread_count").default(0),
 });
 
 export const insertConversationMemberSchema = createInsertSchema(conversationMembers).omit({
@@ -301,6 +311,16 @@ export type MessageReaction = {
   createdAt: string;
 };
 
+// Message Read Receipt type
+export type MessageReadReceipt = {
+  userId: string;
+  userName: string;
+  readAt: string;
+};
+
+// Message Delivery Status type
+export type MessageDeliveryStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+
 // Messages table
 export const messages = pgTable("messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -309,7 +329,15 @@ export const messages = pgTable("messages", {
   content: text("content").notNull(),
   attachments: jsonb("attachments").default([]).$type<MessageAttachment[]>(),
   reactions: jsonb("reactions").default([]).$type<MessageReaction[]>(),
+  readBy: jsonb("read_by").default([]).$type<MessageReadReceipt[]>(),
   replyToMessageId: varchar("reply_to_message_id"),
+  messageType: text("message_type").default('text'), // text, image, video, audio, file, sticker, voice
+  deliveryStatus: text("delivery_status").default('sent'), // sending, sent, delivered, read, failed
+  isEdited: boolean("is_edited").default(false),
+  editedAt: timestamp("edited_at"),
+  isDeleted: boolean("is_deleted").default(false),
+  deletedAt: timestamp("deleted_at"),
+  forwardedFrom: varchar("forwarded_from"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -320,6 +348,24 @@ export const insertMessageSchema = createInsertSchema(messages).omit({
 
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messages.$inferSelect;
+
+// Typing Indicators table - for real-time typing status
+export const typingIndicators = pgTable("typing_indicators", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").references(() => conversations.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  isTyping: boolean("is_typing").default(false),
+  startedAt: timestamp("started_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+});
+
+export const insertTypingIndicatorSchema = createInsertSchema(typingIndicators).omit({
+  id: true,
+  startedAt: true,
+});
+
+export type InsertTypingIndicator = z.infer<typeof insertTypingIndicatorSchema>;
+export type TypingIndicator = typeof typingIndicators.$inferSelect;
 
 // Reaper Assistant Conversations table
 export const assistantConversations = pgTable("assistant_conversations", {
