@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
@@ -1964,8 +1964,13 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                 </div>
               )}
               
-              {/* Action Buttons */}
-              <div className="pt-4 border-t border-border space-y-3 mt-4 flex-shrink-0">
+            </div>
+          )}
+          
+          {/* Fixed Action Buttons Footer - Always visible at bottom */}
+          {selectedOpportunity && (
+            <SheetFooter className="flex-shrink-0 pt-4 border-t border-border bg-card">
+              <div className="w-full space-y-3">
                 <h4 className="font-medium text-sm">Take Action</h4>
                 <div className="flex flex-wrap gap-2">
                   {!isEditMode && (
@@ -2019,7 +2024,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                   </Button>
                 </div>
               </div>
-            </div>
+            </SheetFooter>
           )}
         </SheetContent>
       </Sheet>
