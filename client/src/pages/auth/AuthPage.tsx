@@ -21,9 +21,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useLogin, useSignup } from "@/lib/api";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, CheckCircle, Shield, Clock } from "lucide-react";
+import { Mail, CheckCircle, Shield, Clock, Fingerprint } from "lucide-react";
 import logo from "@assets/generated_images/abstract_minimalist_layer_icon_for_fintech_logo.png";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { isBiometricAvailable, hasStoredCredential, authenticateWithBiometric, getStoredUserId } from "@/lib/webauthn";
+import { hapticFeedback } from "@/hooks/use-haptic";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -66,8 +68,71 @@ export default function AuthPage() {
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [twoFactorLoading, setTwoFactorLoading] = useState(false);
   const [showPendingApproval, setShowPendingApproval] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
   const loginMutation = useLogin();
   const signupMutation = useSignup();
+  
+  useEffect(() => {
+    const checkBiometric = async () => {
+      const available = await isBiometricAvailable();
+      const hasCredential = hasStoredCredential();
+      setBiometricAvailable(available && hasCredential);
+    };
+    checkBiometric();
+  }, []);
+  
+  const handleBiometricLogin = async () => {
+    setBiometricLoading(true);
+    hapticFeedback('medium');
+    
+    try {
+      const result = await authenticateWithBiometric();
+      
+      if (result.success) {
+        const response = await fetch('/api/auth/biometric-login', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        
+        if (response.ok) {
+          const user = await response.json();
+          hapticFeedback('success');
+          
+          const firstName = user?.name?.split(' ')[0] || 'User';
+          setWelcomeName(firstName);
+          
+          if (user?.accessLevel === 'admin') {
+            setRedirectPath("/ceo/dashboard");
+          } else {
+            setRedirectPath("/employee/home");
+          }
+          
+          sessionStorage.setItem('welcomePending', 'true');
+          setShowWelcome(true);
+        } else {
+          const data = await response.json();
+          hapticFeedback('error');
+          if (data.code === 'SESSION_EXPIRED') {
+            toast.error("Session expired. Please login with your password.");
+          } else {
+            toast.error("Biometric login failed. Please use your password.");
+          }
+        }
+      } else {
+        if (result.error !== 'Authentication cancelled') {
+          hapticFeedback('error');
+          toast.error(result.error || "Biometric authentication failed");
+        }
+      }
+    } catch (error) {
+      hapticFeedback('error');
+      toast.error("Biometric login failed. Please use your password.");
+    } finally {
+      setBiometricLoading(false);
+    }
+  };
 
   const handleForgotPassword = async () => {
     if (!forgotPasswordEmail || !forgotPasswordEmail.includes('@')) {
@@ -435,6 +500,31 @@ export default function AuthPage() {
                   >
                     {loginMutation.isPending ? "Authenticating..." : "Sign In"}
                   </Button>
+                  
+                  {biometricAvailable && (
+                    <>
+                      <div className="relative my-4">
+                        <div className="absolute inset-0 flex items-center">
+                          <span className="w-full border-t border-border" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                          <span className="bg-card px-2 text-muted-foreground">or</span>
+                        </div>
+                      </div>
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full h-11 gap-2"
+                        onClick={handleBiometricLogin}
+                        disabled={biometricLoading}
+                        data-testid="button-biometric-login"
+                      >
+                        <Fingerprint className="w-5 h-5" />
+                        {biometricLoading ? "Authenticating..." : "Use Face ID / Fingerprint"}
+                      </Button>
+                    </>
+                  )}
                 </form>
               </Form>
             </TabsContent>

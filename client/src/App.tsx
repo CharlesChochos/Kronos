@@ -12,6 +12,7 @@ import { WelcomeModal } from "@/components/WelcomeModal";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { NotificationPermissionPrompt } from "@/components/NotificationPermissionPrompt";
+import { PWAFeatures } from "@/components/PWAFeatures";
 
 // Loading component for lazy-loaded routes
 const PageLoader = () => (
@@ -405,6 +406,7 @@ function App() {
             <PWAInstallPrompt />
             <MobileBottomNav />
             <NotificationPermissionPrompt />
+            <PWAFeatures />
           </TooltipProvider>
         </DashboardProvider>
       </QueryClientProvider>

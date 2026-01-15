@@ -160,4 +160,100 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+  
+  if (event.data && event.data.type === 'SET_BADGE') {
+    updateAppBadge(event.data.count);
+  }
+  
+  if (event.data && event.data.type === 'CLEAR_BADGE') {
+    clearAppBadge();
+  }
 });
+
+async function updateAppBadge(count) {
+  if (self.registration && 'setAppBadge' in self.registration) {
+    try {
+      if (count > 0) {
+        await self.registration.setAppBadge(count);
+      } else {
+        await self.registration.clearAppBadge();
+      }
+    } catch (error) {
+      console.log('[SW] Unable to set app badge:', error);
+    }
+  }
+}
+
+async function clearAppBadge() {
+  if (self.registration && 'clearAppBadge' in self.registration) {
+    try {
+      await self.registration.clearAppBadge();
+    } catch (error) {
+      console.log('[SW] Unable to clear app badge:', error);
+    }
+  }
+}
+
+const SYNC_QUEUE_KEY = 'kronos-sync-queue';
+
+self.addEventListener('sync', (event) => {
+  console.log('[SW] Background sync triggered:', event.tag);
+  
+  if (event.tag === 'sync-data') {
+    event.waitUntil(syncPendingData());
+  }
+});
+
+async function syncPendingData() {
+  console.log('[SW] Syncing pending data...');
+  
+  try {
+    const cache = await caches.open(DYNAMIC_CACHE);
+    const requests = await cache.keys();
+    
+    for (const request of requests) {
+      if (request.url.includes('/api/')) {
+        try {
+          const freshResponse = await fetch(request);
+          if (freshResponse.ok) {
+            await cache.put(request, freshResponse.clone());
+            console.log('[SW] Synced:', request.url);
+          }
+        } catch (error) {
+          console.log('[SW] Failed to sync:', request.url, error);
+        }
+      }
+    }
+    
+    const clients = await self.clients.matchAll();
+    clients.forEach(client => {
+      client.postMessage({ type: 'SYNC_COMPLETE' });
+    });
+    
+    console.log('[SW] Background sync complete');
+  } catch (error) {
+    console.error('[SW] Background sync failed:', error);
+    throw error;
+  }
+}
+
+self.addEventListener('periodicsync', (event) => {
+  console.log('[SW] Periodic sync triggered:', event.tag);
+  
+  if (event.tag === 'refresh-notifications') {
+    event.waitUntil(refreshNotifications());
+  }
+});
+
+async function refreshNotifications() {
+  try {
+    const response = await fetch('/api/notifications');
+    if (response.ok) {
+      const notifications = await response.json();
+      const unreadCount = notifications.filter(n => !n.read).length;
+      await updateAppBadge(unreadCount);
+    }
+  } catch (error) {
+    console.log('[SW] Failed to refresh notifications:', error);
+  }
+}

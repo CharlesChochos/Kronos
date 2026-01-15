@@ -320,6 +320,39 @@ export async function registerRoutes(
     });
   });
 
+  // Biometric Login - Quick unlock for users with existing valid sessions
+  // Client-side WebAuthn verifies the user owns the device
+  // This endpoint only works when the user already has a valid session
+  // For expired sessions, password login is required first
+  app.post("/api/auth/biometric-login", async (req, res) => {
+    try {
+      // Only allow biometric login if user already has a valid session
+      // This is a "quick unlock" feature, not a standalone authentication method
+      const existingUser = req.user as any;
+      
+      if (!existingUser || !existingUser.id) {
+        return res.status(401).json({ 
+          error: "Session expired. Please login with password first.",
+          code: "SESSION_EXPIRED"
+        });
+      }
+      
+      // Verify user is still active
+      const freshUser = await storage.getUser(existingUser.id);
+      if (!freshUser || freshUser.status !== 'active') {
+        return res.status(401).json({ error: "Account not active" });
+      }
+      
+      // Log the biometric access
+      await createAuditLog(req, 'login', 'user', freshUser.id, freshUser.name, { method: 'biometric_unlock' });
+      
+      return res.json(sanitizeUser(freshUser));
+    } catch (error) {
+      console.error('Biometric login error:', error);
+      res.status(500).json({ error: "Biometric login failed" });
+    }
+  });
+
   // Forgot Password - Request Reset
   app.post("/api/auth/forgot-password", strictLimiter, validateBody(forgotPasswordSchema), async (req, res) => {
     try {
