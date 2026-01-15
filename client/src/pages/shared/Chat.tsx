@@ -235,6 +235,23 @@ export default function Chat({ role }: ChatProps) {
     enabled: !!selectedConversationId,
   });
 
+  // Poll for typing indicators (every 2 seconds when a conversation is selected)
+  const { data: typingData } = useQuery<{ typingUsers: TypingUser[] }>({
+    queryKey: [`/api/chat/conversations/${selectedConversationId}/typing`],
+    enabled: !!selectedConversationId,
+    refetchInterval: 2000,
+    staleTime: 1000,
+  });
+
+  // Update typingUsers when data changes
+  useEffect(() => {
+    if (typingData?.typingUsers) {
+      setTypingUsers(typingData.typingUsers);
+    } else {
+      setTypingUsers([]);
+    }
+  }, [typingData]);
+
   // Create conversation mutation
   const createConversationMutation = useMutation({
     mutationFn: async (data: { participantId?: string; isGroup?: boolean; name?: string; participantIds?: string[] }) => {
