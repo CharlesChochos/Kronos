@@ -1,21 +1,12 @@
 import { eq, and, desc, gt, lt, or, ilike, count, isNull, not } from "drizzle-orm";
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "@shared/schema";
 import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess, DocumentTemplate, InsertDocumentTemplate, InvestorMatch, InsertInvestorMatch, UserPreferences, InsertUserPreferences, DealTemplate, InsertDealTemplate, CalendarEvent, InsertCalendarEvent, TaskAttachmentRecord, InsertTaskAttachmentRecord, ClientPortalInvite, InsertClientPortalInvite, ClientPortalMessage, InsertClientPortalMessage, ClientPortalUpdate, InsertClientPortalUpdate, DealFee, InsertDealFee, StageDocument, InsertStageDocument, StagePodMember, InsertStagePodMember, StageVoiceNote, InsertStageVoiceNote, TaskComment, InsertTaskComment, DealNote, InsertDealNote } from "@shared/schema";
 import bcrypt from "bcryptjs";
+import { db } from "./db";
 
-// Always prefer PRODUCTION_DATABASE_URL if set, otherwise use DATABASE_URL
-// This ensures both dev and production use the same database when PRODUCTION_DATABASE_URL is configured
-const databaseUrl = process.env.PRODUCTION_DATABASE_URL || process.env.DATABASE_URL!;
-
-// Debug logging for database connection
 console.log(`[Storage] PRODUCTION_DATABASE_URL exists: ${!!process.env.PRODUCTION_DATABASE_URL}`);
 console.log(`[Storage] DATABASE_URL exists: ${!!process.env.DATABASE_URL}`);
 console.log(`[Storage] Using PRODUCTION_DATABASE_URL: ${!!process.env.PRODUCTION_DATABASE_URL}`);
-
-const sql = neon(databaseUrl);
-const db = drizzle(sql, { schema });
 
 export interface IStorage {
   // User operations
