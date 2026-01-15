@@ -144,6 +144,7 @@ export function NotificationPermissionPrompt() {
             size="icon"
             className="h-6 w-6 shrink-0"
             onClick={handleDismiss}
+            data-testid="button-close-notification-prompt"
           >
             <X className="w-4 h-4" />
           </Button>
