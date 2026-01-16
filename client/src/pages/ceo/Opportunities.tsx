@@ -918,7 +918,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <Label>Sector</Label>
                 <Popover open={sectorOpen} onOpenChange={setSectorOpen}>
@@ -1089,7 +1089,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
       
       {/* Opportunity Detail Sheet - Enhanced with Tabs */}
       <Sheet open={showOpportunityDetail} onOpenChange={setShowOpportunityDetail}>
-        <SheetContent className="bg-card border-border w-[600px] sm:max-w-[600px] flex flex-col overflow-hidden">
+        <SheetContent className="bg-card border-border w-full sm:w-[600px] sm:max-w-[600px] flex flex-col overflow-hidden">
           <SheetHeader className="flex-shrink-0">
             <SheetTitle className="flex items-center gap-2">
               <Lightbulb className="w-5 h-5 text-amber-500" />

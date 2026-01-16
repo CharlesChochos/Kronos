@@ -906,14 +906,14 @@ function StageWorkSection({
         {activeStageTab === dealStage && <span className="ml-1 text-green-500">(Current)</span>}
       </div>
       
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <Card className="bg-secondary/20">
-          <CardContent className="p-3 text-center">
-            <FileText className="w-4 h-4 mx-auto mb-1 text-blue-400" />
-            <div className="text-lg font-bold">
+          <CardContent className="p-2 sm:p-3 text-center">
+            <FileText className="w-3 h-3 sm:w-4 sm:h-4 mx-auto mb-1 text-blue-400" />
+            <div className="text-base sm:text-lg font-bold">
               {isLoadingDocuments ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : stageDocuments.length}
             </div>
-            <div className="text-xs text-muted-foreground">Documents</div>
+            <div className="text-[10px] sm:text-xs text-muted-foreground">Docs</div>
           </CardContent>
         </Card>
         <Popover open={showTeamPopover} onOpenChange={setShowTeamPopover}>

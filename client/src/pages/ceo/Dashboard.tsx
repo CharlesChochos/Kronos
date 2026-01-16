@@ -1267,7 +1267,7 @@ export default function Dashboard() {
                   <div className="w-3 h-3 rounded-full bg-blue-500" />
                   <span className="text-sm font-medium text-blue-400">Investment Banking</span>
                 </div>
-                <div className="grid grid-cols-4 gap-2 pl-5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pl-5">
                   {(() => {
                     const ibTasks = tasks.filter((t: Task) => {
                       const deal = deals.find(d => d.id === t.dealId);
@@ -1294,7 +1294,7 @@ export default function Dashboard() {
                   <div className="w-3 h-3 rounded-full bg-emerald-500" />
                   <span className="text-sm font-medium text-emerald-400">Asset Management</span>
                 </div>
-                <div className="grid grid-cols-4 gap-2 pl-5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pl-5">
                   {(() => {
                     const amTasks = tasks.filter((t: Task) => {
                       const deal = deals.find(d => d.id === t.dealId);
@@ -1980,32 +1980,32 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <Separator className="bg-border/50" />
-                <div className="grid grid-cols-3 gap-3 text-center py-1">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3 text-center py-1">
                   <div>
-                    <div className="text-xl font-semibold text-green-400">
+                    <div className="text-lg sm:text-xl font-semibold text-green-400">
                       {capitalAtWorkFilter === 'IB' ? ibActiveDeals.length : capitalAtWorkFilter === 'AM' ? amActiveDeals.length : activeDeals.length}
                     </div>
-                    <div className="text-xs text-muted-foreground uppercase tracking-wide mt-0.5">Active</div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide mt-0.5">Active</div>
                   </div>
                   <div>
-                    <div className="text-xl font-semibold text-yellow-400">
+                    <div className="text-lg sm:text-xl font-semibold text-yellow-400">
                       {capitalAtWorkFilter === 'IB' 
                         ? ibDeals.filter(d => d.status === 'On Hold').length 
                         : capitalAtWorkFilter === 'AM' 
                           ? amDeals.filter(d => d.status === 'On Hold').length 
                           : nonOpportunityDeals.filter(d => d.status === 'On Hold').length}
                     </div>
-                    <div className="text-xs text-muted-foreground uppercase tracking-wide mt-0.5">On Hold</div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide mt-0.5">On Hold</div>
                   </div>
                   <div>
-                    <div className="text-xl font-semibold text-muted-foreground">
+                    <div className="text-lg sm:text-xl font-semibold text-muted-foreground">
                       {capitalAtWorkFilter === 'IB' 
                         ? ibDeals.filter(d => d.status === 'Closed').length 
                         : capitalAtWorkFilter === 'AM' 
                           ? amDeals.filter(d => d.status === 'Closed').length 
                           : nonOpportunityDeals.filter(d => d.status === 'Closed').length}
                     </div>
-                    <div className="text-xs text-muted-foreground uppercase tracking-wide mt-0.5">Closed</div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide mt-0.5">Closed</div>
                   </div>
                 </div>
               </CardContent>
@@ -2449,7 +2449,7 @@ export default function Dashboard() {
               {/* Dashboard Background Color */}
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground mb-3">DASHBOARD THEME</h4>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-4 sm:grid-cols-4 gap-2">
                   {[
                     { name: 'Default', value: 'default', color: 'bg-background' },
                     { name: 'Navy', value: 'navy', color: 'bg-[#0f172a]' },
@@ -2519,25 +2519,25 @@ export default function Dashboard() {
           {selectedEmployee && (
             <div className="space-y-6 py-4">
               {/* Stats Overview */}
-              <div className="grid grid-cols-4 gap-4">
-                <div className="bg-secondary/30 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-primary">
-                    <Zap className="w-5 h-5 inline mr-1" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                <div className="bg-secondary/30 rounded-lg p-3 sm:p-4 text-center">
+                  <div className="text-xl sm:text-2xl font-bold text-primary">
+                    <Zap className="w-4 h-4 sm:w-5 sm:h-5 inline mr-1" />
                     {(selectedEmployee as any).velocityScore || 0}
                   </div>
-                  <div className="text-xs text-muted-foreground">Velocity Score</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground">Velocity</div>
                 </div>
-                <div className="bg-secondary/30 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-green-400">{(selectedEmployee as any).completedTasks || 0}</div>
-                  <div className="text-xs text-muted-foreground">Completed</div>
+                <div className="bg-secondary/30 rounded-lg p-3 sm:p-4 text-center">
+                  <div className="text-xl sm:text-2xl font-bold text-green-400">{(selectedEmployee as any).completedTasks || 0}</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground">Completed</div>
                 </div>
-                <div className="bg-secondary/30 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-yellow-400">{(selectedEmployee as any).inProgressTasks || 0}</div>
-                  <div className="text-xs text-muted-foreground">In Progress</div>
+                <div className="bg-secondary/30 rounded-lg p-3 sm:p-4 text-center">
+                  <div className="text-xl sm:text-2xl font-bold text-yellow-400">{(selectedEmployee as any).inProgressTasks || 0}</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground">In Progress</div>
                 </div>
-                <div className="bg-secondary/30 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold">{(selectedEmployee as any).pendingTasks || 0}</div>
-                  <div className="text-xs text-muted-foreground">Pending</div>
+                <div className="bg-secondary/30 rounded-lg p-3 sm:p-4 text-center">
+                  <div className="text-xl sm:text-2xl font-bold">{(selectedEmployee as any).pendingTasks || 0}</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground">Pending</div>
                 </div>
               </div>
 
@@ -2699,20 +2699,20 @@ export default function Dashboard() {
           <ScrollArea className="h-[60vh] pr-4">
             <div className="space-y-6">
               {/* Summary Stats */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="p-4 bg-secondary/30 rounded-lg text-center">
-                  <div className="text-3xl font-bold text-primary">{activeDeals.length}</div>
-                  <div className="text-xs text-muted-foreground uppercase mt-1">Total Active</div>
+              <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                <div className="p-3 sm:p-4 bg-secondary/30 rounded-lg text-center">
+                  <div className="text-xl sm:text-3xl font-bold text-primary">{activeDeals.length}</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground uppercase mt-1">Active</div>
                 </div>
-                <div className="p-4 bg-secondary/30 rounded-lg text-center">
-                  <div className="text-3xl font-bold text-green-400">${displayActiveValue.toLocaleString()}M</div>
-                  <div className="text-xs text-muted-foreground uppercase mt-1">Total Value</div>
+                <div className="p-3 sm:p-4 bg-secondary/30 rounded-lg text-center">
+                  <div className="text-xl sm:text-3xl font-bold text-green-400">${displayActiveValue.toLocaleString()}M</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground uppercase mt-1">Value</div>
                 </div>
-                <div className="p-4 bg-secondary/30 rounded-lg text-center">
-                  <div className="text-3xl font-bold text-blue-400">
+                <div className="p-3 sm:p-4 bg-secondary/30 rounded-lg text-center">
+                  <div className="text-xl sm:text-3xl font-bold text-blue-400">
                     {activeDeals.length > 0 ? Math.round(displayActiveValue / activeDeals.length) : 0}M
                   </div>
-                  <div className="text-xs text-muted-foreground uppercase mt-1">Avg Deal Size</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground uppercase mt-1">Avg Size</div>
                 </div>
               </div>
 
@@ -2894,17 +2894,17 @@ export default function Dashboard() {
                     <div className="w-3 h-3 rounded-full bg-blue-500" />
                     <span className="text-sm font-medium text-blue-400">Investment Banking</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 pl-5">
-                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-center">
-                      <div className="text-xl font-bold text-blue-400">{ibActiveDeals.length}</div>
+                  <div className="grid grid-cols-3 gap-2 pl-3 sm:pl-5">
+                    <div className="p-2 sm:p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-center">
+                      <div className="text-lg sm:text-xl font-bold text-blue-400">{ibActiveDeals.length}</div>
                       <div className="text-[10px] text-muted-foreground uppercase">Active</div>
                     </div>
-                    <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-center">
-                      <div className="text-xl font-bold text-yellow-400">{ibDeals.filter(d => d.status === 'On Hold').length}</div>
-                      <div className="text-[10px] text-muted-foreground uppercase">On Hold</div>
+                    <div className="p-2 sm:p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-center">
+                      <div className="text-lg sm:text-xl font-bold text-yellow-400">{ibDeals.filter(d => d.status === 'On Hold').length}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase">Hold</div>
                     </div>
-                    <div className="p-3 bg-secondary/30 rounded-lg text-center">
-                      <div className="text-xl font-bold text-muted-foreground">{ibDeals.filter(d => d.status === 'Closed').length}</div>
+                    <div className="p-2 sm:p-3 bg-secondary/30 rounded-lg text-center">
+                      <div className="text-lg sm:text-xl font-bold text-muted-foreground">{ibDeals.filter(d => d.status === 'Closed').length}</div>
                       <div className="text-[10px] text-muted-foreground uppercase">Closed</div>
                     </div>
                   </div>
@@ -2916,17 +2916,17 @@ export default function Dashboard() {
                     <div className="w-3 h-3 rounded-full bg-emerald-500" />
                     <span className="text-sm font-medium text-emerald-400">Asset Management</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 pl-5">
-                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-center">
-                      <div className="text-xl font-bold text-emerald-400">{amActiveDeals.length}</div>
+                  <div className="grid grid-cols-3 gap-2 pl-3 sm:pl-5">
+                    <div className="p-2 sm:p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-center">
+                      <div className="text-lg sm:text-xl font-bold text-emerald-400">{amActiveDeals.length}</div>
                       <div className="text-[10px] text-muted-foreground uppercase">Active</div>
                     </div>
-                    <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-center">
-                      <div className="text-xl font-bold text-yellow-400">{amDeals.filter(d => d.status === 'On Hold').length}</div>
-                      <div className="text-[10px] text-muted-foreground uppercase">On Hold</div>
+                    <div className="p-2 sm:p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-center">
+                      <div className="text-lg sm:text-xl font-bold text-yellow-400">{amDeals.filter(d => d.status === 'On Hold').length}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase">Hold</div>
                     </div>
-                    <div className="p-3 bg-secondary/30 rounded-lg text-center">
-                      <div className="text-xl font-bold text-muted-foreground">{amDeals.filter(d => d.status === 'Closed').length}</div>
+                    <div className="p-2 sm:p-3 bg-secondary/30 rounded-lg text-center">
+                      <div className="text-lg sm:text-xl font-bold text-muted-foreground">{amDeals.filter(d => d.status === 'Closed').length}</div>
                       <div className="text-[10px] text-muted-foreground uppercase">Closed</div>
                     </div>
                   </div>

@@ -12,6 +12,15 @@ Preferred communication style: Simple, everyday language.
 
 The frontend is built with React 18, TypeScript, and Vite. It utilizes `shadcn/ui` with the "new-york" style variant for a consistent design system. Styling is managed with Tailwind CSS, featuring a custom fintech-focused navy blue color scheme and dark mode support. The font stack includes Inter, Plus Jakarta Sans, and Space Mono. Role-based layouts ensure tailored experiences for CEOs and employees, with protected routes and reusable UI components.
 
+### Mobile Optimization (January 2026)
+Platform-wide mobile responsiveness has been implemented across all major pages:
+- **Responsive Grids:** All stat card grids use `grid-cols-2 sm:grid-cols-4` or similar patterns for proper mobile stacking
+- **Responsive Typography:** Font sizes scale appropriately (e.g., `text-xl sm:text-2xl`, `text-[10px] sm:text-xs`)
+- **Responsive Spacing:** Padding and gaps adjust for mobile (e.g., `p-3 sm:p-4`, `gap-2 sm:gap-4`)
+- **Responsive Icons:** Icon sizes scale with breakpoints (e.g., `w-4 h-4 sm:w-5 sm:h-5`)
+- **Sheet/Dialog Widths:** Side panels use `w-full sm:w-[Npx]` to prevent horizontal overflow on mobile
+- **Shortened Labels:** Mobile-friendly abbreviated labels where space is constrained
+
 ## Technical Implementations
 
 ### Frontend

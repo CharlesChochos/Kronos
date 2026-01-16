@@ -1303,59 +1303,59 @@ export default function MyTasks({ role = 'Employee' }: MyTasksProps) {
         </div>
         
         {/* Header Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <Card className="bg-card border-border">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-500">
-                <AlertCircle className="w-5 h-5" />
+            <CardContent className="p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-500">
+                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <div>
-                <div className="text-2xl font-bold" data-testid="stat-today">{dueTodayTasks.length}</div>
-                <div className="text-xs text-muted-foreground">Due Today</div>
+                <div className="text-xl sm:text-2xl font-bold" data-testid="stat-today">{dueTodayTasks.length}</div>
+                <div className="text-[10px] sm:text-xs text-muted-foreground">Due Today</div>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-card border-border">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500">
-                <Calendar className="w-5 h-5" />
+            <CardContent className="p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500">
+                <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <div>
-                <div className="text-2xl font-bold" data-testid="stat-week">{dueNextWeekTasks.length}</div>
-                <div className="text-xs text-muted-foreground">Due This Week</div>
+                <div className="text-xl sm:text-2xl font-bold" data-testid="stat-week">{dueNextWeekTasks.length}</div>
+                <div className="text-[10px] sm:text-xs text-muted-foreground">This Week</div>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-card border-border">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-500">
-                <Clock className="w-5 h-5" />
+            <CardContent className="p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-500">
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <div>
-                <div className="text-2xl font-bold" data-testid="stat-later">{dueLaterTasks.length}</div>
-                <div className="text-xs text-muted-foreground">Due Later</div>
+                <div className="text-xl sm:text-2xl font-bold" data-testid="stat-later">{dueLaterTasks.length}</div>
+                <div className="text-[10px] sm:text-xs text-muted-foreground">Later</div>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-card border-border">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-gray-500/20 flex items-center justify-center text-gray-500">
-                <FileEdit className="w-5 h-5" />
+            <CardContent className="p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-500/20 flex items-center justify-center text-gray-500">
+                <FileEdit className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <div>
-                <div className="text-2xl font-bold" data-testid="stat-drafts">{draftTasks.length}</div>
-                <div className="text-xs text-muted-foreground">Drafts</div>
+                <div className="text-xl sm:text-2xl font-bold" data-testid="stat-drafts">{draftTasks.length}</div>
+                <div className="text-[10px] sm:text-xs text-muted-foreground">Drafts</div>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-card border-border">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-500">
-                <Check className="w-5 h-5" />
+            <CardContent className="p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-500">
+                <Check className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <div>
-                <div className="text-2xl font-bold" data-testid="stat-completed">{completedTasks.length}</div>
-                <div className="text-xs text-muted-foreground">Completed</div>
+                <div className="text-xl sm:text-2xl font-bold" data-testid="stat-completed">{completedTasks.length}</div>
+                <div className="text-[10px] sm:text-xs text-muted-foreground">Done</div>
               </div>
             </CardContent>
           </Card>

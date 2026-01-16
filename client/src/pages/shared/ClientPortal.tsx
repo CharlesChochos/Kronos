@@ -245,16 +245,16 @@ export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
           </Button>
         </div>
 
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
+            <CardContent className="pt-4 sm:pt-6">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-2 bg-blue-500/10 rounded-lg">
-                  <Mail className="w-5 h-5 text-blue-500" />
+                  <Mail className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{pendingInvites.length}</p>
-                  <p className="text-xs text-muted-foreground">Pending Invites</p>
+                  <p className="text-xl sm:text-2xl font-bold">{pendingInvites.length}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Pending</p>
                 </div>
               </div>
             </CardContent>
@@ -498,7 +498,7 @@ export default function ClientPortal({ role }: { role: 'CEO' | 'Employee' }) {
           </TabsContent>
           
           <TabsContent value="legacy" className="space-y-4 mt-4">
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">

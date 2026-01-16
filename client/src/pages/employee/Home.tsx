@@ -1463,25 +1463,25 @@ export default function EmployeeHome() {
                 <Separator />
 
                 {/* Key Metrics */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 bg-secondary/20 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-green-400">${selectedDeal.value}M</div>
-                    <div className="text-xs text-muted-foreground uppercase mt-1">Deal Value</div>
+                <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                  <div className="p-3 sm:p-4 bg-secondary/20 rounded-lg text-center">
+                    <div className="text-xl sm:text-2xl font-bold text-green-400">${selectedDeal.value}M</div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground uppercase mt-1">Value</div>
                   </div>
-                  <div className="p-4 bg-secondary/20 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-primary">{selectedDeal.progress || 0}%</div>
-                    <div className="text-xs text-muted-foreground uppercase mt-1">Progress</div>
+                  <div className="p-3 sm:p-4 bg-secondary/20 rounded-lg text-center">
+                    <div className="text-xl sm:text-2xl font-bold text-primary">{selectedDeal.progress || 0}%</div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground uppercase mt-1">Progress</div>
                   </div>
-                  <div className="p-4 bg-secondary/20 rounded-lg text-center">
+                  <div className="p-3 sm:p-4 bg-secondary/20 rounded-lg text-center">
                     <Badge className={cn(
-                      "text-sm",
+                      "text-xs sm:text-sm",
                       selectedDeal.status === 'Active' ? 'bg-green-500/20 text-green-400' :
                       selectedDeal.status === 'On Hold' ? 'bg-yellow-500/20 text-yellow-400' :
                       'bg-secondary'
                     )}>
                       {selectedDeal.status}
                     </Badge>
-                    <div className="text-xs text-muted-foreground uppercase mt-2">Status</div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground uppercase mt-2">Status</div>
                   </div>
                 </div>
 
