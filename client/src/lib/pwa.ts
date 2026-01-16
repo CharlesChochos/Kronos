@@ -5,6 +5,8 @@ export interface BeforeInstallPromptEvent extends Event {
 
 let deferredPrompt: BeforeInstallPromptEvent | null = null;
 
+let pendingWorker: ServiceWorker | null = null;
+
 export function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
@@ -21,10 +23,8 @@ export function registerServiceWorker() {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                 console.log('[PWA] New content available, refresh to update');
-                if (window.confirm('A new version of Kronos is available. Reload to update?')) {
-                  newWorker.postMessage({ type: 'SKIP_WAITING' });
-                  window.location.reload();
-                }
+                pendingWorker = newWorker;
+                window.dispatchEvent(new CustomEvent('pwa-update-available'));
               }
             });
           }
@@ -38,6 +38,13 @@ export function registerServiceWorker() {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       console.log('[PWA] Controller changed, reloading...');
     });
+  }
+}
+
+export function applyUpdate() {
+  if (pendingWorker) {
+    pendingWorker.postMessage({ type: 'SKIP_WAITING' });
+    window.location.reload();
   }
 }
 
