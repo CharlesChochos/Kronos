@@ -1289,6 +1289,64 @@ export function Layout({ children, role = 'CEO', userName = "Joshua Orlinsky", p
                     onCheckedChange={(checked) => updateSetting('desktopAlerts', checked)} 
                   />
                 </div>
+                
+                {/* Browser notification permission status */}
+                <div className="p-3 rounded-lg bg-secondary/50 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {typeof Notification !== 'undefined' && Notification.permission === 'granted' ? (
+                        <>
+                          <Bell className="w-4 h-4 text-green-500" />
+                          <span className="text-sm text-green-500 font-medium">Notifications Enabled</span>
+                        </>
+                      ) : typeof Notification !== 'undefined' && Notification.permission === 'denied' ? (
+                        <>
+                          <Bell className="w-4 h-4 text-red-500" />
+                          <span className="text-sm text-red-500 font-medium">Notifications Blocked</span>
+                        </>
+                      ) : (
+                        <>
+                          <Bell className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground font-medium">Not Enabled</span>
+                        </>
+                      )}
+                    </div>
+                    {typeof Notification !== 'undefined' && Notification.permission !== 'granted' && (
+                      <Button
+                        size="sm"
+                        variant={Notification.permission === 'denied' ? 'outline' : 'default'}
+                        onClick={async () => {
+                          if (Notification.permission === 'denied') {
+                            toast.info("Notifications are blocked. Please enable them in your browser settings.", {
+                              description: "Look for the lock/info icon in your address bar and allow notifications.",
+                              duration: 8000
+                            });
+                          } else {
+                            const permission = await Notification.requestPermission();
+                            if (permission === 'granted') {
+                              toast.success("Notifications enabled!");
+                              window.location.reload();
+                            } else if (permission === 'denied') {
+                              toast.error("Notifications were denied");
+                            }
+                          }
+                        }}
+                        data-testid="button-enable-notifications"
+                      >
+                        {Notification.permission === 'denied' ? 'How to Enable' : 'Enable Now'}
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {typeof Notification === 'undefined'
+                      ? "Notifications are not supported in this browser."
+                      : Notification.permission === 'granted' 
+                      ? "You'll receive alerts for new messages, tasks, and mentions on your device."
+                      : Notification.permission === 'denied'
+                      ? "To receive notifications, you'll need to enable them in your browser settings."
+                      : "Enable notifications to get alerts for messages, tasks, and mentions."}
+                  </p>
+                </div>
               </div>
             </TabsContent>
             

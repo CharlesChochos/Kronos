@@ -1642,11 +1642,11 @@ export default function Chat({ role }: ChatProps) {
                                     <p className="text-xs font-medium mb-1 opacity-70">{message.senderName}</p>
                                   )}
                                   <p className={cn(
-                                    "whitespace-pre-wrap break-words",
+                                    "whitespace-pre-wrap break-words overflow-wrap-anywhere",
                                     chatSettings.fontSize === "small" && "text-xs",
-                                    chatSettings.fontSize === "medium" && "text-sm",
+                                    chatSettings.fontSize === "medium" && "text-sm md:text-sm",
                                     chatSettings.fontSize === "large" && "text-base"
-                                  )}>{message.content}</p>
+                                  )} style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{message.content}</p>
                                 {message.attachments && message.attachments.length > 0 && (
                                   <div className="mt-2 space-y-1.5">
                                     {message.attachments.map((att, idx) => (
@@ -1946,6 +1946,24 @@ export default function Chat({ role }: ChatProps) {
                     multiple
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp,image/*"
                   />
+                  {/* Camera button - mobile only for taking photos */}
+                  <input
+                    id="camera-input"
+                    type="file"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                    accept="image/*"
+                    capture="environment"
+                  />
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-10 w-10 flex-shrink-0 md:hidden"
+                    onClick={() => document.getElementById('camera-input')?.click()}
+                    data-testid="button-camera"
+                  >
+                    <Image className="w-5 h-5" />
+                  </Button>
                   {/* Attachment button - always visible */}
                   <Button 
                     variant="ghost" 
