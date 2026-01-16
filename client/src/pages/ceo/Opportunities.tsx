@@ -1319,29 +1319,6 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                 </div>
               )}
               
-              {/* Edit Mode Save/Cancel - Sticky at top */}
-              {isEditMode && (
-                <div className="sticky top-0 z-10 flex gap-2 mb-4 p-3 bg-green-600/20 border-2 border-green-500 rounded-lg shadow-lg">
-                  <Button
-                    variant="outline"
-                    className="flex-1 h-12 text-base"
-                    onClick={() => setIsEditMode(false)}
-                    data-testid="button-cancel-edit-header"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="flex-1 h-12 text-base bg-green-600 hover:bg-green-700"
-                    onClick={handleSaveEdit}
-                    disabled={updateDeal.isPending}
-                    data-testid="button-save-edit-header"
-                  >
-                    <Save className="w-5 h-5 mr-2" />
-                    {updateDeal.isPending ? "Saving..." : "Save Changes"}
-                  </Button>
-                </div>
-              )}
-              
               <Tabs value={detailTab} onValueChange={(v) => setDetailTab(v as any)}>
                 <TabsList className="w-full grid grid-cols-4">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -1977,10 +1954,35 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
           {/* Fixed Action Buttons Footer - Always visible at bottom */}
           {selectedOpportunity && (
             <SheetFooter className="flex-shrink-0 pt-4 border-t border-border bg-card">
-              <div className="w-full space-y-3">
-                <h4 className="font-medium text-sm">Take Action</h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {!isEditMode && (
+              {isEditMode ? (
+                /* Edit Mode: Show Save/Cancel buttons */
+                <div className="w-full space-y-3">
+                  <h4 className="font-medium text-sm text-green-500">Editing Mode</h4>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-1 h-12 text-base"
+                      onClick={() => setIsEditMode(false)}
+                      data-testid="button-cancel-edit-footer"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      className="flex-1 h-12 text-base bg-green-600 hover:bg-green-700"
+                      onClick={handleSaveEdit}
+                      disabled={updateDeal.isPending}
+                      data-testid="button-save-edit-footer"
+                    >
+                      <Save className="w-5 h-5 mr-2" />
+                      {updateDeal.isPending ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                /* Normal Mode: Show action buttons */
+                <div className="w-full space-y-3">
+                  <h4 className="font-medium text-sm">Take Action</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <Button
                       variant="outline"
                       className="h-10"
@@ -1990,50 +1992,50 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                       <Pencil className="w-4 h-4 mr-2" />
                       Edit
                     </Button>
-                  )}
-                  <Button 
-                    variant="outline" 
-                    className="h-10 border-blue-500/50 text-blue-500 hover:bg-blue-500/10"
-                    onClick={() => setShowCommitteeDialog(true)}
-                    disabled={!!committeeReview}
-                    data-testid="button-detail-committee"
-                  >
-                    <UsersRound className="w-4 h-4 mr-2" />
-                    <span className="truncate">{committeeReview ? 'Review Active' : 'Committee'}</span>
-                  </Button>
-                  <Button 
-                    className="h-10 bg-green-600 hover:bg-green-700" 
-                    onClick={() => setShowApproveDialog(true)}
-                    data-testid="button-detail-approve"
-                  >
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Approve
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="h-10 border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
-                    onClick={() => {
-                      if (selectedOpportunity) {
-                        setDealToArchive(selectedOpportunity.id);
-                        setShowArchiveDialog(true);
-                      }
-                    }}
-                    data-testid="button-detail-archive"
-                  >
-                    <Archive className="w-4 h-4 mr-2" />
-                    Archive
-                  </Button>
-                  <Button 
-                    variant="destructive" 
-                    className="h-10"
-                    onClick={() => setShowRejectDialog(true)}
-                    data-testid="button-detail-reject"
-                  >
-                    <XCircle className="w-4 h-4 mr-2" />
-                    Reject
-                  </Button>
+                    <Button 
+                      variant="outline" 
+                      className="h-10 border-blue-500/50 text-blue-500 hover:bg-blue-500/10"
+                      onClick={() => setShowCommitteeDialog(true)}
+                      disabled={!!committeeReview}
+                      data-testid="button-detail-committee"
+                    >
+                      <UsersRound className="w-4 h-4 mr-2" />
+                      <span className="truncate">{committeeReview ? 'Review Active' : 'Committee'}</span>
+                    </Button>
+                    <Button 
+                      className="h-10 bg-green-600 hover:bg-green-700" 
+                      onClick={() => setShowApproveDialog(true)}
+                      data-testid="button-detail-approve"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Approve
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="h-10 border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
+                      onClick={() => {
+                        if (selectedOpportunity) {
+                          setDealToArchive(selectedOpportunity.id);
+                          setShowArchiveDialog(true);
+                        }
+                      }}
+                      data-testid="button-detail-archive"
+                    >
+                      <Archive className="w-4 h-4 mr-2" />
+                      Archive
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      className="h-10"
+                      onClick={() => setShowRejectDialog(true)}
+                      data-testid="button-detail-reject"
+                    >
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Reject
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </SheetFooter>
           )}
         </SheetContent>
