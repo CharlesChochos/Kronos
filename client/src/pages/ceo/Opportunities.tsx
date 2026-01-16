@@ -1342,10 +1342,30 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                   </TabsTrigger>
                 </TabsList>
                 
-                <ScrollArea className="h-auto max-h-[400px] mt-4">
+                <ScrollArea className="h-auto max-h-[50vh] mt-4">
                   <TabsContent value="overview" className="space-y-4 pr-4 mt-0">
                     {isEditMode ? (
                       <div className="space-y-4">
+                        {/* Save/Cancel buttons at top for visibility */}
+                        <div className="flex gap-2 pb-2 border-b border-border">
+                          <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => setIsEditMode(false)}
+                            data-testid="button-cancel-edit-top"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            className="flex-1"
+                            onClick={handleSaveEdit}
+                            disabled={updateDeal.isPending}
+                            data-testid="button-save-edit-top"
+                          >
+                            <Save className="w-4 h-4 mr-2" />
+                            {updateDeal.isPending ? "Saving..." : "Save Changes"}
+                          </Button>
+                        </div>
                         <div className="space-y-2">
                           <Label>Opportunity Name *</Label>
                           <Input
