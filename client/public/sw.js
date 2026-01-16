@@ -1,6 +1,6 @@
-const CACHE_NAME = 'kronos-v1';
-const STATIC_CACHE = 'kronos-static-v1';
-const DYNAMIC_CACHE = 'kronos-dynamic-v1';
+const CACHE_NAME = 'kronos-v2';
+const STATIC_CACHE = 'kronos-static-v2';
+const DYNAMIC_CACHE = 'kronos-dynamic-v2';
 
 const STATIC_ASSETS = [
   '/',
