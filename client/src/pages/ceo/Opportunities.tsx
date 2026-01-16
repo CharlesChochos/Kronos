@@ -1319,24 +1319,24 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                 </div>
               )}
               
-              {/* Edit Mode Save/Cancel - Always visible outside scroll area */}
+              {/* Edit Mode Save/Cancel - Sticky at top */}
               {isEditMode && (
-                <div className="flex gap-2 mb-4 p-3 bg-primary/10 border border-primary/30 rounded-lg">
+                <div className="sticky top-0 z-10 flex gap-2 mb-4 p-3 bg-green-600/20 border-2 border-green-500 rounded-lg shadow-lg">
                   <Button
                     variant="outline"
-                    className="flex-1"
+                    className="flex-1 h-12 text-base"
                     onClick={() => setIsEditMode(false)}
                     data-testid="button-cancel-edit-header"
                   >
                     Cancel
                   </Button>
                   <Button
-                    className="flex-1"
+                    className="flex-1 h-12 text-base bg-green-600 hover:bg-green-700"
                     onClick={handleSaveEdit}
                     disabled={updateDeal.isPending}
                     data-testid="button-save-edit-header"
                   >
-                    <Save className="w-4 h-4 mr-2" />
+                    <Save className="w-5 h-5 mr-2" />
                     {updateDeal.isPending ? "Saving..." : "Save Changes"}
                   </Button>
                 </div>
