@@ -228,6 +228,16 @@ export default function Chat({ role }: ChatProps) {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Mobile UX improvements
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [longPressMessage, setLongPressMessage] = useState<Message | null>(null);
+  const [swipeState, setSwipeState] = useState<{ messageId: string; offset: number } | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<{ file: File; url: string } | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const swipeStartRef = useRef<{ x: number; y: number; messageId: string } | null>(null);
 
   // Fetch deals for tagging documents
   const { data: deals = [] } = useDealsListing();
@@ -259,6 +269,105 @@ export default function Chat({ role }: ChatProps) {
       setTypingUsers([]);
     }
   }, [typingData]);
+
+  // Mobile UX: Pull to refresh
+  const handlePullToRefresh = useCallback(async () => {
+    if (!selectedConversationId) return;
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: [`/api/chat/conversations/${selectedConversationId}/messages`] });
+    setTimeout(() => setIsRefreshing(false), 500);
+  }, [selectedConversationId, queryClient]);
+
+  // Attach scroll listener to ScrollArea viewport for scroll-to-bottom button
+  const pullStartRef = useRef<{ y: number; scrollTop: number } | null>(null);
+  const pullDistanceRef = useRef(0);
+  const [pullDistance, setPullDistance] = useState(0);
+  const isRefreshingRef = useRef(false);
+  
+  // Keep refs in sync with state for use in event handlers
+  useEffect(() => {
+    isRefreshingRef.current = isRefreshing;
+  }, [isRefreshing]);
+  
+  useEffect(() => {
+    let viewport: Element | null = null;
+    let cleanupFn: (() => void) | null = null;
+    
+    const attachListeners = (viewportEl: Element) => {
+      const el = viewportEl as HTMLElement;
+      
+      const handleScroll = () => {
+        const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+        setShowScrollToBottom(!isNearBottom);
+      };
+      
+      const handleTouchStart = (e: TouchEvent) => {
+        if (el.scrollTop === 0) {
+          pullStartRef.current = { y: e.touches[0].clientY, scrollTop: el.scrollTop };
+        }
+      };
+      
+      const handleTouchMove = (e: TouchEvent) => {
+        if (!pullStartRef.current) return;
+        if (el.scrollTop > 0) {
+          pullStartRef.current = null;
+          pullDistanceRef.current = 0;
+          setPullDistance(0);
+          return;
+        }
+        const deltaY = e.touches[0].clientY - pullStartRef.current.y;
+        if (deltaY > 0) {
+          e.preventDefault();
+          const distance = Math.min(deltaY, 100);
+          pullDistanceRef.current = distance;
+          setPullDistance(distance);
+        }
+      };
+      
+      const handleTouchEnd = async () => {
+        if (pullDistanceRef.current > 60 && !isRefreshingRef.current) {
+          setIsRefreshing(true);
+          await queryClient.invalidateQueries({ queryKey: [`/api/chat/conversations/${selectedConversationId}/messages`] });
+          setTimeout(() => setIsRefreshing(false), 500);
+        }
+        pullStartRef.current = null;
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
+      };
+      
+      viewportEl.addEventListener('scroll', handleScroll);
+      viewportEl.addEventListener('touchstart', handleTouchStart, { passive: false });
+      viewportEl.addEventListener('touchmove', handleTouchMove, { passive: false });
+      viewportEl.addEventListener('touchend', handleTouchEnd);
+      
+      return () => {
+        viewportEl.removeEventListener('scroll', handleScroll);
+        viewportEl.removeEventListener('touchstart', handleTouchStart);
+        viewportEl.removeEventListener('touchmove', handleTouchMove);
+        viewportEl.removeEventListener('touchend', handleTouchEnd);
+      };
+    };
+    
+    // Find viewport with retry for Radix mounting delay
+    const findAndAttach = () => {
+      viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+      if (viewport) {
+        cleanupFn = attachListeners(viewport);
+        return true;
+      }
+      return false;
+    };
+    
+    if (!findAndAttach()) {
+      const timer = setTimeout(findAndAttach, 100);
+      return () => {
+        clearTimeout(timer);
+        cleanupFn?.();
+      };
+    }
+    
+    return () => cleanupFn?.();
+  }, [selectedConversationId, queryClient]);
 
   // Create conversation mutation
   const createConversationMutation = useMutation({
@@ -933,12 +1042,9 @@ export default function Chat({ role }: ChatProps) {
     return mentionedIds;
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   useEffect(() => {
-    scrollToBottom();
+    // Auto-scroll on new messages (using the useCallback version)
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {
@@ -1011,10 +1117,18 @@ export default function Chat({ role }: ChatProps) {
     const files = e.target.files;
     if (!files || !selectedConversationId) return;
     
-    // Show deal tagging dialog
-    setPendingUploadFiles(Array.from(files));
-    setSelectedDealId(null);
-    setShowDealTagDialog(true);
+    const file = files[0];
+    
+    // For single image files, show preview first
+    if (files.length === 1 && file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      setPhotoPreview({ file, url });
+    } else {
+      // Multiple files or non-images go through deal tagging
+      setPendingUploadFiles(Array.from(files));
+      setSelectedDealId(null);
+      setShowDealTagDialog(true);
+    }
     
     // Clear the input so the same file can be selected again
     e.target.value = '';
@@ -1144,6 +1258,110 @@ export default function Chat({ role }: ChatProps) {
     setSelectedConversationId(id);
     setMobileView('chat');
   };
+
+
+  // Mobile UX: Scroll to bottom
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setShowScrollToBottom(false);
+  }, []);
+
+  // Mobile UX: Long press handlers for messages
+  const handleMessageTouchStart = useCallback((e: React.TouchEvent, message: Message) => {
+    longPressTimerRef.current = setTimeout(() => {
+      setLongPressMessage(message);
+      // Vibrate if supported
+      if ('vibrate' in navigator) {
+        navigator.vibrate(50);
+      }
+    }, 500);
+    
+    // Track for swipe
+    swipeStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+      messageId: message.id
+    };
+  }, []);
+
+  const handleMessageTouchMove = useCallback((e: React.TouchEvent) => {
+    // Cancel long press if moving
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    
+    // Handle swipe
+    if (!swipeStartRef.current) return;
+    
+    const deltaX = e.touches[0].clientX - swipeStartRef.current.x;
+    const deltaY = Math.abs(e.touches[0].clientY - swipeStartRef.current.y);
+    
+    // Only horizontal swipe
+    if (deltaY < 30 && Math.abs(deltaX) > 20) {
+      setSwipeState({
+        messageId: swipeStartRef.current.messageId,
+        offset: Math.min(80, Math.max(-80, deltaX))
+      });
+    }
+  }, []);
+
+  const handleMessageTouchEnd = useCallback((e: React.TouchEvent, message: Message, isOwnMessage: boolean) => {
+    // Cancel long press timer
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    
+    // Handle swipe action
+    if (swipeState && swipeState.messageId === message.id) {
+      if (swipeState.offset > 60) {
+        // Swipe right = reply
+        setReplyToMessage(message);
+        if ('vibrate' in navigator) navigator.vibrate(30);
+      } else if (swipeState.offset < -60 && isOwnMessage) {
+        // Swipe left = delete (only own messages)
+        handleUnsendMessage(message.id);
+        if ('vibrate' in navigator) navigator.vibrate(30);
+      }
+      setSwipeState(null);
+    }
+    
+    swipeStartRef.current = null;
+  }, [swipeState]);
+
+  // Mobile UX: Photo preview before sending
+  const handlePhotoSelect = useCallback((file: File) => {
+    if (file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      setPhotoPreview({ file, url });
+    } else {
+      // Not an image, process normally
+      setPendingUploadFiles([file]);
+      setSelectedDealId(null);
+      setShowDealTagDialog(true);
+    }
+  }, []);
+
+  const handleSendPhoto = useCallback(async () => {
+    if (!photoPreview || !selectedConversationId) return;
+    
+    // Clean up preview URL
+    URL.revokeObjectURL(photoPreview.url);
+    
+    // Use existing file upload logic
+    setPendingUploadFiles([photoPreview.file]);
+    setPhotoPreview(null);
+    setSelectedDealId(null);
+    setShowDealTagDialog(true);
+  }, [photoPreview, selectedConversationId]);
+
+  const cancelPhotoPreview = useCallback(() => {
+    if (photoPreview) {
+      URL.revokeObjectURL(photoPreview.url);
+      setPhotoPreview(null);
+    }
+  }, [photoPreview]);
 
   return (
     <Layout role={role} pageTitle="Messages" userName={currentUser?.name || ""}>
@@ -1561,15 +1779,18 @@ export default function Chat({ role }: ChatProps) {
               </div>
 
               {/* Messages */}
-              <div className={cn(
-                "flex-1 overflow-hidden p-0 transition-colors",
-                chatSettings.chatTheme === "default" && "bg-card",
-                chatSettings.chatTheme === "dark" && "bg-zinc-900",
-                chatSettings.chatTheme === "light" && "bg-slate-50",
-                chatSettings.chatTheme === "gradient" && "bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10",
-                chatSettings.chatTheme === "ocean" && "bg-gradient-to-br from-cyan-500/10 via-blue-500/10 to-teal-500/10",
-                chatSettings.chatTheme === "forest" && "bg-gradient-to-br from-green-500/10 via-emerald-500/10 to-lime-500/10"
-              )}>
+              <div 
+                ref={scrollAreaRef}
+                className={cn(
+                  "flex-1 overflow-hidden p-0 transition-colors relative",
+                  chatSettings.chatTheme === "default" && "bg-card",
+                  chatSettings.chatTheme === "dark" && "bg-zinc-900",
+                  chatSettings.chatTheme === "light" && "bg-slate-50",
+                  chatSettings.chatTheme === "gradient" && "bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10",
+                  chatSettings.chatTheme === "ocean" && "bg-gradient-to-br from-cyan-500/10 via-blue-500/10 to-teal-500/10",
+                  chatSettings.chatTheme === "forest" && "bg-gradient-to-br from-green-500/10 via-emerald-500/10 to-lime-500/10"
+                )}
+              >
                 <ScrollArea className="h-full p-4">
                   {messagesLoading ? (
                     <div className="flex items-center justify-center py-8">
@@ -1613,8 +1834,26 @@ export default function Chat({ role }: ChatProps) {
                           <div 
                             key={message.id} 
                             data-message-id={message.id}
-                            className={cn("flex gap-2 md:gap-3 px-2 md:px-0", isOwnMessage && "flex-row-reverse")}
+                            className={cn("flex gap-2 md:gap-3 px-2 md:px-0 transition-transform relative", isOwnMessage && "flex-row-reverse")}
+                            style={{
+                              transform: swipeState?.messageId === message.id ? `translateX(${swipeState.offset}px)` : undefined,
+                              transition: swipeState?.messageId === message.id ? 'none' : 'transform 0.2s ease-out'
+                            }}
+                            onTouchStart={(e) => handleMessageTouchStart(e, message)}
+                            onTouchMove={handleMessageTouchMove}
+                            onTouchEnd={(e) => handleMessageTouchEnd(e, message, isOwnMessage)}
                           >
+                            {/* Swipe action indicators */}
+                            {swipeState?.messageId === message.id && swipeState.offset > 30 && (
+                              <div className="absolute left-2 top-1/2 -translate-y-1/2 text-primary">
+                                <Reply className="w-5 h-5" />
+                              </div>
+                            )}
+                            {swipeState?.messageId === message.id && swipeState.offset < -30 && isOwnMessage && (
+                              <div className="absolute right-2 top-1/2 -translate-y-1/2 text-destructive">
+                                <Trash2 className="w-5 h-5" />
+                              </div>
+                            )}
                             <Avatar className="w-8 h-8 flex-shrink-0 hidden md:flex">
                               <AvatarFallback className="text-xs bg-secondary">
                                 {message.senderName?.split(' ').map(n => n[0]).join('').slice(0, 2) || '??'}
@@ -1861,6 +2100,41 @@ export default function Chat({ role }: ChatProps) {
                     </div>
                   )}
                 </ScrollArea>
+                
+                {/* Scroll to bottom button */}
+                {showScrollToBottom && (
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="absolute bottom-4 right-4 h-10 w-10 rounded-full shadow-lg z-10"
+                    onClick={scrollToBottom}
+                    data-testid="button-scroll-to-bottom"
+                  >
+                    <ChevronDown className="w-5 h-5" />
+                  </Button>
+                )}
+                
+                {/* Pull to refresh indicator */}
+                {(isRefreshing || pullDistance > 0) && (
+                  <div 
+                    className="absolute top-4 left-1/2 -translate-x-1/2 z-10 transition-transform"
+                    style={{ 
+                      transform: `translateX(-50%) translateY(${isRefreshing ? 0 : Math.min(pullDistance / 2, 20)}px)`,
+                      opacity: isRefreshing ? 1 : Math.min(pullDistance / 60, 1)
+                    }}
+                  >
+                    <div className="bg-card rounded-full p-2 shadow-lg">
+                      {isRefreshing ? (
+                        <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                      ) : (
+                        <ChevronDown 
+                          className="w-5 h-5 text-primary transition-transform" 
+                          style={{ transform: pullDistance > 60 ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Typing Indicator */}
@@ -2721,6 +2995,151 @@ export default function Chat({ role }: ChatProps) {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Long Press Context Menu for Messages */}
+      <Sheet open={!!longPressMessage} onOpenChange={(open) => !open && setLongPressMessage(null)}>
+        <SheetContent side="bottom" className="rounded-t-2xl pb-8">
+          <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-4" />
+          <div className="space-y-1">
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 h-12 text-base"
+              onClick={() => {
+                if (longPressMessage) setReplyToMessage(longPressMessage);
+                setLongPressMessage(null);
+              }}
+              data-testid="menu-reply"
+            >
+              <Reply className="w-5 h-5" />
+              Reply
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 h-12 text-base"
+              onClick={async () => {
+                if (longPressMessage) {
+                  try {
+                    await navigator.clipboard.writeText(longPressMessage.content);
+                    toast.success("Message copied");
+                  } catch {
+                    toast.error("Could not copy to clipboard");
+                  }
+                }
+                setLongPressMessage(null);
+              }}
+              data-testid="menu-copy"
+            >
+              <Type className="w-5 h-5" />
+              Copy Text
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 h-12 text-base"
+              onClick={() => {
+                if (longPressMessage) handleForwardMessage(longPressMessage);
+                setLongPressMessage(null);
+              }}
+              data-testid="menu-forward"
+            >
+              <Forward className="w-5 h-5" />
+              Forward
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 h-12 text-base"
+              onClick={() => {
+                if (longPressMessage) handlePinMessage(longPressMessage);
+                setLongPressMessage(null);
+              }}
+              data-testid="menu-pin"
+            >
+              <Pin className="w-5 h-5" />
+              {pinnedMessages.some(m => m.id === longPressMessage?.id) ? 'Unpin' : 'Pin'}
+            </Button>
+            {longPressMessage?.senderId === currentUser?.id && (
+              <>
+                <Separator className="my-2" />
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-12 text-base"
+                  onClick={() => {
+                    if (longPressMessage) {
+                      setEditingMessage(longPressMessage);
+                      setEditContent(longPressMessage.content);
+                    }
+                    setLongPressMessage(null);
+                  }}
+                  data-testid="menu-edit"
+                >
+                  <Pencil className="w-5 h-5" />
+                  Edit
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-12 text-base text-destructive hover:text-destructive"
+                  onClick={() => {
+                    if (longPressMessage) handleUnsendMessage(longPressMessage.id);
+                    setLongPressMessage(null);
+                  }}
+                  data-testid="menu-delete"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  Delete
+                </Button>
+              </>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Photo Preview Before Sending */}
+      <Dialog open={!!photoPreview} onOpenChange={(open) => !open && cancelPhotoPreview()}>
+        <DialogContent className="max-w-md p-0 overflow-hidden">
+          <div className="relative">
+            {photoPreview && (
+              <img 
+                src={photoPreview.url} 
+                alt="Preview" 
+                className="w-full max-h-[60vh] object-contain bg-black"
+              />
+            )}
+          </div>
+          <div className="p-4 space-y-3">
+            <p className="text-sm text-muted-foreground truncate">
+              {photoPreview?.file.name}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={cancelPhotoPreview}
+                data-testid="button-cancel-photo"
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleSendPhoto}
+                data-testid="button-send-photo"
+              >
+                <Send className="w-4 h-4 mr-2" />
+                Send
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Floating New Chat Button - Mobile only, on conversation list */}
+      {mobileView === 'list' && (
+        <Button
+          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl z-50 md:hidden"
+          onClick={() => setShowNewChatModal(true)}
+          data-testid="fab-new-chat"
+        >
+          <Plus className="w-6 h-6" />
+        </Button>
+      )}
     </Layout>
   );
 }
