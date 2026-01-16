@@ -82,7 +82,7 @@ import {
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { useCurrentUser, useUsers, useDealsListing, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews, useUserPreferences, useSaveUserPreferences, useCalendarEvents, useAllDealFees, useCustomSectors, useCreateCustomSector, usePendingCommitteeReviews } from "@/lib/api";
+import { useCurrentUser, useUsers, useDealsListing, useTasks, useCreateDeal, useNotifications, useCreateMeeting, useMeetings, useUpdateUserPreferences, useMarketData, useMarketNews, useUserPreferences, useSaveUserPreferences, useCalendarEvents, useAllDealFees, useCustomSectors, useCreateCustomSector } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, subDays, startOfDay, isAfter, isSameDay } from "date-fns";
@@ -103,7 +103,6 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'marketIntelligence', name: 'Market Intelligence', enabled: true },
   { id: 'teamTaskProgress', name: 'Team Task Progress', enabled: true },
   { id: 'upcomingMeetings', name: 'Upcoming Meetings', enabled: true },
-  { id: 'pendingReviews', name: 'Pending Committee Reviews', enabled: true },
   { id: 'recentActivity', name: 'Recent Activity', enabled: true },
   { id: 'capitalAtWork', name: 'Capital At Work', enabled: true },
   { id: 'feeSummary', name: 'Fee Summary', enabled: true },
@@ -121,7 +120,6 @@ export default function Dashboard() {
   const { data: meetings = [] } = useMeetings();
   const { data: allDealFees = [] } = useAllDealFees();
   const { data: calendarEvents = [] } = useCalendarEvents();
-  const { data: pendingReviews = [] } = usePendingCommitteeReviews();
   const createDeal = useCreateDeal();
   const createMeeting = useCreateMeeting();
   const updateUserPreferences = useUpdateUserPreferences();
@@ -1900,70 +1898,6 @@ export default function Dashboard() {
               </Card>
             );
           })()}
-
-          {/* Pending Committee Reviews Widget */}
-          {widgets.find(w => w.id === 'pendingReviews')?.enabled && (
-            <Card className="bg-card border-border">
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <CardTitle className="text-base font-semibold text-foreground">Pending Reviews</CardTitle>
-                <div className="flex items-center gap-2">
-                  {pendingReviews.length > 0 && (
-                    <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
-                      {pendingReviews.length}
-                    </Badge>
-                  )}
-                  <Users className="w-4 h-4 text-muted-foreground" />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3 pt-0">
-                {pendingReviews.length === 0 ? (
-                  <div className="text-center py-6 text-muted-foreground text-sm">No pending committee reviews</div>
-                ) : (
-                  <>
-                    {pendingReviews.slice(0, 3).map((review) => (
-                      <div 
-                        key={review.id} 
-                        className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm hover:bg-blue-500/20 transition-colors cursor-pointer"
-                        onClick={() => setLocation('/ceo/opportunities')}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="font-medium text-foreground truncate leading-snug">{review.deal?.name || 'Unknown Deal'}</div>
-                            <div className="text-muted-foreground text-xs mt-0.5 truncate">{review.deal?.client}</div>
-                          </div>
-                          <Badge 
-                            variant="secondary" 
-                            className={cn(
-                              "text-[10px] shrink-0",
-                              review.voteSummary?.majorityReached && "bg-green-500/20 text-green-400"
-                            )}
-                          >
-                            {review.voteSummary?.approved || 0}/{review.voteSummary?.total || 0} votes
-                          </Badge>
-                        </div>
-                        {review.deadline && (
-                          <div className="text-xs text-amber-400 mt-1.5 flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            Due: {format(new Date(review.deadline), 'MMM d, h:mm a')}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    {pendingReviews.length > 3 && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="w-full text-sm text-muted-foreground hover:text-primary"
-                        onClick={() => setLocation('/ceo/opportunities')}
-                      >
-                        View all {pendingReviews.length} reviews
-                      </Button>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          )}
 
           {/* Recent Activity Widget */}
           {widgets.find(w => w.id === 'recentActivity')?.enabled && (

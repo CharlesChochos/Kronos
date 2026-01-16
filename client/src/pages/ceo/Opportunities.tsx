@@ -1993,16 +1993,6 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                       Edit
                     </Button>
                     <Button 
-                      variant="outline" 
-                      className="h-10 border-blue-500/50 text-blue-500 hover:bg-blue-500/10"
-                      onClick={() => setShowCommitteeDialog(true)}
-                      disabled={!!committeeReview}
-                      data-testid="button-detail-committee"
-                    >
-                      <UsersRound className="w-4 h-4 mr-2" />
-                      <span className="truncate">{committeeReview ? 'Review Active' : 'Committee'}</span>
-                    </Button>
-                    <Button 
                       className="h-10 bg-green-600 hover:bg-green-700" 
                       onClick={() => setShowApproveDialog(true)}
                       data-testid="button-detail-approve"
