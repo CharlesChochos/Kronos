@@ -1,0 +1,198 @@
+[Warning] 200 console messages are not shown.
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.replit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
+
+[Error] WebSocket connection to 'wss://3eebe7f6-961c-4ea9-bb2e-38846d600578-00-1oosem43sh6u3.picard.replit.dev/vite-hmr?token=e6fEEsl-F8ZS' failed: There was a bad response from the server.
+[Error] Invalid url for WebSocket wss://localhost:undefined/?token=e6fEEsl-F8ZS
+	setupWebSocket
+	fallback
+	(anonymous function)
+	(anonymous function)
+[Error] Unhandled Promise Rejection: SyntaxError: The string did not match the expected pattern.
+	WebSocket
+	setupWebSocket
+	fallback
+	(anonymous function)
+	(anonymous function)
+[Error] Unable to post message to https://staging.replit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.replit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.replit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.replit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.replit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.replit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
+
+[Warning] [ai-chat] Creating connection with chat proxy enabled (7962fdfa56df3760.js, line 2)
+[Error] Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation', 'allow-presentation', 'allow-orientation-lock' are invalid sandbox flags.
+	z (ed1e693c96a75807.js:2:7413)
+	(anonymous function) (ed1e693c96a75807.js:2:107042)
+	iA (ed1e693c96a75807.js:2:110705)
+	iV (ed1e693c96a75807.js:2:103655)
+	iU (ed1e693c96a75807.js:2:103465)
+	i_ (ed1e693c96a75807.js:2:98514)
+	C (ed1e693c96a75807.js:2:1566)
+	M (ed1e693c96a75807.js:2:2096)
+[Error] The source list for Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+[Error] The Content Security Policy directive 'default-src' contains 'report-uri' as a source expression. Did you mean 'default-src ...; report-uri...' (note the semicolon)?
+[Error] The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+[Error] Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation', 'allow-presentation', 'allow-orientation-lock' are invalid sandbox flags. (workspace_iframe.html, line 32)
+[Error] Refused to load https://f3894a26-1354-4d7a-8434-881391b1e385-00-35mhkvg6sjngo.janeway.replit.dev/ because it does not appear in the frame-ancestors directive of the Content Security Policy.
+[Error] Unable to post message to https://staging.replit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.replit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
+
+[Error] WebSocket connection to 'wss://eval.janeway.platform.replit.com/wsv2/v2.public.Q2dZSTVwS3B5d1lTQmdpRnI2bkxCaUlIYW1GdVpYZGhlVEFBT29JQ0NpUm1Nemc1TkdFeU5pMHhNelUwTFRSa04yRXRPRFF6TkMwNE9ERXpPVEZpTVdVek9EVVNBMjVwZUJvWmNtVndiR2wwTFhKbGNHd3RabWxzWlhNdGFtRnVaWGRoZVNJR1MzSnZibTl6S2c5amFHOWphRzl6WTJoaGNteGxjekJDVndvYWNtVndiR2wwTFhKbGNHd3RZbXh2WTJ0ekxXcGhibVYzWVhrU0dISmxjR3hwZEMxeVpYQnNMVzFsZEdFdGFtRnVaWGRoZVJvZmNtVndiR2wwTFcxaGNtZGhjbWx1WlMxaWJHOWphM010YW1GdVpYZGhlVW9IQ0tDSjdCUVFBVkFBV2c5cGJuUmxiblJmWW5WemFXNWxjM05hRW05dVltOWhjbVJwYm1kZmFtOWlYMlZ1WjFvV2IyNWliMkZ5WkdsdVoxOXliMnhsWDIxbGJXSmxjbmdBVWlVSUFSQ0FnSUNBSUJrQUFBQUFBQUFRUUNFQUFBQUFBQUFRUUNpQWdJQ0F5QUV3QWpnQVlBTnFGZ2lnaWV3VUVnOWphRzlqYUc5elkyaGhjbXhsY3pDQ0FRSXFBSm9CQ2dvSU1DNHdMakk1TWpPZ0FRRT2gyGSHnNtsUDX_t6yP81ON0ove4BAJ5mDTUmm4psaHqKpvhCh-G98XMEzTws6ub8atCarJojFDIGE66V6umiYO.Q2dad2NtOWtPak1pQ25KbGNHeHBkQzVqYjIwPQ' failed: The network connection was lost.
+[Error] WebSocket connection to 'wss://eval.janeway.platform.replit.com/wsv2/v2.public.Q2dZSWhKT3B5d1lTQmdpanI2bkxCaUlIYW1GdVpYZGhlVEFBT29JQ0NpUm1Nemc1TkdFeU5pMHhNelUwTFRSa04yRXRPRFF6TkMwNE9ERXpPVEZpTVdVek9EVVNBMjVwZUJvWmNtVndiR2wwTFhKbGNHd3RabWxzWlhNdGFtRnVaWGRoZVNJR1MzSnZibTl6S2c5amFHOWphRzl6WTJoaGNteGxjekJDVndvYWNtVndiR2wwTFhKbGNHd3RZbXh2WTJ0ekxXcGhibVYzWVhrU0dISmxjR3hwZEMxeVpYQnNMVzFsZEdFdGFtRnVaWGRoZVJvZmNtVndiR2wwTFcxaGNtZGhjbWx1WlMxaWJHOWphM010YW1GdVpYZGhlVW9IQ0tDSjdCUVFBVkFBV2c5cGJuUmxiblJmWW5WemFXNWxjM05hRW05dVltOWhjbVJwYm1kZmFtOWlYMlZ1WjFvV2IyNWliMkZ5WkdsdVoxOXliMnhsWDIxbGJXSmxjbmdBVWlVSUFSQ0FnSUNBSUJrQUFBQUFBQUFRUUNFQUFBQUFBQUFRUUNpQWdJQ0F5QUV3QWpnQVlBTnFGZ2lnaWV3VUVnOWphRzlqYUc5elkyaGhjbXhsY3pDQ0FRSXFBSm9CQ2dvSU1DNHdMakk1TWpPZ0FRRT2rmPw1E3WoIec942u57Te4VtAKL8_pCQWgFxNSEiScaJhGRs5EOKtnP2C-W-gOVqKfQOU8Aoyap2utPBsSe6wH.Q2dad2NtOWtPak1pQ25KbGNHeHBkQzVqYjIwPQ' failed: The network connection was lost.
+[Error] WebSocket connection to 'wss://eval.janeway.platform.replit.com/wsv2/v2.public.Q2dZSTc1T3B5d1lTQmdpT3NLbkxCaUlIYW1GdVpYZGhlVEFBT29JQ0NpUm1Nemc1TkdFeU5pMHhNelUwTFRSa04yRXRPRFF6TkMwNE9ERXpPVEZpTVdVek9EVVNBMjVwZUJvWmNtVndiR2wwTFhKbGNHd3RabWxzWlhNdGFtRnVaWGRoZVNJR1MzSnZibTl6S2c5amFHOWphRzl6WTJoaGNteGxjekJDVndvYWNtVndiR2wwTFhKbGNHd3RZbXh2WTJ0ekxXcGhibVYzWVhrU0dISmxjR3hwZEMxeVpYQnNMVzFsZEdFdGFtRnVaWGRoZVJvZmNtVndiR2wwTFcxaGNtZGhjbWx1WlMxaWJHOWphM010YW1GdVpYZGhlVW9IQ0tDSjdCUVFBVkFBV2c5cGJuUmxiblJmWW5WemFXNWxjM05hRW05dVltOWhjbVJwYm1kZmFtOWlYMlZ1WjFvV2IyNWliMkZ5WkdsdVoxOXliMnhsWDIxbGJXSmxjbmdBVWlVSUFSQ0FnSUNBSUJrQUFBQUFBQUFRUUNFQUFBQUFBQUFRUUNpQWdJQ0F5QUV3QWpnQVlBTnFGZ2lnaWV3VUVnOWphRzlqYUc5elkyaGhjbXhsY3pDQ0FRSXFBSm9CQ2dvSU1DNHdMakk1TWpPZ0FRRT069TKKwVkPs-fvXf_B27sp1a13ya7amo_Qn8M2CFjWx2rtoMpc6M39IeSKKk6YDBI6zCk2NOruDdJfwa24ioEK.Q2dad2NtOWtPak1pQ25KbGNHeHBkQzVqYjIwPQ' failed: The network connection was lost.
+[Error] Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation', 'allow-presentation', 'allow-orientation-lock' are invalid sandbox flags.
+	z (ed1e693c96a75807.js:2:7413)
+	(anonymous function) (ed1e693c96a75807.js:2:107042)
+	iA (ed1e693c96a75807.js:2:110705)
+	iV (ed1e693c96a75807.js:2:103655)
+	iU (ed1e693c96a75807.js:2:103465)
+	i_ (ed1e693c96a75807.js:2:98514)
+	C (ed1e693c96a75807.js:2:1566)
+	M (ed1e693c96a75807.js:2:2096)
+[Error] The source list for Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+[Error] The Content Security Policy directive 'default-src' contains 'report-uri' as a source expression. Did you mean 'default-src ...; report-uri...' (note the semicolon)?
+[Error] The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+[Error] Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation', 'allow-presentation', 'allow-orientation-lock' are invalid sandbox flags. (workspace_iframe.html, line 32)
+[Error] Refused to load https://f3894a26-1354-4d7a-8434-881391b1e385-00-35mhkvg6sjngo.janeway.replit.dev/ because it does not appear in the frame-ancestors directive of the Content Security Policy.
+[Error] Unable to post message to https://staging.replit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.replit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
+
+[Error] WebSocket connection to 'wss://eval.janeway.platform.replit.com/wsv2/v2.public.Q2dZSWhwZXB5d1lTQmdpbHM2bkxCaUlIYW1GdVpYZGhlVEFBT29JQ0NpUm1Nemc1TkdFeU5pMHhNelUwTFRSa04yRXRPRFF6TkMwNE9ERXpPVEZpTVdVek9EVVNBMjVwZUJvWmNtVndiR2wwTFhKbGNHd3RabWxzWlhNdGFtRnVaWGRoZVNJR1MzSnZibTl6S2c5amFHOWphRzl6WTJoaGNteGxjekJDVndvYWNtVndiR2wwTFhKbGNHd3RZbXh2WTJ0ekxXcGhibVYzWVhrU0dISmxjR3hwZEMxeVpYQnNMVzFsZEdFdGFtRnVaWGRoZVJvZmNtVndiR2wwTFcxaGNtZGhjbWx1WlMxaWJHOWphM010YW1GdVpYZGhlVW9IQ0tDSjdCUVFBVkFBV2c5cGJuUmxiblJmWW5WemFXNWxjM05hRW05dVltOWhjbVJwYm1kZmFtOWlYMlZ1WjFvV2IyNWliMkZ5WkdsdVoxOXliMnhsWDIxbGJXSmxjbmdBVWlVSUFSQ0FnSUNBSUJrQUFBQUFBQUFRUUNFQUFBQUFBQUFRUUNpQWdJQ0F5QUV3QWpnQVlBTnFGZ2lnaWV3VUVnOWphRzlqYUc5elkyaGhjbXhsY3pDQ0FRSXFBSm9CQ2dvSU1DNHdMakk1TWpPZ0FRRT0i8dXF4h74hFNKPFCB1UXgT7u5LHX0g6vMUd94WvUM2FN0MMJ51T4uKsm1b_OZ9LXuPiwn9XUsvApoM3fx3IoF.Q2dad2NtOWtPak1pQ25KbGNHeHBkQzVqYjIwPQ' failed: The network connection was lost.
+[Error] WebSocket connection to 'wss://eval.janeway.platform.replit.com/wsv2/v2.public.Q2dZSWhaZXB5d1lTQmdpa3M2bkxCaUlIYW1GdVpYZGhlVEFBT29JQ0NpUm1Nemc1TkdFeU5pMHhNelUwTFRSa04yRXRPRFF6TkMwNE9ERXpPVEZpTVdVek9EVVNBMjVwZUJvWmNtVndiR2wwTFhKbGNHd3RabWxzWlhNdGFtRnVaWGRoZVNJR1MzSnZibTl6S2c5amFHOWphRzl6WTJoaGNteGxjekJDVndvYWNtVndiR2wwTFhKbGNHd3RZbXh2WTJ0ekxXcGhibVYzWVhrU0dISmxjR3hwZEMxeVpYQnNMVzFsZEdFdGFtRnVaWGRoZVJvZmNtVndiR2wwTFcxaGNtZGhjbWx1WlMxaWJHOWphM010YW1GdVpYZGhlVW9IQ0tDSjdCUVFBVkFBV2c5cGJuUmxiblJmWW5WemFXNWxjM05hRW05dVltOWhjbVJwYm1kZmFtOWlYMlZ1WjFvV2IyNWliMkZ5WkdsdVoxOXliMnhsWDIxbGJXSmxjbmdBVWlVSUFSQ0FnSUNBSUJrQUFBQUFBQUFRUUNFQUFBQUFBQUFRUUNpQWdJQ0F5QUV3QWpnQVlBQnFGZ2lnaWV3VUVnOWphRzlqYUc5elkyaGhjbXhsY3pDQ0FRSXFBSm9CQ2dvSU1DNHdMakk1TWpPZ0FRRT2_PmhUgboJ8bAUGIw8mrolaTWwy5D6EXdD_Lnj_eILZbucL77J_pGqgXnpglkWxUDrMVG1nIG30ko6z3h3YvgE.Q2dad2NtOWtPak1pQ25KbGNHeHBkQzVqYjIwPQ' failed: The network connection was lost.
+[Error] Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation', 'allow-presentation', 'allow-orientation-lock' are invalid sandbox flags.
+	z (ed1e693c96a75807.js:2:7413)
+	(anonymous function) (ed1e693c96a75807.js:2:107042)
+	iA (ed1e693c96a75807.js:2:110705)
+	iV (ed1e693c96a75807.js:2:103655)
+	iU (ed1e693c96a75807.js:2:103465)
+	i_ (ed1e693c96a75807.js:2:98514)
+	C (ed1e693c96a75807.js:2:1566)
+	M (ed1e693c96a75807.js:2:2096)
+[Error] The source list for Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+[Error] The Content Security Policy directive 'default-src' contains 'report-uri' as a source expression. Did you mean 'default-src ...; report-uri...' (note the semicolon)?
+[Error] The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+[Error] Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation', 'allow-presentation', 'allow-orientation-lock' are invalid sandbox flags. (workspace_iframe.html, line 32)
+[Error] Refused to load https://f3894a26-1354-4d7a-8434-881391b1e385-00-35mhkvg6sjngo.janeway.replit.dev/ because it does not appear in the frame-ancestors directive of the Content Security Policy.
+[Error] Unable to post message to https://staging.replit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.replit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
+
+[Error] Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation', 'allow-presentation', 'allow-orientation-lock' are invalid sandbox flags.
+	z (ed1e693c96a75807.js:2:7413)
+	(anonymous function) (ed1e693c96a75807.js:2:107042)
+	iA (ed1e693c96a75807.js:2:110705)
+	iV (ed1e693c96a75807.js:2:103655)
+	iU (ed1e693c96a75807.js:2:103465)
+	i_ (ed1e693c96a75807.js:2:98514)
+	C (ed1e693c96a75807.js:2:1566)
+	M (ed1e693c96a75807.js:2:2096)
+[Error] The source list for Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+[Error] The Content Security Policy directive 'default-src' contains 'report-uri' as a source expression. Did you mean 'default-src ...; report-uri...' (note the semicolon)?
+[Error] The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+[Error] Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation', 'allow-presentation', 'allow-orientation-lock' are invalid sandbox flags. (workspace_iframe.html, line 32)
+[Error] Refused to load https://f3894a26-1354-4d7a-8434-881391b1e385-00-35mhkvg6sjngo.janeway.replit.dev/ because it does not appear in the frame-ancestors directive of the Content Security Policy.
+[Error] Unable to post message to https://staging.replit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.replit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to https://staging.firewalledreplit.com. Recipient has origin https://replit.com.
+
+[Error] Unable to post message to http://localhost:3000. Recipient has origin https://replit.com.
