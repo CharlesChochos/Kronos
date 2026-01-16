@@ -1,4 +1,4 @@
-import { eq, and, desc, gt, lt, or, ilike, count, isNull, not } from "drizzle-orm";
+import { eq, and, desc, gt, lt, or, ilike, count, isNull, not, sql } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import type { User, InsertUser, Deal, InsertDeal, Task, InsertTask, Meeting, InsertMeeting, Notification, InsertNotification, PasswordResetToken, AssistantConversation, InsertAssistantConversation, AssistantMessage, InsertAssistantMessage, Conversation, InsertConversation, ConversationMember, InsertConversationMember, Message, InsertMessage, TimeEntry, InsertTimeEntry, TimeOffRequest, InsertTimeOffRequest, AuditLog, InsertAuditLog, Investor, InsertInvestor, InvestorInteraction, InsertInvestorInteraction, Okr, InsertOkr, Stakeholder, InsertStakeholder, Announcement, InsertAnnouncement, Poll, InsertPoll, MentorshipPairing, InsertMentorshipPairing, ClientPortalAccess, InsertClientPortalAccess, DocumentTemplate, InsertDocumentTemplate, InvestorMatch, InsertInvestorMatch, UserPreferences, InsertUserPreferences, DealTemplate, InsertDealTemplate, CalendarEvent, InsertCalendarEvent, TaskAttachmentRecord, InsertTaskAttachmentRecord, ClientPortalInvite, InsertClientPortalInvite, ClientPortalMessage, InsertClientPortalMessage, ClientPortalUpdate, InsertClientPortalUpdate, DealFee, InsertDealFee, StageDocument, InsertStageDocument, StagePodMember, InsertStagePodMember, StageVoiceNote, InsertStageVoiceNote, TaskComment, InsertTaskComment, DealNote, InsertDealNote } from "@shared/schema";
 import bcrypt from "bcryptjs";
@@ -497,11 +497,11 @@ export class DatabaseStorage implements IStorage {
   async appendDealAttachments(id: string, newAttachments: any[]): Promise<Deal | undefined> {
     // Use raw SQL with JSONB concatenation operator for atomic append
     // This prevents race conditions by doing read-modify-write in a single atomic operation
-    await sql`
+    await db.execute(sql`
       UPDATE deals 
       SET attachments = COALESCE(attachments, '[]'::jsonb) || ${JSON.stringify(newAttachments)}::jsonb
       WHERE id = ${id}
-    `;
+    `);
     // Reload and return the authoritative deal record to ensure consistency
     const [deal] = await db.select().from(schema.deals).where(eq(schema.deals.id, id));
     return deal;
