@@ -1319,6 +1319,29 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                 </div>
               )}
               
+              {/* Edit Mode Save/Cancel - Always visible outside scroll area */}
+              {isEditMode && (
+                <div className="flex gap-2 mb-4 p-3 bg-primary/10 border border-primary/30 rounded-lg">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setIsEditMode(false)}
+                    data-testid="button-cancel-edit-header"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={handleSaveEdit}
+                    disabled={updateDeal.isPending}
+                    data-testid="button-save-edit-header"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    {updateDeal.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              )}
+              
               <Tabs value={detailTab} onValueChange={(v) => setDetailTab(v as any)}>
                 <TabsList className="w-full grid grid-cols-4">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -1346,26 +1369,6 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                   <TabsContent value="overview" className="space-y-4 pr-4 mt-0">
                     {isEditMode ? (
                       <div className="space-y-4">
-                        {/* Save/Cancel buttons at top for visibility */}
-                        <div className="flex gap-2 pb-2 border-b border-border">
-                          <Button
-                            variant="outline"
-                            className="flex-1"
-                            onClick={() => setIsEditMode(false)}
-                            data-testid="button-cancel-edit-top"
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            className="flex-1"
-                            onClick={handleSaveEdit}
-                            disabled={updateDeal.isPending}
-                            data-testid="button-save-edit-top"
-                          >
-                            <Save className="w-4 h-4 mr-2" />
-                            {updateDeal.isPending ? "Saving..." : "Save Changes"}
-                          </Button>
-                        </div>
                         <div className="space-y-2">
                           <Label>Opportunity Name *</Label>
                           <Input
@@ -1483,25 +1486,6 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                             rows={4}
                             data-testid="textarea-edit-description"
                           />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            className="flex-1"
-                            onClick={() => setIsEditMode(false)}
-                            data-testid="button-cancel-edit"
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            className="flex-1"
-                            onClick={handleSaveEdit}
-                            disabled={updateDeal.isPending}
-                            data-testid="button-save-edit"
-                          >
-                            <Save className="w-4 h-4 mr-2" />
-                            {updateDeal.isPending ? "Saving..." : "Save Changes"}
-                          </Button>
                         </div>
                       </div>
                     ) : (
