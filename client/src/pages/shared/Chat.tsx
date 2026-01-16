@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,7 +57,7 @@ import {
   Clock
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useCurrentUser, useUsers } from "@/lib/api";
+import { useCurrentUser, useUsers, useDealsListing } from "@/lib/api";
 import { useDashboardContext } from "@/contexts/DashboardContext";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -218,12 +218,20 @@ export default function Chat({ role }: ChatProps) {
   const [showArchived, setShowArchived] = useState(false);
   const [messageSearchQuery, setMessageSearchQuery] = useState("");
   const [isSearchingMessages, setIsSearchingMessages] = useState(false);
+  
+  // Deal tagging for shared documents
+  const [showDealTagDialog, setShowDealTagDialog] = useState(false);
+  const [pendingUploadFiles, setPendingUploadFiles] = useState<File[]>([]);
+  const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTypingRef = useRef<number>(0);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Fetch deals for tagging documents
+  const { data: deals = [] } = useDealsListing();
+  
   // Fetch conversations from database
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
     queryKey: ["/api/chat/conversations"],
@@ -1002,8 +1010,23 @@ export default function Chat({ role }: ChatProps) {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !selectedConversationId) return;
-
-    for (const file of Array.from(files)) {
+    
+    // Show deal tagging dialog
+    setPendingUploadFiles(Array.from(files));
+    setSelectedDealId(null);
+    setShowDealTagDialog(true);
+    
+    // Clear the input so the same file can be selected again
+    e.target.value = '';
+  };
+  
+  // Process file upload after deal selection (or skip)
+  const processFileUpload = async (tagToDeal: boolean) => {
+    if (!selectedConversationId) return;
+    
+    setShowDealTagDialog(false);
+    
+    for (const file of pendingUploadFiles) {
       try {
         // Upload file to server first
         const formData = new FormData();
@@ -1022,6 +1045,7 @@ export default function Chat({ role }: ChatProps) {
         
         const uploadedFile = await uploadRes.json();
         
+        // Send message with attachment
         await sendMessageMutation.mutateAsync({
           conversationId: selectedConversationId,
           content: `Shared a file: ${file.name}`,
@@ -1030,14 +1054,46 @@ export default function Chat({ role }: ChatProps) {
             filename: uploadedFile.filename, 
             type: uploadedFile.type, 
             size: uploadedFile.size,
-            url: uploadedFile.url // Server URL for download
+            url: uploadedFile.url
           }],
         });
-        toast.success("File shared successfully");
+        
+        // Also tag to deal if selected
+        if (tagToDeal && selectedDealId) {
+          try {
+            const dealAttachment = {
+              id: uploadedFile.id,
+              filename: uploadedFile.filename,
+              url: uploadedFile.url,
+              objectPath: uploadedFile.url,
+              size: uploadedFile.size,
+              type: uploadedFile.type,
+              uploadedAt: new Date().toISOString(),
+            };
+            
+            await fetch(`/api/deals/${selectedDealId}/attachments`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ attachments: [dealAttachment] }),
+            });
+            
+            const selectedDeal = deals.find(d => d.id === selectedDealId);
+            toast.success(`File shared and tagged to "${selectedDeal?.name || 'deal'}"`);
+          } catch (tagError) {
+            console.error("Failed to tag file to deal:", tagError);
+            toast.success("File shared successfully (failed to tag to deal)");
+          }
+        } else {
+          toast.success("File shared successfully");
+        }
       } catch (error: any) {
         toast.error(error.message || "Failed to share file");
       }
     }
+    
+    setPendingUploadFiles([]);
+    setSelectedDealId(null);
   };
 
   const selectedConversation = conversations.find(c => c.id === selectedConversationId);
@@ -1050,6 +1106,31 @@ export default function Chat({ role }: ChatProps) {
 
   // Mobile view state - controls which panel is shown on mobile
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
+  
+  // Touch swipe handling for mobile navigation
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const chatPanelRef = useRef<HTMLDivElement>(null);
+  
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY
+    };
+  }, []);
+  
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    
+    const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
+    const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+    
+    // Swipe right to go back (deltaX > 100px, more horizontal than vertical)
+    if (deltaX > 100 && deltaY < 100 && mobileView === 'chat') {
+      setMobileView('list');
+    }
+    
+    touchStartRef.current = null;
+  }, [mobileView]);
   
   // Reset to list view when page loads or no conversation is selected
   useEffect(() => {
@@ -1266,11 +1347,16 @@ export default function Chat({ role }: ChatProps) {
         </div>
 
         {/* Chat Window - Full screen on mobile, main area on desktop */}
-        <div className={cn(
-          "flex-1 bg-card flex flex-col transition-transform duration-300 ease-out",
-          "absolute md:relative inset-0 z-20",
-          mobileView === 'list' && "translate-x-full md:translate-x-0"
-        )}>
+        <div 
+          ref={chatPanelRef}
+          className={cn(
+            "flex-1 bg-card flex flex-col transition-transform duration-300 ease-out",
+            "absolute md:relative inset-0 z-20",
+            mobileView === 'list' && "translate-x-full md:translate-x-0"
+          )}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
           {selectedConversation ? (
             <>
               {/* Chat Header */}
@@ -1280,12 +1366,13 @@ export default function Chat({ role }: ChatProps) {
                     {/* Back button - mobile only */}
                     <Button 
                       variant="ghost" 
-                      size="icon"
+                      size="sm"
                       onClick={() => setMobileView('list')}
-                      className="md:hidden h-10 w-10 -ml-1"
+                      className="md:hidden h-10 px-2 -ml-1 gap-1"
                       data-testid="button-back-to-list"
                     >
                       <ArrowLeft className="w-5 h-5" />
+                      <span className="text-sm">Back</span>
                     </Button>
                     <Avatar className="w-10 h-10">
                       <AvatarFallback className={cn(
@@ -1555,6 +1642,7 @@ export default function Chat({ role }: ChatProps) {
                                     <p className="text-xs font-medium mb-1 opacity-70">{message.senderName}</p>
                                   )}
                                   <p className={cn(
+                                    "whitespace-pre-wrap break-words",
                                     chatSettings.fontSize === "small" && "text-xs",
                                     chatSettings.fontSize === "medium" && "text-sm",
                                     chatSettings.fontSize === "large" && "text-base"
@@ -2151,6 +2239,76 @@ export default function Chat({ role }: ChatProps) {
               </div>
             </ScrollArea>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deal Tagging Dialog */}
+      <Dialog open={showDealTagDialog} onOpenChange={(open) => {
+        if (!open) {
+          setPendingUploadFiles([]);
+          setSelectedDealId(null);
+        }
+        setShowDealTagDialog(open);
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Tag Document to Deal
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Would you like to tag {pendingUploadFiles.length === 1 ? "this file" : `these ${pendingUploadFiles.length} files`} to a deal?
+            </p>
+            
+            {pendingUploadFiles.length > 0 && (
+              <div className="bg-secondary/30 rounded-lg p-3 space-y-1">
+                {pendingUploadFiles.map((file, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-sm">
+                    <File className="w-4 h-4 text-muted-foreground" />
+                    <span className="truncate">{file.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      ({(file.size / 1024).toFixed(1)} KB)
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label>Select Deal (Optional)</Label>
+              <Select value={selectedDealId || ""} onValueChange={setSelectedDealId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a deal..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {deals.filter(d => d.dealType !== 'Opportunity' || d.status === 'Active').map(deal => (
+                    <SelectItem key={deal.id} value={deal.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{deal.name}</span>
+                        <span className="text-xs text-muted-foreground">({deal.client})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => processFileUpload(false)}
+            >
+              Skip Tagging
+            </Button>
+            <Button 
+              onClick={() => processFileUpload(true)}
+              disabled={!selectedDealId}
+            >
+              Tag & Send
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
