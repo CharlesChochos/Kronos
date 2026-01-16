@@ -1975,11 +1975,11 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
             <SheetFooter className="flex-shrink-0 pt-4 border-t border-border bg-card">
               <div className="w-full space-y-3">
                 <h4 className="font-medium text-sm">Take Action</h4>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {!isEditMode && (
                     <Button
                       variant="outline"
-                      className="flex-1 min-w-[100px]"
+                      className="h-10"
                       onClick={() => setIsEditMode(true)}
                       data-testid="button-edit-opportunity"
                     >
@@ -1989,15 +1989,16 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                   )}
                   <Button 
                     variant="outline" 
-                    className="flex-1 min-w-[120px] border-blue-500/50 text-blue-500 hover:bg-blue-500/10"
+                    className="h-10 border-blue-500/50 text-blue-500 hover:bg-blue-500/10"
                     onClick={() => setShowCommitteeDialog(true)}
                     disabled={!!committeeReview}
                     data-testid="button-detail-committee"
                   >
                     <UsersRound className="w-4 h-4 mr-2" />
-                    {committeeReview ? 'Review Active' : 'Deal Committee'}
+                    <span className="truncate">{committeeReview ? 'Review Active' : 'Committee'}</span>
                   </Button>
-                  <Button className="flex-1 min-w-[120px] bg-green-600 hover:bg-green-700" 
+                  <Button 
+                    className="h-10 bg-green-600 hover:bg-green-700" 
                     onClick={() => setShowApproveDialog(true)}
                     data-testid="button-detail-approve"
                   >
@@ -2006,7 +2007,7 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="flex-1 min-w-[100px] border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
+                    className="h-10 border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
                     onClick={() => {
                       if (selectedOpportunity) {
                         setDealToArchive(selectedOpportunity.id);
@@ -2018,7 +2019,9 @@ export default function Opportunities({ role = 'CEO' }: OpportunitiesProps) {
                     <Archive className="w-4 h-4 mr-2" />
                     Archive
                   </Button>
-                  <Button variant="destructive" className="flex-1 min-w-[100px]"
+                  <Button 
+                    variant="destructive" 
+                    className="h-10"
                     onClick={() => setShowRejectDialog(true)}
                     data-testid="button-detail-reject"
                   >
