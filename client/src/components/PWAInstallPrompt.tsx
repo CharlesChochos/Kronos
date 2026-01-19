@@ -73,7 +73,7 @@ export function PWAInstallPrompt() {
 
   if (showIOSInstructions) {
     return (
-      <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-80">
+      <div className="fixed bottom-20 left-4 right-4 z-50 md:bottom-4 md:left-auto md:right-4 md:w-80">
         <div className="bg-card border border-border rounded-xl shadow-2xl p-4 animate-in slide-in-from-bottom-5">
           <div className="flex items-start gap-3">
             <div className="p-2 bg-primary/10 rounded-lg shrink-0">
@@ -105,7 +105,7 @@ export function PWAInstallPrompt() {
   }
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-80">
+    <div className="fixed bottom-20 left-4 right-4 z-50 md:bottom-4 md:left-auto md:right-4 md:w-80">
       <div className="bg-card border border-border rounded-xl shadow-2xl p-4 animate-in slide-in-from-bottom-5">
         <div className="flex items-start gap-3">
           <div className="p-2 bg-primary/10 rounded-lg shrink-0">

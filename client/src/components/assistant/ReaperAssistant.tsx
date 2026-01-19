@@ -988,7 +988,7 @@ export function ReaperAssistant() {
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
             style={{ width: currentSize.width, height: currentSize.height }}
-            className="fixed bottom-20 left-20 bg-card border border-border rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden transition-all duration-200"
+            className="fixed bottom-24 left-4 right-4 md:left-20 md:right-auto md:bottom-20 bg-card border border-border rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden transition-all duration-200"
             data-testid="reaper-assistant-panel"
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-gradient-to-r from-primary/10 to-primary/5">

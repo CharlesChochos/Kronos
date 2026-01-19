@@ -133,7 +133,46 @@ export function DockedChatBoxes() {
   const { data: currentUser } = useCurrentUser();
   const queryClient = useQueryClient();
   
-  const [openChats, setOpenChats] = useState<OpenChat[]>(() => loadOpenChats());
+  // Check if we're on mobile - don't render docked chats on mobile devices
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768;
+    }
+    return false;
+  });
+  
+  // Clear stored chats on mobile to prevent them from persisting
+  useEffect(() => {
+    if (isMobile) {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {}
+    }
+  }, [isMobile]);
+  
+  // Listen for resize to detect mobile/desktop changes
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) {
+        // Clear open chats when switching to mobile
+        try {
+          localStorage.removeItem(STORAGE_KEY);
+        } catch {}
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  const [openChats, setOpenChats] = useState<OpenChat[]>(() => {
+    // Don't load saved chats on mobile
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return [];
+    }
+    return loadOpenChats();
+  });
   const [messageInputs, setMessageInputs] = useState<Record<string, string>>({});
   const [showMessagingMenu, setShowMessagingMenu] = useState(false);
   const lastSeenMessagesRef = useRef<Record<string, string>>({});
@@ -230,7 +269,8 @@ export function DockedChatBoxes() {
     setLocation(`${basePath}/chat`);
   };
 
-  if (!currentUser) return null;
+  // Don't render on mobile - users should use the full chat page instead
+  if (!currentUser || isMobile) return null;
 
   const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
   const closedConversations = conversations.filter(
