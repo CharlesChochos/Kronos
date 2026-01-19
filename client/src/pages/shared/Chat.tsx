@@ -3018,7 +3018,7 @@ export default function Chat({ role }: ChatProps) {
                   key={emoji}
                   className="w-10 h-10 flex items-center justify-center text-2xl hover:bg-muted rounded-full transition-colors active:scale-90"
                   onClick={() => {
-                    if (longPressMessage) handleAddReaction(longPressMessage.id, emoji);
+                    if (longPressMessage) handleReaction(longPressMessage.id, emoji);
                     setLongPressMessage(null);
                   }}
                   data-testid={`reaction-${emoji}`}
