@@ -54,7 +54,8 @@ import {
   Forward,
   Reply,
   Circle,
-  Clock
+  Clock,
+  Star
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCurrentUser, useUsers, useDealsListing } from "@/lib/api";
@@ -1320,8 +1321,8 @@ export default function Chat({ role }: ChatProps) {
         setReplyToMessage(message);
         if ('vibrate' in navigator) navigator.vibrate(30);
       } else if (swipeState.offset < -60 && isOwnMessage) {
-        // Swipe left = delete (only own messages)
-        handleUnsendMessage(message.id);
+        // Swipe left = open context menu (no longer auto-delete for safety)
+        setLongPressMessage(message);
         if ('vibrate' in navigator) navigator.vibrate(30);
       }
       setSwipeState(null);
@@ -2996,101 +2997,148 @@ export default function Chat({ role }: ChatProps) {
         </SheetContent>
       </Sheet>
 
-      {/* Long Press Context Menu for Messages */}
-      <Sheet open={!!longPressMessage} onOpenChange={(open) => !open && setLongPressMessage(null)}>
-        <SheetContent side="bottom" className="rounded-t-2xl pb-8">
-          <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-4" />
-          <div className="space-y-1">
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 h-12 text-base"
-              onClick={() => {
-                if (longPressMessage) setReplyToMessage(longPressMessage);
-                setLongPressMessage(null);
-              }}
-              data-testid="menu-reply"
-            >
-              <Reply className="w-5 h-5" />
-              Reply
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 h-12 text-base"
-              onClick={async () => {
-                if (longPressMessage) {
-                  try {
-                    await navigator.clipboard.writeText(longPressMessage.content);
-                    toast.success("Message copied");
-                  } catch {
-                    toast.error("Could not copy to clipboard");
-                  }
-                }
-                setLongPressMessage(null);
-              }}
-              data-testid="menu-copy"
-            >
-              <Type className="w-5 h-5" />
-              Copy Text
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 h-12 text-base"
-              onClick={() => {
-                if (longPressMessage) handleForwardMessage(longPressMessage);
-                setLongPressMessage(null);
-              }}
-              data-testid="menu-forward"
-            >
-              <Forward className="w-5 h-5" />
-              Forward
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 h-12 text-base"
-              onClick={() => {
-                if (longPressMessage) handlePinMessage(longPressMessage);
-                setLongPressMessage(null);
-              }}
-              data-testid="menu-pin"
-            >
-              <Pin className="w-5 h-5" />
-              {pinnedMessages.some(m => m.id === longPressMessage?.id) ? 'Unpin' : 'Pin'}
-            </Button>
-            {longPressMessage?.senderId === currentUser?.id && (
-              <>
-                <Separator className="my-2" />
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-3 h-12 text-base"
+      {/* Long Press Context Menu for Messages - WhatsApp Style */}
+      {longPressMessage && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setLongPressMessage(null)}
+        >
+          {/* Blurred backdrop */}
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+          
+          {/* Context menu card */}
+          <div 
+            className="relative w-full max-w-xs bg-card rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Quick emoji reactions */}
+            <div className="flex items-center justify-center gap-2 p-3 bg-muted/50 border-b">
+              {['👍', '❤️', '😂', '😮', '😢', '🙏'].map((emoji) => (
+                <button
+                  key={emoji}
+                  className="w-10 h-10 flex items-center justify-center text-2xl hover:bg-muted rounded-full transition-colors active:scale-90"
                   onClick={() => {
-                    if (longPressMessage) {
-                      setEditingMessage(longPressMessage);
-                      setEditContent(longPressMessage.content);
+                    if (longPressMessage) handleAddReaction(longPressMessage.id, emoji);
+                    setLongPressMessage(null);
+                  }}
+                  data-testid={`reaction-${emoji}`}
+                >
+                  {emoji}
+                </button>
+              ))}
+              <button
+                className="w-10 h-10 flex items-center justify-center text-xl text-muted-foreground hover:bg-muted rounded-full transition-colors border-2 border-dashed border-muted-foreground/30"
+                onClick={() => {
+                  setLongPressMessage(null);
+                }}
+                data-testid="reaction-more"
+              >
+                +
+              </button>
+            </div>
+            
+            {/* Message preview */}
+            <div className="px-4 py-3 border-b bg-muted/30">
+              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                <span className="font-medium">~ {longPressMessage.senderName}</span>
+                <span>{format(new Date(longPressMessage.createdAt), 'HH:mm')}</span>
+              </div>
+              <p className="text-sm line-clamp-2">{longPressMessage.content}</p>
+            </div>
+            
+            {/* Menu options */}
+            <div className="py-1">
+              <button
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors active:bg-muted"
+                onClick={() => {
+                  if (longPressMessage) setReplyToMessage(longPressMessage);
+                  setLongPressMessage(null);
+                }}
+                data-testid="menu-reply"
+              >
+                <span className="text-sm">Reply</span>
+                <Reply className="w-5 h-5 text-muted-foreground" />
+              </button>
+              
+              <button
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors active:bg-muted"
+                onClick={() => {
+                  if (longPressMessage) handleForwardMessage(longPressMessage);
+                  setLongPressMessage(null);
+                }}
+                data-testid="menu-forward"
+              >
+                <span className="text-sm">Forward</span>
+                <Forward className="w-5 h-5 text-muted-foreground" />
+              </button>
+              
+              <button
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors active:bg-muted"
+                onClick={async () => {
+                  if (longPressMessage) {
+                    try {
+                      await navigator.clipboard.writeText(longPressMessage.content);
+                      toast.success("Message copied");
+                    } catch {
+                      toast.error("Could not copy to clipboard");
                     }
-                    setLongPressMessage(null);
-                  }}
-                  data-testid="menu-edit"
-                >
-                  <Pencil className="w-5 h-5" />
-                  Edit
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-3 h-12 text-base text-destructive hover:text-destructive"
-                  onClick={() => {
-                    if (longPressMessage) handleUnsendMessage(longPressMessage.id);
-                    setLongPressMessage(null);
-                  }}
-                  data-testid="menu-delete"
-                >
-                  <Trash2 className="w-5 h-5" />
-                  Delete
-                </Button>
-              </>
-            )}
+                  }
+                  setLongPressMessage(null);
+                }}
+                data-testid="menu-copy"
+              >
+                <span className="text-sm">Copy</span>
+                <Type className="w-5 h-5 text-muted-foreground" />
+              </button>
+              
+              <button
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors active:bg-muted"
+                onClick={() => {
+                  if (longPressMessage) handlePinMessage(longPressMessage);
+                  setLongPressMessage(null);
+                }}
+                data-testid="menu-pin"
+              >
+                <span className="text-sm">{pinnedMessages.some(m => m.id === longPressMessage?.id) ? 'Unpin' : 'Star'}</span>
+                <Star className="w-5 h-5 text-muted-foreground" />
+              </button>
+              
+              {longPressMessage?.senderId === currentUser?.id && (
+                <>
+                  <div className="border-t my-1" />
+                  
+                  <button
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors active:bg-muted"
+                    onClick={() => {
+                      if (longPressMessage) {
+                        setEditingMessage(longPressMessage);
+                        setEditContent(longPressMessage.content);
+                      }
+                      setLongPressMessage(null);
+                    }}
+                    data-testid="menu-edit"
+                  >
+                    <span className="text-sm">Edit</span>
+                    <Pencil className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                  
+                  <button
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors active:bg-muted text-destructive"
+                    onClick={() => {
+                      if (longPressMessage) handleUnsendMessage(longPressMessage.id);
+                      setLongPressMessage(null);
+                    }}
+                    data-testid="menu-delete"
+                  >
+                    <span className="text-sm">Delete</span>
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </div>
+      )}
 
       {/* Photo Preview Before Sending */}
       <Dialog open={!!photoPreview} onOpenChange={(open) => !open && cancelPhotoPreview()}>
